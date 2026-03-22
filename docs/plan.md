@@ -589,9 +589,67 @@ For `restart` strategy apps, standard host port mapping is used (simpler, no net
 
 ### Docker Isolation
 
-Jib must coexist with any existing Docker containers, volumes, and networks on the machine. It achieves this through strict namespacing:
+Jib must coexist with any existing Docker containers, volumes, and networks on the machine. It achieves this through strict namespacing and a **generated compose override file**.
 
-**Project names**: All compose commands use `-p jib-<app>` (e.g., `docker compose -p jib-propertyclerk`). This prefixes all container names, networks, and volumes with `jib-<app>-`, preventing clashes with non-jib containers or between jib apps.
+#### Generated Override File
+
+On every deploy, jib auto-generates `.jib-compose.yml` in the repo directory. This file is passed as an additional `-f` flag alongside the user's compose file(s):
+
+```bash
+docker compose -p jib-<app> -f docker-compose.yml -f .jib-compose.yml up -d
+```
+
+The user's compose file is never modified. The override adds jib-managed controls:
+
+```yaml
+# /opt/jib/repos/myapp/.jib-compose.yml (auto-generated, never committed)
+services:
+  api:
+    labels:
+      jib.app: myapp
+      jib.managed: "true"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+  web:
+    labels:
+      jib.app: myapp
+      jib.managed: "true"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+```
+
+**What the override provides:**
+- **Labels** — identify jib-managed containers (`docker ps --filter label=jib.app=myapp`), used by `jib metrics`, `jib cleanup`, etc.
+- **Restart policies** — enforce `unless-stopped` without requiring it in the user's compose file
+- **Log rotation** — prevent disk fill from chatty containers (50MB max, 3 files)
+- **Future: resource limits** — memory/cpu limits configurable in jib config, injected via override
+- **Future: jib-net network** — attach services for blue-green nginx routing
+
+The override is regenerated on every deploy based on the app's compose file (to discover service names) and jib config. It's written to the repo dir but added to `.gitignore` — it's ephemeral, never committed.
+
+#### How it's generated
+
+During deploy, before `docker compose build`:
+1. Parse the user's compose file(s) to extract service names
+2. Generate `.jib-compose.yml` with labels, restart policy, and logging for each service
+3. Pass it as the last `-f` flag (Docker Compose merges override files in order)
+
+```go
+// internal/docker/override.go
+func GenerateOverride(app string, composeFiles []string, dir string) (string, error)
+```
+
+#### Project Naming
+
+All compose commands use `-p jib-<app>` (e.g., `docker compose -p jib-propertyclerk`). This prefixes all container names, networks, and volumes with `jib-<app>-`, preventing clashes with non-jib containers or between jib apps.
 
 ```
 # Two apps both define "db_data" volume and "default" network — no conflict:
@@ -603,9 +661,9 @@ jib-whisker-default              # network for whisker
 
 **Networks**: Each app gets its own compose-managed network (`jib-<app>-default`). For blue-green, jib also creates `jib-net` (shared network for nginx → container routing). Non-jib containers on other networks are unaffected.
 
-**Cleanup safety**: `jib cleanup` only prunes images/containers/volumes prefixed with `jib-`. Never touches non-jib resources. `jib nuke` only tears down `jib-*` projects.
+**Cleanup safety**: `jib cleanup` only prunes images/containers/volumes with `jib.managed` label. Never touches non-jib resources. `jib nuke` only tears down `jib-*` projects.
 
-**Existing Docker**: `jib init` does not modify Docker daemon config (no changes to `/etc/docker/daemon.json`). It only configures log rotation if no config exists yet. If Docker is already configured, it's left alone.
+**Existing Docker**: `jib init` does not modify Docker daemon config (no changes to `/etc/docker/daemon.json`). If Docker is already configured, it's left alone. Log rotation is handled per-container via the override file, not daemon-wide.
 
 ### Health Checks
 
@@ -1803,5 +1861,5 @@ Does NOT remove: docker, nginx, certbot, the deploy user, SSL certs in `/etc/let
 24. **Existing nginx coexistence**: Jib's configs symlinked into `conf.d/`, coexist with existing configs. Domain conflicts detected and flagged.
 25. **Ubuntu-first, platform interface from day 1**: All OS-specific calls go through `internal/platform/`. Only `UbuntuPlatform` in Phase 1. Adding Debian/RHEL/macOS later doesn't touch core logic.
 26. **Everything from init is CLI-manageable**: `jib config`, `jib notify`, `jib backup-dest` let you change any setting configured during init without re-running it. `jib serve` picks up changes automatically.
-27. **Docker isolation via project prefix**: All compose commands use `-p jib-<app>`, namespacing containers, volumes, and networks. Two apps defining `db_data` volume won't clash. Non-jib Docker resources are never touched.
+27. **Docker isolation via override file**: Generated `.jib-compose.yml` adds labels, restart policies, and log rotation without modifying the user's compose file. Project prefix `-p jib-<app>` namespaces containers, volumes, and networks. Non-jib Docker resources are never touched.
 28. **Config versioning**: `config_version` integer in config file. Jib auto-migrates old configs forward on load. Refuses to run if config is newer than binary. Migrations are explicit functions, one per version bump, tested independently.

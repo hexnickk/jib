@@ -175,6 +175,12 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	// Build the compose helper.
 	compose := e.newCompose(opts.App, appCfg, repoDir)
 
+	// 6b. Generate jib override file (labels, restart policy, log rotation).
+	if _, err := docker.GenerateOverride(ctx, opts.App, []string(appCfg.Compose), repoDir); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not generate override file: %v\n", err)
+		// Non-fatal — deploy can proceed without it
+	}
+
 	// 7. Docker compose build.
 	if err := compose.Build(ctx, appCfg.BuildArgs); err != nil {
 		return nil, fmt.Errorf("docker compose build: %w", err)

@@ -22,11 +22,18 @@ func (c *Compose) ProjectName() string {
 }
 
 // baseArgs returns the common docker compose arguments:
-// compose -p jib-<app> -f file1 -f file2 ...
+// compose -p jib-<app> -f file1 -f file2 ... [-f .jib-compose.yml]
 func (c *Compose) baseArgs() []string {
 	args := []string{"compose", "-p", c.ProjectName()}
 	for _, f := range c.Files {
 		args = append(args, "-f", f)
+	}
+	// Include the jib override file if it exists in the working directory
+	if c.Dir != "" {
+		overridePath := OverridePath(c.Dir)
+		if _, err := os.Stat(overridePath); err == nil {
+			args = append(args, "-f", overridePath)
+		}
 	}
 	return args
 }
