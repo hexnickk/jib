@@ -26,8 +26,12 @@ func (s *StringOrSlice) UnmarshalYAML(value *yaml.Node) error {
 	}
 }
 
+// LatestConfigVersion is the current config schema version.
+const LatestConfigVersion = 1
+
 // Config is the top-level Jib configuration.
 type Config struct {
+	ConfigVersion    int                          `yaml:"config_version,omitempty"`
 	PollInterval     string                       `yaml:"poll_interval"`
 	CertbotEmail     string                       `yaml:"certbot_email"`
 	GitHub           *GitHubConfig                `yaml:"github,omitempty"`

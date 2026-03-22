@@ -24,6 +24,18 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
+	// Default config_version to 1 if missing.
+	if cfg.ConfigVersion == 0 {
+		cfg.ConfigVersion = 1
+	}
+
+	// Refuse to load configs from a newer version of jib.
+	if cfg.ConfigVersion > LatestConfigVersion {
+		return nil, fmt.Errorf("config version %d is newer than this jib binary supports (v%d). Run 'jib upgrade' first", cfg.ConfigVersion, LatestConfigVersion)
+	}
+
+	// TODO: run migrations here when config_version < LatestConfigVersion
+
 	applyDefaults(&cfg)
 
 	if err := Validate(&cfg); err != nil {

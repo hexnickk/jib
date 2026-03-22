@@ -188,9 +188,40 @@ jh deploy propertyclerk
 
 Lives on the server at `/opt/jib/config.yml`. Edited via `jib edit`, `jib add`, or directly.
 
+### Config Versioning & Migrations
+
+Config files include a `config_version` field at the top. Jib uses this to detect outdated configs and migrate them forward automatically.
+
+```yaml
+config_version: 1   # ← incremented when the config schema changes
+```
+
+**How it works:**
+
+1. Every config file has a `config_version` integer (defaults to 1 if missing).
+2. Jib knows the latest config version (compiled into the binary).
+3. On `LoadConfig`, if `config_version < latest`:
+   - Run each migration function in order (e.g., `migrateV1toV2`, `migrateV2toV3`).
+   - Each migration transforms the YAML structure, adds new fields with defaults, renames/removes deprecated fields.
+   - Write the migrated config back to disk with the new `config_version`.
+   - Print what changed: `"Config migrated from v1 to v2: added 'webhook' section with defaults"`.
+4. If `config_version > latest` (newer config than binary): refuse to operate, print `"Config version 3 is newer than this jib binary supports (v2). Run 'jib upgrade' first."`.
+5. Migrations are in `internal/config/migrate.go` — one function per version bump, tested independently.
+
+**When to bump config_version:**
+- Adding a required field (migration adds it with a default)
+- Renaming a field (migration renames it)
+- Changing field semantics (migration transforms values)
+- Removing a field (migration deletes it)
+
+**When NOT to bump:**
+- Adding an optional field with a sensible zero-value (existing configs just work)
+- Adding a new app (that's `jib add`, not a schema change)
+
 ```yaml
 # /opt/jib/config.yml
 
+config_version: 1
 poll_interval: 5m
 certbot_email: nick@hexnickk.sh
 
@@ -1627,6 +1658,7 @@ jib/
 - [ ] `jib notify setup/test/remove/list` — manage notification channels
 - [ ] `jib backup-dest setup/remove/list` — manage backup destinations
 - [ ] Config parsing + validation (strict from day 1)
+- [ ] Config versioning (`config_version` field) + migration framework (`internal/config/migrate.go`)
 - [ ] State management with flock + atomic writes + schema version
 - [ ] `jib deploy <app>` with `restart` strategy — build, pre_deploy hooks, up, healthcheck
 - [ ] `jib deploy --ref SHA` — pin + deploy specific ref
@@ -1772,3 +1804,4 @@ Does NOT remove: docker, nginx, certbot, the deploy user, SSL certs in `/etc/let
 25. **Ubuntu-first, platform interface from day 1**: All OS-specific calls go through `internal/platform/`. Only `UbuntuPlatform` in Phase 1. Adding Debian/RHEL/macOS later doesn't touch core logic.
 26. **Everything from init is CLI-manageable**: `jib config`, `jib notify`, `jib backup-dest` let you change any setting configured during init without re-running it. `jib serve` picks up changes automatically.
 27. **Docker isolation via project prefix**: All compose commands use `-p jib-<app>`, namespacing containers, volumes, and networks. Two apps defining `db_data` volume won't clash. Non-jib Docker resources are never touched.
+28. **Config versioning**: `config_version` integer in config file. Jib auto-migrates old configs forward on load. Refuses to run if config is newer than binary. Migrations are explicit functions, one per version bump, tested independently.
