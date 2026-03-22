@@ -473,10 +473,10 @@ The default. Build while old containers serve, then fast swap (seconds of downti
 5. git fetch origin <branch>
 6. git checkout <ref> (default: origin/<branch> HEAD)
 7. Symlink secrets .env into repo
-8. docker compose build (with build_args if configured)
-9. Run pre_deploy hooks (e.g. migrations service)
+8. docker compose -p jib-<app> build (with build_args if configured)
+9. Run pre_deploy hooks (e.g. docker compose -p jib-<app> run --rm migrations)
    - If any hook exits non-zero → git checkout <previous_sha> to restore repo state, notify, release lock, exit 1
-10. docker compose up -d --force-recreate --remove-orphans [services]
+10. docker compose -p jib-<app> up -d --force-recreate --remove-orphans [services]
     (if `services` configured, only start those — avoids starting migrations service)
 11. Wait for warmup
 12. Health check (see Health Checks below)
@@ -555,6 +555,26 @@ For `restart` strategy apps, standard host port mapping is used (simpler, no net
 | Complexity | Low | Medium |
 
 **Default is `restart`** because it works with everything — shared volumes, migrations, stateful apps. Downtime is only seconds (build happens while old containers serve). Blue-green is opt-in (Phase 4) for apps needing true zero-downtime, using external volumes shared across slots.
+
+### Docker Isolation
+
+Jib must coexist with any existing Docker containers, volumes, and networks on the machine. It achieves this through strict namespacing:
+
+**Project names**: All compose commands use `-p jib-<app>` (e.g., `docker compose -p jib-propertyclerk`). This prefixes all container names, networks, and volumes with `jib-<app>-`, preventing clashes with non-jib containers or between jib apps.
+
+```
+# Two apps both define "db_data" volume and "default" network — no conflict:
+jib-propertyclerk-db_data        # volume for propertyclerk
+jib-whisker-db_data              # volume for whisker
+jib-propertyclerk-default        # network for propertyclerk
+jib-whisker-default              # network for whisker
+```
+
+**Networks**: Each app gets its own compose-managed network (`jib-<app>-default`). For blue-green, jib also creates `jib-net` (shared network for nginx → container routing). Non-jib containers on other networks are unaffected.
+
+**Cleanup safety**: `jib cleanup` only prunes images/containers/volumes prefixed with `jib-`. Never touches non-jib resources. `jib nuke` only tears down `jib-*` projects.
+
+**Existing Docker**: `jib init` does not modify Docker daemon config (no changes to `/etc/docker/daemon.json`). It only configures log rotation if no config exists yet. If Docker is already configured, it's left alone.
 
 ### Health Checks
 
@@ -1751,3 +1771,4 @@ Does NOT remove: docker, nginx, certbot, the deploy user, SSL certs in `/etc/let
 24. **Existing nginx coexistence**: Jib's configs symlinked into `conf.d/`, coexist with existing configs. Domain conflicts detected and flagged.
 25. **Ubuntu-first, platform interface from day 1**: All OS-specific calls go through `internal/platform/`. Only `UbuntuPlatform` in Phase 1. Adding Debian/RHEL/macOS later doesn't touch core logic.
 26. **Everything from init is CLI-manageable**: `jib config`, `jib notify`, `jib backup-dest` let you change any setting configured during init without re-running it. `jib serve` picks up changes automatically.
+27. **Docker isolation via project prefix**: All compose commands use `-p jib-<app>`, namespacing containers, volumes, and networks. Two apps defining `db_data` volume won't clash. Non-jib Docker resources are never touched.
