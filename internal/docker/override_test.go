@@ -118,8 +118,8 @@ services:
 }
 
 func TestOverridePath(t *testing.T) {
-	got := OverridePath("/opt/jib/repos/myapp")
-	want := "/opt/jib/repos/myapp/.jib-compose.yml"
+	got := OverridePath("/opt/jib/overrides", "myapp")
+	want := "/opt/jib/overrides/myapp.yml"
 	if got != want {
 		t.Errorf("OverridePath = %q, want %q", got, want)
 	}

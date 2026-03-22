@@ -16,9 +16,10 @@ import (
 )
 
 const (
-	defaultRepoBaseDir = "/opt/jib/repos"
-	defaultNginxDir    = "/opt/jib/nginx"
-	defaultSymlinkDir  = "/etc/nginx/conf.d"
+	defaultRepoBaseDir  = "/opt/jib/repos"
+	defaultNginxDir     = "/opt/jib/nginx"
+	defaultSymlinkDir   = "/etc/nginx/conf.d"
+	defaultOverrideDir  = "/opt/jib/overrides"
 )
 
 func loadConfig() (*config.Config, error) {
@@ -59,6 +60,7 @@ func newEngine(cfg *config.Config) *deploy.Engine {
 		SSL:         newSSLManager(cfg),
 		LockDir:     state.DefaultLockDir(),
 		RepoBaseDir: defaultRepoBaseDir,
+		OverrideDir: defaultOverrideDir,
 	}
 }
 
@@ -82,10 +84,11 @@ func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {
 	repoDir := filepath.Join(defaultRepoBaseDir, appName)
 
 	return &docker.Compose{
-		App:     appName,
-		Dir:     repoDir,
-		Files:   files,
-		EnvFile: envFile,
+		App:      appName,
+		Dir:      repoDir,
+		Files:    files,
+		EnvFile:  envFile,
+		Override: docker.OverridePath(defaultOverrideDir, appName),
 	}, nil
 }
 

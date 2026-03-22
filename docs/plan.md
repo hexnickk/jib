@@ -602,7 +602,7 @@ docker compose -p jib-<app> -f docker-compose.yml -f .jib-compose.yml up -d
 The user's compose file is never modified. The override adds jib-managed controls:
 
 ```yaml
-# /opt/jib/repos/myapp/.jib-compose.yml (auto-generated, never committed)
+# /opt/jib/overrides/myapp.yml (auto-generated, outside repo)
 services:
   api:
     labels:
@@ -633,7 +633,7 @@ services:
 - **Future: resource limits** — memory/cpu limits configurable in jib config, injected via override
 - **Future: jib-net network** — attach services for blue-green nginx routing
 
-The override is regenerated on every deploy based on the app's compose file (to discover service names) and jib config. It's written to the repo dir but added to `.gitignore` — it's ephemeral, never committed.
+The override is regenerated on every deploy based on the app's compose file (to discover service names) and jib config. It's stored outside the repo at `/opt/jib/overrides/<app>.yml` — no `.gitignore` management needed, no risk of git conflicts.
 
 #### How it's generated
 
@@ -789,6 +789,9 @@ Layout:
 │   ├── propertyclerk.app.conf
 │   ├── api.propertyclerk.app.conf
 │   └── whisker.spatialkittens.com.conf
+├── overrides/                          # generated compose override files
+│   ├── propertyclerk.yml
+│   └── whisker.yml
 ├── backups/                            # local tarballs (local_retain applies)
 ├── locks/                              # flock files per app
 └── deploy-keys/                        # 700 (only if not using GitHub App)

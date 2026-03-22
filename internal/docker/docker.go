@@ -10,10 +10,11 @@ import (
 
 // Compose runs docker compose commands for an app.
 type Compose struct {
-	App     string   // app name, used for project prefix "jib-<app>"
-	Dir     string   // working directory (repo checkout dir)
-	Files   []string // compose files (-f flags)
-	EnvFile string   // path to .env file (if any)
+	App      string   // app name, used for project prefix "jib-<app>"
+	Dir      string   // working directory (repo checkout dir)
+	Files    []string // compose files (-f flags)
+	EnvFile  string   // path to .env file (if any)
+	Override string   // path to jib-generated override file (if any)
 }
 
 // ProjectName returns the compose project name for this app.
@@ -22,17 +23,15 @@ func (c *Compose) ProjectName() string {
 }
 
 // baseArgs returns the common docker compose arguments:
-// compose -p jib-<app> -f file1 -f file2 ... [-f .jib-compose.yml]
+// compose -p jib-<app> -f file1 -f file2 ... [-f override]
 func (c *Compose) baseArgs() []string {
 	args := []string{"compose", "-p", c.ProjectName()}
 	for _, f := range c.Files {
 		args = append(args, "-f", f)
 	}
-	// Include the jib override file if it exists in the working directory
-	if c.Dir != "" {
-		overridePath := OverridePath(c.Dir)
-		if _, err := os.Stat(overridePath); err == nil {
-			args = append(args, "-f", overridePath)
+	if c.Override != "" {
+		if _, err := os.Stat(c.Override); err == nil {
+			args = append(args, "-f", c.Override)
 		}
 	}
 	return args

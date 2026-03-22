@@ -36,6 +36,7 @@ type Engine struct {
 	SSL         *ssl.CertManager
 	LockDir     string
 	RepoBaseDir string // e.g. /opt/jib/repos
+	OverrideDir string // e.g. /opt/jib/overrides
 }
 
 // DeployOptions configures a single deploy invocation.
@@ -176,7 +177,11 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	compose := e.newCompose(opts.App, appCfg, repoDir)
 
 	// 6b. Generate jib override file (labels, restart policy, log rotation).
-	if _, err := docker.GenerateOverride(ctx, opts.App, []string(appCfg.Compose), repoDir); err != nil {
+	overrideDir := e.OverrideDir
+	if overrideDir == "" {
+		overrideDir = docker.DefaultOverrideDir
+	}
+	if _, err := docker.GenerateOverride(ctx, opts.App, []string(appCfg.Compose), repoDir, overrideDir); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not generate override file: %v\n", err)
 		// Non-fatal — deploy can proceed without it
 	}
@@ -294,11 +299,17 @@ func (e *Engine) newCompose(app string, appCfg config.App, repoDir string) *dock
 		envFile = e.Secrets.SymlinkPath(app, appCfg.EnvFile)
 	}
 
+	overrideDir := e.OverrideDir
+	if overrideDir == "" {
+		overrideDir = docker.DefaultOverrideDir
+	}
+
 	return &docker.Compose{
-		App:     app,
-		Dir:     repoDir,
-		Files:   files,
-		EnvFile: envFile,
+		App:      app,
+		Dir:      repoDir,
+		Files:    files,
+		EnvFile:  envFile,
+		Override: docker.OverridePath(overrideDir, app),
 	}
 }
 
