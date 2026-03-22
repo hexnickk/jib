@@ -16,11 +16,6 @@ func main() {
 	}
 }
 
-func notImplemented(_ *cobra.Command, _ []string) error {
-	cobra.WriteStringAndCheck(os.Stderr, "not implemented yet\n")
-	return nil
-}
-
 func newRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "jib",
