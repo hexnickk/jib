@@ -31,18 +31,18 @@ func TestEventSummary(t *testing.T) {
 	}{
 		{
 			name: "deploy success with autodeploy",
-			ev:   Event{App: "propertyclerk", Type: "deploy", SHA: "abc1234567", Status: "success", Trigger: "autodeploy"},
-			want: "✓ deploy propertyclerk abc1234 (autodeploy)",
+			ev:   Event{App: "myapp", Type: "deploy", SHA: "abc1234567", Status: "success", Trigger: "autodeploy"},
+			want: "✓ deploy myapp abc1234 (autodeploy)",
 		},
 		{
 			name: "deploy failure with error",
-			ev:   Event{App: "propertyclerk", Type: "deploy", SHA: "abc1234", Status: "failure", Error: "migrations error"},
-			want: "✗ deploy propertyclerk abc1234 failed: migrations error",
+			ev:   Event{App: "myapp", Type: "deploy", SHA: "abc1234", Status: "failure", Error: "migrations error"},
+			want: "✗ deploy myapp abc1234 failed: migrations error",
 		},
 		{
 			name: "rollback success manual",
-			ev:   Event{App: "whisker", Type: "rollback", SHA: "def5678", Status: "success", Trigger: "manual"},
-			want: "✓ rollback whisker def5678 (manual)",
+			ev:   Event{App: "otherapp", Type: "rollback", SHA: "def5678", Status: "success", Trigger: "manual"},
+			want: "✓ rollback otherapp def5678 (manual)",
 		},
 		{
 			name: "backup success no app",
@@ -56,8 +56,8 @@ func TestEventSummary(t *testing.T) {
 		},
 		{
 			name: "cert expiry warning",
-			ev:   Event{App: "propertyclerk", Type: "cert_expiry", Status: "success"},
-			want: "✓ cert_expiry propertyclerk",
+			ev:   Event{App: "myapp", Type: "cert_expiry", Status: "success"},
+			want: "✓ cert_expiry myapp",
 		},
 		{
 			name: "deploy failure no error message",

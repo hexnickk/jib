@@ -5,9 +5,9 @@ import (
 )
 
 func TestProjectName(t *testing.T) {
-	c := &Compose{App: "propertyclerk"}
+	c := &Compose{App: "myapp"}
 	got := c.ProjectName()
-	want := "jib-propertyclerk"
+	want := "jib-myapp"
 	if got != want {
 		t.Errorf("ProjectName() = %q, want %q", got, want)
 	}
@@ -19,7 +19,7 @@ func TestProjectNamePrefix(t *testing.T) {
 		want string
 	}{
 		{"myapp", "jib-myapp"},
-		{"whisker", "jib-whisker"},
+		{"otherapp", "jib-otherapp"},
 		{"a", "jib-a"},
 	}
 	for _, tt := range tests {
@@ -50,13 +50,13 @@ func TestBaseArgsSingleFile(t *testing.T) {
 
 func TestBaseArgsMultipleFiles(t *testing.T) {
 	c := &Compose{
-		App:   "propertyclerk",
-		Dir:   "/srv/jib/repos/propertyclerk",
+		App:   "myapp",
+		Dir:   "/srv/jib/repos/myapp",
 		Files: []string{"docker-compose.yml", "docker-compose.prod.yml"},
 	}
 	args := c.baseArgs()
 	expected := []string{
-		"compose", "-p", "jib-propertyclerk",
+		"compose", "-p", "jib-myapp",
 		"-f", "docker-compose.yml",
 		"-f", "docker-compose.prod.yml",
 	}

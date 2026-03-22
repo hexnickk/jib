@@ -200,8 +200,8 @@ func TestRemoveNonexistentIsNoOp(t *testing.T) {
 func TestSymlinkPath(t *testing.T) {
 	m := NewManager("/opt/jib/secrets")
 
-	got := m.SymlinkPath("propertyclerk", "")
-	want := "/opt/jib/secrets/propertyclerk/.env"
+	got := m.SymlinkPath("myapp", "")
+	want := "/opt/jib/secrets/myapp/.env"
 	if got != want {
 		t.Errorf("SymlinkPath = %q, want %q", got, want)
 	}
