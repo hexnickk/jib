@@ -37,7 +37,7 @@ ssh user@server jib <command> [args] [flags]
 
 | Command | What it does |
 |---------|-------------|
-| `jib add <app> --repo org/name --domain host:port` | Add new app to config |
+| `jib add <app> --repo org/name --domain host:port` | Add new app to config (**--repo and --domain are required**) |
 | `jib add <app> ... --health /path:port` | Add with health check |
 | `jib add <app> ... --compose file1,file2` | Add with multi-compose |
 | `jib add <app> ... --config-only` | Write config only, skip provisioning |
@@ -76,7 +76,11 @@ ssh user@server jib <command> [args] [flags]
 | `jib secrets set <app> --file <path>` | Upload .env file to server |
 | `jib secrets check [app]` | Verify secrets files exist |
 
-Secrets are stored at `/opt/jib/secrets/<app>/.env` with 0700/0600 permissions. For secrets to be injected into containers, set `secrets_env: true` in the app config. Deploy will fail if `secrets_env: true` but the file is missing.
+Secrets are stored at `/opt/jib/secrets/<app>/.env` with 0700/0600 permissions. For secrets to be injected into containers:
+1. Set `secrets_env: true` in the app config
+2. Your `docker-compose.yml` must include `env_file: .env` in the service definition
+
+Deploy will fail if `secrets_env: true` but the secrets file is missing. Jib creates a symlink from `/opt/jib/secrets/<app>/.env` into the repo directory at deploy time, so the compose file's `env_file: .env` resolves to the secrets file.
 
 ### Configuration
 
@@ -84,10 +88,12 @@ Secrets are stored at `/opt/jib/secrets/<app>/.env` with 0700/0600 permissions. 
 |---------|-------------|
 | `jib config list` | Show full config (secrets redacted) |
 | `jib config get <key>` | Read a config value |
-| `jib config set <key> <value>` | Write a config value |
+| `jib config set <key> <value>` | Write a config value (see caveat below) |
 | `jib edit` | Open config in $EDITOR, validate on save |
 
 Config lives at `/opt/jib/config.yml`.
+
+**Caveat:** `jib config set` stores all values as strings. For boolean fields like `secrets_env`, this causes YAML parse errors (`cannot unmarshal !!str into bool`). Use `jib edit` instead to modify boolean or nested fields.
 
 ### Infrastructure
 
@@ -141,7 +147,7 @@ certbot_email: you@example.com
 
 apps:
   myapp:
-    repo: org/repo               # GitHub repo, or "local" for local-only
+    repo: org/repo               # GitHub repo, or "local" (see Local Repos below)
     branch: main                 # Git branch (default: main)
     compose: docker-compose.yml  # Single file or list of files
     strategy: restart             # Deploy strategy (default: restart)
@@ -169,6 +175,15 @@ apps:
       schedule: "0 4 * * *"
       volumes: [db_data]
 ```
+
+### Local Repos
+
+When `repo: local`, jib skips `git fetch` and uses the existing repo at `/opt/jib/repos/<app>/`. Requirements:
+- The directory must be a **git repository** (`git init`)
+- It must have **at least one commit** (jib tracks deploy state by SHA)
+- You manage the code yourself (copy files, git commit) — jib won't clone anything
+
+This is useful for testing, single-server apps, or repos you sync manually.
 
 ## File System Layout
 
@@ -217,11 +232,12 @@ jib logs myapp --tail 50              # Verify logs
 ```bash
 jib status myapp                      # Check failure count + error
 jib logs myapp --tail 200             # Find the error
-jib rollback myapp                    # Revert to previous version
+jib rollback myapp                    # Revert to previous version (resets failures)
 # Fix the code, push, then:
-jib resume myapp                      # Clear failures
 jib deploy myapp                      # Deploy the fix
 ```
+
+**When to use `jib resume`:** Rollback automatically resets the failure counter. Use `resume` when you want to re-enable autodeploy *without* rolling back — e.g., after fixing config/secrets and redeploying, or when the app auto-healed.
 
 ### Change domains
 ```bash
@@ -254,7 +270,7 @@ The app started but the health endpoint isn't responding. Check:
 2. `curl localhost:<port><health_path>` — test directly
 3. Check `warmup` is long enough for the app to start
 
-The deploy is recorded as a failure but containers keep running. Fix the issue and redeploy.
+The deploy is recorded as a failure. If the app crashes on startup, the container will be in a restart loop (not running). If the app starts but returns unhealthy responses, containers stay running with bad code. Either way: fix the issue and redeploy, or `jib rollback`.
 
 ### "No previous deploy found" on rollback
 There's only one deploy in history. Rollback requires at least two deploys.
