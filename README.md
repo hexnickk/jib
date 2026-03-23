@@ -8,7 +8,7 @@ Jib lives on the server. You SSH in and run commands, or use `ssh <host> jib <co
 
 ```bash
 # Install on a fresh Ubuntu 22.04+ server:
-curl -fsSL https://get.jibdeploy.dev/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/main/install.sh | bash
 jib init
 
 # Add an app:
