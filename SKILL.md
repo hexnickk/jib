@@ -37,8 +37,9 @@ ssh user@server jib <command> [args] [flags]
 
 | Command | What it does |
 |---------|-------------|
-| `jib add <app> --repo org/name --domain host:port` | Add new app to config (**--repo and --domain are required**) |
-| `jib add <app> ... --health /path:port` | Add with health check |
+| `jib add <app> --repo org/name --domain hostname` | Add new app (**--repo and --domain required**; port and health inferred from compose) |
+| `jib add <app> ... --domain host:port` | Explicit port (overrides compose inference) |
+| `jib add <app> ... --health /path:port` | Explicit health check (overrides compose inference) |
 | `jib add <app> ... --compose file1,file2` | Add with multi-compose |
 | `jib add <app> ... --config-only` | Write config only, skip provisioning |
 | `jib remove <app> [--force]` | Remove app (**stub — not yet implemented, only prints what it would do**) |
@@ -238,7 +239,7 @@ Each app gets its own isolated Docker network. Cross-app communication uses `hos
 ### First-time setup
 ```bash
 jib init                    # Install deps, create config
-jib add myapp --repo org/repo --domain example.com:3000 --health /health:3000
+jib add myapp --repo org/repo --domain example.com
 jib secrets set myapp --file .env    # If using secrets
 jib deploy myapp
 jib doctor                  # Verify everything

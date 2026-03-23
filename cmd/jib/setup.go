@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/hexnickk/jib/internal/config"
+	"github.com/hexnickk/jib/internal/docker"
+	"github.com/hexnickk/jib/internal/network"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -40,8 +42,8 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	}
 	addCmd.Flags().String("repo", "", "GitHub repo (org/name)")
 	addCmd.Flags().String("compose", "", "Compose file path (or comma-separated list)")
-	addCmd.Flags().StringSlice("domain", nil, "Domain:port mapping (repeatable)")
-	addCmd.Flags().StringSlice("health", nil, "Health check path:port (repeatable)")
+	addCmd.Flags().StringSlice("domain", nil, "Domain or domain:port (repeatable). Port is inferred from compose if omitted.")
+	addCmd.Flags().StringSlice("health", nil, "Health check path:port (repeatable). Inferred from compose if omitted.")
 	addCmd.Flags().Bool("config-only", false, "Write config without provisioning")
 	rootCmd.AddCommand(addCmd)
 
@@ -152,9 +154,14 @@ func runProvision(cmd *cobra.Command, args []string) error {
 		// Save current domains for future stale detection.
 		savePreviousDomains(name, appCfg.Domains)
 
-		// Obtain SSL certificates
+		// Check domain reachability before SSL
 		if !skipSSL {
 			for _, d := range appCfg.Domains {
+				check := network.CheckDomain(d.Host)
+				if check.Warning != "" {
+					fmt.Fprintf(os.Stderr, "  ssl: skipping %s — %s\n", d.Host, check.Warning)
+					continue
+				}
 				fmt.Printf("  ssl: obtaining cert for %s...\n", d.Host)
 				if err := sslMgr.Obtain(context.Background(), d.Host); err != nil {
 					fmt.Fprintf(os.Stderr, "  ssl: warning: %s: %v\n", d.Host, err)
@@ -251,41 +258,67 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--repo is required (e.g. --repo org/repo-name)")
 	}
 	if len(domainFlags) == 0 {
-		return fmt.Errorf("at least one --domain is required (e.g. --domain example.com:3000)")
-	}
-
-	// Parse domains
-	var domains []config.Domain
-	for _, d := range domainFlags {
-		host, portStr, ok := strings.Cut(d, ":")
-		if !ok {
-			return fmt.Errorf("invalid domain format %q, expected host:port", d)
-		}
-		port, err := strconv.Atoi(portStr)
-		if err != nil {
-			return fmt.Errorf("invalid port in domain %q: %w", d, err)
-		}
-		domains = append(domains, config.Domain{Host: host, Port: port})
-	}
-
-	// Parse health checks
-	var healthChecks []config.HealthCheck
-	for _, h := range healthFlags {
-		path, portStr, ok := strings.Cut(h, ":")
-		if !ok {
-			return fmt.Errorf("invalid health check format %q, expected /path:port", h)
-		}
-		port, err := strconv.Atoi(portStr)
-		if err != nil {
-			return fmt.Errorf("invalid port in health check %q: %w", h, err)
-		}
-		healthChecks = append(healthChecks, config.HealthCheck{Path: path, Port: port})
+		return fmt.Errorf("at least one --domain is required (e.g. --domain example.com)")
 	}
 
 	// Parse compose files
 	var composeFiles config.StringOrSlice
 	if composeFlag != "" {
 		composeFiles = strings.Split(composeFlag, ",")
+	}
+
+	// Try to infer ports and health from compose file
+	repoDir := filepath.Join(jibRoot(), "repos", appName)
+	var composeSvcs []docker.ComposeService
+	files := []string(composeFiles)
+	if len(files) == 0 {
+		files = []string{"docker-compose.yml"}
+	}
+	composeSvcs, _ = docker.ParseComposeServices(repoDir, files)
+
+	inferredPath, inferredPort := docker.InferHealthAndPort(composeSvcs)
+	inferredPorts := docker.InferPorts(composeSvcs)
+
+	// Parse domains — port is optional, inferred from compose
+	var domains []config.Domain
+	for _, d := range domainFlags {
+		if host, portStr, ok := strings.Cut(d, ":"); ok {
+			port, err := strconv.Atoi(portStr)
+			if err != nil {
+				return fmt.Errorf("invalid port in domain %q: %w", d, err)
+			}
+			domains = append(domains, config.Domain{Host: host, Port: port})
+		} else {
+			// No port — infer from compose
+			port := 0
+			if len(inferredPorts) > 0 {
+				port = inferredPorts[0]
+				fmt.Printf("  Inferred port %d from docker-compose.yml for %s\n", port, d)
+			}
+			if port == 0 {
+				return fmt.Errorf("could not infer port for domain %q — specify as domain:port or add ports to docker-compose.yml", d)
+			}
+			domains = append(domains, config.Domain{Host: d, Port: port})
+		}
+	}
+
+	// Parse health checks — infer from compose if not provided
+	var healthChecks []config.HealthCheck
+	if len(healthFlags) > 0 {
+		for _, h := range healthFlags {
+			path, portStr, ok := strings.Cut(h, ":")
+			if !ok {
+				return fmt.Errorf("invalid health check format %q, expected /path:port", h)
+			}
+			port, err := strconv.Atoi(portStr)
+			if err != nil {
+				return fmt.Errorf("invalid port in health check %q: %w", h, err)
+			}
+			healthChecks = append(healthChecks, config.HealthCheck{Path: path, Port: port})
+		}
+	} else if inferredPort > 0 {
+		healthChecks = []config.HealthCheck{{Path: inferredPath, Port: inferredPort}}
+		fmt.Printf("  Inferred health check: %s on port %d\n", inferredPath, inferredPort)
 	}
 
 	newApp := config.App{
@@ -355,12 +388,39 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "Warning: config validation: %v\n", err)
 	}
 
+	// Run domain reachability checks (warnings only)
+	fmt.Println("\nChecking domains...")
+	for _, d := range domains {
+		checkDomainAndWarn(d.Host)
+	}
+
 	if configOnly {
-		fmt.Println("Config-only mode: skipping provisioning.")
+		fmt.Println("\nConfig-only mode: skipping provisioning.")
 	} else {
-		fmt.Println("To provision (clone repo, setup nginx, obtain SSL), run:")
+		fmt.Println("\nTo provision (nginx + SSL), run:")
 		fmt.Printf("  jib provision %s\n", appName)
 	}
 
 	return nil
+}
+
+// checkDomainAndWarn runs domain checks and prints warnings.
+func checkDomainAndWarn(domain string) {
+	check := network.CheckDomain(domain)
+
+	if check.Warning != "" {
+		fmt.Fprintf(os.Stderr, "  ⚠ %s: %s\n", domain, check.Warning)
+		return
+	}
+
+	switch check.Transport {
+	case "direct":
+		fmt.Printf("  ✓ %s → this server\n", domain)
+	case "cloudflare":
+		fmt.Printf("  ✓ %s → Cloudflare (%s)\n", domain, check.IPs[0])
+	case "tailscale":
+		fmt.Printf("  ✓ %s → Tailscale (%s)\n", domain, check.IPs[0])
+	default:
+		fmt.Fprintf(os.Stderr, "  ⚠ %s → %s (not this server)\n", domain, check.IPs[0])
+	}
 }

@@ -10,11 +10,8 @@ Jib lives on the server. You SSH in and run commands, or use `ssh <host> jib <co
 # Install on a fresh Ubuntu 22.04+ server (installs + runs jib init):
 curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/main/install.sh | bash
 
-# Add an app:
-jib add myapp \
-  --repo myorg/myapp \
-  --domain myapp.com:3000 \
-  --health /health:3000
+# Add an app (port and health check inferred from docker-compose.yml):
+jib add myapp --repo myorg/myapp --domain myapp.com
 
 # Set secrets and deploy:
 jib secrets set myapp --file .env.production
@@ -37,7 +34,7 @@ jib deploy myapp
 
 ### Deploy and forget
 ```bash
-jib add myapp --repo myorg/myapp --domain myapp.com:3000 --health /health:3000
+jib add myapp --repo myorg/myapp --domain myapp.com
 jib deploy myapp
 jib serve                    # Start daemon for autodeploy on push
 ```
