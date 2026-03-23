@@ -41,7 +41,7 @@ ssh user@server jib <command> [args] [flags]
 | `jib add <app> ... --health /path:port` | Add with health check |
 | `jib add <app> ... --compose file1,file2` | Add with multi-compose |
 | `jib add <app> ... --config-only` | Write config only, skip provisioning |
-| `jib remove <app> [--force]` | Remove app (containers, config, nginx) |
+| `jib remove <app> [--force]` | Remove app (**stub — not yet implemented, only prints what it would do**) |
 | `jib provision [app] [--skip-ssl]` | Regenerate nginx configs + SSL certs |
 | `jib down <app>` | Stop containers, keep config |
 | `jib restart <app>` | Restart containers without rebuild |
@@ -55,7 +55,7 @@ ssh user@server jib <command> [args] [flags]
 | `jib status [app] --json` | JSON output |
 | `jib apps` | List apps with repo, branch, strategy, domains |
 | `jib logs <app> [service] [--tail N] [-f]` | Container logs (default tail 100) |
-| `jib metrics [app] [--watch]` | Live CPU/memory/network stats |
+| `jib metrics [app] [--watch]` | Live CPU/memory/network stats (`--watch` requires TTY) |
 | `jib env <app>` | Show env vars (secrets redacted) |
 | `jib doctor` | Check deps, secrets, SSL certs |
 | `jib history <app> [--json] [--limit N]` | Deploy timeline (not yet implemented) |
@@ -93,7 +93,9 @@ Deploy will fail if `secrets_env: true` but the secrets file is missing. Jib cre
 
 Config lives at `/opt/jib/config.yml`.
 
-**Caveat:** `jib config set` stores all values as strings. For boolean fields like `secrets_env`, this causes YAML parse errors (`cannot unmarshal !!str into bool`). Use `jib edit` instead to modify boolean or nested fields.
+**Caveats:**
+- `jib config set` stores all values as strings. For boolean fields like `secrets_env`, this causes YAML parse errors (`cannot unmarshal !!str into bool`). It also cannot set nested maps like `build_args`.
+- Use `jib edit` for booleans, lists, and nested fields. In non-interactive SSH sessions where `jib edit` won't work (no TTY), edit `/opt/jib/config.yml` directly instead.
 
 ### Infrastructure
 
@@ -128,6 +130,12 @@ Config lives at `/opt/jib/config.yml`.
 
 Requires `rclone` installed. Check with `jib doctor`.
 
+**Ad-hoc local backups** (without rclone): Use `jib exec` to dump data, then `docker cp` to extract:
+```bash
+jib exec myapp db -- pg_dump -U postgres mydb > /tmp/backup.sql
+docker cp jib-myapp-db-1:/tmp/backup.sql ./backup.sql
+```
+
 ### Cron
 
 | Command | What it does |
@@ -160,7 +168,7 @@ apps:
         port: 3000
     secrets_env: true            # Inject /opt/jib/secrets/<app>/.env
     env_file: .env               # Name of secrets file (default: .env)
-    pre_deploy:                  # Run before deploy (e.g., migrations)
+    pre_deploy:                  # Run before deploy (see Pre-deploy Hooks below)
       - service: migrations
     build_args:                  # Passed to docker compose build
       NODE_ENV: production
@@ -176,6 +184,19 @@ apps:
       volumes: [db_data]
 ```
 
+### Pre-deploy Hooks
+
+Services listed in `pre_deploy` run via `docker compose run --rm` before the main deploy. **Important:** Jib's generated override applies `restart: unless-stopped` to all services. One-shot services (like migrations) will restart-loop after deploy unless you exclude them from `docker compose up` using the `services:` config key:
+
+```yaml
+  myapp:
+    pre_deploy:
+      - service: migrations    # Runs once before deploy
+    services: [api, web]       # Only these stay running after deploy
+```
+
+Without `services:`, the migrations container will restart indefinitely after exiting.
+
 ### Local Repos
 
 When `repo: local`, jib skips `git fetch` and uses the existing repo at `/opt/jib/repos/<app>/`. Requirements:
@@ -184,6 +205,8 @@ When `repo: local`, jib skips `git fetch` and uses the existing repo at `/opt/ji
 - You manage the code yourself (copy files, git commit) — jib won't clone anything
 
 This is useful for testing, single-server apps, or repos you sync manually.
+
+**Tip:** Always commit on a named branch (`main`). Jib's deploy/rollback cycle uses `git checkout <sha>` which leaves a detached HEAD — subsequent commits should be on a branch to avoid confusion.
 
 ## File System Layout
 
@@ -281,6 +304,10 @@ jib provision <app>          # Attempts certbot
 ```
 Requirements: DNS must point to the server, port 80 must be open, `certbot_email` must be set. If behind Cloudflare with proxy enabled, ensure the ACME challenge can reach the origin.
 
+If `jib doctor` shows MISSING for a domain, check DNS first:
+- **NXDOMAIN** — the DNS record doesn't exist at all. Create an A record pointing to the server IP before provisioning.
+- **Wrong IP** — the record exists but points elsewhere. Update it.
+
 ### Stale nginx config after domain change
 ```bash
 jib provision <app>          # Detects and removes stale configs
@@ -309,3 +336,14 @@ jib run <app> <service> -- <migration command>
 jib exec <app> <service> -- sh
 # e.g.: jib exec myapp api -- sh
 ```
+
+---
+
+## Known Limitations
+
+- **`jib remove`** is a stub — it prints what it would do but doesn't execute. To remove an app manually: `jib down <app>`, delete from config, remove `/opt/jib/repos/<app>/`, `/opt/jib/state/<app>.json`, `/opt/jib/secrets/<app>/`.
+- **`jib init`** is a stub — prints the onboarding steps but doesn't execute them.
+- **`jib history`** is not yet implemented.
+- **Blue-green strategy** is defined in config but not implemented in the deploy engine.
+- **`jib config set`** corrupts booleans and can't set nested maps/lists. Edit the YAML directly.
+- **Exit codes** — some commands return exit code 0 even on failure. Don't rely on exit codes for scripting; parse the output instead.
