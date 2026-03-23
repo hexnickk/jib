@@ -67,5 +67,6 @@ fi
 
 echo "Installed jib ${TAG} to ${INSTALL_DIR}/${BINARY}"
 echo ""
-echo "Get started:"
-echo "  jib init"
+
+# Run init automatically
+"${INSTALL_DIR}/${BINARY}" init
