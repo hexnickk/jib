@@ -1,0 +1,8 @@
+services:
+  migrations:
+    build: .
+    command: ["node", "migrate.js"]
+  app:
+    build: .
+    ports:
+      - "7000:7000"

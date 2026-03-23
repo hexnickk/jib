@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jib
+      POSTGRES_PASSWORD: jibpass
+      POSTGRES_DB: jibdb
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jib"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: ./api
+    environment:
+      DB_HOST: db
+      DB_USER: jib
+      DB_PASS: jibpass
+      DB_NAME: jibdb
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  web:
+    build: ./web
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  db_data:

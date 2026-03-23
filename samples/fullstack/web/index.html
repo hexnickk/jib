@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head><title>Jib Fullstack Demo</title>
+<style>
+  body { font-family: system-ui; max-width: 600px; margin: 40px auto; padding: 0 20px; background: #1a1a2e; color: #eee; }
+  h1 { color: #e94560; }
+  input { padding: 8px; width: 70%; background: #16213e; color: #eee; border: 1px solid #e94560; border-radius: 4px; }
+  button { padding: 8px 16px; background: #e94560; color: white; border: none; border-radius: 4px; cursor: pointer; }
+  .note { background: #16213e; padding: 10px; margin: 8px 0; border-radius: 4px; border-left: 3px solid #e94560; }
+  .meta { font-size: 0.8em; color: #888; }
+</style></head>
+<body>
+<h1>Jib Notes</h1>
+<div><input id="input" placeholder="Write a note..."><button onclick="add()">Add</button></div>
+<div id="notes"></div>
+<script>
+async function load() {
+  const r = await fetch('/api/notes');
+  const notes = await r.json();
+  document.getElementById('notes').innerHTML = notes.map(n =>
+    `<div class="note">${n.content}<div class="meta">${new Date(n.created_at).toLocaleString()}</div></div>`
+  ).join('');
+}
+async function add() {
+  const input = document.getElementById('input');
+  if (!input.value) return;
+  await fetch('/api/notes', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({content: input.value}) });
+  input.value = '';
+  load();
+}
+load();
+</script>
+</body></html>

@@ -1,0 +1,97 @@
+config_version: 1
+certbot_email: you@example.com
+
+apps:
+  # FE + BE + DB with persistent volume
+  fullstack:
+    repo: org/fullstack
+    branch: main
+    compose: docker-compose.yml
+    strategy: restart
+    health:
+      - path: /health
+        port: 3000
+    warmup: "5s"
+    domains:
+      - host: example.com
+        port: 8080
+      - host: api.example.com
+        port: 3000
+
+  # Background worker that polls the fullstack API
+  worker:
+    repo: org/worker
+    branch: main
+    compose: docker-compose.yml
+    strategy: restart
+    health:
+      - path: /health
+        port: 4000
+    warmup: "3s"
+    domains:
+      - host: worker.example.com
+        port: 4000
+
+  # App with secrets injected via .env symlink
+  secretapp:
+    repo: org/secretapp
+    branch: main
+    compose: docker-compose.yml
+    strategy: restart
+    secrets_env: true
+    health:
+      - path: /health
+        port: 6000
+    warmup: "2s"
+    domains:
+      - host: secret.example.com
+        port: 6000
+
+  # App with pre-deploy migration hook
+  hookapp:
+    repo: org/hookapp
+    branch: main
+    compose: docker-compose.yml
+    strategy: restart
+    pre_deploy:
+      - service: migrations
+    health:
+      - path: /
+        port: 7000
+    warmup: "2s"
+    domains:
+      - host: hook.example.com
+        port: 7000
+
+  # App using compose overlay (base + prod)
+  multicompose:
+    repo: org/multicompose
+    branch: main
+    compose:
+      - docker-compose.yml
+      - docker-compose.prod.yml
+    strategy: restart
+    health:
+      - path: /
+        port: 9000
+    warmup: "2s"
+    domains:
+      - host: multi.example.com
+        port: 9000
+
+  # App with build-time args
+  buildargapp:
+    repo: org/buildargapp
+    branch: main
+    compose: docker-compose.yml
+    strategy: restart
+    build_args:
+      VITE_API_URL: https://api.example.com
+      BUILD_VERSION: "1.2.3"
+    health:
+      - path: /
+        port: 9100
+    warmup: "2s"
+    domains:
+      - host: build.example.com
+        port: 9100

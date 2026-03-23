@@ -1,0 +1,9 @@
+services:
+  worker:
+    build: .
+    environment:
+      API_URL: ${API_URL:-http://host.docker.internal:3000}
+    ports:
+      - "4000:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

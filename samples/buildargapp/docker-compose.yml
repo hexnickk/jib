@@ -1,0 +1,9 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://default}
+        BUILD_VERSION: ${BUILD_VERSION:-dev}
+    ports:
+      - "9100:9100"
