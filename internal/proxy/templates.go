@@ -10,12 +10,20 @@ server {
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
-
+{{ if .HasSSL }}
     location / {
         return 301 https://$host$request_uri;
     }
-}
-
+{{ else }}
+    location / {
+        proxy_pass http://127.0.0.1:{{ .Port }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+{{ end }}}
+{{ if .HasSSL }}
 server {
     listen 443 ssl;
     server_name {{ .Domain }};
@@ -41,7 +49,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
-`
+{{ end }}`
 
 var nginxTmpl *template.Template
 

@@ -36,6 +36,7 @@ type templateData struct {
 	Port         int
 	WebhookPort  int
 	NginxInclude string
+	HasSSL       bool
 }
 
 // confFilename returns the config filename for a domain.
@@ -57,12 +58,17 @@ func (n *Nginx) GenerateConfig(app string, appCfg config.App) (map[string]string
 
 		filename := confFilename(d.Host)
 
+		certPath := fmt.Sprintf("/etc/letsencrypt/live/%s/fullchain.pem", d.Host)
+		_, certErr := os.Stat(certPath)
+		hasSSL := certErr == nil
+
 		data := templateData{
 			Filename:     filename,
 			Domain:       d.Host,
 			Port:         d.Port,
 			WebhookPort:  n.WebhookPort,
 			NginxInclude: appCfg.NginxInclude,
+			HasSSL:       hasSSL,
 		}
 
 		var buf bytes.Buffer

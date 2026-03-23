@@ -122,7 +122,7 @@ func registerConfigCommands(rootCmd *cobra.Command) {
 func runConfigGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
-	data, err := os.ReadFile(config.DefaultConfigPath())
+	data, err := os.ReadFile(configPath())
 	if err != nil {
 		return fmt.Errorf("reading config: %w", err)
 	}
@@ -155,7 +155,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 	value := args[1]
 
-	path := config.DefaultConfigPath()
+	path := configPath()
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -190,7 +190,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 }
 
 func runConfigList(cmd *cobra.Command, args []string) error {
-	data, err := os.ReadFile(config.DefaultConfigPath())
+	data, err := os.ReadFile(configPath())
 	if err != nil {
 		return fmt.Errorf("reading config: %w", err)
 	}

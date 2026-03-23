@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -43,23 +46,14 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(addCmd)
 
 	// jib provision [app]
-	rootCmd.AddCommand(&cobra.Command{
+	provisionCmd := &cobra.Command{
 		Use:   "provision [app]",
 		Short: "Re-reconcile infra for app (or all) -- idempotent",
 		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				fmt.Printf("[provision] Would re-provision infrastructure for app %q:\n", args[0])
-			} else {
-				fmt.Println("[provision] Would re-provision infrastructure for all apps:")
-			}
-			fmt.Println("  - Clone/update git repo")
-			fmt.Println("  - Generate and write nginx configs")
-			fmt.Println("  - Obtain SSL certificates")
-			fmt.Println("  - Reload nginx")
-			return nil
-		},
-	})
+		RunE:  runProvision,
+	}
+	provisionCmd.Flags().Bool("skip-ssl", false, "Skip SSL certificate provisioning")
+	rootCmd.AddCommand(provisionCmd)
 
 	// jib remove <app>
 	removeCmd := &cobra.Command{
@@ -90,6 +84,123 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	})
 }
 
+func runProvision(cmd *cobra.Command, args []string) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	skipSSL, _ := cmd.Flags().GetBool("skip-ssl")
+	p := newProxy(cfg)
+	sslMgr := newSSLManager(cfg)
+
+	// Determine which apps to provision
+	apps := make(map[string]config.App)
+	if len(args) > 0 {
+		appCfg, ok := cfg.Apps[args[0]]
+		if !ok {
+			return fmt.Errorf("app %q not found in config", args[0])
+		}
+		apps[args[0]] = appCfg
+	} else {
+		apps = cfg.Apps
+	}
+
+	for name, appCfg := range apps {
+		fmt.Printf("Provisioning %s...\n", name)
+
+		// Remove stale nginx configs for domains no longer in config.
+		// Collect all domains currently configured for this app.
+		currentDomains := make(map[string]bool)
+		for _, d := range appCfg.Domains {
+			currentDomains[d.Host+".conf"] = true
+		}
+		// Check all existing nginx configs and remove any that belonged
+		// to this app's old domain list but are no longer configured.
+		// We identify stale configs by checking if a conf file exists
+		// that is NOT in the current domain set.
+		// First, collect all conf files from previous provision for this app.
+		if prevAppCfg, err := loadPreviousDomains(name); err == nil {
+			var staleDomains []config.Domain
+			for _, d := range prevAppCfg {
+				if !currentDomains[d.Host+".conf"] {
+					staleDomains = append(staleDomains, d)
+				}
+			}
+			if len(staleDomains) > 0 {
+				if err := p.RemoveConfigs(name, staleDomains); err != nil {
+					fmt.Fprintf(os.Stderr, "  warning: removing stale configs: %v\n", err)
+				}
+				for _, d := range staleDomains {
+					fmt.Printf("  nginx: removed stale %s.conf\n", d.Host)
+				}
+			}
+		}
+
+		// Generate and write nginx configs
+		configs, err := p.GenerateConfig(name, appCfg)
+		if err != nil {
+			return fmt.Errorf("generating nginx config for %s: %w", name, err)
+		}
+		if err := p.WriteConfigs(configs); err != nil {
+			return fmt.Errorf("writing nginx configs for %s: %w", name, err)
+		}
+		for filename := range configs {
+			fmt.Printf("  nginx: %s\n", filename)
+		}
+
+		// Save current domains for future stale detection.
+		savePreviousDomains(name, appCfg.Domains)
+
+		// Obtain SSL certificates
+		if !skipSSL {
+			for _, d := range appCfg.Domains {
+				fmt.Printf("  ssl: obtaining cert for %s...\n", d.Host)
+				if err := sslMgr.Obtain(context.Background(), d.Host); err != nil {
+					fmt.Fprintf(os.Stderr, "  ssl: warning: %s: %v\n", d.Host, err)
+				} else {
+					fmt.Printf("  ssl: %s OK\n", d.Host)
+				}
+			}
+		}
+	}
+
+	// Test and reload nginx
+	if err := p.Test(); err != nil {
+		return fmt.Errorf("nginx config test: %w", err)
+	}
+	if err := p.Reload(); err != nil {
+		return fmt.Errorf("nginx reload: %w", err)
+	}
+	fmt.Println("Nginx reloaded.")
+	return nil
+}
+
+// loadPreviousDomains reads the previously provisioned domain list for an app.
+func loadPreviousDomains(app string) ([]config.Domain, error) {
+	path := filepath.Join(jibRoot(), "state", app+".domains.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var domains []config.Domain
+	if err := json.Unmarshal(data, &domains); err != nil {
+		return nil, err
+	}
+	return domains, nil
+}
+
+// savePreviousDomains persists the current domain list for stale detection on next provision.
+func savePreviousDomains(app string, domains []config.Domain) {
+	dir := filepath.Join(jibRoot(), "state")
+	_ = os.MkdirAll(dir, 0o755)
+	data, err := json.Marshal(domains)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(dir, app+".domains.json"), data, 0o644)
+}
+
 func runEdit(cmd *cobra.Command, args []string) error {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
@@ -99,7 +210,7 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		editor = "vi"
 	}
 
-	cfgPath := config.DefaultConfigPath()
+	cfgPath := configPath()
 
 	// Check the file exists before editing
 	if _, err := os.Stat(cfgPath); err != nil {
@@ -185,7 +296,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load or create config
-	cfgPath := config.DefaultConfigPath()
+	cfgPath := configPath()
 	data, err := os.ReadFile(cfgPath)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("reading config: %w", err)

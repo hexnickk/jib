@@ -15,27 +15,33 @@ import (
 	"github.com/hexnickk/jib/internal/state"
 )
 
-const (
-	defaultRepoBaseDir  = "/opt/jib/repos"
-	defaultNginxDir     = "/opt/jib/nginx"
-	defaultSymlinkDir   = "/etc/nginx/conf.d"
-	defaultOverrideDir  = "/opt/jib/overrides"
-)
+// jibRoot returns the base directory for all jib data.
+// Defaults to /opt/jib, overridable with JIB_ROOT env var.
+func jibRoot() string {
+	if root := os.Getenv("JIB_ROOT"); root != "" {
+		return root
+	}
+	return "/opt/jib"
+}
+
+func configPath() string {
+	return filepath.Join(jibRoot(), "config.yml")
+}
 
 func loadConfig() (*config.Config, error) {
-	return config.LoadConfig(config.DefaultConfigPath())
+	return config.LoadConfig(configPath())
 }
 
 func newStateStore() *state.Store {
-	return state.NewStore(state.DefaultStateDir())
+	return state.NewStore(filepath.Join(jibRoot(), "state"))
 }
 
 func newSecretsManager() *secrets.Manager {
-	return secrets.NewManager(secrets.DefaultSecretsDir)
+	return secrets.NewManager(filepath.Join(jibRoot(), "secrets"))
 }
 
 func newNotifier() *notify.Multi {
-	return notify.LoadFromSecrets(secrets.DefaultSecretsDir)
+	return notify.LoadFromSecrets(filepath.Join(jibRoot(), "secrets"))
 }
 
 func newSSLManager(cfg *config.Config) *ssl.CertManager {
@@ -47,10 +53,15 @@ func newProxy(cfg *config.Config) proxy.Proxy {
 	if cfg.Webhook != nil {
 		webhookPort = cfg.Webhook.Port
 	}
-	return proxy.NewNginx(defaultNginxDir, defaultSymlinkDir, webhookPort)
+	return proxy.NewNginx(
+		filepath.Join(jibRoot(), "nginx"),
+		"/etc/nginx/conf.d",
+		webhookPort,
+	)
 }
 
 func newEngine(cfg *config.Config) *deploy.Engine {
+	root := jibRoot()
 	return &deploy.Engine{
 		Config:      cfg,
 		StateStore:  newStateStore(),
@@ -58,9 +69,9 @@ func newEngine(cfg *config.Config) *deploy.Engine {
 		Notifier:    newNotifier(),
 		Proxy:       newProxy(cfg),
 		SSL:         newSSLManager(cfg),
-		LockDir:     state.DefaultLockDir(),
-		RepoBaseDir: defaultRepoBaseDir,
-		OverrideDir: defaultOverrideDir,
+		LockDir:     filepath.Join(root, "locks"),
+		RepoBaseDir: filepath.Join(root, "repos"),
+		OverrideDir: filepath.Join(root, "overrides"),
 	}
 }
 
@@ -70,6 +81,7 @@ func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {
 		return nil, fmt.Errorf("app %q not found in config", appName)
 	}
 
+	root := jibRoot()
 	files := []string(appCfg.Compose)
 	if len(files) == 0 {
 		files = []string{"docker-compose.yml"}
@@ -81,14 +93,14 @@ func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {
 		envFile = mgr.SymlinkPath(appName, appCfg.EnvFile)
 	}
 
-	repoDir := filepath.Join(defaultRepoBaseDir, appName)
+	repoDir := filepath.Join(root, "repos", appName)
 
 	return &docker.Compose{
 		App:      appName,
 		Dir:      repoDir,
 		Files:    files,
 		EnvFile:  envFile,
-		Override: docker.OverridePath(defaultOverrideDir, appName),
+		Override: docker.OverridePath(filepath.Join(root, "overrides"), appName),
 	}, nil
 }
 

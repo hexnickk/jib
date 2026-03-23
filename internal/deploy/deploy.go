@@ -107,17 +107,29 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	previousSHA := appState.DeployedSHA
 
 	// 5. Git fetch and determine target ref.
-	if err := gitFetch(ctx, repoDir, branch); err != nil {
-		return nil, fmt.Errorf("git fetch: %w", err)
+	hasRemote := gitHasRemote(ctx, repoDir)
+	if hasRemote {
+		if err := gitFetch(ctx, repoDir, branch); err != nil {
+			return nil, fmt.Errorf("git fetch: %w", err)
+		}
 	}
 
 	targetRef := opts.Ref
 	if targetRef == "" {
-		remoteSHA, err := gitRemoteSHA(ctx, repoDir, branch)
-		if err != nil {
-			return nil, fmt.Errorf("resolving remote HEAD: %w", err)
+		if hasRemote {
+			remoteSHA, err := gitRemoteSHA(ctx, repoDir, branch)
+			if err != nil {
+				return nil, fmt.Errorf("resolving remote HEAD: %w", err)
+			}
+			targetRef = remoteSHA
+		} else {
+			// Local-only repo: use current HEAD
+			localSHA, err := gitCurrentSHA(ctx, repoDir)
+			if err != nil {
+				return nil, fmt.Errorf("resolving local HEAD: %w", err)
+			}
+			targetRef = localSHA
 		}
-		targetRef = remoteSHA
 	}
 
 	// Check if already at target SHA (skip unless --force).
@@ -337,6 +349,13 @@ func parseWarmup(s string) time.Duration {
 	}
 	d, _ := time.ParseDuration(s)
 	return d
+}
+
+// gitHasRemote checks if the repo has an "origin" remote configured.
+func gitHasRemote(ctx context.Context, repoDir string) bool {
+	cmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
+	cmd.Dir = repoDir
+	return cmd.Run() == nil
 }
 
 // gitFetch runs git fetch origin <branch> in the given directory.
