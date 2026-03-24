@@ -2,7 +2,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
 
 	"github.com/hexnickk/jib/internal/docker"
 	"github.com/spf13/cobra"
@@ -179,11 +188,9 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	// jib upgrade
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "upgrade",
-		Short: "Self-update jib binary",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("[upgrade] Would download the latest jib binary and replace the current one.")
-			return nil
-		},
+		Short: "Self-update jib binary from GitHub Releases",
+		Args:  cobra.NoArgs,
+		RunE:  runUpgrade,
 	})
 
 	// jib maintenance
@@ -552,4 +559,180 @@ func runMaintenanceStatus(cmd *cobra.Command, args []string) error {
 		}
 	}
 	return nil
+}
+
+// githubRelease represents the relevant fields from the GitHub Releases API.
+type githubRelease struct {
+	TagName string `json:"tag_name"`
+}
+
+const (
+	upgradeRepoAPI = "https://api.github.com/repos/hexnickk/jib/releases/latest"
+	upgradeRepoURL = "https://github.com/hexnickk/jib/releases/download"
+)
+
+func runUpgrade(cmd *cobra.Command, args []string) error {
+	currentVersion := version
+
+	// 1. Fetch latest release tag from GitHub
+	fmt.Println("Checking for updates...")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, err := http.NewRequest("GET", upgradeRepoAPI, nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "jib/"+currentVersion)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("checking for updates failed (network error): %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode == 404 {
+		return fmt.Errorf("no releases found — the project may not have published any releases yet")
+	}
+	if resp.StatusCode != 200 {
+		var errResp struct{ Message string }
+		if json.Unmarshal(body, &errResp) == nil && errResp.Message != "" {
+			return fmt.Errorf("GitHub API error (%d): %s", resp.StatusCode, errResp.Message)
+		}
+		return fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var release githubRelease
+	if err := json.Unmarshal(body, &release); err != nil {
+		return fmt.Errorf("parsing release info: %w", err)
+	}
+
+	if release.TagName == "" {
+		return fmt.Errorf("no release tag found in API response")
+	}
+
+	latestTag := release.TagName
+	// Normalize: strip leading "v" for comparison
+	latestClean := strings.TrimPrefix(latestTag, "v")
+	currentClean := strings.TrimPrefix(currentVersion, "v")
+
+	// 2. Compare versions
+	if currentClean == latestClean {
+		fmt.Printf("Already up to date (%s).\n", latestTag)
+		return nil
+	}
+
+	fmt.Printf("Current version: %s\n", currentVersion)
+	fmt.Printf("Latest version:  %s\n", latestTag)
+
+	// 3. Detect OS/arch
+	goos := runtime.GOOS
+	goarch := runtime.GOARCH
+	binaryName := fmt.Sprintf("jib-%s-%s", goos, goarch)
+	downloadURL := fmt.Sprintf("%s/%s/%s", upgradeRepoURL, latestTag, binaryName)
+
+	fmt.Printf("Downloading %s...\n", downloadURL)
+
+	// 4. Download binary to temp file
+	dlClient := &http.Client{Timeout: 5 * time.Minute}
+	dlResp, err := dlClient.Get(downloadURL)
+	if err != nil {
+		return fmt.Errorf("downloading binary (network error): %w", err)
+	}
+	defer dlResp.Body.Close()
+
+	if dlResp.StatusCode == 404 {
+		return fmt.Errorf("binary not found for %s/%s at %s — this platform may not be supported", goos, goarch, latestTag)
+	}
+	if dlResp.StatusCode != 200 {
+		return fmt.Errorf("download failed with status %d", dlResp.StatusCode)
+	}
+
+	tmpFile, err := os.CreateTemp("", "jib-upgrade-*")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	removeTmp := true
+	defer func() {
+		if removeTmp {
+			os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := io.Copy(tmpFile, dlResp.Body); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("writing binary to temp file: %w", err)
+	}
+	tmpFile.Close()
+
+	// 5. Make executable
+	if err := os.Chmod(tmpPath, 0755); err != nil {
+		return fmt.Errorf("making binary executable: %w", err)
+	}
+
+	// 6. Verify: run <tmp>/jib version
+	verifyCmd := exec.Command(tmpPath, "--version")
+	verifyOut, err := verifyCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("verification failed — downloaded binary does not run correctly: %w\nOutput: %s", err, string(verifyOut))
+	}
+	fmt.Printf("Verified: %s", string(verifyOut))
+
+	// 7. Get current binary path
+	currentBinary, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("finding current binary path: %w", err)
+	}
+	currentBinary, err = filepath.EvalSymlinks(currentBinary)
+	if err != nil {
+		return fmt.Errorf("resolving binary path: %w", err)
+	}
+
+	// 8. Replace current binary
+	if err := os.Rename(tmpPath, currentBinary); err != nil {
+		if os.IsPermission(err) {
+			return fmt.Errorf("permission denied replacing %s — try running: sudo jib upgrade", currentBinary)
+		}
+		// On cross-device rename, fall back to copy
+		if strings.Contains(err.Error(), "cross-device") || strings.Contains(err.Error(), "invalid cross-device link") {
+			if copyErr := copyFile(tmpPath, currentBinary); copyErr != nil {
+				if os.IsPermission(copyErr) {
+					return fmt.Errorf("permission denied replacing %s — try running: sudo jib upgrade", currentBinary)
+				}
+				return fmt.Errorf("replacing binary: %w", copyErr)
+			}
+		} else {
+			return fmt.Errorf("replacing binary: %w", err)
+		}
+	}
+	removeTmp = false // rename/copy succeeded; temp file is gone or consumed
+
+	fmt.Printf("Upgraded jib from %s to %s\n", currentVersion, latestTag)
+	return nil
+}
+
+// copyFile copies src to dst, used as fallback when os.Rename fails (cross-device).
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
 }
