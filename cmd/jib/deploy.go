@@ -66,6 +66,15 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	force, _ := cmd.Flags().GetBool("force")
 
+	// Warn if app is in maintenance mode
+	if appCfg, ok := cfg.Apps[appName]; ok && len(appCfg.Domains) > 0 {
+		p := newProxy(cfg)
+		if p.IsInMaintenance(appName, appCfg.Domains) {
+			fmt.Printf("WARNING: %s is in maintenance mode. Deploy will proceed but the app will remain behind a 503 page.\n", appName)
+			fmt.Println("Run `jib maintenance off " + appName + "` after deploy to restore traffic.")
+		}
+	}
+
 	engine := newEngine(cfg)
 
 	opts := deploy.DeployOptions{

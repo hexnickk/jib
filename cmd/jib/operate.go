@@ -186,6 +186,37 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 		},
 	})
 
+	// jib maintenance
+	maintenanceCmd := &cobra.Command{
+		Use:   "maintenance",
+		Short: "Manage maintenance mode for apps",
+	}
+
+	maintenanceOnCmd := &cobra.Command{
+		Use:   "on <app>",
+		Short: "Enable maintenance mode (serve 503 page)",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runMaintenanceOn,
+	}
+	maintenanceOnCmd.Flags().String("message", "", "Custom maintenance message")
+	maintenanceCmd.AddCommand(maintenanceOnCmd)
+
+	maintenanceCmd.AddCommand(&cobra.Command{
+		Use:   "off <app>",
+		Short: "Disable maintenance mode (restore normal config)",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runMaintenanceOff,
+	})
+
+	maintenanceCmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Show which apps are in maintenance mode",
+		Args:  cobra.NoArgs,
+		RunE:  runMaintenanceStatus,
+	})
+
+	rootCmd.AddCommand(maintenanceCmd)
+
 	// jib nuke
 	nukeCmd := &cobra.Command{
 		Use:   "nuke",
@@ -438,6 +469,87 @@ func runSecretsCheck(cmd *cobra.Command, args []string) error {
 
 	if !allOK {
 		return fmt.Errorf("some secrets files are missing")
+	}
+	return nil
+}
+
+func runMaintenanceOn(cmd *cobra.Command, args []string) error {
+	appName := args[0]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	appCfg, ok := cfg.Apps[appName]
+	if !ok {
+		return fmt.Errorf("app %q not found in config", appName)
+	}
+
+	if len(appCfg.Domains) == 0 {
+		return fmt.Errorf("app %q has no domains configured", appName)
+	}
+
+	message, _ := cmd.Flags().GetString("message")
+
+	p := newProxy(cfg)
+	if err := p.MaintenanceOn(appName, appCfg.Domains, message); err != nil {
+		return fmt.Errorf("enabling maintenance mode: %w", err)
+	}
+
+	fmt.Printf("Maintenance mode enabled for %s.\n", appName)
+	for _, d := range appCfg.Domains {
+		fmt.Printf("  %s -> 503 maintenance page\n", d.Host)
+	}
+	fmt.Println("Run `jib maintenance off " + appName + "` to restore normal operation.")
+	return nil
+}
+
+func runMaintenanceOff(cmd *cobra.Command, args []string) error {
+	appName := args[0]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	appCfg, ok := cfg.Apps[appName]
+	if !ok {
+		return fmt.Errorf("app %q not found in config", appName)
+	}
+
+	if len(appCfg.Domains) == 0 {
+		return fmt.Errorf("app %q has no domains configured", appName)
+	}
+
+	p := newProxy(cfg)
+	if err := p.MaintenanceOff(appName, appCfg.Domains); err != nil {
+		return fmt.Errorf("disabling maintenance mode: %w", err)
+	}
+
+	fmt.Printf("Maintenance mode disabled for %s. Normal operation restored.\n", appName)
+	return nil
+}
+
+func runMaintenanceStatus(cmd *cobra.Command, args []string) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	p := newProxy(cfg)
+	status := p.MaintenanceStatus(cfg.Apps)
+
+	if len(status) == 0 {
+		fmt.Println("No apps are in maintenance mode.")
+		return nil
+	}
+
+	for app, domains := range status {
+		fmt.Printf("%s: maintenance\n", app)
+		for _, d := range domains {
+			fmt.Printf("  %s\n", d)
+		}
 	}
 	return nil
 }

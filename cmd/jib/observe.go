@@ -153,7 +153,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		LastDeploy          string `json:"last_deploy"`
 		ConsecutiveFailures int    `json:"consecutive_failures"`
 		Pinned              bool   `json:"pinned"`
+		Maintenance         bool   `json:"maintenance"`
 	}
+
+	p := newProxy(cfg)
+	maintenanceApps := p.MaintenanceStatus(cfg.Apps)
 
 	var statuses []appStatus
 	names := sortedAppNames(cfg.Apps)
@@ -172,6 +176,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		if !appState.LastDeploy.IsZero() {
 			lastDeploy = appState.LastDeploy.Format("2006-01-02 15:04:05")
 		}
+		_, inMaintenance := maintenanceApps[name]
 		statuses = append(statuses, appStatus{
 			Name:                name,
 			DeployedSHA:         sha,
@@ -179,6 +184,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			LastDeploy:          lastDeploy,
 			ConsecutiveFailures: appState.ConsecutiveFailures,
 			Pinned:              appState.Pinned,
+			Maintenance:         inMaintenance,
 		})
 	}
 
@@ -194,8 +200,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "APP\tSHA\tSTATUS\tLAST DEPLOY\tFAILURES\tPINNED")
 	for _, s := range statuses {
+		status := s.LastDeployStatus
+		if s.Maintenance {
+			status = "maintenance"
+		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%v\n",
-			s.Name, s.DeployedSHA, s.LastDeployStatus, s.LastDeploy,
+			s.Name, s.DeployedSHA, status, s.LastDeploy,
 			s.ConsecutiveFailures, s.Pinned)
 	}
 	w.Flush()
