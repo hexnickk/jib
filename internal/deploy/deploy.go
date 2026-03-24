@@ -15,6 +15,7 @@ import (
 	"github.com/hexnickk/jib/internal/docker"
 	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/notify"
+	"github.com/hexnickk/jib/internal/platform"
 	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/ssl"
@@ -197,7 +198,22 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	if overrideDir == "" {
 		overrideDir = docker.DefaultOverrideDir
 	}
-	if _, err := docker.GenerateOverride(ctx, opts.App, []string(appCfg.Compose), repoDir, overrideDir); err != nil {
+	// Determine resource limits: use configured values, or compute defaults from server resources.
+	resources := appCfg.Resources
+	if resources == nil {
+		sr, err := platform.DetectResources()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not detect server resources for default limits: %v\n", err)
+		} else {
+			appCount := len(e.Config.Apps)
+			if appCount < 1 {
+				appCount = 1
+			}
+			mem, cpus := platform.SuggestAppResources(sr, appCount)
+			resources = &config.Resources{Memory: mem, CPUs: cpus}
+		}
+	}
+	if _, err := docker.GenerateOverride(ctx, opts.App, []string(appCfg.Compose), repoDir, overrideDir, resources); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not generate override file: %v\n", err)
 		// Non-fatal — deploy can proceed without it
 	}

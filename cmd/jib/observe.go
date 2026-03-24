@@ -309,6 +309,53 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Check resource allocation
+	if cfgErr == nil {
+		fmt.Println("\n=== Resource Limits ===")
+		sr, resErr := platform.DetectResources()
+		if resErr != nil {
+			fmt.Printf("  Could not detect server resources: %v\n", resErr)
+		} else {
+			totalAllocMemMB := 0
+			totalAllocCPU := 0.0
+			anyConfigured := false
+			for appName, app := range cfg.Apps {
+				if app.Resources != nil {
+					anyConfigured = true
+					mem := platform.ParseMemoryMB(app.Resources.Memory)
+					cpu := platform.ParseCPUs(app.Resources.CPUs)
+					totalAllocMemMB += mem
+					totalAllocCPU += cpu
+					fmt.Printf("  %-20s memory=%-8s cpus=%s\n", appName, app.Resources.Memory, app.Resources.CPUs)
+				} else {
+					// Apps without configured resources will get auto-defaults at deploy time
+					fmt.Printf("  %-20s (auto — defaults applied at deploy)\n", appName)
+				}
+			}
+			if anyConfigured {
+				resourcesOK := true
+				if totalAllocMemMB > sr.TotalMemoryMB {
+					fmt.Printf("  WARNING: total allocated memory (%dM) exceeds server capacity (%dM)\n",
+						totalAllocMemMB, sr.TotalMemoryMB)
+					resourcesOK = false
+					allOK = false
+				}
+				if totalAllocCPU > float64(sr.NumCPUs) {
+					fmt.Printf("  WARNING: total allocated CPUs (%.1f) exceeds server capacity (%d)\n",
+						totalAllocCPU, sr.NumCPUs)
+					resourcesOK = false
+					allOK = false
+				}
+				if resourcesOK {
+					fmt.Printf("  Server: %s RAM, %s CPUs — allocated: %dM RAM, %.1f CPUs\n",
+						sr.MemoryString, sr.CPUString, totalAllocMemMB, totalAllocCPU)
+				}
+			} else if len(cfg.Apps) > 0 {
+				fmt.Println("  No apps have explicit resource limits (defaults applied at deploy).")
+			}
+		}
+	}
+
 	fmt.Println()
 	if allOK {
 		fmt.Println("All checks passed.")

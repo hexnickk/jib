@@ -57,6 +57,12 @@ type BackupDestination struct {
 	GPGKeyID    string `yaml:"gpg_key_id,omitempty"`
 }
 
+// Resources defines CPU and memory limits for an app's containers.
+type Resources struct {
+	Memory string `yaml:"memory,omitempty"` // e.g. "256M"
+	CPUs   string `yaml:"cpus,omitempty"`   // e.g. "0.5"
+}
+
 // App describes a single deployable application.
 type App struct {
 	Repo         string            `yaml:"repo"`
@@ -74,6 +80,7 @@ type App struct {
 	EnvFile      string            `yaml:"env_file,omitempty"`
 	Services     []string          `yaml:"services,omitempty"`
 	Cron         []CronTask        `yaml:"cron,omitempty"`
+	Resources    *Resources        `yaml:"resources,omitempty"`
 }
 
 // Domain maps a hostname to a container port.

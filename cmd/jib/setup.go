@@ -14,6 +14,7 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
 	"github.com/hexnickk/jib/internal/network"
+	"github.com/hexnickk/jib/internal/platform"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -312,13 +313,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Inferred health check: %s on port %d\n", inferredPath, inferredPort)
 	}
 
-	newApp := config.App{
-		Repo:    repo,
-		Compose: composeFiles,
-		Domains: domains,
-		Health:  healthChecks,
-	}
-
 	// Load or create config
 	cfgPath := configPath()
 	data, err := os.ReadFile(cfgPath)
@@ -334,6 +328,34 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 	if raw == nil {
 		raw = make(map[string]interface{})
+	}
+
+	// Count existing apps from the config we already loaded
+	existingApps := 0
+	if appsRaw, ok := raw["apps"]; ok {
+		if appsMap, ok := appsRaw.(map[string]interface{}); ok {
+			existingApps = len(appsMap)
+		}
+	}
+
+	// Suggest resource limits based on server capacity
+	var resources *config.Resources
+	if sr, err := platform.DetectResources(); err == nil {
+		appCount := existingApps + 1
+		mem, cpus := platform.SuggestAppResources(sr, appCount)
+		resources = &config.Resources{Memory: mem, CPUs: cpus}
+		fmt.Printf("  Resource limits: memory=%s, cpus=%s (server: %s RAM, %s CPUs, %d app(s))\n",
+			mem, cpus, sr.MemoryString, sr.CPUString, appCount)
+	} else {
+		fmt.Fprintf(os.Stderr, "  warning: could not detect server resources: %v\n", err)
+	}
+
+	newApp := config.App{
+		Repo:      repo,
+		Compose:   composeFiles,
+		Domains:   domains,
+		Health:    healthChecks,
+		Resources: resources,
 	}
 
 	// Marshal the new app to a generic map for YAML insertion
