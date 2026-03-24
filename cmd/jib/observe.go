@@ -287,10 +287,11 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	if allOK {
 		fmt.Println("All checks passed.")
-	} else {
-		fmt.Println("Some checks failed. See above for details.")
+		return nil
 	}
-	return nil
+
+	fmt.Println("Some checks failed. See above for details.")
+	return fmt.Errorf("doctor found problems")
 }
 
 func runLogs(cmd *cobra.Command, args []string) error {
