@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -60,22 +61,12 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	// jib remove <app>
 	removeCmd := &cobra.Command{
 		Use:   "remove <app>",
-		Short: "Remove an app",
+		Short: "Remove an app completely",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			force, _ := cmd.Flags().GetBool("force")
-			fmt.Printf("[remove] Would remove app %q:\n", args[0])
-			fmt.Println("  - Stop and remove containers")
-			fmt.Println("  - Remove nginx configs")
-			fmt.Println("  - Remove state and secrets")
-			fmt.Println("  - Remove app from config.yml")
-			if !force {
-				fmt.Println("  Use --force to skip confirmation prompt.")
-			}
-			return nil
-		},
+		RunE:  runRemove,
 	}
 	removeCmd.Flags().Bool("force", false, "Skip confirmation prompt")
+	removeCmd.Flags().Bool("volumes", false, "Also remove Docker volumes")
 	rootCmd.AddCommand(removeCmd)
 
 	// jib edit
@@ -401,6 +392,178 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  jib provision %s\n", appName)
 	}
 
+	return nil
+}
+
+func runRemove(cmd *cobra.Command, args []string) error {
+	appName := args[0]
+	force, _ := cmd.Flags().GetBool("force")
+	volumes, _ := cmd.Flags().GetBool("volumes")
+
+	// Load config to verify app exists and get its details
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	appCfg, ok := cfg.Apps[appName]
+	if !ok {
+		return fmt.Errorf("app %q not found in config", appName)
+	}
+
+	root := jibRoot()
+
+	// Paths that will be removed
+	stateFile := filepath.Join(root, "state", appName+".json")
+	domainStateFile := filepath.Join(root, "state", appName+".domains.json")
+	secretsDir := filepath.Join(root, "secrets", appName)
+	repoDir := filepath.Join(root, "repos", appName)
+	overrideFile := docker.OverridePath(filepath.Join(root, "overrides"), appName)
+
+	// If not --force, show what will be removed and ask for confirmation
+	if !force {
+		fmt.Printf("Will remove app %q:\n", appName)
+		fmt.Println("  - Stop and remove containers")
+		if volumes {
+			fmt.Println("  - Remove Docker volumes")
+		}
+		for _, d := range appCfg.Domains {
+			fmt.Printf("  - Remove nginx config for %s\n", d.Host)
+		}
+		fmt.Printf("  - Remove state file: %s\n", stateFile)
+		fmt.Printf("  - Remove domain state: %s\n", domainStateFile)
+		fmt.Printf("  - Remove secrets: %s\n", secretsDir)
+		fmt.Printf("  - Remove repo: %s\n", repoDir)
+		fmt.Printf("  - Remove override: %s\n", overrideFile)
+		fmt.Println("  - Remove app from config.yml")
+		fmt.Println()
+		fmt.Print("Continue? [y/N] ")
+
+		scanner := bufio.NewScanner(os.Stdin)
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				return fmt.Errorf("reading confirmation: %w", err)
+			}
+			fmt.Println("Aborted.")
+			return nil
+		}
+		answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
+		if answer != "y" && answer != "yes" {
+			fmt.Println("Aborted.")
+			return nil
+		}
+	}
+
+	var removed []string
+
+	// 1. Docker compose down
+	compose, err := newCompose(cfg, appName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not create compose handle: %v\n", err)
+	} else {
+		ctx := context.Background()
+		if volumes {
+			err = compose.DownVolumes(ctx)
+		} else {
+			err = compose.Down(ctx)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: docker compose down: %v\n", err)
+		} else {
+			removed = append(removed, "containers")
+			if volumes {
+				removed = append(removed, "volumes")
+			}
+		}
+	}
+
+	// 2. Remove nginx configs
+	if len(appCfg.Domains) > 0 {
+		p := newProxy(cfg)
+		if err := p.RemoveConfigs(appName, appCfg.Domains); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: removing nginx configs: %v\n", err)
+		} else {
+			removed = append(removed, "nginx configs")
+		}
+
+		// Reload nginx (test first)
+		if err := p.Test(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: nginx config test failed: %v\n", err)
+		} else if err := p.Reload(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: nginx reload: %v\n", err)
+		} else {
+			removed = append(removed, "nginx reloaded")
+		}
+	}
+
+	// 3. Remove state file
+	if err := os.Remove(stateFile); err != nil && !os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "warning: removing state file: %v\n", err)
+	} else if err == nil {
+		removed = append(removed, "state file")
+	}
+
+	// 4. Remove domain state file
+	if err := os.Remove(domainStateFile); err != nil && !os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "warning: removing domain state file: %v\n", err)
+	} else if err == nil {
+		removed = append(removed, "domain state")
+	}
+
+	// 5. Remove secrets directory
+	if _, statErr := os.Stat(secretsDir); statErr == nil {
+		if err := os.RemoveAll(secretsDir); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: removing secrets dir: %v\n", err)
+		} else {
+			removed = append(removed, "secrets")
+		}
+	}
+
+	// 6. Remove repo directory
+	if _, statErr := os.Stat(repoDir); statErr == nil {
+		if err := os.RemoveAll(repoDir); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: removing repo dir: %v\n", err)
+		} else {
+			removed = append(removed, "repo")
+		}
+	}
+
+	// 7. Remove override file
+	if err := os.Remove(overrideFile); err != nil && !os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "warning: removing override file: %v\n", err)
+	} else if err == nil {
+		removed = append(removed, "override")
+	}
+
+	// 8. Remove app from config.yml
+	cfgPath := configPath()
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return fmt.Errorf("reading config for removal: %w", err)
+	}
+
+	var raw map[string]interface{}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("parsing config: %w", err)
+	}
+
+	if appsRaw, ok := raw["apps"]; ok {
+		if appsMap, ok := appsRaw.(map[string]interface{}); ok {
+			delete(appsMap, appName)
+		}
+	}
+
+	out, err := yaml.Marshal(raw)
+	if err != nil {
+		return fmt.Errorf("marshaling config: %w", err)
+	}
+
+	if err := os.WriteFile(cfgPath, out, 0o644); err != nil {
+		return fmt.Errorf("writing config: %w", err)
+	}
+	removed = append(removed, "config entry")
+
+	fmt.Printf("\nRemoved app %q: %s\n", appName, strings.Join(removed, ", "))
 	return nil
 }
 

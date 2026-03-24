@@ -94,6 +94,13 @@ func (c *Compose) Down(ctx context.Context) error {
 	return c.runInteractive(ctx, args, nil)
 }
 
+// DownVolumes runs docker compose down -v (removing volumes too).
+func (c *Compose) DownVolumes(ctx context.Context) error {
+	args := c.baseArgs()
+	args = append(args, "down", "-v")
+	return c.runInteractive(ctx, args, nil)
+}
+
 // Run runs docker compose run --rm <service> [cmd...].
 func (c *Compose) Run(ctx context.Context, service string, cmd []string) error {
 	args := c.baseArgs()
