@@ -8,6 +8,7 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/docker"
+	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/notify"
 	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
@@ -60,6 +61,10 @@ func newProxy(cfg *config.Config) proxy.Proxy {
 	)
 }
 
+func newHistoryLogger() *history.Logger {
+	return history.NewLogger(filepath.Join(jibRoot(), "logs"))
+}
+
 func newEngine(cfg *config.Config) *deploy.Engine {
 	root := jibRoot()
 	return &deploy.Engine{
@@ -69,6 +74,7 @@ func newEngine(cfg *config.Config) *deploy.Engine {
 		Notifier:    newNotifier(),
 		Proxy:       newProxy(cfg),
 		SSL:         newSSLManager(cfg),
+		History:     newHistoryLogger(),
 		LockDir:     filepath.Join(root, "locks"),
 		RepoBaseDir: filepath.Join(root, "repos"),
 		OverrideDir: filepath.Join(root, "overrides"),

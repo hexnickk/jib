@@ -419,6 +419,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	secretsDir := filepath.Join(root, "secrets", appName)
 	repoDir := filepath.Join(root, "repos", appName)
 	overrideFile := docker.OverridePath(filepath.Join(root, "overrides"), appName)
+	historyFile := filepath.Join(root, "logs", appName+".jsonl")
 
 	// If not --force, show what will be removed and ask for confirmation
 	if !force {
@@ -435,6 +436,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  - Remove secrets: %s\n", secretsDir)
 		fmt.Printf("  - Remove repo: %s\n", repoDir)
 		fmt.Printf("  - Remove override: %s\n", overrideFile)
+		fmt.Printf("  - Remove history: %s\n", historyFile)
 		fmt.Println("  - Remove app from config.yml")
 		fmt.Println()
 		fmt.Print("Continue? [y/N] ")
@@ -533,6 +535,13 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "warning: removing override file: %v\n", err)
 	} else if err == nil {
 		removed = append(removed, "override")
+	}
+
+	// 7b. Remove history log
+	if err := os.Remove(historyFile); err != nil && !os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "warning: removing history file: %v\n", err)
+	} else if err == nil {
+		removed = append(removed, "history")
 	}
 
 	// 8. Remove app from config.yml

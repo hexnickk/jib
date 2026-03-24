@@ -13,6 +13,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
+	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/notify"
 	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
@@ -34,6 +35,7 @@ type Engine struct {
 	Notifier    *notify.Multi
 	Proxy       proxy.Proxy
 	SSL         *ssl.CertManager
+	History     *history.Logger
 	LockDir     string
 	RepoBaseDir string // e.g. /opt/jib/repos
 	OverrideDir string // e.g. /opt/jib/overrides
@@ -61,6 +63,8 @@ type DeployResult struct {
 
 // Deploy implements the full restart strategy deploy flow (steps 1-17 from the plan).
 func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult, error) {
+	deployStart := time.Now()
+
 	// 1. Validate app exists in config.
 	appCfg, ok := e.Config.Apps[opts.App]
 	if !ok {
@@ -210,14 +214,16 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 			if previousSHA != "" {
 				_ = gitCheckout(ctx, repoDir, previousSHA)
 			}
-			e.sendNotify(ctx, opts.App, "deploy", targetRef, opts.Trigger, opts.User, "failure", fmt.Sprintf("pre_deploy hook %q failed: %v", hook.Service, err))
+			hookErr := fmt.Sprintf("pre_deploy hook %q failed: %v", hook.Service, err)
+			e.sendNotify(ctx, opts.App, "deploy", targetRef, opts.Trigger, opts.User, "failure", hookErr)
+			e.logHistory(opts.App, history.EventDeploy, targetRef, previousSHA, opts.Trigger, opts.User, "failure", hookErr, deployStart)
 			return &DeployResult{
 				App:         opts.App,
 				PreviousSHA: previousSHA,
 				DeployedSHA: "",
 				Strategy:    strategy,
 				Success:     false,
-				Error:       fmt.Sprintf("pre_deploy hook %q failed: %v", hook.Service, err),
+				Error:       hookErr,
 			}, nil
 		}
 	}
@@ -289,6 +295,9 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	// 17. Prune old images.
 	_ = docker.PruneImages(ctx)
 
+	// 18. Log event to history.
+	e.logHistory(opts.App, history.EventDeploy, deployedSHA, previousSHA, opts.Trigger, opts.User, deployStatus, deployError, deployStart)
+
 	return &DeployResult{
 		App:         opts.App,
 		PreviousSHA: previousSHA,
@@ -323,6 +332,24 @@ func (e *Engine) newCompose(app string, appCfg config.App, repoDir string) *dock
 		EnvFile:  envFile,
 		Override: docker.OverridePath(overrideDir, app),
 	}
+}
+
+// logHistory appends an event to the history log, ignoring errors.
+func (e *Engine) logHistory(app, eventType, sha, previousSHA, trigger, user, status, errMsg string, start time.Time) {
+	if e.History == nil {
+		return
+	}
+	_ = e.History.Append(app, history.Event{
+		Timestamp:   time.Now(),
+		Type:        eventType,
+		SHA:         sha,
+		PreviousSHA: previousSHA,
+		Trigger:     trigger,
+		User:        user,
+		Status:      status,
+		Error:       errMsg,
+		DurationMs:  time.Since(start).Milliseconds(),
+	})
 }
 
 // sendNotify sends a notification event, ignoring errors.

@@ -8,6 +8,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
+	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/state"
 )
 
@@ -21,6 +22,8 @@ type RollbackOptions struct {
 // It checks out the previous SHA, reuses the rollback-tagged image if available,
 // otherwise rebuilds, brings containers up, and runs health checks.
 func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployResult, error) {
+	rollbackStart := time.Now()
+
 	// Validate app exists in config.
 	appCfg, ok := e.Config.Apps[opts.App]
 	if !ok {
@@ -102,9 +105,11 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 	}
 
 	// 9. Update state (swap deployed/previous).
-	deployStatus := "success"
+	rollbackStatus := "success"
+	rollbackError := ""
 	if !healthOK {
-		deployStatus = "failure"
+		rollbackStatus = "failure"
+		rollbackError = "health check failed: " + healthErr
 		appState.ConsecutiveFailures++
 	} else {
 		appState.ConsecutiveFailures = 0
@@ -115,8 +120,8 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 	appState.DeployedSHA = previousSHA
 	appState.PreviousSHA = currentSHA
 	appState.LastDeploy = time.Now()
-	appState.LastDeployStatus = deployStatus
-	appState.LastDeployError = healthErr
+	appState.LastDeployStatus = rollbackStatus
+	appState.LastDeployError = rollbackError
 	appState.LastDeployTrigger = "manual"
 	appState.LastDeployUser = opts.User
 
@@ -125,11 +130,10 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 	}
 
 	// 10. Notify.
-	if healthOK {
-		e.sendNotify(ctx, opts.App, "rollback", previousSHA, "manual", opts.User, "success", "")
-	} else {
-		e.sendNotify(ctx, opts.App, "rollback", previousSHA, "manual", opts.User, "failure", "health check failed: "+healthErr)
-	}
+	e.sendNotify(ctx, opts.App, "rollback", previousSHA, "manual", opts.User, rollbackStatus, rollbackError)
+
+	// 11. Log event to history.
+	e.logHistory(opts.App, history.EventRollback, previousSHA, currentSHA, "manual", opts.User, rollbackStatus, rollbackError, rollbackStart)
 
 	return &DeployResult{
 		App:         opts.App,

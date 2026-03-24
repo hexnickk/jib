@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/hexnickk/jib/internal/platform"
 	"github.com/spf13/cobra"
@@ -40,14 +41,10 @@ func registerObserveCommands(rootCmd *cobra.Command) {
 		Use:   "history <app>",
 		Short: "Deploy/rollback/backup timeline",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("[history] Would show deploy/rollback/backup timeline for %q.\n", args[0])
-			fmt.Println("  This requires a history log which is not yet implemented.")
-			return nil
-		},
+		RunE:  runHistory,
 	}
-	historyCmd.Flags().Int("limit", 0, "Maximum number of entries to show (0 = all)")
-	historyCmd.Flags().Bool("json", false, "Output in JSON format")
+	historyCmd.Flags().Int("limit", 20, "Maximum number of entries to show")
+	historyCmd.Flags().Bool("json", false, "Output raw JSON lines")
 	rootCmd.AddCommand(historyCmd)
 
 	// jib env <app>
@@ -470,6 +467,56 @@ func runEnvDel(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Deleted %s\n", key)
 	}
 	fmt.Println("Restart or redeploy to apply changes.")
+	return nil
+}
+
+func runHistory(cmd *cobra.Command, args []string) error {
+	appName := args[0]
+	limit, _ := cmd.Flags().GetInt("limit")
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+
+	logger := newHistoryLogger()
+	events, err := logger.Read(appName, limit)
+	if err != nil {
+		return fmt.Errorf("reading history for %s: %w", appName, err)
+	}
+
+	if len(events) == 0 {
+		fmt.Printf("No history for %s.\n", appName)
+		return nil
+	}
+
+	if jsonOutput {
+		for _, ev := range events {
+			data, err := json.Marshal(ev)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(data))
+		}
+		return nil
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(w, "TIME\tTYPE\tSHA\tSTATUS\tUSER\tDURATION")
+	for _, ev := range events {
+		sha := ev.SHA
+		if len(sha) > 7 {
+			sha = sha[:7]
+		}
+		ts := ev.Timestamp.Local().Format(time.DateTime)
+		dur := fmt.Sprintf("%dms", ev.DurationMs)
+		if ev.DurationMs >= 1000 {
+			dur = fmt.Sprintf("%.1fs", float64(ev.DurationMs)/1000)
+		}
+		status := ev.Status
+		if ev.Error != "" {
+			status = status + " (" + ev.Error + ")"
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			ts, ev.Type, sha, status, ev.User, dur)
+	}
+	w.Flush()
 	return nil
 }
 
