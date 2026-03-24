@@ -21,19 +21,14 @@ import (
 
 func registerSetupCommands(rootCmd *cobra.Command) {
 	// jib init
-	rootCmd.AddCommand(&cobra.Command{
+	initCmd := &cobra.Command{
 		Use:   "init",
-		Short: "Interactive onboarding: deps, user, config, first app",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("[init] Would perform interactive onboarding:")
-			fmt.Println("  1. Check and install dependencies (docker, nginx, certbot, etc.)")
-			fmt.Println("  2. Create jib system user and directories under /opt/jib/")
-			fmt.Println("  3. Generate initial config.yml")
-			fmt.Println("  4. Set up systemd service for jib daemon")
-			fmt.Println("  5. Prompt to add first app")
-			return nil
-		},
-	})
+		Short: "Bootstrap server: install deps, create config, set up directories",
+		RunE:  runInit,
+	}
+	initCmd.Flags().Bool("non-interactive", false, "Use all defaults, skip prompts (for scripting)")
+	initCmd.Flags().Bool("skip-install", false, "Assume deps are already installed, just create config/dirs")
+	rootCmd.AddCommand(initCmd)
 
 	// jib add <app>
 	addCmd := &cobra.Command{
@@ -76,6 +71,255 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 		Short: "$EDITOR config.yml + validate on save",
 		RunE:  runEdit,
 	})
+}
+
+// systemd unit file for the jib daemon.
+const jibServiceUnit = `[Unit]
+Description=Jib Deploy Daemon
+After=docker.service nginx.service
+
+[Service]
+ExecStart=/usr/local/bin/jib _daemon
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+`
+
+func runInit(cmd *cobra.Command, args []string) error {
+	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
+	skipInstall, _ := cmd.Flags().GetBool("skip-install")
+
+	scanner := bufio.NewScanner(os.Stdin)
+
+	// Step a: Check if already initialized
+	cfgPath := configPath()
+	if _, err := os.Stat(cfgPath); err == nil {
+		fmt.Println("Already initialized. Use jib edit to modify config.")
+		return nil
+	}
+
+	fmt.Println("=== Jib Server Bootstrap ===")
+	fmt.Println()
+
+	// Step b: Install core dependencies (Docker, Docker Compose, nginx, git)
+	if !skipInstall {
+		fmt.Println("Checking dependencies...")
+		depResults := platform.CheckAllDependencies()
+
+		// Determine which core packages are missing
+		// Core deps: Docker, Docker Compose, Nginx, Git
+		coreDeps := map[string]bool{
+			"Docker":         false,
+			"Docker Compose": false,
+			"Nginx":          false,
+			"Git":            false,
+		}
+		for _, r := range depResults {
+			if _, isCore := coreDeps[r.Name]; isCore {
+				coreDeps[r.Name] = r.Installed
+				if r.Installed {
+					fmt.Printf("  %s: installed (v%s)\n", r.Name, r.Version)
+				} else {
+					fmt.Printf("  %s: not installed\n", r.Name)
+				}
+			}
+		}
+
+		// Build list of apt packages to install
+		var toInstall []string
+		if !coreDeps["Docker"] {
+			toInstall = append(toInstall, "docker.io")
+		}
+		if !coreDeps["Docker Compose"] {
+			toInstall = append(toInstall, "docker-compose-v2")
+		}
+		if !coreDeps["Nginx"] {
+			toInstall = append(toInstall, "nginx")
+		}
+		if !coreDeps["Git"] {
+			toInstall = append(toInstall, "git")
+		}
+
+		if len(toInstall) > 0 {
+			fmt.Printf("\nInstalling: %s\n", strings.Join(toInstall, ", "))
+
+			// apt-get update
+			updateCmd := exec.Command("apt-get", "update")
+			updateCmd.Stdout = os.Stdout
+			updateCmd.Stderr = os.Stderr
+			if err := updateCmd.Run(); err != nil {
+				return fmt.Errorf("apt-get update failed: %w", err)
+			}
+
+			// apt-get install
+			installArgs := append([]string{"install", "-y"}, toInstall...)
+			installCmd := exec.Command("apt-get", installArgs...)
+			installCmd.Stdout = os.Stdout
+			installCmd.Stderr = os.Stderr
+			if err := installCmd.Run(); err != nil {
+				return fmt.Errorf("apt-get install failed: %w", err)
+			}
+		} else {
+			fmt.Println("\nAll core dependencies already installed.")
+		}
+
+		// Enable and start Docker and Nginx
+		fmt.Println("\nEnabling services...")
+		for _, svc := range []string{"docker", "nginx"} {
+			enableCmd := exec.Command("systemctl", "enable", "--now", svc)
+			enableCmd.Stdout = os.Stdout
+			enableCmd.Stderr = os.Stderr
+			if err := enableCmd.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "  warning: systemctl enable --now %s: %v\n", svc, err)
+			} else {
+				fmt.Printf("  %s: enabled and started\n", svc)
+			}
+		}
+	} else {
+		fmt.Println("Skipping dependency installation (--skip-install).")
+	}
+
+	// Step c: Domain/SSL choice
+	sslChoice := 1 // default: certbot
+	certbotEmail := ""
+
+	if !nonInteractive {
+		fmt.Println("\nDomain/SSL management:")
+		fmt.Println("  1. Certbot (Let's Encrypt) — recommended for direct server access")
+		fmt.Println("  2. Cloudflare Tunnel")
+		fmt.Println("  3. Tailscale")
+		fmt.Println("  4. None — I'll manage SSL myself")
+		fmt.Print("Choose [1-4, default 1]: ")
+
+		if scanner.Scan() {
+			choice := strings.TrimSpace(scanner.Text())
+			if choice != "" {
+				n, err := strconv.Atoi(choice)
+				if err != nil || n < 1 || n > 4 {
+					fmt.Println("Invalid choice, using default (1: Certbot).")
+				} else {
+					sslChoice = n
+				}
+			}
+		}
+	}
+
+	switch sslChoice {
+	case 1:
+		// Install certbot
+		if !skipInstall {
+			fmt.Println("\nInstalling certbot...")
+			installCmd := exec.Command("apt-get", "install", "-y", "certbot", "python3-certbot-nginx")
+			installCmd.Stdout = os.Stdout
+			installCmd.Stderr = os.Stderr
+			if err := installCmd.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: certbot installation failed: %v\n", err)
+			}
+		}
+
+		if !nonInteractive {
+			fmt.Print("Email for Let's Encrypt notifications: ")
+			if scanner.Scan() {
+				certbotEmail = strings.TrimSpace(scanner.Text())
+			}
+		}
+	case 2:
+		fmt.Println("\nRun 'jib cloudflare setup' after init to configure.")
+	case 3:
+		fmt.Println("\nRun 'jib tailscale setup' after init to configure.")
+	case 4:
+		fmt.Println("\nSkipping SSL setup.")
+	}
+
+	// Step d: Optional rclone for backups
+	installRclone := false
+	if !nonInteractive {
+		fmt.Print("\nInstall rclone for backups? [y/N]: ")
+		if scanner.Scan() {
+			answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
+			installRclone = answer == "y" || answer == "yes"
+		}
+	}
+
+	if installRclone && !skipInstall {
+		fmt.Println("Installing rclone...")
+		installCmd := exec.Command("apt-get", "install", "-y", "rclone")
+		installCmd.Stdout = os.Stdout
+		installCmd.Stderr = os.Stderr
+		if err := installCmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: rclone installation failed: %v\n", err)
+		} else {
+			fmt.Println("Run 'jib backup-dest add' to configure destinations.")
+		}
+	}
+
+	// Step e: Create directory structure
+	fmt.Println("\nCreating directory structure...")
+	root := jibRoot()
+	dirs := []string{
+		"state", "secrets", "repos", "overrides",
+		"nginx", "backups", "locks", "deploy-keys", "logs",
+	}
+	for _, dir := range dirs {
+		dirPath := filepath.Join(root, dir)
+		perm := os.FileMode(0o755)
+		if dir == "secrets" {
+			perm = 0o700
+		}
+		if err := os.MkdirAll(dirPath, perm); err != nil {
+			return fmt.Errorf("creating directory %s: %w", dirPath, err)
+		}
+	}
+	fmt.Printf("  Created %s/{%s}\n", root, strings.Join(dirs, ","))
+
+	// Step f: Generate initial config.yml
+	fmt.Println("\nGenerating config.yml...")
+	cfgContent := fmt.Sprintf("config_version: %d\npoll_interval: 5m\n", config.LatestConfigVersion)
+	if certbotEmail != "" {
+		cfgContent += fmt.Sprintf("certbot_email: %s\n", certbotEmail)
+	}
+	cfgContent += "apps: {}\n"
+
+	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0o644); err != nil {
+		return fmt.Errorf("writing config: %w", err)
+	}
+	fmt.Printf("  Written to %s\n", cfgPath)
+
+	// Step g: Install systemd service
+	// TODO: Don't start the service yet — daemon implementation not complete.
+	fmt.Println("\nInstalling systemd service...")
+	unitPath := "/etc/systemd/system/jib.service"
+	if err := os.WriteFile(unitPath, []byte(jibServiceUnit), 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not write systemd unit file: %v\n", err)
+	} else {
+		// Reload systemd and enable (but don't start — daemon not implemented yet)
+		reloadCmd := exec.Command("systemctl", "daemon-reload")
+		if err := reloadCmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: systemctl daemon-reload: %v\n", err)
+		}
+		enableCmd := exec.Command("systemctl", "enable", "jib")
+		if err := enableCmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: systemctl enable jib: %v\n", err)
+		} else {
+			fmt.Printf("  Installed %s (enabled, not started — daemon not yet implemented)\n", unitPath)
+		}
+	}
+
+	// Step h: Run doctor checks
+	fmt.Println("\n=== Verifying installation ===")
+	if err := runDoctor(cmd, nil); err != nil {
+		fmt.Fprintf(os.Stderr, "\nSome checks failed, but init completed. Run 'jib doctor' to review.\n")
+	}
+
+	// Step i: Print next steps
+	fmt.Println()
+	fmt.Println("Jib initialized! Next:")
+	fmt.Println("  jib add <app> --repo org/repo --domain example.com")
+	fmt.Println("  jib deploy <app>")
+
+	return nil
 }
 
 func runProvision(cmd *cobra.Command, args []string) error {
