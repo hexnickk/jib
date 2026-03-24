@@ -155,6 +155,28 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 	value := args[1]
 
+	// Parse value as YAML to preserve correct types (bool, int, etc.)
+	var parsed interface{}
+	if err := yaml.Unmarshal([]byte(value), &parsed); err != nil {
+		return fmt.Errorf("parsing value %q: %w", value, err)
+	}
+
+	// YAML unmarshals "" and "null" to nil; treat empty input as empty string,
+	// and reject explicit null since unsetting keys should use 'jib edit'.
+	if parsed == nil {
+		if value == "" {
+			parsed = ""
+		} else {
+			return fmt.Errorf("null values cannot be set via 'config set'; use 'jib edit' to remove a key")
+		}
+	}
+
+	// Reject complex types — user should use `jib edit` for maps/lists
+	switch parsed.(type) {
+	case map[string]interface{}, []interface{}:
+		return fmt.Errorf("complex values (maps/lists) cannot be set via 'config set'; use 'jib edit' instead")
+	}
+
 	path := configPath()
 
 	data, err := os.ReadFile(path)
@@ -167,7 +189,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("parsing config: %w", err)
 	}
 
-	if err := setNestedValue(raw, key, value); err != nil {
+	if err := setNestedValue(raw, key, parsed); err != nil {
 		return err
 	}
 
@@ -185,7 +207,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "warning: config validation failed after set: %v\n", err)
 	}
 
-	fmt.Printf("Set %s = %s\n", key, value)
+	fmt.Printf("Set %s = %v\n", key, parsed)
 	return nil
 }
 
@@ -220,7 +242,7 @@ func getNestedValue(m map[string]interface{}, key string) (interface{}, error) {
 }
 
 // setNestedValue sets a dotted key path in a map, creating intermediate maps as needed.
-func setNestedValue(m map[string]interface{}, key string, value string) error {
+func setNestedValue(m map[string]interface{}, key string, value interface{}) error {
 	parts := strings.Split(key, ".")
 	current := m
 
