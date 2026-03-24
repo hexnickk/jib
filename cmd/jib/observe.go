@@ -51,12 +51,30 @@ func registerObserveCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(historyCmd)
 
 	// jib env <app>
-	rootCmd.AddCommand(&cobra.Command{
+	envCmd := &cobra.Command{
 		Use:   "env <app>",
 		Short: "Show env vars (secrets redacted)",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runEnv,
+	}
+
+	// jib env set <app> KEY=VALUE [KEY2=VALUE2 ...]
+	envCmd.AddCommand(&cobra.Command{
+		Use:   "set <app> KEY=VALUE [KEY2=VALUE2 ...]",
+		Short: "Set environment variables",
+		Args:  cobra.MinimumNArgs(2),
+		RunE:  runEnvSet,
 	})
+
+	// jib env del <app> KEY [KEY2 ...]
+	envCmd.AddCommand(&cobra.Command{
+		Use:   "del <app> KEY [KEY2 ...]",
+		Short: "Delete environment variables",
+		Args:  cobra.MinimumNArgs(2),
+		RunE:  runEnvDel,
+	})
+
+	rootCmd.AddCommand(envCmd)
 
 	// jib apps
 	rootCmd.AddCommand(&cobra.Command{
@@ -383,6 +401,75 @@ func runMetrics(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println(output)
+	return nil
+}
+
+func runEnvSet(cmd *cobra.Command, args []string) error {
+	appName := args[0]
+	pairs := args[1:]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	appCfg, ok := cfg.Apps[appName]
+	if !ok {
+		return fmt.Errorf("app %q not found in config", appName)
+	}
+
+	vars := make(map[string]string, len(pairs))
+	for _, pair := range pairs {
+		idx := strings.Index(pair, "=")
+		if idx < 1 {
+			return fmt.Errorf("invalid format %q: expected KEY=VALUE", pair)
+		}
+		vars[pair[:idx]] = pair[idx+1:]
+	}
+
+	mgr := newSecretsManager()
+	if err := mgr.SetVar(appName, appCfg.EnvFile, vars); err != nil {
+		return fmt.Errorf("setting env vars: %w", err)
+	}
+
+	if !appCfg.SecretsEnv {
+		fmt.Println("Note: enable secrets_env in config for this app to use these vars")
+	}
+
+	for key := range vars {
+		fmt.Printf("Set %s\n", key)
+	}
+	fmt.Println("Restart or redeploy to apply changes.")
+	return nil
+}
+
+func runEnvDel(cmd *cobra.Command, args []string) error {
+	appName := args[0]
+	keys := args[1:]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	appCfg, ok := cfg.Apps[appName]
+	if !ok {
+		return fmt.Errorf("app %q not found in config", appName)
+	}
+
+	mgr := newSecretsManager()
+	if err := mgr.DelVar(appName, appCfg.EnvFile, keys); err != nil {
+		return fmt.Errorf("deleting env vars: %w", err)
+	}
+
+	if !appCfg.SecretsEnv {
+		fmt.Println("Note: enable secrets_env in config for this app to use these vars")
+	}
+
+	for _, key := range keys {
+		fmt.Printf("Deleted %s\n", key)
+	}
+	fmt.Println("Restart or redeploy to apply changes.")
 	return nil
 }
 

@@ -115,6 +115,128 @@ func (m *Manager) CheckAll(apps map[string]config.App) []AppSecretStatus {
 	return results
 }
 
+// SetVar updates or appends one or more KEY=VALUE pairs in the app's .env file.
+// Creates the directory (0700) and file (0600) if they don't exist.
+func (m *Manager) SetVar(app string, envFileName string, vars map[string]string) error {
+	envFileName = envFile(envFileName)
+	appDir := filepath.Join(m.Dir, app)
+
+	if err := os.MkdirAll(appDir, 0700); err != nil {
+		return fmt.Errorf("creating secrets directory: %w", err)
+	}
+	if err := os.Chmod(appDir, 0700); err != nil {
+		return fmt.Errorf("setting directory permissions: %w", err)
+	}
+
+	path := filepath.Join(appDir, envFileName)
+	lines, err := readLines(path)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("reading secrets file: %w", err)
+	}
+
+	// Track which vars have been updated (by key).
+	updated := make(map[string]bool)
+
+	// Update existing lines in place.
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		idx := strings.Index(line, "=")
+		if idx < 0 {
+			continue
+		}
+		key := line[:idx]
+		if newVal, ok := vars[key]; ok {
+			lines[i] = key + "=" + newVal
+			updated[key] = true
+		}
+	}
+
+	// Append any vars that weren't already present, in sorted order.
+	var newKeys []string
+	for key := range vars {
+		if !updated[key] {
+			newKeys = append(newKeys, key)
+		}
+	}
+	sort.Strings(newKeys)
+	for _, key := range newKeys {
+		lines = append(lines, key+"="+vars[key])
+	}
+
+	return writeLines(path, lines)
+}
+
+// DelVar removes one or more keys from the app's .env file.
+func (m *Manager) DelVar(app string, envFileName string, keys []string) error {
+	envFileName = envFile(envFileName)
+	path := filepath.Join(m.Dir, app, envFileName)
+
+	lines, err := readLines(path)
+	if err != nil {
+		return fmt.Errorf("reading secrets file: %w", err)
+	}
+
+	keySet := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		keySet[k] = true
+	}
+
+	var filtered []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			filtered = append(filtered, line)
+			continue
+		}
+		idx := strings.Index(line, "=")
+		if idx < 0 {
+			filtered = append(filtered, line)
+			continue
+		}
+		key := line[:idx]
+		if keySet[key] {
+			continue // skip this line
+		}
+		filtered = append(filtered, line)
+	}
+
+	return writeLines(path, filtered)
+}
+
+// readLines reads all lines from a file. Returns nil, nil if the file is empty.
+func readLines(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines, scanner.Err()
+}
+
+// writeLines writes lines to a file with 0600 permissions.
+func writeLines(path string, lines []string) error {
+	content := strings.Join(lines, "\n")
+	if len(lines) > 0 {
+		content += "\n"
+	}
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		return fmt.Errorf("writing secrets file: %w", err)
+	}
+	if err := os.Chmod(path, 0600); err != nil {
+		return fmt.Errorf("setting file permissions: %w", err)
+	}
+	return nil
+}
+
 // Remove deletes the entire <dir>/<app>/ directory.
 func (m *Manager) Remove(app string) error {
 	return os.RemoveAll(filepath.Join(m.Dir, app))
