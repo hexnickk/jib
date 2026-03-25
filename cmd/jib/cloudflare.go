@@ -87,8 +87,8 @@ func runCloudflareSetup(cmd *cobra.Command, args []string) error {
 
 	// Step 2: Get tunnel token from user (dashboard-managed tunnel)
 	fmt.Println()
-	fmt.Println("Create a tunnel in the Cloudflare Zero Trust dashboard:")
-	fmt.Println("  https://one.dash.cloudflare.com → Networks → Tunnels → Create")
+	fmt.Println("Create a tunnel in the Cloudflare dashboard:")
+	fmt.Println("  https://dash.cloudflare.com → Networks → Connectors → Create a tunnel")
 	fmt.Println()
 	fmt.Print("Paste the tunnel token: ")
 	token, _ := reader.ReadString('\n')
