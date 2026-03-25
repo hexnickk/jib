@@ -29,7 +29,7 @@ func registerObserveCommands(rootCmd *cobra.Command) {
 	logsCmd := &cobra.Command{
 		Use:   "logs <app> [service]",
 		Short: "Show container logs",
-		Args:  cobra.RangeArgs(1, 2),
+		Args:  rangeArgs(1, 2),
 		RunE:  runLogs,
 	}
 	logsCmd.Flags().BoolP("follow", "f", false, "Follow log output")
@@ -40,7 +40,7 @@ func registerObserveCommands(rootCmd *cobra.Command) {
 	historyCmd := &cobra.Command{
 		Use:   "history <app>",
 		Short: "Deploy/rollback/backup timeline",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runHistory,
 	}
 	historyCmd.Flags().Int("limit", 20, "Maximum number of entries to show")
@@ -50,42 +50,48 @@ func registerObserveCommands(rootCmd *cobra.Command) {
 	// jib env <app>
 	envCmd := &cobra.Command{
 		Use:   "env <app>",
-		Short: "Show env vars (secrets redacted)",
-		Args:  cobra.ExactArgs(1),
+		Short: "Show/manage individual environment variables",
+		Long:  "Show/manage individual environment variables.\n\nFor bulk import from a file, use 'jib secrets set <app> --file .env'",
+		Args:  exactArgs(1),
 		RunE:  runEnv,
 	}
 
 	// jib env set <app> KEY=VALUE [KEY2=VALUE2 ...]
 	envCmd.AddCommand(&cobra.Command{
 		Use:   "set <app> KEY=VALUE [KEY2=VALUE2 ...]",
-		Short: "Set environment variables",
-		Args:  cobra.MinimumNArgs(2),
+		Short: "Set individual env vars (KEY=VALUE pairs)",
+		Args:  minimumArgs(2),
 		RunE:  runEnvSet,
 	})
 
-	// jib env del <app> KEY [KEY2 ...]
+	// jib env remove <app> KEY [KEY2 ...] (alias: del)
 	envCmd.AddCommand(&cobra.Command{
-		Use:   "del <app> KEY [KEY2 ...]",
-		Short: "Delete environment variables",
-		Args:  cobra.MinimumNArgs(2),
-		RunE:  runEnvDel,
+		Use:     "remove <app> KEY [KEY2 ...]",
+		Aliases: []string{"del"},
+		Short:   "Remove individual env vars by key",
+		Args:    minimumArgs(2),
+		RunE:    runEnvDel,
 	})
 
 	rootCmd.AddCommand(envCmd)
 
 	// jib apps
-	rootCmd.AddCommand(&cobra.Command{
+	appsCmd := &cobra.Command{
 		Use:   "apps",
 		Short: "List all apps with status summary",
 		RunE:  runApps,
-	})
+	}
+	appsCmd.Flags().Bool("json", false, "Output in JSON format")
+	rootCmd.AddCommand(appsCmd)
 
 	// jib doctor
-	rootCmd.AddCommand(&cobra.Command{
+	doctorCmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Check everything: deps, nginx, docker, daemon, certs, secrets",
 		RunE:  runDoctor,
-	})
+	}
+	doctorCmd.Flags().Bool("json", false, "Output in JSON format")
+	rootCmd.AddCommand(doctorCmd)
 
 	// jib metrics [app] [service]
 	metricsCmd := &cobra.Command{
@@ -209,6 +215,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			s.ConsecutiveFailures, s.Pinned)
 	}
 	w.Flush()
+	fmt.Println("\nRun 'jib apps' for config details (repo, domains, strategy)")
 	return nil
 }
 
@@ -218,15 +225,54 @@ func runApps(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+
 	if len(cfg.Apps) == 0 {
+		if jsonOutput {
+			fmt.Println("[]")
+			return nil
+		}
 		fmt.Println("No apps configured.")
+		return nil
+	}
+
+	type appInfo struct {
+		Name     string   `json:"name"`
+		Repo     string   `json:"repo"`
+		Branch   string   `json:"branch"`
+		Strategy string   `json:"strategy"`
+		Domains  []string `json:"domains"`
+	}
+
+	names := sortedAppNames(cfg.Apps)
+
+	if jsonOutput {
+		var items []appInfo
+		for _, name := range names {
+			app := cfg.Apps[name]
+			var domains []string
+			for _, d := range app.Domains {
+				domains = append(domains, fmt.Sprintf("%s:%d", d.Host, d.Port))
+			}
+			items = append(items, appInfo{
+				Name:     name,
+				Repo:     app.Repo,
+				Branch:   app.Branch,
+				Strategy: app.Strategy,
+				Domains:  domains,
+			})
+		}
+		data, err := json.MarshalIndent(items, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
 		return nil
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "APP\tREPO\tBRANCH\tSTRATEGY\tDOMAINS")
 
-	names := sortedAppNames(cfg.Apps)
 	for _, name := range names {
 		app := cfg.Apps[name]
 		var domains []string
@@ -237,84 +283,138 @@ func runApps(cmd *cobra.Command, args []string) error {
 			name, app.Repo, app.Branch, app.Strategy, strings.Join(domains, ", "))
 	}
 	w.Flush()
+	fmt.Println("\nRun 'jib status' for deploy status (SHA, failures, last deploy)")
 	return nil
 }
 
 func runDoctor(cmd *cobra.Command, args []string) error {
-	fmt.Println("=== Dependency Checks ===")
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+
+	type doctorCheck struct {
+		Category string `json:"category"`
+		Name     string `json:"name"`
+		Status   string `json:"status"`
+		Detail   string `json:"detail,omitempty"`
+	}
+
+	var checks []doctorCheck
+
+	if !jsonOutput {
+		fmt.Println("=== Dependency Checks ===")
+	}
 	depResults := platform.CheckAllDependencies()
 	allOK := true
 	for _, r := range depResults {
-		status := "OK"
+		status := "ok"
 		detail := fmt.Sprintf("v%s", r.Version)
 		if !r.Installed {
-			status = "MISSING"
+			status = "missing"
 			detail = "not installed"
 			allOK = false
 		} else if !r.MeetsMinimum {
-			status = "OLD"
+			status = "old"
 			detail = fmt.Sprintf("v%s (need >= %s)", r.Version, r.MinVersion)
 			allOK = false
 		}
-		fmt.Printf("  %-20s %s  %s\n", r.Name, status, detail)
+		if jsonOutput {
+			checks = append(checks, doctorCheck{Category: "dependency", Name: r.Name, Status: status, Detail: detail})
+		} else {
+			fmt.Printf("  %-20s %s  %s\n", r.Name, strings.ToUpper(status), detail)
+		}
 	}
 
 	// Check secrets for all apps
 	cfg, cfgErr := loadConfig()
 	if cfgErr != nil {
-		fmt.Printf("\n=== Config ===\n")
-		fmt.Printf("  FAIL  Could not load config: %v\n", cfgErr)
+		if jsonOutput {
+			checks = append(checks, doctorCheck{Category: "config", Name: "config", Status: "fail", Detail: cfgErr.Error()})
+		} else {
+			fmt.Printf("\n=== Config ===\n")
+			fmt.Printf("  FAIL  Could not load config: %v\n", cfgErr)
+		}
 		allOK = false
 	} else {
-		fmt.Println("\n=== Secrets ===")
+		if !jsonOutput {
+			fmt.Println("\n=== Secrets ===")
+		}
 		mgr := newSecretsManager()
 		secretStatuses := mgr.CheckAll(cfg.Apps)
-		if len(secretStatuses) == 0 {
+		if len(secretStatuses) == 0 && !jsonOutput {
 			fmt.Println("  No apps require secrets_env.")
 		}
 		for _, s := range secretStatuses {
 			if s.Exists {
-				fmt.Printf("  %-20s OK    %s\n", s.App, s.Path)
+				if jsonOutput {
+					checks = append(checks, doctorCheck{Category: "secret", Name: s.App, Status: "ok", Detail: s.Path})
+				} else {
+					fmt.Printf("  %-20s OK    %s\n", s.App, s.Path)
+				}
 			} else {
-				fmt.Printf("  %-20s MISSING  %s\n", s.App, s.Path)
+				if jsonOutput {
+					checks = append(checks, doctorCheck{Category: "secret", Name: s.App, Status: "missing", Detail: s.Path})
+				} else {
+					fmt.Printf("  %-20s MISSING  %s\n", s.App, s.Path)
+				}
 				allOK = false
 			}
 		}
 
 		// Check certs
-		fmt.Println("\n=== SSL Certificates ===")
+		if !jsonOutput {
+			fmt.Println("\n=== SSL Certificates ===")
+		}
 		sslMgr := newSSLManager(cfg)
 		hasDomains := false
 		for appName, app := range cfg.Apps {
 			for _, d := range app.Domains {
 				hasDomains = true
 				if !sslMgr.CertExists(d.Host) {
-					fmt.Printf("  %-30s MISSING  (app: %s)\n", d.Host, appName)
+					if jsonOutput {
+						checks = append(checks, doctorCheck{Category: "ssl", Name: d.Host, Status: "missing", Detail: fmt.Sprintf("app: %s", appName)})
+					} else {
+						fmt.Printf("  %-30s MISSING  (app: %s)\n", d.Host, appName)
+					}
 					allOK = false
 				} else {
 					days, err := sslMgr.CheckExpiry(d.Host)
 					if err != nil {
-						fmt.Printf("  %-30s ERROR    %v (app: %s)\n", d.Host, err, appName)
+						if jsonOutput {
+							checks = append(checks, doctorCheck{Category: "ssl", Name: d.Host, Status: "error", Detail: fmt.Sprintf("%v (app: %s)", err, appName)})
+						} else {
+							fmt.Printf("  %-30s ERROR    %v (app: %s)\n", d.Host, err, appName)
+						}
 						allOK = false
 					} else if days < 14 {
-						fmt.Printf("  %-30s WARNING  %d days remaining (app: %s)\n", d.Host, days, appName)
+						if jsonOutput {
+							checks = append(checks, doctorCheck{Category: "ssl", Name: d.Host, Status: "warning", Detail: fmt.Sprintf("%d days remaining (app: %s)", days, appName)})
+						} else {
+							fmt.Printf("  %-30s WARNING  %d days remaining (app: %s)\n", d.Host, days, appName)
+						}
 					} else {
-						fmt.Printf("  %-30s OK       %d days remaining (app: %s)\n", d.Host, days, appName)
+						if jsonOutput {
+							checks = append(checks, doctorCheck{Category: "ssl", Name: d.Host, Status: "ok", Detail: fmt.Sprintf("%d days remaining (app: %s)", days, appName)})
+						} else {
+							fmt.Printf("  %-30s OK       %d days remaining (app: %s)\n", d.Host, days, appName)
+						}
 					}
 				}
 			}
 		}
-		if !hasDomains {
+		if !hasDomains && !jsonOutput {
 			fmt.Println("  No domains configured.")
 		}
 	}
 
 	// Check resource allocation
 	if cfgErr == nil {
-		fmt.Println("\n=== Resource Limits ===")
+		if !jsonOutput {
+			fmt.Println("\n=== Resource Limits ===")
+		}
 		sr, resErr := platform.DetectResources()
 		if resErr != nil {
-			fmt.Printf("  Could not detect server resources: %v\n", resErr)
+			if !jsonOutput {
+				fmt.Printf("  Could not detect server resources: %v\n", resErr)
+			}
 		} else {
 			totalAllocMemMB := 0
 			totalAllocCPU := 0.0
@@ -326,34 +426,61 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 					cpu := platform.ParseCPUs(app.Resources.CPUs)
 					totalAllocMemMB += mem
 					totalAllocCPU += cpu
-					fmt.Printf("  %-20s memory=%-8s cpus=%s\n", appName, app.Resources.Memory, app.Resources.CPUs)
+					if !jsonOutput {
+						fmt.Printf("  %-20s memory=%-8s cpus=%s\n", appName, app.Resources.Memory, app.Resources.CPUs)
+					}
 				} else {
-					// Apps without configured resources will get auto-defaults at deploy time
-					fmt.Printf("  %-20s (auto — defaults applied at deploy)\n", appName)
+					if !jsonOutput {
+						fmt.Printf("  %-20s (auto — defaults applied at deploy)\n", appName)
+					}
 				}
 			}
 			if anyConfigured {
 				resourcesOK := true
 				if totalAllocMemMB > sr.TotalMemoryMB {
-					fmt.Printf("  WARNING: total allocated memory (%dM) exceeds server capacity (%dM)\n",
-						totalAllocMemMB, sr.TotalMemoryMB)
+					if jsonOutput {
+						checks = append(checks, doctorCheck{Category: "resources", Name: "memory", Status: "warning", Detail: fmt.Sprintf("allocated %dM exceeds server capacity %dM", totalAllocMemMB, sr.TotalMemoryMB)})
+					} else {
+						fmt.Printf("  WARNING: total allocated memory (%dM) exceeds server capacity (%dM)\n",
+							totalAllocMemMB, sr.TotalMemoryMB)
+					}
 					resourcesOK = false
 					allOK = false
 				}
 				if totalAllocCPU > float64(sr.NumCPUs) {
-					fmt.Printf("  WARNING: total allocated CPUs (%.1f) exceeds server capacity (%d)\n",
-						totalAllocCPU, sr.NumCPUs)
+					if jsonOutput {
+						checks = append(checks, doctorCheck{Category: "resources", Name: "cpus", Status: "warning", Detail: fmt.Sprintf("allocated %.1f exceeds server capacity %d", totalAllocCPU, sr.NumCPUs)})
+					} else {
+						fmt.Printf("  WARNING: total allocated CPUs (%.1f) exceeds server capacity (%d)\n",
+							totalAllocCPU, sr.NumCPUs)
+					}
 					resourcesOK = false
 					allOK = false
 				}
 				if resourcesOK {
-					fmt.Printf("  Server: %s RAM, %s CPUs — allocated: %dM RAM, %.1f CPUs\n",
-						sr.MemoryString, sr.CPUString, totalAllocMemMB, totalAllocCPU)
+					if jsonOutput {
+						checks = append(checks, doctorCheck{Category: "resources", Name: "allocation", Status: "ok", Detail: fmt.Sprintf("%dM RAM, %.1f CPUs allocated of %s RAM, %s CPUs", totalAllocMemMB, totalAllocCPU, sr.MemoryString, sr.CPUString)})
+					} else {
+						fmt.Printf("  Server: %s RAM, %s CPUs — allocated: %dM RAM, %.1f CPUs\n",
+							sr.MemoryString, sr.CPUString, totalAllocMemMB, totalAllocCPU)
+					}
 				}
-			} else if len(cfg.Apps) > 0 {
+			} else if len(cfg.Apps) > 0 && !jsonOutput {
 				fmt.Println("  No apps have explicit resource limits (defaults applied at deploy).")
 			}
 		}
+	}
+
+	if jsonOutput {
+		data, err := json.MarshalIndent(checks, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
+		if !allOK {
+			return fmt.Errorf("doctor found problems")
+		}
+		return nil
 	}
 
 	fmt.Println()

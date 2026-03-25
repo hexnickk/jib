@@ -13,7 +13,7 @@ func registerDeployCommands(rootCmd *cobra.Command) {
 	deployCmd := &cobra.Command{
 		Use:   "deploy <app>",
 		Short: "Build and deploy an app",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runDeploy,
 	}
 	deployCmd.Flags().String("ref", "", "Git ref (SHA, branch, tag) to deploy")
@@ -25,7 +25,7 @@ func registerDeployCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "rollback <app>",
 		Short: "Swap to previous version",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runRollback,
 	})
 
@@ -33,7 +33,7 @@ func registerDeployCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "resume <app>",
 		Short: "Reset failures, unpin, re-enable autodeploy",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runResume,
 	})
 
@@ -91,6 +91,9 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("deploy failed: %w", err)
 	}
 
+	if dryRun {
+		fmt.Println("[dry-run] No changes were made.")
+	}
 	printDeployResult(result)
 	if !result.Success {
 		return fmt.Errorf("deploy completed with errors: %s", result.Error)

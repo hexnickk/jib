@@ -151,23 +151,23 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 
 	// Dry-run: report what would happen and return.
 	if opts.DryRun {
-		fmt.Printf("DRY RUN — %s (%s strategy)\n", opts.App, strategy)
-		fmt.Printf("  Current SHA: %s\n", currentSHA)
-		fmt.Printf("  Target SHA:  %s\n", targetRef)
+		fmt.Printf("[dry-run] %s (%s strategy)\n", opts.App, strategy)
+		fmt.Printf("[dry-run]   Current SHA: %s\n", currentSHA)
+		fmt.Printf("[dry-run]   Target SHA:  %s\n", targetRef)
 		if len(appCfg.PreDeploy) > 0 {
-			fmt.Printf("  Pre-deploy hooks:\n")
+			fmt.Printf("[dry-run]   Pre-deploy hooks:\n")
 			for _, h := range appCfg.PreDeploy {
-				fmt.Printf("    - %s\n", h.Service)
+				fmt.Printf("[dry-run]     - %s\n", h.Service)
 			}
 		}
 		if len(appCfg.BuildArgs) > 0 {
-			fmt.Printf("  Build args:\n")
+			fmt.Printf("[dry-run]   Build args:\n")
 			for k, v := range appCfg.BuildArgs {
-				fmt.Printf("    %s=%s\n", k, v)
+				fmt.Printf("[dry-run]     %s=%s\n", k, v)
 			}
 		}
 		if len(appCfg.Services) > 0 {
-			fmt.Printf("  Services: %s\n", strings.Join(appCfg.Services, ", "))
+			fmt.Printf("[dry-run]   Services: %s\n", strings.Join(appCfg.Services, ", "))
 		}
 		return &DeployResult{
 			App:         opts.App,

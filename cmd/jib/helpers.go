@@ -14,6 +14,7 @@ import (
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/ssl"
 	"github.com/hexnickk/jib/internal/state"
+	"github.com/spf13/cobra"
 )
 
 // jibRoot returns the base directory for all jib data.
@@ -135,4 +136,41 @@ func currentUser() string {
 		user = "unknown"
 	}
 	return user
+}
+
+// exactArgs returns a cobra.PositionalArgs validator that requires exactly n
+// arguments, producing a descriptive error message that includes the command's
+// Use string instead of cobra's generic "accepts N arg(s), received M".
+func exactArgs(n int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) != n {
+			return fmt.Errorf("requires exactly %d argument(s)\n\nUsage:\n  %s\n\nRun '%s --help' for more information",
+				n, cmd.UseLine(), cmd.CommandPath())
+		}
+		return nil
+	}
+}
+
+// minimumArgs returns a cobra.PositionalArgs validator that requires at least n
+// arguments, producing a descriptive error message.
+func minimumArgs(n int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) < n {
+			return fmt.Errorf("requires at least %d argument(s)\n\nUsage:\n  %s\n\nRun '%s --help' for more information",
+				n, cmd.UseLine(), cmd.CommandPath())
+		}
+		return nil
+	}
+}
+
+// rangeArgs returns a cobra.PositionalArgs validator that requires between min
+// and max arguments, producing a descriptive error message.
+func rangeArgs(min, max int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) < min || len(args) > max {
+			return fmt.Errorf("requires between %d and %d argument(s)\n\nUsage:\n  %s\n\nRun '%s --help' for more information",
+				min, max, cmd.UseLine(), cmd.CommandPath())
+		}
+		return nil
+	}
 }

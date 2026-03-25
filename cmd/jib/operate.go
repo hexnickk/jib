@@ -21,11 +21,20 @@ import (
 )
 
 func registerOperateCommands(rootCmd *cobra.Command) {
+	// jib up <app>
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "up <app>",
+		Short: "Start existing containers without rebuilding or pulling",
+		Args:  exactArgs(1),
+		RunE:  runUp,
+	})
+
 	// jib down <app>
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "down <app>",
 		Short: "Stop containers without removing app from config",
-		Args:  cobra.ExactArgs(1),
+		Long:  "Stop containers without removing app from config.\n\nTo bring the app back up without redeploying, use 'jib up <app>'.",
+		Args:  exactArgs(1),
 		RunE:  runDown,
 	})
 
@@ -33,7 +42,7 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "restart <app>",
 		Short: "Restart containers without redeploying",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runRestart,
 	})
 
@@ -41,7 +50,6 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	execCmd := &cobra.Command{
 		Use:                "exec <app> [service] -- <cmd>",
 		Short:              "Execute command in running container",
-		Args:               cobra.MinimumNArgs(1),
 		DisableFlagParsing: true,
 		RunE:               runExec,
 	}
@@ -51,7 +59,6 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	runCmd := &cobra.Command{
 		Use:                "run <app> <service> [-- <cmd>]",
 		Short:              "Run a one-off command in a new container",
-		Args:               cobra.MinimumNArgs(2),
 		DisableFlagParsing: true,
 		RunE:               runRun,
 	}
@@ -61,23 +68,25 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	backupCmd := &cobra.Command{
 		Use:   "backup <app>",
 		Short: "Create a backup of app data",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runBackup,
 	}
 	backupListCmd := &cobra.Command{
 		Use:   "list <app>",
 		Short: "List available backups for an app",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runBackupList,
 	}
+	backupListCmd.Flags().Bool("json", false, "Output in JSON format")
 	backupCmd.AddCommand(backupListCmd)
+	backupCmd.AddCommand(newBackupDestCmd())
 	rootCmd.AddCommand(backupCmd)
 
 	// jib restore <app>
 	restoreCmd := &cobra.Command{
 		Use:   "restore <app>",
 		Short: "Restore app data from a backup",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runRestore,
 	}
 	restoreCmd.Flags().String("from", "", "Timestamp to restore from (e.g. 20260325-040000)")
@@ -86,22 +95,25 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(restoreCmd)
 
 	// jib cleanup
-	rootCmd.AddCommand(&cobra.Command{
+	cleanupCmd := &cobra.Command{
 		Use:   "cleanup",
 		Short: "Clean up old images, volumes, and build cache",
 		RunE:  runCleanup,
-	})
+	}
+	cleanupCmd.Flags().Bool("dry-run", false, "Show what would be pruned without actually pruning")
+	rootCmd.AddCommand(cleanupCmd)
 
 	// jib secrets
 	secretsCmd := &cobra.Command{
 		Use:              "secrets",
-		Short:            "Manage app secrets",
+		Short:            "Manage app secrets (bulk file import)",
+		Long:             "Manage app secrets (bulk file import).\n\nFor individual variable management, use 'jib env set <app> KEY=VALUE'",
 		TraverseChildren: true,
 	}
 	secretsSetCmd := &cobra.Command{
 		Use:   "set <app>",
-		Short: "Set secrets for an app from a file",
-		Args:  cobra.ExactArgs(1),
+		Short: "Import env vars from a file (bulk replace)",
+		Args:  exactArgs(1),
 		RunE:  runSecretsSet,
 	}
 	secretsSetCmd.Flags().String("file", "", "Path to secrets file")
@@ -109,16 +121,17 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	secretsCmd.AddCommand(secretsSetCmd)
 	secretsCmd.AddCommand(&cobra.Command{
 		Use:   "check [app]",
-		Short: "Check that required secrets are present",
+		Short: "Verify secrets file exists for an app",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  runSecretsCheck,
 	})
 	rootCmd.AddCommand(secretsCmd)
 
-	// jib cron <app>
+	// jib cron <app> — stub, hidden until implemented
 	cronCmd := &cobra.Command{
-		Use:   "cron",
-		Short: "Manage scheduled tasks per app",
+		Use:    "cron",
+		Short:  "Manage scheduled tasks per app",
+		Hidden: true,
 	}
 	cronCmd.AddCommand(&cobra.Command{
 		Use:   "add <app>",
@@ -175,7 +188,7 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	maintenanceOnCmd := &cobra.Command{
 		Use:   "on <app>",
 		Short: "Enable maintenance mode (serve 503 page)",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runMaintenanceOn,
 	}
 	maintenanceOnCmd.Flags().String("message", "", "Custom maintenance message")
@@ -184,7 +197,7 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	maintenanceCmd.AddCommand(&cobra.Command{
 		Use:   "off <app>",
 		Short: "Disable maintenance mode (restore normal config)",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runMaintenanceOff,
 	})
 
@@ -197,10 +210,11 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 
 	rootCmd.AddCommand(maintenanceCmd)
 
-	// jib nuke
+	// jib nuke — stub, hidden until implemented
 	nukeCmd := &cobra.Command{
-		Use:   "nuke",
-		Short: "Remove everything jib-related from the machine",
+		Use:    "nuke",
+		Short:  "Remove everything jib-related from the machine",
+		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			force, _ := cmd.Flags().GetBool("force")
 			fmt.Println("[nuke] Would remove everything jib-related from this machine:")
@@ -216,6 +230,27 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	}
 	nukeCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 	rootCmd.AddCommand(nukeCmd)
+}
+
+func runUp(cmd *cobra.Command, args []string) error {
+	appName := args[0]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	compose, err := newCompose(cfg, appName)
+	if err != nil {
+		return err
+	}
+
+	if err := compose.Up(context.Background(), nil); err != nil {
+		return fmt.Errorf("starting %s: %w", appName, err)
+	}
+
+	fmt.Printf("Started %s.\n", appName)
+	return nil
 }
 
 func runDown(cmd *cobra.Command, args []string) error {
@@ -264,7 +299,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 // Since DisableFlagParsing is true, we receive the full args slice.
 func parseExecArgs(args []string) (appName, service string, cmdArgs []string, err error) {
 	if len(args) == 0 {
-		return "", "", nil, fmt.Errorf("app name is required")
+		return "", "", nil, fmt.Errorf("missing app name\n\nUsage:\n  jib exec <app> [service] -- <cmd>")
 	}
 
 	appName = args[0]
@@ -282,7 +317,7 @@ func parseExecArgs(args []string) (appName, service string, cmdArgs []string, er
 	if dashIdx == -1 {
 		// No "--", treat everything after app as command (service defaults to first)
 		if len(rest) == 0 {
-			return "", "", nil, fmt.Errorf("command is required after app name")
+			return "", "", nil, fmt.Errorf("command is required after app name\n\nUsage:\n  jib exec <app> [service] -- <cmd>")
 		}
 		// If only one arg after app, it could be service name or command
 		// Convention: if there's no --, first arg is service, rest is command
@@ -304,6 +339,13 @@ func parseExecArgs(args []string) (appName, service string, cmdArgs []string, er
 }
 
 func runExec(cmd *cobra.Command, args []string) error {
+	// DisableFlagParsing is true, so we must handle --help manually.
+	for _, a := range args {
+		if a == "--help" || a == "-h" {
+			return cmd.Help()
+		}
+	}
+
 	appName, service, cmdArgs, err := parseExecArgs(args)
 	if err != nil {
 		return err
@@ -325,7 +367,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 // parseRunArgs parses "jib run <app> <service> [-- <cmd...>]" from raw args.
 func parseRunArgs(args []string) (appName, service string, cmdArgs []string, err error) {
 	if len(args) < 2 {
-		return "", "", nil, fmt.Errorf("app name and service are required")
+		return "", "", nil, fmt.Errorf("app name and service are required\n\nUsage:\n  jib run <app> <service> [-- <cmd>]")
 	}
 
 	appName = args[0]
@@ -351,6 +393,13 @@ func parseRunArgs(args []string) (appName, service string, cmdArgs []string, err
 }
 
 func runRun(cmd *cobra.Command, args []string) error {
+	// DisableFlagParsing is true, so we must handle --help manually.
+	for _, a := range args {
+		if a == "--help" || a == "-h" {
+			return cmd.Help()
+		}
+	}
+
 	appName, service, cmdArgs, err := parseRunArgs(args)
 	if err != nil {
 		return err
@@ -370,6 +419,19 @@ func runRun(cmd *cobra.Command, args []string) error {
 }
 
 func runCleanup(cmd *cobra.Command, args []string) error {
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+	if dryRun {
+		fmt.Println("Dry run: showing reclaimable space (nothing will be deleted).")
+		fmt.Println()
+		out, err := exec.CommandContext(context.Background(), "docker", "system", "df").CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("docker system df failed: %w", err)
+		}
+		fmt.Print(string(out))
+		return nil
+	}
+
 	fmt.Println("Pruning unused Docker images...")
 	if err := docker.PruneImages(context.Background()); err != nil {
 		return fmt.Errorf("cleanup failed: %w", err)
@@ -730,6 +792,7 @@ func runBackup(cmd *cobra.Command, args []string) error {
 
 func runBackupList(cmd *cobra.Command, args []string) error {
 	appName := args[0]
+	jsonOutput, _ := cmd.Flags().GetBool("json")
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -743,7 +806,20 @@ func runBackupList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(backups) == 0 {
+		if jsonOutput {
+			fmt.Println("[]")
+			return nil
+		}
 		fmt.Printf("No backups found for %s.\n", appName)
+		return nil
+	}
+
+	if jsonOutput {
+		data, err := json.MarshalIndent(backups, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
 		return nil
 	}
 

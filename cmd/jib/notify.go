@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,11 +24,13 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	}
 
 	// jib notify list
-	notifyCmd.AddCommand(&cobra.Command{
+	notifyListCmd := &cobra.Command{
 		Use:   "list",
 		Short: "Show all configured notification channels",
 		RunE:  runNotifyList,
-	})
+	}
+	notifyListCmd.Flags().Bool("json", false, "Output in JSON format")
+	notifyCmd.AddCommand(notifyListCmd)
 
 	// jib notify add <name> --driver <driver>
 	addCmd := &cobra.Command{
@@ -56,79 +59,143 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 		RunE:  runNotifyTest,
 	})
 
-	rootCmd.AddCommand(notifyCmd)
-
-	// jib telegram add/test
-	telegramCmd := &cobra.Command{
+	// jib notify telegram add/test
+	notifyTelegramCmd := &cobra.Command{
 		Use:   "telegram",
 		Short: "Manage Telegram notification channels",
 	}
-	telegramCmd.AddCommand(&cobra.Command{
+	notifyTelegramCmd.AddCommand(&cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a Telegram notification channel",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runTelegramAdd,
 	})
-	telegramCmd.AddCommand(&cobra.Command{
+	notifyTelegramCmd.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Send a test message to a Telegram channel",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runNotifyTest,
 	})
-	rootCmd.AddCommand(telegramCmd)
+	notifyCmd.AddCommand(notifyTelegramCmd)
 
-	// jib slack add/test
-	slackCmd := &cobra.Command{
+	// jib notify slack add/test
+	notifySlackCmd := &cobra.Command{
 		Use:   "slack",
 		Short: "Manage Slack notification channels",
 	}
-	slackCmd.AddCommand(&cobra.Command{
+	notifySlackCmd.AddCommand(&cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a Slack notification channel",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runSlackAdd,
 	})
-	slackCmd.AddCommand(&cobra.Command{
+	notifySlackCmd.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Send a test message to a Slack channel",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runNotifyTest,
 	})
-	rootCmd.AddCommand(slackCmd)
+	notifyCmd.AddCommand(notifySlackCmd)
 
-	// jib discord add/test
-	discordCmd := &cobra.Command{
+	// jib notify discord add/test
+	notifyDiscordCmd := &cobra.Command{
 		Use:   "discord",
 		Short: "Manage Discord notification channels",
 	}
-	discordCmd.AddCommand(&cobra.Command{
+	notifyDiscordCmd.AddCommand(&cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a Discord notification channel",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runDiscordAdd,
 	})
-	discordCmd.AddCommand(&cobra.Command{
+	notifyDiscordCmd.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Send a test message to a Discord channel",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runNotifyTest,
 	})
-	rootCmd.AddCommand(discordCmd)
+	notifyCmd.AddCommand(notifyDiscordCmd)
+
+	rootCmd.AddCommand(notifyCmd)
+
+	// Hidden backward-compat aliases: jib telegram, jib slack, jib discord
+	telegramAlias := &cobra.Command{
+		Use:    "telegram",
+		Short:  "Manage Telegram notification channels",
+		Hidden: true,
+	}
+	telegramAlias.AddCommand(&cobra.Command{
+		Use:   "add <name>",
+		Short: "Add a Telegram notification channel",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runTelegramAdd,
+	})
+	telegramAlias.AddCommand(&cobra.Command{
+		Use:   "test <name>",
+		Short: "Send a test message to a Telegram channel",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runNotifyTest,
+	})
+	rootCmd.AddCommand(telegramAlias)
+
+	slackAlias := &cobra.Command{
+		Use:    "slack",
+		Short:  "Manage Slack notification channels",
+		Hidden: true,
+	}
+	slackAlias.AddCommand(&cobra.Command{
+		Use:   "add <name>",
+		Short: "Add a Slack notification channel",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runSlackAdd,
+	})
+	slackAlias.AddCommand(&cobra.Command{
+		Use:   "test <name>",
+		Short: "Send a test message to a Slack channel",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runNotifyTest,
+	})
+	rootCmd.AddCommand(slackAlias)
+
+	discordAlias := &cobra.Command{
+		Use:    "discord",
+		Short:  "Manage Discord notification channels",
+		Hidden: true,
+	}
+	discordAlias.AddCommand(&cobra.Command{
+		Use:   "add <name>",
+		Short: "Add a Discord notification channel",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runDiscordAdd,
+	})
+	discordAlias.AddCommand(&cobra.Command{
+		Use:   "test <name>",
+		Short: "Send a test message to a Discord channel",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runNotifyTest,
+	})
+	rootCmd.AddCommand(discordAlias)
 }
 
 // runNotifyList shows all configured notification channels and which apps use them.
 func runNotifyList(cmd *cobra.Command, args []string) error {
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
 
 	if len(cfg.Notifications) == 0 {
+		if jsonOutput {
+			fmt.Println("[]")
+			return nil
+		}
 		fmt.Println("No notification channels configured.")
 		fmt.Println("\nAdd one with:")
-		fmt.Println("  jib telegram add <name>")
-		fmt.Println("  jib slack add <name>")
-		fmt.Println("  jib discord add <name>")
+		fmt.Println("  jib notify telegram add <name>")
+		fmt.Println("  jib notify slack add <name>")
+		fmt.Println("  jib notify discord add <name>")
 		fmt.Println("  jib notify add <name> --driver webhook --url <url>")
 		return nil
 	}
@@ -150,6 +217,37 @@ func runNotifyList(cmd *cobra.Command, args []string) error {
 
 	// Check for credentials.
 	secretsDir := filepath.Join(jibRoot(), "secrets")
+
+	if jsonOutput {
+		type channelInfo struct {
+			Name   string   `json:"name"`
+			Driver string   `json:"driver"`
+			Creds  string   `json:"creds"`
+			Apps   []string `json:"apps"`
+		}
+		var items []channelInfo
+		for _, name := range names {
+			ch := cfg.Notifications[name]
+			credsStatus := "missing"
+			if _, err := notify.ReadChannelCreds(secretsDir, name); err == nil {
+				credsStatus = "ok"
+			}
+			apps := channelApps[name]
+			sort.Strings(apps)
+			items = append(items, channelInfo{
+				Name:   name,
+				Driver: ch.Driver,
+				Creds:  credsStatus,
+				Apps:   apps,
+			})
+		}
+		data, err := json.MarshalIndent(items, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
+		return nil
+	}
 
 	fmt.Printf("%-20s %-10s %-10s %s\n", "NAME", "DRIVER", "CREDS", "APPS")
 	fmt.Printf("%-20s %-10s %-10s %s\n", "----", "------", "-----", "----")

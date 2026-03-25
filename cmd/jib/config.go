@@ -21,13 +21,13 @@ func registerConfigCommands(rootCmd *cobra.Command) {
 	configCmd.AddCommand(&cobra.Command{
 		Use:   "get <key>",
 		Short: "Read a config value",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runConfigGet,
 	})
 	configCmd.AddCommand(&cobra.Command{
 		Use:   "set <key> <value>",
 		Short: "Write a config value",
-		Args:  cobra.ExactArgs(2),
+		Args:  exactArgs(2),
 		RunE:  runConfigSet,
 	})
 	configCmd.AddCommand(&cobra.Command{
@@ -37,16 +37,32 @@ func registerConfigCommands(rootCmd *cobra.Command) {
 	})
 	rootCmd.AddCommand(configCmd)
 
-	// jib backup-dest
+	// jib backup-dest (hidden alias for backward compat — use "jib backup dest" instead)
 	backupDestCmd := &cobra.Command{
-		Use:   "backup-dest",
+		Use:    "backup-dest",
+		Short:  "Manage backup destinations",
+		Hidden: true,
+	}
+	populateBackupDestSubcommands(backupDestCmd)
+	rootCmd.AddCommand(backupDestCmd)
+}
+
+// newBackupDestCmd creates the "dest" subcommand for the backup command.
+func newBackupDestCmd() *cobra.Command {
+	destCmd := &cobra.Command{
+		Use:   "dest",
 		Short: "Manage backup destinations",
 	}
+	populateBackupDestSubcommands(destCmd)
+	return destCmd
+}
 
+// populateBackupDestSubcommands adds add/remove/list/test subcommands to the given parent.
+func populateBackupDestSubcommands(parent *cobra.Command) {
 	addDestCmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a backup destination",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runBackupDestAdd,
 	}
 	addDestCmd.Flags().String("driver", "", "Driver: r2, s3, ssh, or local")
@@ -54,26 +70,25 @@ func registerConfigCommands(rootCmd *cobra.Command) {
 	addDestCmd.Flags().String("host", "", "SSH host (for ssh)")
 	addDestCmd.Flags().String("path", "", "Path (for ssh/local)")
 	addDestCmd.Flags().Int("retain", 7, "Number of backups to retain")
-	backupDestCmd.AddCommand(addDestCmd)
+	parent.AddCommand(addDestCmd)
 
-	backupDestCmd.AddCommand(&cobra.Command{
+	parent.AddCommand(&cobra.Command{
 		Use:   "remove <name>",
 		Short: "Remove a backup destination",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runBackupDestRemove,
 	})
-	backupDestCmd.AddCommand(&cobra.Command{
+	parent.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "Show configured backup destinations",
 		RunE:  runBackupDestList,
 	})
-	backupDestCmd.AddCommand(&cobra.Command{
+	parent.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Test a backup destination (write/read/delete)",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runBackupDestTest,
 	})
-	rootCmd.AddCommand(backupDestCmd)
 }
 
 func runConfigGet(cmd *cobra.Command, args []string) error {
@@ -334,7 +349,7 @@ func runBackupDestList(cmd *cobra.Command, args []string) error {
 
 	if len(cfg.BackupDests) == 0 {
 		fmt.Println("No backup destinations configured.")
-		fmt.Println("Add one with: jib backup-dest add <name> --driver <r2|s3|ssh|local>")
+		fmt.Println("Add one with: jib backup dest add <name> --driver <r2|s3|ssh|local>")
 		return nil
 	}
 

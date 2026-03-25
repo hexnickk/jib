@@ -34,7 +34,7 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	addCmd := &cobra.Command{
 		Use:   "add <app>",
 		Short: "Add app: config + clone + key + nginx + SSL",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runAdd,
 	}
 	addCmd.Flags().String("repo", "", "GitHub repo (org/name)")
@@ -58,7 +58,7 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	removeCmd := &cobra.Command{
 		Use:   "remove <app>",
 		Short: "Remove an app completely",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runRemove,
 	}
 	removeCmd.Flags().Bool("force", false, "Skip confirmation prompt")

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -37,6 +38,7 @@ Services run on the jib-shared Docker network and can be accessed by any app.`,
 		Short: "List all shared services",
 		RunE:  runServiceList,
 	}
+	listCmd.Flags().Bool("json", false, "Output in JSON format")
 	serviceCmd.AddCommand(listCmd)
 
 	// jib service status <name>
@@ -103,6 +105,7 @@ func runServiceAdd(cmd *cobra.Command, args []string) error {
 }
 
 func runServiceList(cmd *cobra.Command, args []string) error {
+	jsonOutput, _ := cmd.Flags().GetBool("json")
 	mgr := newServiceManager()
 
 	services, err := mgr.List()
@@ -111,7 +114,20 @@ func runServiceList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(services) == 0 {
+		if jsonOutput {
+			fmt.Println("[]")
+			return nil
+		}
 		fmt.Println("No shared services.")
+		return nil
+	}
+
+	if jsonOutput {
+		data, err := json.MarshalIndent(services, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
 		return nil
 	}
 
