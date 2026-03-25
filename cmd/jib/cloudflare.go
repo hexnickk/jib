@@ -68,10 +68,11 @@ func installCloudflared() error {
 }
 
 func runCloudflareSetup(cmd *cobra.Command, args []string) error {
+	reader := bufio.NewReader(os.Stdin)
+
 	// Step 1: Check / install cloudflared
 	if !cloudflaredInstalled() {
 		fmt.Print("cloudflared is not installed. Install it now? [Y/n]: ")
-		reader := bufio.NewReader(os.Stdin)
 		answer, _ := reader.ReadString('\n')
 		answer = strings.TrimSpace(strings.ToLower(answer))
 		if answer != "" && answer != "y" && answer != "yes" {
@@ -90,7 +91,6 @@ func runCloudflareSetup(cmd *cobra.Command, args []string) error {
 	fmt.Println("  https://one.dash.cloudflare.com → Networks → Tunnels → Create")
 	fmt.Println()
 	fmt.Print("Paste the tunnel token: ")
-	reader := bufio.NewReader(os.Stdin)
 	token, _ := reader.ReadString('\n')
 	token = strings.TrimSpace(token)
 	if token == "" {
@@ -123,24 +123,13 @@ func runCloudflareStatus(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println("Cloudflare Tunnel status:")
-	fmt.Println()
-
-	// Try to get tunnel info
-	info := exec.Command("cloudflared", "tunnel", "info", "jib")
-	info.Stdout = os.Stdout
-	info.Stderr = os.Stderr
-	if err := info.Run(); err != nil {
-		// Fall back to listing tunnels
-		fmt.Println("Could not get info for tunnel 'jib'. Listing all tunnels:")
-		fmt.Println()
-		list := exec.Command("cloudflared", "tunnel", "list")
-		list.Stdout = os.Stdout
-		list.Stderr = os.Stderr
-		if listErr := list.Run(); listErr != nil {
-			fmt.Println("No tunnels found or not authenticated.")
-			fmt.Println("Run 'jib cloudflare setup' to configure.")
-		}
+	// Check systemd service status
+	status := sudoCmd("systemctl", "status", "cloudflared", "--no-pager")
+	status.Stdout = os.Stdout
+	status.Stderr = os.Stderr
+	if err := status.Run(); err != nil {
+		fmt.Println("\ncloudflared service is not running.")
+		fmt.Println("Run 'jib cloudflare setup' to configure.")
 	}
 
 	return nil
