@@ -63,6 +63,11 @@ type Resources struct {
 	CPUs   string `yaml:"cpus,omitempty"`   // e.g. "0.5"
 }
 
+// AppWebhook stores per-app webhook integration config.
+type AppWebhook struct {
+	Provider string `yaml:"provider"` // github, gitlab, etc.
+}
+
 // App describes a single deployable application.
 type App struct {
 	Repo         string            `yaml:"repo"`
@@ -82,6 +87,7 @@ type App struct {
 	Cron         []CronTask        `yaml:"cron,omitempty"`
 	Resources    *Resources        `yaml:"resources,omitempty"`
 	Notify       []string          `yaml:"notify,omitempty"`
+	Webhook      *AppWebhook       `yaml:"webhook,omitempty"`
 }
 
 // Domain maps a hostname to a container port.

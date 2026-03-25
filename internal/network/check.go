@@ -51,7 +51,7 @@ func CheckDomain(domain string) *DomainCheck {
 	result.IPs = ips
 
 	// Classify based on IP
-	serverIP := getPublicIP()
+	serverIP := GetPublicIP()
 
 	for _, ip := range ips {
 		if ip == serverIP {
@@ -140,8 +140,8 @@ func cleanupProbe(path string) {
 	exec.Command("bash", "-c", fmt.Sprintf("rm -f %s && nginx -s reload 2>/dev/null", path)).Run()
 }
 
-// getPublicIP returns this server's public IP address.
-func getPublicIP() string {
+// GetPublicIP returns this server's public IP address.
+func GetPublicIP() string {
 	client := &http.Client{Timeout: 5 * time.Second}
 	for _, url := range []string{
 		"https://ifconfig.me",

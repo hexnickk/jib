@@ -45,6 +45,7 @@ Jib lives on the server. You SSH in and run commands, or use
 	registerOperateCommands(rootCmd)
 	registerConfigCommands(rootCmd)
 	registerNotifyCommands(rootCmd)
+	registerGitHubCommands(rootCmd)
 	registerDaemonCommands(rootCmd)
 
 	return rootCmd
