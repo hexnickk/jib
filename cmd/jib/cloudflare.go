@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -75,11 +77,12 @@ func installCloudflared() error {
 func runCloudflareSetup(cmd *cobra.Command, args []string) error {
 	// Step 1: Check / install cloudflared
 	if !cloudflaredInstalled() {
-		fmt.Println("cloudflared is not installed.")
-		if os.Getuid() != 0 {
-			fmt.Println("Run this command as root to install cloudflared automatically, or install it manually:")
-			fmt.Println("  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/")
-			return fmt.Errorf("cloudflared not installed")
+		fmt.Print("cloudflared is not installed. Install it now? [Y/n]: ")
+		reader := bufio.NewReader(os.Stdin)
+		answer, _ := reader.ReadString('\n')
+		answer = strings.TrimSpace(strings.ToLower(answer))
+		if answer != "" && answer != "y" && answer != "yes" {
+			return fmt.Errorf("cloudflared is required for Cloudflare Tunnel setup")
 		}
 		if err := installCloudflared(); err != nil {
 			return fmt.Errorf("installing cloudflared: %w", err)
