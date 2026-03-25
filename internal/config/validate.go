@@ -62,9 +62,16 @@ func Validate(cfg *Config) error {
 		}
 	}
 
+	// Notification channels.
+	for name, ch := range cfg.Notifications {
+		if !ValidNotifyDrivers[ch.Driver] {
+			ve.addf("notification '%s': driver must be telegram, slack, discord, or webhook, got %q", name, ch.Driver)
+		}
+	}
+
 	// Apps.
 	for name, app := range cfg.Apps {
-		validateApp(ve, name, &app, cfg.BackupDests)
+		validateApp(ve, name, &app, cfg.BackupDests, cfg.Notifications)
 	}
 
 	if ve.hasErrors() {
@@ -73,7 +80,7 @@ func Validate(cfg *Config) error {
 	return nil
 }
 
-func validateApp(ve *ValidationErrors, name string, app *App, backupDests map[string]BackupDestination) {
+func validateApp(ve *ValidationErrors, name string, app *App, backupDests map[string]BackupDestination, notifications map[string]NotificationChannel) {
 	prefix := fmt.Sprintf("app '%s'", name)
 
 	// App name format.
@@ -147,6 +154,13 @@ func validateApp(ve *ValidationErrors, name string, app *App, backupDests map[st
 		}
 		if task.Command == "" {
 			ve.addf("%s: command is required", taskPrefix)
+		}
+	}
+
+	// Notify: each referenced channel must exist in notifications.
+	for _, ch := range app.Notify {
+		if _, ok := notifications[ch]; !ok {
+			ve.addf("%s: notify references undefined channel %q", prefix, ch)
 		}
 	}
 }

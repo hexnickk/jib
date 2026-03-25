@@ -72,21 +72,41 @@ type Notifier interface {
 	Send(ctx context.Context, event Event) error
 }
 
-// Multi fans out notifications to multiple notifiers.
+// namedNotifier pairs a channel name with its notifier.
+type namedNotifier struct {
+	name     string
+	notifier Notifier
+}
+
+// Multi fans out notifications to multiple named channels.
 // If no notifiers are configured, Send is a no-op.
 type Multi struct {
-	notifiers []Notifier
+	channels []namedNotifier
 }
 
 // NewMulti creates a Multi that fans out to the given notifiers.
+// Each notifier is registered under its Name().
 func NewMulti(notifiers ...Notifier) *Multi {
-	return &Multi{notifiers: notifiers}
+	var chs []namedNotifier
+	for _, n := range notifiers {
+		chs = append(chs, namedNotifier{name: n.Name(), notifier: n})
+	}
+	return &Multi{channels: chs}
+}
+
+// ChannelNames returns the names of all configured channels.
+func (m *Multi) ChannelNames() []string {
+	var names []string
+	for _, ch := range m.channels {
+		names = append(names, ch.name)
+	}
+	return names
 }
 
 // Send sends the event to all notifiers. It does not stop on first failure
 // and returns a joined error if any notifier failed.
 func (m *Multi) Send(ctx context.Context, event Event) error {
-	if len(m.notifiers) == 0 {
+	if len(m.channels) == 0 {
 		return nil
 	}
 
@@ -95,11 +115,64 @@ func (m *Multi) Send(ctx context.Context, event Event) error {
 	}
 
 	var errs []error
-	for _, n := range m.notifiers {
-		if err := n.Send(ctx, event); err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", n.Name(), err))
+	for _, ch := range m.channels {
+		if err := ch.notifier.Send(ctx, event); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", ch.name, err))
 		}
 	}
 
 	return errors.Join(errs...)
+}
+
+// SendTo sends the event only to the named channels. If names is empty,
+// it sends to all channels (same as Send).
+func (m *Multi) SendTo(ctx context.Context, names []string, event Event) error {
+	if len(names) == 0 {
+		return m.Send(ctx, event)
+	}
+
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now()
+	}
+
+	nameSet := make(map[string]bool, len(names))
+	for _, n := range names {
+		nameSet[n] = true
+	}
+
+	var errs []error
+	for _, ch := range m.channels {
+		if !nameSet[ch.name] {
+			continue
+		}
+		if err := ch.notifier.Send(ctx, event); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", ch.name, err))
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// SendForApp sends the event to channels listed in the app's notify list.
+// If notifyList is empty, notification is skipped (not sent to all).
+func (m *Multi) SendForApp(ctx context.Context, notifyList []string, event Event) error {
+	if len(notifyList) == 0 {
+		return nil
+	}
+	return m.SendTo(ctx, notifyList, event)
+}
+
+// SendToChannel sends a test event to a single named channel.
+// Returns an error if the channel is not found.
+func (m *Multi) SendToChannel(ctx context.Context, name string, event Event) error {
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now()
+	}
+
+	for _, ch := range m.channels {
+		if ch.name == name {
+			return ch.notifier.Send(ctx, event)
+		}
+	}
+	return fmt.Errorf("channel %q not found", name)
 }

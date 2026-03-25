@@ -2,6 +2,7 @@ package notify
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -132,17 +133,115 @@ func TestMultiSendAllSucceed(t *testing.T) {
 }
 
 func TestMultiSendSetsTimestamp(t *testing.T) {
-	called := false
-	var captured Event
 	mn := &mockNotifier{name: "cap"}
-	// We can't easily capture the event with mockNotifier, so just verify
-	// that Send doesn't error on zero timestamp
-	_ = captured
-	_ = called
 	multi := NewMulti(mn)
 	err := multi.Send(context.Background(), Event{Type: "deploy"})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestSendTo(t *testing.T) {
+	m1 := &mockNotifier{name: "alpha"}
+	m2 := &mockNotifier{name: "beta"}
+	m3 := &mockNotifier{name: "gamma"}
+
+	multi := NewMulti(m1, m2, m3)
+	err := multi.SendTo(context.Background(), []string{"alpha", "gamma"}, Event{Type: "deploy"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !m1.called {
+		t.Error("alpha should have been called")
+	}
+	if m2.called {
+		t.Error("beta should NOT have been called")
+	}
+	if !m3.called {
+		t.Error("gamma should have been called")
+	}
+}
+
+func TestSendToEmptyNames(t *testing.T) {
+	m1 := &mockNotifier{name: "a"}
+	multi := NewMulti(m1)
+	// Empty names means send to all.
+	err := multi.SendTo(context.Background(), nil, Event{Type: "deploy"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !m1.called {
+		t.Error("should have sent to all when names is empty")
+	}
+}
+
+func TestSendForApp(t *testing.T) {
+	m1 := &mockNotifier{name: "ops"}
+	m2 := &mockNotifier{name: "dev"}
+	multi := NewMulti(m1, m2)
+
+	err := multi.SendForApp(context.Background(), []string{"ops"}, Event{Type: "deploy", App: "myapp"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !m1.called {
+		t.Error("ops should have been called")
+	}
+	if m2.called {
+		t.Error("dev should NOT have been called")
+	}
+}
+
+func TestSendForAppEmptyList(t *testing.T) {
+	m1 := &mockNotifier{name: "ops"}
+	multi := NewMulti(m1)
+
+	err := multi.SendForApp(context.Background(), nil, Event{Type: "deploy", App: "myapp"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if m1.called {
+		t.Error("should NOT send when notify list is empty")
+	}
+}
+
+func TestSendToChannel(t *testing.T) {
+	m1 := &mockNotifier{name: "ops"}
+	m2 := &mockNotifier{name: "dev"}
+	multi := NewMulti(m1, m2)
+
+	err := multi.SendToChannel(context.Background(), "ops", Event{Type: "test"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !m1.called {
+		t.Error("ops should have been called")
+	}
+	if m2.called {
+		t.Error("dev should NOT have been called")
+	}
+}
+
+func TestSendToChannelNotFound(t *testing.T) {
+	multi := NewMulti()
+	err := multi.SendToChannel(context.Background(), "nonexistent", Event{Type: "test"})
+	if err == nil {
+		t.Fatal("expected error for nonexistent channel")
+	}
+}
+
+func TestChannelNames(t *testing.T) {
+	m1 := &mockNotifier{name: "alpha"}
+	m2 := &mockNotifier{name: "beta"}
+	multi := NewMulti(m1, m2)
+
+	names := multi.ChannelNames()
+	if len(names) != 2 {
+		t.Fatalf("expected 2 names, got %d", len(names))
+	}
+	if names[0] != "alpha" || names[1] != "beta" {
+		t.Errorf("names = %v", names)
 	}
 }
 
@@ -190,8 +289,8 @@ func TestParseEnvFileMissing(t *testing.T) {
 func TestLoadFromSecretsEmpty(t *testing.T) {
 	dir := t.TempDir()
 	multi := LoadFromSecrets(dir)
-	if len(multi.notifiers) != 0 {
-		t.Errorf("expected 0 notifiers, got %d", len(multi.notifiers))
+	if len(multi.channels) != 0 {
+		t.Errorf("expected 0 notifiers, got %d", len(multi.channels))
 	}
 	// Send should be a no-op
 	err := multi.Send(context.Background(), Event{Type: "deploy"})
@@ -213,11 +312,11 @@ func TestLoadFromSecretsWithTelegram(t *testing.T) {
 	}
 
 	multi := LoadFromSecrets(dir)
-	if len(multi.notifiers) != 1 {
-		t.Fatalf("expected 1 notifier, got %d", len(multi.notifiers))
+	if len(multi.channels) != 1 {
+		t.Fatalf("expected 1 notifier, got %d", len(multi.channels))
 	}
-	if multi.notifiers[0].Name() != "telegram" {
-		t.Errorf("expected telegram notifier, got %s", multi.notifiers[0].Name())
+	if multi.channels[0].notifier.Name() != "telegram" {
+		t.Errorf("expected telegram notifier, got %s", multi.channels[0].notifier.Name())
 	}
 }
 
@@ -234,13 +333,13 @@ func TestLoadFromSecretsWithAll(t *testing.T) {
 	os.WriteFile(filepath.Join(jibDir, "webhook_url"), []byte("https://example.com/hook"), 0644)
 
 	multi := LoadFromSecrets(dir)
-	if len(multi.notifiers) != 4 {
-		t.Fatalf("expected 4 notifiers, got %d", len(multi.notifiers))
+	if len(multi.channels) != 4 {
+		t.Fatalf("expected 4 notifiers, got %d", len(multi.channels))
 	}
 
 	names := make(map[string]bool)
-	for _, n := range multi.notifiers {
-		names[n.Name()] = true
+	for _, ch := range multi.channels {
+		names[ch.notifier.Name()] = true
 	}
 	for _, want := range []string{"telegram", "slack", "discord", "webhook"} {
 		if !names[want] {
@@ -260,8 +359,85 @@ func TestLoadFromSecretsTelegramPartialCreds(t *testing.T) {
 	os.WriteFile(filepath.Join(jibDir, "telegram.env"), []byte("TELEGRAM_BOT_TOKEN=t\n"), 0644)
 
 	multi := LoadFromSecrets(dir)
-	if len(multi.notifiers) != 0 {
-		t.Errorf("expected 0 notifiers with partial telegram creds, got %d", len(multi.notifiers))
+	if len(multi.channels) != 0 {
+		t.Errorf("expected 0 notifiers with partial telegram creds, got %d", len(multi.channels))
+	}
+}
+
+func TestLoadChannels(t *testing.T) {
+	dir := t.TempDir()
+	jibDir := filepath.Join(dir, "_jib")
+	os.MkdirAll(jibDir, 0755)
+
+	// Write telegram creds
+	tgCreds, _ := json.Marshal(map[string]string{"bot_token": "t123", "chat_id": "-100"})
+	os.WriteFile(filepath.Join(jibDir, "ops-tg.json"), tgCreds, 0600)
+
+	// Write slack creds
+	slackCreds, _ := json.Marshal(map[string]string{"webhook_url": "https://hooks.slack.com/x"})
+	os.WriteFile(filepath.Join(jibDir, "dev-slack.json"), slackCreds, 0600)
+
+	channels := map[string]ChannelConfig{
+		"ops-tg":    {Driver: "telegram"},
+		"dev-slack": {Driver: "slack"},
+		"missing":   {Driver: "webhook"}, // no creds file
+	}
+
+	multi := LoadChannels(dir, channels)
+	if len(multi.channels) != 2 {
+		t.Fatalf("expected 2 channels, got %d", len(multi.channels))
+	}
+
+	names := multi.ChannelNames()
+	nameSet := make(map[string]bool)
+	for _, n := range names {
+		nameSet[n] = true
+	}
+	if !nameSet["ops-tg"] {
+		t.Error("missing ops-tg channel")
+	}
+	if !nameSet["dev-slack"] {
+		t.Error("missing dev-slack channel")
+	}
+}
+
+func TestWriteAndReadChannelCreds(t *testing.T) {
+	dir := t.TempDir()
+	creds := map[string]string{"bot_token": "abc", "chat_id": "-123"}
+
+	if err := WriteChannelCreds(dir, "test-tg", creds); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	got, err := ReadChannelCreds(dir, "test-tg")
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if got["bot_token"] != "abc" || got["chat_id"] != "-123" {
+		t.Errorf("creds = %v", got)
+	}
+}
+
+func TestDeleteChannelCreds(t *testing.T) {
+	dir := t.TempDir()
+	creds := map[string]string{"url": "https://example.com"}
+	WriteChannelCreds(dir, "test-hook", creds)
+
+	if err := DeleteChannelCreds(dir, "test-hook"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	_, err := ReadChannelCreds(dir, "test-hook")
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestDeleteChannelCredsNonExistent(t *testing.T) {
+	dir := t.TempDir()
+	// Should not error for non-existent file.
+	if err := DeleteChannelCreds(dir, "nope"); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 

@@ -35,52 +35,6 @@ func registerConfigCommands(rootCmd *cobra.Command) {
 	})
 	rootCmd.AddCommand(configCmd)
 
-	// jib notify
-	notifyCmd := &cobra.Command{
-		Use:   "notify",
-		Short: "Manage notification channels",
-	}
-	notifyCmd.AddCommand(&cobra.Command{
-		Use:   "setup <channel>",
-		Short: "Interactive setup for telegram|slack|discord|webhook",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("[notify setup] Would run interactive setup for %q notification channel.\n", args[0])
-			return nil
-		},
-	})
-	notifyCmd.AddCommand(&cobra.Command{
-		Use:   "test [channel]",
-		Short: "Send test notification",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				fmt.Printf("[notify test] Would send a test notification to %q channel.\n", args[0])
-			} else {
-				fmt.Println("[notify test] Would send a test notification to all configured channels.")
-			}
-			return nil
-		},
-	})
-	notifyCmd.AddCommand(&cobra.Command{
-		Use:   "remove <channel>",
-		Short: "Remove a notification channel",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("[notify remove] Would remove the %q notification channel.\n", args[0])
-			return nil
-		},
-	})
-	notifyCmd.AddCommand(&cobra.Command{
-		Use:   "list",
-		Short: "Show configured channels and status",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("[notify list] Would show configured notification channels and their status.")
-			return nil
-		},
-	})
-	rootCmd.AddCommand(notifyCmd)
-
 	// jib backup-dest
 	backupDestCmd := &cobra.Command{
 		Use:   "backup-dest",

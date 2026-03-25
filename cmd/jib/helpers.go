@@ -41,8 +41,17 @@ func newSecretsManager() *secrets.Manager {
 	return secrets.NewManager(filepath.Join(jibRoot(), "secrets"))
 }
 
-func newNotifier() *notify.Multi {
-	return notify.LoadFromSecrets(filepath.Join(jibRoot(), "secrets"))
+func newNotifier(cfg *config.Config) *notify.Multi {
+	secretsDir := filepath.Join(jibRoot(), "secrets")
+	if len(cfg.Notifications) > 0 {
+		channels := make(map[string]notify.ChannelConfig, len(cfg.Notifications))
+		for name, ch := range cfg.Notifications {
+			channels[name] = notify.ChannelConfig{Driver: ch.Driver}
+		}
+		return notify.LoadChannels(secretsDir, channels)
+	}
+	// Fallback to legacy loader for configs without named channels.
+	return notify.LoadFromSecrets(secretsDir)
 }
 
 func newSSLManager(cfg *config.Config) *ssl.CertManager {
@@ -71,7 +80,7 @@ func newEngine(cfg *config.Config) *deploy.Engine {
 		Config:      cfg,
 		StateStore:  newStateStore(),
 		Secrets:     newSecretsManager(),
-		Notifier:    newNotifier(),
+		Notifier:    newNotifier(cfg),
 		Proxy:       newProxy(cfg),
 		SSL:         newSSLManager(cfg),
 		History:     newHistoryLogger(),

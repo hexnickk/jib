@@ -37,7 +37,7 @@ type Config struct {
 	GitHub           *GitHubConfig                `yaml:"github,omitempty"`
 	BackupDests      map[string]BackupDestination `yaml:"backup_destinations,omitempty"`
 	Apps             map[string]App               `yaml:"apps"`
-	Notifications    *NotificationConfig          `yaml:"notifications,omitempty"`
+	Notifications    map[string]NotificationChannel `yaml:"notifications,omitempty"`
 	Webhook          *WebhookConfig               `yaml:"webhook,omitempty"`
 	Tunnel           *TunnelConfig                `yaml:"tunnel,omitempty"`
 }
@@ -81,6 +81,7 @@ type App struct {
 	Services     []string          `yaml:"services,omitempty"`
 	Cron         []CronTask        `yaml:"cron,omitempty"`
 	Resources    *Resources        `yaml:"resources,omitempty"`
+	Notify       []string          `yaml:"notify,omitempty"`
 }
 
 // Domain maps a hostname to a container port.
@@ -115,13 +116,18 @@ type CronTask struct {
 	Command  string `yaml:"command"`
 }
 
-// NotificationConfig holds notification channel markers.
-// Actual secrets (tokens, webhook URLs) live in /opt/jib/secrets/_jib/.
-type NotificationConfig struct {
-	Telegram *struct{} `yaml:"telegram,omitempty"`
-	Slack    *struct{} `yaml:"slack,omitempty"`
-	Discord  *struct{} `yaml:"discord,omitempty"`
-	Webhook  *struct{} `yaml:"webhook,omitempty"`
+// NotificationChannel defines a named notification channel.
+// Credentials (tokens, webhook URLs) are stored in /opt/jib/secrets/_jib/<name>.json.
+type NotificationChannel struct {
+	Driver string `yaml:"driver"` // telegram, slack, discord, webhook
+}
+
+// ValidNotifyDrivers is the set of supported notification drivers.
+var ValidNotifyDrivers = map[string]bool{
+	"telegram": true,
+	"slack":    true,
+	"discord":  true,
+	"webhook":  true,
 }
 
 // WebhookConfig controls the GitHub webhook listener.

@@ -28,8 +28,10 @@ tunnel:
   provider: cloudflare
 
 notifications:
-  telegram:
-  slack:
+  ops-telegram:
+    driver: telegram
+  dev-slack:
+    driver: slack
 
 apps:
   myapp:
@@ -488,6 +490,51 @@ apps:
 	}
 	if !strings.Contains(errStr, "command is required") {
 		t.Errorf("expected command error, got: %v", errStr)
+	}
+}
+
+func TestValidation_NotifyUndefinedChannel(t *testing.T) {
+	yml := `
+notifications:
+  ops:
+    driver: telegram
+apps:
+  myapp:
+    repo: org/repo
+    domains:
+      - host: example.com
+        port: 80
+    notify:
+      - ops
+      - nonexistent
+`
+	_, err := LoadConfig(writeTemp(t, yml))
+	if err == nil {
+		t.Fatal("expected error for undefined notify channel")
+	}
+	if !strings.Contains(err.Error(), "undefined channel") {
+		t.Errorf("error = %v", err)
+	}
+}
+
+func TestValidation_BadNotifyDriver(t *testing.T) {
+	yml := `
+notifications:
+  test:
+    driver: email
+apps:
+  myapp:
+    repo: org/repo
+    domains:
+      - host: example.com
+        port: 80
+`
+	_, err := LoadConfig(writeTemp(t, yml))
+	if err == nil {
+		t.Fatal("expected error for bad notify driver")
+	}
+	if !strings.Contains(err.Error(), "driver must be") {
+		t.Errorf("error = %v", err)
 	}
 }
 

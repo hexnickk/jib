@@ -369,11 +369,13 @@ func (e *Engine) logHistory(app, eventType, sha, previousSHA, trigger, user, sta
 }
 
 // sendNotify sends a notification event, ignoring errors.
+// It uses the app's notify list if available, otherwise sends to all channels.
 func (e *Engine) sendNotify(ctx context.Context, app, eventType, sha, trigger, user, status, errMsg string) {
 	if e.Notifier == nil {
 		return
 	}
-	_ = e.Notifier.Send(ctx, notify.Event{
+
+	event := notify.Event{
 		App:       app,
 		Type:      eventType,
 		SHA:       sha,
@@ -382,7 +384,16 @@ func (e *Engine) sendNotify(ctx context.Context, app, eventType, sha, trigger, u
 		Status:    status,
 		Error:     errMsg,
 		Timestamp: time.Now(),
-	})
+	}
+
+	// Use per-app routing if the app has a notify list configured.
+	if appCfg, ok := e.Config.Apps[app]; ok && len(appCfg.Notify) > 0 {
+		_ = e.Notifier.SendForApp(ctx, appCfg.Notify, event)
+		return
+	}
+
+	// Fallback: send to all channels.
+	_ = e.Notifier.Send(ctx, event)
 }
 
 // parseWarmup parses a duration string (e.g. "10s"), returning 0 on error.
