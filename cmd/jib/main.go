@@ -49,6 +49,7 @@ Jib lives on the server. You SSH in and run commands, or use
 	registerCloudflareCommands(rootCmd)
 	registerTailscaleCommands(rootCmd)
 	registerDaemonCommands(rootCmd)
+	registerServiceCommands(rootCmd)
 
 	return rootCmd
 }
