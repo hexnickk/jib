@@ -8,6 +8,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
+	"github.com/hexnickk/jib/internal/git"
 	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/state"
 )
@@ -59,7 +60,7 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 	defer func() { _ = lock.Release() }()
 
 	// 4. Git checkout previous_sha.
-	if err := GitCheckout(ctx, repoDir, previousSHA); err != nil {
+	if err := git.Checkout(ctx, repoDir, previousSHA); err != nil {
 		return nil, fmt.Errorf("git checkout %s: %w", previousSHA, err)
 	}
 

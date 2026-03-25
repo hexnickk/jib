@@ -136,27 +136,10 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 
 	path := configPath()
 
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("reading config: %w", err)
-	}
-
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("parsing config: %w", err)
-	}
-
-	if err := setNestedValue(raw, key, parsed); err != nil {
+	if err := config.ModifyRawConfig(path, func(raw map[string]interface{}) error {
+		return setNestedValue(raw, key, parsed)
+	}); err != nil {
 		return err
-	}
-
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshaling config: %w", err)
-	}
-
-	if err := os.WriteFile(path, out, 0o644); err != nil {
-		return fmt.Errorf("writing config: %w", err)
 	}
 
 	// Validate the newly written config
@@ -261,59 +244,44 @@ func runBackupDestAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Load raw config
 	cfgPath := configPath()
-	data, err := os.ReadFile(cfgPath)
-	if err != nil {
-		return fmt.Errorf("reading config: %w", err)
-	}
+	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
+		// Get or create backup_destinations section
+		destsRaw, ok := raw["backup_destinations"]
+		if !ok {
+			destsRaw = make(map[string]interface{})
+			raw["backup_destinations"] = destsRaw
+		}
+		destsMap, ok := destsRaw.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("backup_destinations section in config is not a map")
+		}
 
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("parsing config: %w", err)
-	}
+		if _, exists := destsMap[name]; exists {
+			return fmt.Errorf("backup destination %q already exists", name)
+		}
 
-	// Get or create backup_destinations section
-	destsRaw, ok := raw["backup_destinations"]
-	if !ok {
-		destsRaw = make(map[string]interface{})
-		raw["backup_destinations"] = destsRaw
-	}
-	destsMap, ok := destsRaw.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("backup_destinations section in config is not a map")
-	}
+		// Build the destination entry
+		dest := map[string]interface{}{
+			"driver": driver,
+		}
+		if bucket != "" {
+			dest["bucket"] = bucket
+		}
+		if host != "" {
+			dest["host"] = host
+		}
+		if path != "" {
+			dest["path"] = path
+		}
+		if retain > 0 {
+			dest["retain"] = retain
+		}
 
-	if _, exists := destsMap[name]; exists {
-		return fmt.Errorf("backup destination %q already exists", name)
-	}
-
-	// Build the destination entry
-	dest := map[string]interface{}{
-		"driver": driver,
-	}
-	if bucket != "" {
-		dest["bucket"] = bucket
-	}
-	if host != "" {
-		dest["host"] = host
-	}
-	if path != "" {
-		dest["path"] = path
-	}
-	if retain > 0 {
-		dest["retain"] = retain
-	}
-
-	destsMap[name] = dest
-
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshaling config: %w", err)
-	}
-
-	if err := os.WriteFile(cfgPath, out, 0o644); err != nil {
-		return fmt.Errorf("writing config: %w", err)
+		destsMap[name] = dest
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	// Validate
@@ -329,43 +297,29 @@ func runBackupDestRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	cfgPath := configPath()
-	data, err := os.ReadFile(cfgPath)
-	if err != nil {
-		return fmt.Errorf("reading config: %w", err)
-	}
+	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
+		destsRaw, ok := raw["backup_destinations"]
+		if !ok {
+			return fmt.Errorf("no backup destinations configured")
+		}
+		destsMap, ok := destsRaw.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("backup_destinations is not a map")
+		}
 
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("parsing config: %w", err)
-	}
+		if _, exists := destsMap[name]; !exists {
+			return fmt.Errorf("backup destination %q not found", name)
+		}
 
-	destsRaw, ok := raw["backup_destinations"]
-	if !ok {
-		return fmt.Errorf("no backup destinations configured")
-	}
-	destsMap, ok := destsRaw.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("backup_destinations is not a map")
-	}
+		delete(destsMap, name)
 
-	if _, exists := destsMap[name]; !exists {
-		return fmt.Errorf("backup destination %q not found", name)
-	}
-
-	delete(destsMap, name)
-
-	// Remove the section entirely if empty
-	if len(destsMap) == 0 {
-		delete(raw, "backup_destinations")
-	}
-
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshaling config: %w", err)
-	}
-
-	if err := os.WriteFile(cfgPath, out, 0o644); err != nil {
-		return fmt.Errorf("writing config: %w", err)
+		// Remove the section entirely if empty
+		if len(destsMap) == 0 {
+			delete(raw, "backup_destinations")
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	fmt.Printf("Removed backup destination %q.\n", name)

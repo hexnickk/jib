@@ -282,7 +282,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	cfgContent += "apps: {}\n"
 
-	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0o644); err != nil {
+	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0o640); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
 	fmt.Printf("  Written to %s\n", cfgPath)
@@ -334,9 +334,9 @@ func runProvision(cmd *cobra.Command, args []string) error {
 	// Determine which apps to provision
 	apps := make(map[string]config.App)
 	if len(args) > 0 {
-		appCfg, ok := cfg.Apps[args[0]]
-		if !ok {
-			return fmt.Errorf("app %q not found in config", args[0])
+		appCfg, err := requireApp(cfg, args[0])
+		if err != nil {
+			return err
 		}
 		apps[args[0]] = appCfg
 	} else {
@@ -556,85 +556,70 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Inferred health check: %s on port %d\n", inferredPath, inferredPort)
 	}
 
-	// Load or create config
 	cfgPath := configPath()
-	data, err := os.ReadFile(cfgPath)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("reading config: %w", err)
-	}
 
-	var raw map[string]interface{}
-	if len(data) > 0 {
-		if err := yaml.Unmarshal(data, &raw); err != nil {
-			return fmt.Errorf("parsing config: %w", err)
-		}
-	}
-	if raw == nil {
-		raw = make(map[string]interface{})
-	}
-
-	// Count existing apps from the config we already loaded
-	existingApps := 0
-	if appsRaw, ok := raw["apps"]; ok {
-		if appsMap, ok := appsRaw.(map[string]interface{}); ok {
-			existingApps = len(appsMap)
-		}
-	}
-
-	// Suggest resource limits based on server capacity
+	// Marshal the new app struct to a generic map for YAML insertion.
+	// We need to determine resource limits first, which requires counting
+	// existing apps; ModifyRawConfig gives us access to the raw map for that.
 	var resources *config.Resources
-	if sr, err := platform.DetectResources(); err == nil {
-		appCount := existingApps + 1
-		mem, cpus := platform.SuggestAppResources(sr, appCount)
-		resources = &config.Resources{Memory: mem, CPUs: cpus}
-		fmt.Printf("  Resource limits: memory=%s, cpus=%s (server: %s RAM, %s CPUs, %d app(s))\n",
-			mem, cpus, sr.MemoryString, sr.CPUString, appCount)
-	} else {
-		fmt.Fprintf(os.Stderr, "  warning: could not detect server resources: %v\n", err)
-	}
 
-	newApp := config.App{
-		Repo:      repo,
-		Compose:   composeFiles,
-		Domains:   domains,
-		Health:    healthChecks,
-		Resources: resources,
-	}
+	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
+		// Count existing apps
+		existingApps := 0
+		if appsRaw, ok := raw["apps"]; ok {
+			if appsMap, ok := appsRaw.(map[string]interface{}); ok {
+				existingApps = len(appsMap)
+			}
+		}
 
-	// Marshal the new app to a generic map for YAML insertion
-	appData, err := yaml.Marshal(newApp)
-	if err != nil {
-		return fmt.Errorf("marshaling app config: %w", err)
-	}
-	var appMap interface{}
-	if err := yaml.Unmarshal(appData, &appMap); err != nil {
-		return fmt.Errorf("parsing app config: %w", err)
-	}
+		// Suggest resource limits based on server capacity
+		if sr, err := platform.DetectResources(); err == nil {
+			appCount := existingApps + 1
+			mem, cpus := platform.SuggestAppResources(sr, appCount)
+			resources = &config.Resources{Memory: mem, CPUs: cpus}
+			fmt.Printf("  Resource limits: memory=%s, cpus=%s (server: %s RAM, %s CPUs, %d app(s))\n",
+				mem, cpus, sr.MemoryString, sr.CPUString, appCount)
+		} else {
+			fmt.Fprintf(os.Stderr, "  warning: could not detect server resources: %v\n", err)
+		}
 
-	// Get or create apps section
-	appsRaw, ok := raw["apps"]
-	if !ok {
-		appsRaw = make(map[string]interface{})
-		raw["apps"] = appsRaw
-	}
-	appsMap, ok := appsRaw.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("apps section in config is not a map")
-	}
+		newApp := config.App{
+			Repo:      repo,
+			Compose:   composeFiles,
+			Domains:   domains,
+			Health:    healthChecks,
+			Resources: resources,
+		}
 
-	if _, exists := appsMap[appName]; exists {
-		return fmt.Errorf("app %q already exists in config", appName)
-	}
+		// Marshal the new app to a generic map for YAML insertion
+		appData, err := yaml.Marshal(newApp)
+		if err != nil {
+			return fmt.Errorf("marshaling app config: %w", err)
+		}
+		var appMap interface{}
+		if err := yaml.Unmarshal(appData, &appMap); err != nil {
+			return fmt.Errorf("parsing app config: %w", err)
+		}
 
-	appsMap[appName] = appMap
+		// Get or create apps section
+		appsRaw, ok := raw["apps"]
+		if !ok {
+			appsRaw = make(map[string]interface{})
+			raw["apps"] = appsRaw
+		}
+		appsMap, ok := appsRaw.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("apps section in config is not a map")
+		}
 
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshaling config: %w", err)
-	}
+		if _, exists := appsMap[appName]; exists {
+			return fmt.Errorf("app %q already exists in config", appName)
+		}
 
-	if err := os.WriteFile(cfgPath, out, 0o644); err != nil {
-		return fmt.Errorf("writing config: %w", err)
+		appsMap[appName] = appMap
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	fmt.Printf("Added app %q to config.\n", appName)
@@ -671,9 +656,9 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	appCfg, ok := cfg.Apps[appName]
-	if !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	appCfg, err := requireApp(cfg, appName)
+	if err != nil {
+		return err
 	}
 
 	root := jibRoot()
@@ -811,29 +796,15 @@ func runRemove(cmd *cobra.Command, args []string) error {
 
 	// 8. Remove app from config.yml
 	cfgPath := configPath()
-	data, err := os.ReadFile(cfgPath)
-	if err != nil {
-		return fmt.Errorf("reading config for removal: %w", err)
-	}
-
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("parsing config: %w", err)
-	}
-
-	if appsRaw, ok := raw["apps"]; ok {
-		if appsMap, ok := appsRaw.(map[string]interface{}); ok {
-			delete(appsMap, appName)
+	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
+		if appsRaw, ok := raw["apps"]; ok {
+			if appsMap, ok := appsRaw.(map[string]interface{}); ok {
+				delete(appsMap, appName)
+			}
 		}
-	}
-
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshaling config: %w", err)
-	}
-
-	if err := os.WriteFile(cfgPath, out, 0o644); err != nil {
-		return fmt.Errorf("writing config: %w", err)
+		return nil
+	}); err != nil {
+		return fmt.Errorf("removing app from config: %w", err)
 	}
 	removed = append(removed, "config entry")
 

@@ -311,8 +311,8 @@ func redactLine(line string) string {
 		return line
 	}
 
-	if len(value) > 10 {
-		return key + "=" + value[:10] + "***"
+	if len(value) > 4 {
+		return key + "=" + value[:4] + "***"
 	}
 	return key + "=***"
 }

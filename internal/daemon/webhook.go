@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -58,7 +59,10 @@ func (d *Daemon) runWebhookServer(ctx context.Context) {
 	mux.HandleFunc("/_jib/webhook/", d.handleWebhook)
 	mux.HandleFunc("/_jib/health", d.handleHealthEndpoint)
 
-	addr := fmt.Sprintf(":%d", port)
+	// Bind to localhost by default. Users who need direct external access
+	// (not behind a reverse proxy or Cloudflare tunnel) should configure
+	// webhook.bind_address to "0.0.0.0" in their config.
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	server := &http.Server{
 		Addr:         addr,
 		Handler:      mux,
@@ -112,21 +116,29 @@ func (d *Daemon) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate signature if webhook secret is configured.
-	if appCfg.Webhook != nil {
-		secret, err := d.loadWebhookSecret(appName)
-		if err != nil {
-			d.logger.Printf("webhook: %s: error loading secret: %v", appName, err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		if secret != "" {
-			if !d.validateSignature(r, body, secret) {
-				d.logger.Printf("webhook: %s: invalid signature", appName)
-				http.Error(w, "invalid signature", http.StatusForbidden)
-				return
-			}
-		}
+	// Require webhook configuration for the app.
+	if appCfg.Webhook == nil {
+		d.logger.Printf("webhook: %s: no webhook configured for app", appName)
+		http.Error(w, "webhook not configured for this app", http.StatusForbidden)
+		return
+	}
+
+	// Validate signature — reject if secret is missing or invalid.
+	secret, err := d.loadWebhookSecret(appName)
+	if err != nil {
+		d.logger.Printf("webhook: %s: error loading secret: %v", appName, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if secret == "" {
+		d.logger.Printf("webhook: %s: no webhook secret found, rejecting request", appName)
+		http.Error(w, "webhook secret not configured", http.StatusForbidden)
+		return
+	}
+	if !d.validateSignature(r, body, secret) {
+		d.logger.Printf("webhook: %s: invalid signature", appName)
+		http.Error(w, "invalid signature", http.StatusForbidden)
+		return
 	}
 
 	// Detect provider and parse payload.
@@ -225,7 +237,7 @@ func (d *Daemon) validateSignature(r *http.Request, body []byte, secret string) 
 		// Also check GitLab's X-Gitlab-Token header.
 		gitlabToken := r.Header.Get("X-Gitlab-Token")
 		if gitlabToken != "" {
-			return gitlabToken == secret
+			return subtle.ConstantTimeCompare([]byte(gitlabToken), []byte(secret)) == 1
 		}
 		return false
 	}

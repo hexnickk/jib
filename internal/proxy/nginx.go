@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"fmt"
+	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -164,7 +165,7 @@ func (n *Nginx) MaintenanceOn(app string, domains []config.Domain, message strin
 		return fmt.Errorf("creating maintenance html dir: %w", err)
 	}
 
-	htmlContent := strings.ReplaceAll(maintenanceHTMLTemplate, "{{MESSAGE}}", message)
+	htmlContent := strings.ReplaceAll(maintenanceHTMLTemplate, "{{MESSAGE}}", html.EscapeString(message))
 	htmlPath := filepath.Join(htmlDir, "maintenance.html")
 	if err := os.WriteFile(htmlPath, []byte(htmlContent), 0o644); err != nil {
 		return fmt.Errorf("writing maintenance html: %w", err)

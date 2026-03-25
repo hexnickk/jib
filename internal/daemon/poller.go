@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hexnickk/jib/internal/deploy"
+	"github.com/hexnickk/jib/internal/git"
 	"github.com/hexnickk/jib/internal/state"
 )
 
@@ -78,18 +79,18 @@ func (d *Daemon) pollOnce(ctx context.Context) {
 		}
 
 		// Check if repo has a remote.
-		if !deploy.GitHasRemote(ctx, repoDir) {
+		if !git.HasRemote(ctx, repoDir) {
 			continue
 		}
 
 		// Fetch from origin.
-		if err := deploy.GitFetch(ctx, repoDir, branch); err != nil {
+		if err := git.Fetch(ctx, repoDir, branch); err != nil {
 			d.logger.Printf("poller: %s: fetch error: %v", appName, err)
 			continue
 		}
 
 		// Compare remote HEAD with deployed SHA.
-		remoteSHA, err := deploy.GitRemoteSHA(ctx, repoDir, branch)
+		remoteSHA, err := git.RemoteSHA(ctx, repoDir, branch)
 		if err != nil {
 			d.logger.Printf("poller: %s: error getting remote SHA: %v", appName, err)
 			continue

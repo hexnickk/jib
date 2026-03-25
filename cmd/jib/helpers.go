@@ -91,9 +91,9 @@ func newEngine(cfg *config.Config) *deploy.Engine {
 }
 
 func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {
-	appCfg, ok := cfg.Apps[appName]
-	if !ok {
-		return nil, fmt.Errorf("app %q not found in config", appName)
+	appCfg, err := requireApp(cfg, appName)
+	if err != nil {
+		return nil, err
 	}
 
 	root := jibRoot()
@@ -117,6 +117,16 @@ func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {
 		EnvFile:  envFile,
 		Override: docker.OverridePath(filepath.Join(root, "overrides"), appName),
 	}, nil
+}
+
+// requireApp looks up an app in the config and returns it, or returns an error
+// with a helpful message if it doesn't exist.
+func requireApp(cfg *config.Config, appName string) (config.App, error) {
+	appCfg, ok := cfg.Apps[appName]
+	if !ok {
+		return config.App{}, fmt.Errorf("app %q not found in config (see 'jib apps' for available apps)", appName)
+	}
+	return appCfg, nil
 }
 
 func currentUser() string {

@@ -355,12 +355,12 @@ func TestEnvRedacted(t *testing.T) {
 	expected := []string{
 		"# Database config",
 		"",
-		"DATABASE_URL=file:./sto***",
-		"RESEND_API_KEY=***",       // <= 10 chars, fully redacted
-		"SHORT=***",                // <= 10 chars, fully redacted
-		"EMPTY=",                   // empty, shown as-is
-		"EXACTLY10=***",            // exactly 10, fully redacted
-		"ELEVEN_CHR=1234567890***", // 11 chars, first 10 shown
+		"DATABASE_URL=file***",   // >4 chars, first 4 shown
+		"RESEND_API_KEY=re_a***", // >4 chars, first 4 shown
+		"SHORT=***",              // <=4 chars, fully redacted
+		"EMPTY=",                 // empty, shown as-is
+		"EXACTLY10=1234***",      // >4 chars, first 4 shown
+		"ELEVEN_CHR=1234***",     // >4 chars, first 4 shown
 	}
 
 	if len(lines) != len(expected) {

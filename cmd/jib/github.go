@@ -13,7 +13,6 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/network"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 func registerGitHubCommands(rootCmd *cobra.Command) {
@@ -67,8 +66,8 @@ func runGitHubSetup(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	if _, ok := cfg.Apps[appName]; !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	if _, err := requireApp(cfg, appName); err != nil {
+		return err
 	}
 
 	root := jibRoot()
@@ -192,8 +191,8 @@ func runGitHubStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	if _, ok := cfg.Apps[appName]; !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	if _, err := requireApp(cfg, appName); err != nil {
+		return err
 	}
 
 	root := jibRoot()
@@ -253,8 +252,8 @@ func runGitHubRemove(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	if _, ok := cfg.Apps[appName]; !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	if _, err := requireApp(cfg, appName); err != nil {
+		return err
 	}
 
 	root := jibRoot()
@@ -305,38 +304,25 @@ func runGitHubRemove(cmd *cobra.Command, args []string) error {
 // app entry, calls mutate to modify it, then writes the result back.
 func modifyAppWebhookConfig(appName string, mutate func(appMap map[string]interface{})) error {
 	cfgPath := configPath()
-	data, err := os.ReadFile(cfgPath)
-	if err != nil {
-		return fmt.Errorf("reading config: %w", err)
-	}
+	return config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
+		appsRaw, ok := raw["apps"]
+		if !ok {
+			return fmt.Errorf("no apps section in config")
+		}
+		appsMap, ok := appsRaw.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("apps section is not a map")
+		}
+		appRaw, ok := appsMap[appName]
+		if !ok {
+			return fmt.Errorf("app %q not found in config", appName)
+		}
+		appMap, ok := appRaw.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("app %q config is not a map", appName)
+		}
 
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("parsing config: %w", err)
-	}
-
-	appsRaw, ok := raw["apps"]
-	if !ok {
-		return fmt.Errorf("no apps section in config")
-	}
-	appsMap, ok := appsRaw.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("apps section is not a map")
-	}
-	appRaw, ok := appsMap[appName]
-	if !ok {
-		return fmt.Errorf("app %q not found in config", appName)
-	}
-	appMap, ok := appRaw.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("app %q config is not a map", appName)
-	}
-
-	mutate(appMap)
-
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshaling config: %w", err)
-	}
-	return os.WriteFile(cfgPath, out, 0o644)
+		mutate(appMap)
+		return nil
+	})
 }

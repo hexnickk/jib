@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/hexnickk/jib/internal/config"
+	"github.com/hexnickk/jib/internal/git"
 	"github.com/hexnickk/jib/internal/notify"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
@@ -85,7 +86,7 @@ func TestGitCurrentSHA(t *testing.T) {
 	repoDir, _ := initTestRepo(t, tmpDir)
 
 	ctx := context.Background()
-	sha, err := GitCurrentSHA(ctx, repoDir)
+	sha, err := git.CurrentSHA(ctx, repoDir)
 	if err != nil {
 		t.Fatalf("GitCurrentSHA failed: %v", err)
 	}
@@ -99,7 +100,7 @@ func TestGitRemoteSHA(t *testing.T) {
 	repoDir, _ := initTestRepo(t, tmpDir)
 
 	ctx := context.Background()
-	sha, err := GitRemoteSHA(ctx, repoDir, "main")
+	sha, err := git.RemoteSHA(ctx, repoDir, "main")
 	if err != nil {
 		t.Fatalf("GitRemoteSHA failed: %v", err)
 	}
@@ -108,7 +109,7 @@ func TestGitRemoteSHA(t *testing.T) {
 	}
 
 	// Remote SHA should match current SHA since we just pushed.
-	current, _ := GitCurrentSHA(ctx, repoDir)
+	current, _ := git.CurrentSHA(ctx, repoDir)
 	if sha != current {
 		t.Fatalf("remote SHA %s != current SHA %s", sha, current)
 	}
@@ -132,13 +133,13 @@ func TestGitFetch(t *testing.T) {
 	run(t, clone2, "git", "push", "origin", "main")
 
 	// Fetch in original repo.
-	if err := GitFetch(ctx, repoDir, "main"); err != nil {
+	if err := git.Fetch(ctx, repoDir, "main"); err != nil {
 		t.Fatalf("GitFetch failed: %v", err)
 	}
 
 	// Now remote SHA should differ from current.
-	remoteSHA, _ := GitRemoteSHA(ctx, repoDir, "main")
-	currentSHA, _ := GitCurrentSHA(ctx, repoDir)
+	remoteSHA, _ := git.RemoteSHA(ctx, repoDir, "main")
+	currentSHA, _ := git.CurrentSHA(ctx, repoDir)
 	if remoteSHA == currentSHA {
 		t.Fatal("remote SHA should differ from current after fetch without checkout")
 	}
@@ -150,7 +151,7 @@ func TestGitCheckout(t *testing.T) {
 	ctx := context.Background()
 
 	// Record initial SHA.
-	initialSHA, _ := GitCurrentSHA(ctx, repoDir)
+	initialSHA, _ := git.CurrentSHA(ctx, repoDir)
 
 	// Push a new commit from a second clone.
 	clone2 := filepath.Join(tmpDir, "clone2")
@@ -165,16 +166,16 @@ func TestGitCheckout(t *testing.T) {
 	run(t, clone2, "git", "push", "origin", "main")
 
 	// Fetch and checkout.
-	if err := GitFetch(ctx, repoDir, "main"); err != nil {
+	if err := git.Fetch(ctx, repoDir, "main"); err != nil {
 		t.Fatalf("GitFetch failed: %v", err)
 	}
-	remoteSHA, _ := GitRemoteSHA(ctx, repoDir, "main")
+	remoteSHA, _ := git.RemoteSHA(ctx, repoDir, "main")
 
-	if err := GitCheckout(ctx, repoDir, remoteSHA); err != nil {
+	if err := git.Checkout(ctx, repoDir, remoteSHA); err != nil {
 		t.Fatalf("GitCheckout failed: %v", err)
 	}
 
-	newSHA, _ := GitCurrentSHA(ctx, repoDir)
+	newSHA, _ := git.CurrentSHA(ctx, repoDir)
 	if newSHA != remoteSHA {
 		t.Fatalf("after checkout expected %s, got %s", remoteSHA, newSHA)
 	}

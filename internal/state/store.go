@@ -49,7 +49,7 @@ func (s *Store) Load(app string) (*AppState, error) {
 // file in the same directory, then renames it into place (atomic on Linux).
 // It sets SchemaVersion to CurrentSchemaVersion before writing.
 func (s *Store) Save(app string, state *AppState) error {
-	if err := os.MkdirAll(s.dir, 0o755); err != nil {
+	if err := os.MkdirAll(s.dir, 0o750); err != nil {
 		return fmt.Errorf("creating state directory: %w", err)
 	}
 

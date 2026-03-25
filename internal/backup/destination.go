@@ -2,13 +2,13 @@ package backup
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/hexnickk/jib/internal/config"
+	"github.com/hexnickk/jib/internal/util"
 )
 
 // Destination is the interface for backup storage backends.
@@ -225,7 +225,7 @@ func (d *LocalDest) Upload(src, remotePath string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return fmt.Errorf("creating directory for %s: %w", dst, err)
 	}
-	return copyFileLocal(src, dst)
+	return util.CopyFile(src, dst)
 }
 
 func (d *LocalDest) Download(remotePath, dst string) error {
@@ -233,7 +233,7 @@ func (d *LocalDest) Download(remotePath, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return fmt.Errorf("creating directory for %s: %w", dst, err)
 	}
-	return copyFileLocal(src, dst)
+	return util.CopyFile(src, dst)
 }
 
 func (d *LocalDest) List(prefix string) ([]string, error) {
@@ -260,24 +260,4 @@ func (d *LocalDest) Delete(remotePath string) error {
 		return fmt.Errorf("deleting %s: %w", path, err)
 	}
 	return nil
-}
-
-// copyFileLocal copies a file from src to dst.
-func copyFileLocal(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("opening %s: %w", src, err)
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("creating %s: %w", dst, err)
-	}
-
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		return fmt.Errorf("copying to %s: %w", dst, err)
-	}
-	return out.Close()
 }

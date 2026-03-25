@@ -110,8 +110,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	// If a specific app is requested
 	if len(args) == 1 {
 		appName := args[0]
-		if _, ok := cfg.Apps[appName]; !ok {
-			return fmt.Errorf("app %q not found in config", appName)
+		if _, err := requireApp(cfg, appName); err != nil {
+			return err
 		}
 		appState, err := store.Load(appName)
 		if err != nil {
@@ -397,9 +397,9 @@ func runEnv(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	appCfg, ok := cfg.Apps[appName]
-	if !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	appCfg, err := requireApp(cfg, appName)
+	if err != nil {
+		return err
 	}
 
 	mgr := newSecretsManager()
@@ -467,9 +467,9 @@ func runEnvSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	appCfg, ok := cfg.Apps[appName]
-	if !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	appCfg, err := requireApp(cfg, appName)
+	if err != nil {
+		return err
 	}
 
 	vars := make(map[string]string, len(pairs))
@@ -506,9 +506,9 @@ func runEnvDel(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	appCfg, ok := cfg.Apps[appName]
-	if !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	appCfg, err := requireApp(cfg, appName)
+	if err != nil {
+		return err
 	}
 
 	mgr := newSecretsManager()

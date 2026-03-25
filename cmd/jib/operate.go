@@ -16,6 +16,7 @@ import (
 	"github.com/hexnickk/jib/internal/backup"
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
+	"github.com/hexnickk/jib/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -386,9 +387,9 @@ func runSecretsSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	appCfg, ok := cfg.Apps[appName]
-	if !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	appCfg, err := requireApp(cfg, appName)
+	if err != nil {
+		return err
 	}
 
 	mgr := newSecretsManager()
@@ -411,9 +412,9 @@ func runSecretsCheck(cmd *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		// Check a single app
 		appName := args[0]
-		appCfg, ok := cfg.Apps[appName]
-		if !ok {
-			return fmt.Errorf("app %q not found in config", appName)
+		appCfg, err := requireApp(cfg, appName)
+		if err != nil {
+			return err
 		}
 		if !appCfg.SecretsEnv {
 			fmt.Printf("App %q does not use secrets_env.\n", appName)
@@ -460,9 +461,9 @@ func runMaintenanceOn(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	appCfg, ok := cfg.Apps[appName]
-	if !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	appCfg, err := requireApp(cfg, appName)
+	if err != nil {
+		return err
 	}
 
 	if len(appCfg.Domains) == 0 {
@@ -492,9 +493,9 @@ func runMaintenanceOff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	appCfg, ok := cfg.Apps[appName]
-	if !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	appCfg, err := requireApp(cfg, appName)
+	if err != nil {
+		return err
 	}
 
 	if len(appCfg.Domains) == 0 {
@@ -673,7 +674,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 		}
 		// On cross-device rename, fall back to copy
 		if strings.Contains(err.Error(), "cross-device") || strings.Contains(err.Error(), "invalid cross-device link") {
-			if copyErr := copyFile(tmpPath, currentBinary); copyErr != nil {
+			if copyErr := util.CopyFile(tmpPath, currentBinary); copyErr != nil {
 				if os.IsPermission(copyErr) {
 					return fmt.Errorf("permission denied replacing %s — try running: sudo jib upgrade", currentBinary)
 				}
@@ -689,26 +690,6 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// copyFile copies src to dst, used as fallback when os.Rename fails (cross-device).
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		return err
-	}
-
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		return err
-	}
-	return out.Close()
-}
-
 func newBackupManager(cfg *config.Config) *backup.Manager {
 	return backup.NewManager(cfg, filepath.Join(jibRoot(), "backups"))
 }
@@ -721,9 +702,9 @@ func runBackup(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	appCfg, ok := cfg.Apps[appName]
-	if !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	appCfg, err := requireApp(cfg, appName)
+	if err != nil {
+		return err
 	}
 
 	mgr := newBackupManager(cfg)
@@ -790,8 +771,8 @@ func runRestore(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	if _, ok := cfg.Apps[appName]; !ok {
-		return fmt.Errorf("app %q not found in config", appName)
+	if _, err := requireApp(cfg, appName); err != nil {
+		return err
 	}
 
 	if !dryRun && !force {

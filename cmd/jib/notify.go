@@ -13,7 +13,6 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/notify"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 func registerNotifyCommands(rootCmd *cobra.Command) {
@@ -232,67 +231,53 @@ func runNotifyAdd(cmd *cobra.Command, args []string) error {
 func runNotifyRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
-	// Remove from config.
 	cfgPath := configPath()
-	data, err := os.ReadFile(cfgPath)
-	if err != nil {
-		return fmt.Errorf("reading config: %w", err)
-	}
-
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("parsing config: %w", err)
-	}
-
-	removed := false
-	if notifRaw, ok := raw["notifications"]; ok {
-		if notifMap, ok := notifRaw.(map[string]interface{}); ok {
-			if _, exists := notifMap[name]; exists {
-				delete(notifMap, name)
-				removed = true
-				if len(notifMap) == 0 {
-					delete(raw, "notifications")
+	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
+		removed := false
+		if notifRaw, ok := raw["notifications"]; ok {
+			if notifMap, ok := notifRaw.(map[string]interface{}); ok {
+				if _, exists := notifMap[name]; exists {
+					delete(notifMap, name)
+					removed = true
+					if len(notifMap) == 0 {
+						delete(raw, "notifications")
+					}
 				}
 			}
 		}
-	}
 
-	if !removed {
-		return fmt.Errorf("channel %q not found in config", name)
-	}
+		if !removed {
+			return fmt.Errorf("channel %q not found in config", name)
+		}
 
-	// Also remove from any app's notify list.
-	if appsRaw, ok := raw["apps"]; ok {
-		if appsMap, ok := appsRaw.(map[string]interface{}); ok {
-			for appName, appRaw := range appsMap {
-				if appMap, ok := appRaw.(map[string]interface{}); ok {
-					if notifyRaw, ok := appMap["notify"]; ok {
-						if notifyList, ok := notifyRaw.([]interface{}); ok {
-							var filtered []interface{}
-							for _, item := range notifyList {
-								if s, ok := item.(string); ok && s != name {
-									filtered = append(filtered, item)
+		// Also remove from any app's notify list.
+		if appsRaw, ok := raw["apps"]; ok {
+			if appsMap, ok := appsRaw.(map[string]interface{}); ok {
+				for appName, appRaw := range appsMap {
+					if appMap, ok := appRaw.(map[string]interface{}); ok {
+						if notifyRaw, ok := appMap["notify"]; ok {
+							if notifyList, ok := notifyRaw.([]interface{}); ok {
+								var filtered []interface{}
+								for _, item := range notifyList {
+									if s, ok := item.(string); ok && s != name {
+										filtered = append(filtered, item)
+									}
 								}
+								if len(filtered) > 0 {
+									appMap["notify"] = filtered
+								} else {
+									delete(appMap, "notify")
+								}
+								appsMap[appName] = appMap
 							}
-							if len(filtered) > 0 {
-								appMap["notify"] = filtered
-							} else {
-								delete(appMap, "notify")
-							}
-							appsMap[appName] = appMap
 						}
 					}
 				}
 			}
 		}
-	}
-
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshaling config: %w", err)
-	}
-	if err := os.WriteFile(cfgPath, out, 0o644); err != nil {
-		return fmt.Errorf("writing config: %w", err)
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	// Delete credentials file.
@@ -422,41 +407,27 @@ func addWebhookChannel(name, driver, prompt, credKey string) error {
 // addChannelToConfig writes a notification channel entry to config.yml.
 func addChannelToConfig(name, driver string) error {
 	cfgPath := configPath()
-	data, err := os.ReadFile(cfgPath)
-	if err != nil {
-		return fmt.Errorf("reading config: %w", err)
-	}
+	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
+		notifRaw, ok := raw["notifications"]
+		if !ok {
+			notifRaw = make(map[string]interface{})
+			raw["notifications"] = notifRaw
+		}
+		notifMap, ok := notifRaw.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("notifications section in config is not a map")
+		}
 
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("parsing config: %w", err)
-	}
+		if _, exists := notifMap[name]; exists {
+			return fmt.Errorf("channel %q already exists in config", name)
+		}
 
-	notifRaw, ok := raw["notifications"]
-	if !ok {
-		notifRaw = make(map[string]interface{})
-		raw["notifications"] = notifRaw
-	}
-	notifMap, ok := notifRaw.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("notifications section in config is not a map")
-	}
-
-	if _, exists := notifMap[name]; exists {
-		return fmt.Errorf("channel %q already exists in config", name)
-	}
-
-	notifMap[name] = map[string]interface{}{
-		"driver": driver,
-	}
-
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshaling config: %w", err)
-	}
-
-	if err := os.WriteFile(cfgPath, out, 0o644); err != nil {
-		return fmt.Errorf("writing config: %w", err)
+		notifMap[name] = map[string]interface{}{
+			"driver": driver,
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	// Validate.

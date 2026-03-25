@@ -11,12 +11,18 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
+
+	"github.com/hexnickk/jib/internal/util"
 	"strings"
 	"time"
 
 	"github.com/hexnickk/jib/internal/config"
 )
+
+// validVolumeName matches safe Docker volume name components.
+var validVolumeName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 
 // Manager coordinates backups and restores.
 type Manager struct {
@@ -136,7 +142,7 @@ func (m *Manager) Backup(app string, appCfg config.App) (*BackupResult, error) {
 	bundleName := fmt.Sprintf("%s-%s.tar.gz", app, timestamp)
 	bundlePath := filepath.Join(m.BaseDir, bundleName)
 
-	if err := os.MkdirAll(m.BaseDir, 0o755); err != nil {
+	if err := os.MkdirAll(m.BaseDir, 0o700); err != nil {
 		return nil, fmt.Errorf("creating backup dir: %w", err)
 	}
 
@@ -232,7 +238,7 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 	localPath := filepath.Join(m.BaseDir, bundleName)
 	if _, err := os.Stat(localPath); err == nil {
 		fmt.Printf("Using local backup: %s\n", localPath)
-		if err := copyFileLocal(localPath, localBundle); err != nil {
+		if err := util.CopyFile(localPath, localBundle); err != nil {
 			return fmt.Errorf("copying local backup: %w", err)
 		}
 	} else {
@@ -267,7 +273,7 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 		return fmt.Errorf("creating extract dir: %w", err)
 	}
 
-	extractCmd := exec.Command("tar", "xzf", localBundle, "-C", extractDir)
+	extractCmd := exec.Command("tar", "--no-same-owner", "xzf", localBundle, "-C", extractDir)
 	extractCmd.Stdout = os.Stdout
 	extractCmd.Stderr = os.Stderr
 	if err := extractCmd.Run(); err != nil {
@@ -317,6 +323,14 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 
 	// Restore each volume
 	for _, vol := range manifest.Volumes {
+		// Validate volume name to prevent path traversal and shell injection.
+		if !validVolumeName.MatchString(vol) {
+			return fmt.Errorf("invalid volume name in manifest: %q", vol)
+		}
+		if strings.Contains(vol, "..") {
+			return fmt.Errorf("invalid volume name in manifest (path traversal): %q", vol)
+		}
+
 		volumeName := project + "_" + vol
 		volArchive := filepath.Join(extractDir, vol+".tar.gz")
 
@@ -331,7 +345,7 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 			"-v", volumeName+":/data",
 			"-v", extractDir+":/backup:ro",
 			"alpine",
-			"sh", "-c", "rm -rf /data/* /data/..?* /data/.[!.]* 2>/dev/null; tar xzf /backup/"+vol+".tar.gz -C /data",
+			"sh", "-c", "rm -rf /data/* /data/..?* /data/.[!.]* 2>/dev/null; tar --no-same-owner -xzf /backup/"+vol+".tar.gz -C /data",
 		)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
