@@ -255,7 +255,24 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Step e: Create directory structure
+	// Step e: Create jib group and add current user (like Docker does with the docker group).
+	fmt.Println("\nSetting up jib group...")
+	sudoCmd("groupadd", "-f", "jib").Run()
+
+	// Detect the real user even when running under sudo.
+	currentUser := os.Getenv("SUDO_USER")
+	if currentUser == "" {
+		currentUser = os.Getenv("USER")
+	}
+	if currentUser != "" && currentUser != "root" {
+		if err := sudoCmd("usermod", "-aG", "jib", currentUser).Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not add %s to jib group: %v\n", currentUser, err)
+		} else {
+			fmt.Printf("  Added user '%s' to jib group\n", currentUser)
+		}
+	}
+
+	// Step f: Create directory structure
 	fmt.Println("\nCreating directory structure...")
 	root := jibRoot()
 	dirs := []string{
@@ -264,29 +281,19 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	for _, dir := range dirs {
 		dirPath := filepath.Join(root, dir)
-		perm := "755"
-		if dir == "secrets" {
-			perm = "700"
-		}
-		mkdirCmd := sudoCmd("mkdir", "-p", dirPath)
-		if err := mkdirCmd.Run(); err != nil {
+		if err := sudoCmd("mkdir", "-p", dirPath).Run(); err != nil {
 			return fmt.Errorf("creating directory %s: %w", dirPath, err)
 		}
-		chmodCmd := sudoCmd("chmod", perm, dirPath)
-		if err := chmodCmd.Run(); err != nil {
-			return fmt.Errorf("setting permissions on %s: %w", dirPath, err)
-		}
 	}
-	// Chown to current user so jib can read/write without sudo at runtime.
-	if os.Getuid() != 0 {
-		chownCmd := sudoCmd("chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), root)
-		if err := chownCmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: chown %s: %v\n", root, err)
-		}
-	}
+	// Own as root:jib. Group members can read/write without sudo.
+	sudoCmd("chown", "-R", "root:jib", root).Run()
+	// Default: rwxrwx--- (dirs), rw-rw---- (files) for root:jib.
+	sudoCmd("chmod", "-R", "u=rwX,g=rwX,o=", root).Run()
+	// Secrets: rwxrwx--- but files inside get 0660 (set by secrets manager).
+	sudoCmd("chmod", "2770", filepath.Join(root, "secrets")).Run()
 	fmt.Printf("  Created %s/{%s}\n", root, strings.Join(dirs, ","))
 
-	// Step f: Generate initial config.yml
+	// Step g: Generate initial config.yml
 	fmt.Println("\nGenerating config.yml...")
 	cfgContent := fmt.Sprintf("config_version: %d\npoll_interval: 5m\n", config.LatestConfigVersion)
 	if certbotEmail != "" {
@@ -294,16 +301,20 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	cfgContent += "apps: {}\n"
 
-	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0o640); err != nil {
+	writeCfgCmd := sudoCmd("tee", cfgPath)
+	writeCfgCmd.Stdin = strings.NewReader(cfgContent)
+	writeCfgCmd.Stdout = nil // suppress tee's stdout echo
+	if err := writeCfgCmd.Run(); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
 	fmt.Printf("  Written to %s\n", cfgPath)
 
-	// Step g: Install systemd service for jib daemon
+	// Step h: Install systemd service for jib daemon
 	fmt.Println("\nInstalling systemd service...")
 	unitPath := "/etc/systemd/system/jib.service"
-	writeUnitCmd := sudoBash(fmt.Sprintf("cat > %s", unitPath))
+	writeUnitCmd := sudoCmd("tee", unitPath)
 	writeUnitCmd.Stdin = strings.NewReader(jibServiceUnit)
+	writeUnitCmd.Stdout = nil
 	if err := writeUnitCmd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not write systemd unit file: %v\n", err)
 	} else {
@@ -320,15 +331,18 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Step h: Run doctor checks
+	// Step i: Run doctor checks
 	fmt.Println("\n=== Verifying installation ===")
 	if err := runDoctor(cmd, nil); err != nil {
 		fmt.Fprintf(os.Stderr, "\nSome checks failed, but init completed. Run 'jib doctor' to review.\n")
 	}
 
-	// Step i: Print next steps
+	// Step j: Print next steps
 	fmt.Println()
 	fmt.Println("Jib initialized! Next:")
+	if currentUser != "" && currentUser != "root" {
+		fmt.Printf("  Log out and back in (or run 'newgrp jib') for group membership to take effect.\n")
+	}
 	fmt.Println("  jib add <app> --repo org/repo --domain example.com")
 	fmt.Println("  jib deploy <app>")
 
