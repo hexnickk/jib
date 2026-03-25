@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/hexnickk/jib/internal/config"
@@ -24,6 +25,23 @@ func jibRoot() string {
 		return root
 	}
 	return "/opt/jib"
+}
+
+// sudoCmd creates an exec.Cmd that prepends "sudo" when not running as root.
+func sudoCmd(name string, args ...string) *exec.Cmd {
+	if os.Getuid() == 0 {
+		return exec.Command(name, args...)
+	}
+	return exec.Command("sudo", append([]string{name}, args...)...)
+}
+
+// sudoBash creates an exec.Cmd that runs a shell command via "bash -c",
+// prepending "sudo" when not running as root.
+func sudoBash(script string) *exec.Cmd {
+	if os.Getuid() == 0 {
+		return exec.Command("bash", "-c", script)
+	}
+	return exec.Command("sudo", "bash", "-c", script)
 }
 
 func configPath() string {

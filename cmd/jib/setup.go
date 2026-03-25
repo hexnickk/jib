@@ -146,7 +146,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			fmt.Printf("\nInstalling: %s\n", strings.Join(toInstall, ", "))
 
 			// apt-get update
-			updateCmd := exec.Command("apt-get", "update")
+			updateCmd := sudoCmd("apt-get", "update")
 			updateCmd.Stdout = os.Stdout
 			updateCmd.Stderr = os.Stderr
 			if err := updateCmd.Run(); err != nil {
@@ -155,7 +155,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 			// apt-get install
 			installArgs := append([]string{"install", "-y"}, toInstall...)
-			installCmd := exec.Command("apt-get", installArgs...)
+			installCmd := sudoCmd("apt-get", installArgs...)
 			installCmd.Stdout = os.Stdout
 			installCmd.Stderr = os.Stderr
 			if err := installCmd.Run(); err != nil {
@@ -168,7 +168,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		// Enable and start Docker and Nginx
 		fmt.Println("\nEnabling services...")
 		for _, svc := range []string{"docker", "nginx"} {
-			enableCmd := exec.Command("systemctl", "enable", "--now", svc)
+			enableCmd := sudoCmd("systemctl", "enable", "--now", svc)
 			enableCmd.Stdout = os.Stdout
 			enableCmd.Stderr = os.Stderr
 			if err := enableCmd.Run(); err != nil {
@@ -211,7 +211,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		// Install certbot
 		if !skipInstall {
 			fmt.Println("\nInstalling certbot...")
-			installCmd := exec.Command("apt-get", "install", "-y", "certbot", "python3-certbot-nginx")
+			installCmd := sudoCmd("apt-get", "install", "-y", "certbot", "python3-certbot-nginx")
 			installCmd.Stdout = os.Stdout
 			installCmd.Stderr = os.Stderr
 			if err := installCmd.Run(); err != nil {
@@ -245,7 +245,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	if installRclone && !skipInstall {
 		fmt.Println("Installing rclone...")
-		installCmd := exec.Command("apt-get", "install", "-y", "rclone")
+		installCmd := sudoCmd("apt-get", "install", "-y", "rclone")
 		installCmd.Stdout = os.Stdout
 		installCmd.Stderr = os.Stderr
 		if err := installCmd.Run(); err != nil {
@@ -264,12 +264,17 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	for _, dir := range dirs {
 		dirPath := filepath.Join(root, dir)
-		perm := os.FileMode(0o755)
+		perm := "755"
 		if dir == "secrets" {
-			perm = 0o700
+			perm = "700"
 		}
-		if err := os.MkdirAll(dirPath, perm); err != nil {
+		mkdirCmd := sudoCmd("mkdir", "-p", dirPath)
+		if err := mkdirCmd.Run(); err != nil {
 			return fmt.Errorf("creating directory %s: %w", dirPath, err)
+		}
+		chmodCmd := sudoCmd("chmod", perm, dirPath)
+		if err := chmodCmd.Run(); err != nil {
+			return fmt.Errorf("setting permissions on %s: %w", dirPath, err)
 		}
 	}
 	fmt.Printf("  Created %s/{%s}\n", root, strings.Join(dirs, ","))
@@ -282,7 +287,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	cfgContent += "apps: {}\n"
 
-	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0o640); err != nil {
+	writeCfgCmd := sudoBash(fmt.Sprintf("cat > %s && chmod 640 %s", cfgPath, cfgPath))
+	writeCfgCmd.Stdin = strings.NewReader(cfgContent)
+	if err := writeCfgCmd.Run(); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
 	fmt.Printf("  Written to %s\n", cfgPath)
@@ -290,15 +297,17 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Step g: Install systemd service for jib daemon
 	fmt.Println("\nInstalling systemd service...")
 	unitPath := "/etc/systemd/system/jib.service"
-	if err := os.WriteFile(unitPath, []byte(jibServiceUnit), 0o644); err != nil {
+	writeUnitCmd := sudoBash(fmt.Sprintf("cat > %s", unitPath))
+	writeUnitCmd.Stdin = strings.NewReader(jibServiceUnit)
+	if err := writeUnitCmd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not write systemd unit file: %v\n", err)
 	} else {
 		// Reload systemd, enable and start the daemon
-		reloadCmd := exec.Command("systemctl", "daemon-reload")
+		reloadCmd := sudoCmd("systemctl", "daemon-reload")
 		if err := reloadCmd.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: systemctl daemon-reload: %v\n", err)
 		}
-		enableCmd := exec.Command("systemctl", "enable", "--now", "jib")
+		enableCmd := sudoCmd("systemctl", "enable", "--now", "jib")
 		if err := enableCmd.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: systemctl enable --now jib: %v\n", err)
 		} else {

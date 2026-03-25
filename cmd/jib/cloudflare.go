@@ -53,19 +53,18 @@ func installCloudflared() error {
 	fmt.Println("Installing cloudflared...")
 
 	// Use the official Cloudflare package repository method
-	cmds := [][]string{
-		{"bash", "-c", "curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-main.gpg"},
-		{"bash", "-c", `echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" > /etc/apt/sources.list.d/cloudflared.list`},
-		{"apt-get", "update", "-qq"},
-		{"apt-get", "install", "-y", "-qq", "cloudflared"},
+	cmds := []*exec.Cmd{
+		sudoBash("curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-main.gpg"),
+		sudoBash(`echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" > /etc/apt/sources.list.d/cloudflared.list`),
+		sudoCmd("apt-get", "update", "-qq"),
+		sudoCmd("apt-get", "install", "-y", "-qq", "cloudflared"),
 	}
 
-	for _, argv := range cmds {
-		c := exec.Command(argv[0], argv[1:]...)
+	for _, c := range cmds {
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
 		if err := c.Run(); err != nil {
-			return fmt.Errorf("running %v: %w", argv, err)
+			return fmt.Errorf("running %v: %w", c.Args, err)
 		}
 	}
 
