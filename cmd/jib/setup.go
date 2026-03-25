@@ -215,8 +215,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 	ensureJibDaemon()
 
 	// --- Verify ---
+	// Run doctor with jib group active (current process may not have it yet).
 	fmt.Println("\n=== Verifying installation ===")
-	if err := runDoctor(cmd, nil); err != nil {
+	jibBin, _ := os.Executable()
+	doctorCmd := exec.Command("sg", "jib", "-c", jibBin+" doctor")
+	doctorCmd.Stdout = os.Stdout
+	doctorCmd.Stderr = os.Stderr
+	if err := doctorCmd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "\nSome checks failed, but init completed. Run 'jib doctor' to review.\n")
 	}
 
