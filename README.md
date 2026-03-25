@@ -80,7 +80,6 @@ jib metrics myapp                           # CPU/memory/network stats
 ### SSL + reverse proxy — automatic
 ```bash
 jib provision myapp          # Generates nginx config + obtains Let's Encrypt cert
-jib doctor                   # Check cert expiry, deps, secrets
 ```
 
 ### Compose overlays for production
@@ -171,7 +170,7 @@ make install
 | Git | 2.25 | `ls-remote` with ref filtering |
 | Rclone | 1.50 | R2/S3 backups (optional) |
 
-Ubuntu 22.04+ supported. Checked at `jib init` and `jib doctor`.
+Ubuntu 22.04+ supported. Checked at `jib init`.
 
 ## Samples
 

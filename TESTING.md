@@ -27,8 +27,7 @@ Tested on DigitalOcean droplet (1 vCPU, 2GB RAM, Ubuntu 24.04) with domain `basi
 | 12 | `jib apps` | PASS | Lists apps with repo, branch, strategy, domains. |
 | 13 | `jib logs <app>` | PASS | `--tail N` works. Shows all services interleaved. |
 | 14 | `jib metrics <app>` | PASS | Live CPU/memory/network stats per container. |
-| 15 | `jib doctor` | PASS | Checks deps (versions), secrets, SSL cert expiry. Reports missing rclone, missing certs. |
-| 16 | `jib exec <app> <svc> -- <cmd>` | PASS | Runs in existing container (not PID 1). |
+| 15 | `jib exec <app> <svc> -- <cmd>` | PASS | Runs in existing container (not PID 1). |
 | 17 | `jib run <app> <svc> -- <cmd>` | PASS | Spawns new container (PID 1), auto-removed after exit. |
 | 18 | `jib down <app>` | PASS | Stops and removes containers + network. State preserved. |
 | 19 | `jib restart <app>` | PASS | Restarts containers without rebuild. |

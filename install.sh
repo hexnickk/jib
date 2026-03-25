@@ -68,5 +68,10 @@ fi
 echo "Installed jib ${TAG} to ${INSTALL_DIR}/${BINARY}"
 echo ""
 
-# Run init automatically
-"${INSTALL_DIR}/${BINARY}" init
+# Run init with sudo so it can create dirs, groups, and systemd units.
+# SUDO_USER is preserved so init knows which user to add to the jib group.
+if [ "$(id -u)" -eq 0 ]; then
+  "${INSTALL_DIR}/${BINARY}" init
+else
+  sudo "${INSTALL_DIR}/${BINARY}" init
+fi

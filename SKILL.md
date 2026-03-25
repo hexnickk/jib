@@ -58,7 +58,6 @@ ssh user@server jib <command> [args] [flags]
 | `jib logs <app> [service] [--tail N] [-f]` | Container logs (default tail 100) |
 | `jib metrics [app] [--watch]` | Live CPU/memory/network stats (`--watch` requires TTY) |
 | `jib env <app>` | Show env vars (secrets redacted) |
-| `jib doctor` | Check deps, secrets, SSL certs |
 | `jib history <app> [--json] [--limit N]` | Deploy timeline (not yet implemented) |
 
 ### Running Commands in Containers
@@ -129,7 +128,7 @@ Config lives at `/opt/jib/config.yml`.
 | `jib backup-dest list` | Show destinations |
 | `jib backup-dest remove <name>` | Remove a destination |
 
-Requires `rclone` installed. Check with `jib doctor`.
+Requires `rclone` installed. Run `jib init` to install it.
 
 **Ad-hoc local backups** (without rclone): Use `jib exec` to dump data, then `docker cp` to extract:
 ```bash
@@ -242,7 +241,7 @@ jib init                    # Install deps, create config
 jib add myapp --repo org/repo --domain example.com
 jib secrets set myapp --file .env    # If using secrets
 jib deploy myapp
-jib doctor                  # Verify everything
+jib status                  # Verify everything
 ```
 
 ### Deploy cycle
@@ -305,7 +304,7 @@ jib provision <app>          # Attempts certbot
 ```
 Requirements: DNS must point to the server, port 80 must be open, `certbot_email` must be set. If behind Cloudflare with proxy enabled, ensure the ACME challenge can reach the origin.
 
-If `jib doctor` shows MISSING for a domain, check DNS first:
+If SSL provisioning fails for a domain, check DNS first:
 - **NXDOMAIN** — the DNS record doesn't exist at all. Create an A record pointing to the server IP before provisioning.
 - **Wrong IP** — the record exists but points elsewhere. Update it.
 
@@ -324,7 +323,7 @@ Jib uses file locks (`flock`). A second deploy on the same app waits for the fir
 Jib refuses to deploy with < 2GB free disk. Run `jib cleanup` to prune old images.
 
 ### rclone missing
-Backups require rclone. Install: `curl https://rclone.org/install.sh | bash`, then `jib doctor` to verify.
+Backups require rclone. Install: `curl https://rclone.org/install.sh | bash` or run `jib init` to install it.
 
 ### Need to run a database migration manually
 ```bash
