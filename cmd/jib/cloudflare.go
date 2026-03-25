@@ -89,6 +89,7 @@ func runCloudflareSetup(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Println("Create a tunnel in the Cloudflare dashboard:")
 	fmt.Println("  https://dash.cloudflare.com → Networks → Connectors → Create a tunnel")
+	fmt.Println("  When asked, choose 'Cloudflared' (not WARP).")
 	fmt.Println()
 	fmt.Print("Paste the tunnel token: ")
 	token, _ := reader.ReadString('\n')
