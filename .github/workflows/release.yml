@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        run: |
+          if [[ ! "${{ github.event.inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: version must match vX.Y.Z (e.g. v0.1.0)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build binaries
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          LDFLAGS="-X main.version=${VERSION}"
+
+          GOOS=linux  GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/jib-linux-amd64  ./cmd/jib
+          GOOS=linux  GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/jib-linux-arm64  ./cmd/jib
+          GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/jib-darwin-amd64 ./cmd/jib
+          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/jib-darwin-arm64 ./cmd/jib
+
+      - name: Create tag
+        run: |
+          git tag "${{ github.event.inputs.version }}"
+          git push origin "${{ github.event.inputs.version }}"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          generate_release_notes: true
+          files: dist/*
