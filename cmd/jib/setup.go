@@ -277,6 +277,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("setting permissions on %s: %w", dirPath, err)
 		}
 	}
+	// Chown to current user so jib can read/write without sudo at runtime.
+	if os.Getuid() != 0 {
+		chownCmd := sudoCmd("chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), root)
+		if err := chownCmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: chown %s: %v\n", root, err)
+		}
+	}
 	fmt.Printf("  Created %s/{%s}\n", root, strings.Join(dirs, ","))
 
 	// Step f: Generate initial config.yml
@@ -287,9 +294,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	cfgContent += "apps: {}\n"
 
-	writeCfgCmd := sudoBash(fmt.Sprintf("cat > %s && chmod 640 %s", cfgPath, cfgPath))
-	writeCfgCmd.Stdin = strings.NewReader(cfgContent)
-	if err := writeCfgCmd.Run(); err != nil {
+	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0o640); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
 	fmt.Printf("  Written to %s\n", cfgPath)
