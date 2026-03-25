@@ -92,124 +92,59 @@ func runInit(cmd *cobra.Command, args []string) error {
 	skipInstall, _ := cmd.Flags().GetBool("skip-install")
 
 	scanner := bufio.NewScanner(os.Stdin)
-
-	// Step a: Check if already initialized
 	cfgPath := configPath()
-	if _, err := os.Stat(cfgPath); err == nil {
-		fmt.Println("Already initialized. Use jib edit to modify config.")
-		return nil
-	}
+	root := jibRoot()
+	firstRun := !fileExists(cfgPath)
 
-	fmt.Println("=== Jib Server Bootstrap ===")
+	if firstRun {
+		fmt.Println("=== Jib Server Bootstrap ===")
+	} else {
+		fmt.Println("=== Jib Server Converge ===")
+	}
 	fmt.Println()
 
-	// Step b: Install core dependencies (Docker, Docker Compose, nginx, git)
+	// --- Ensure: dependencies installed ---
 	if !skipInstall {
 		fmt.Println("Checking dependencies...")
-		depResults := platform.CheckAllDependencies()
-
-		// Determine which core packages are missing
-		// Core deps: Docker, Docker Compose, Nginx, Git
-		coreDeps := map[string]bool{
-			"Docker":         false,
-			"Docker Compose": false,
-			"Nginx":          false,
-			"Git":            false,
-		}
-		for _, r := range depResults {
-			if _, isCore := coreDeps[r.Name]; isCore {
-				coreDeps[r.Name] = r.Installed
-				if r.Installed {
-					fmt.Printf("  %s: installed (v%s)\n", r.Name, r.Version)
-				} else {
-					fmt.Printf("  %s: not installed\n", r.Name)
-				}
-			}
-		}
-
-		// Build list of apt packages to install
-		var toInstall []string
-		if !coreDeps["Docker"] {
-			toInstall = append(toInstall, "docker.io")
-		}
-		if !coreDeps["Docker Compose"] {
-			toInstall = append(toInstall, "docker-compose-v2")
-		}
-		if !coreDeps["Nginx"] {
-			toInstall = append(toInstall, "nginx")
-		}
-		if !coreDeps["Git"] {
-			toInstall = append(toInstall, "git")
-		}
-
-		if len(toInstall) > 0 {
-			fmt.Printf("\nInstalling: %s\n", strings.Join(toInstall, ", "))
-
-			// apt-get update
-			updateCmd := sudoCmd("apt-get", "update")
-			updateCmd.Stdout = os.Stdout
-			updateCmd.Stderr = os.Stderr
-			if err := updateCmd.Run(); err != nil {
-				return fmt.Errorf("apt-get update failed: %w", err)
-			}
-
-			// apt-get install
-			installArgs := append([]string{"install", "-y"}, toInstall...)
-			installCmd := sudoCmd("apt-get", installArgs...)
-			installCmd.Stdout = os.Stdout
-			installCmd.Stderr = os.Stderr
-			if err := installCmd.Run(); err != nil {
-				return fmt.Errorf("apt-get install failed: %w", err)
-			}
-		} else {
-			fmt.Println("\nAll core dependencies already installed.")
+		if err := ensureDeps(); err != nil {
+			return err
 		}
 
 		// Enable and start Docker and Nginx
-		fmt.Println("\nEnabling services...")
 		for _, svc := range []string{"docker", "nginx"} {
-			enableCmd := sudoCmd("systemctl", "enable", "--now", svc)
-			enableCmd.Stdout = os.Stdout
-			enableCmd.Stderr = os.Stderr
-			if err := enableCmd.Run(); err != nil {
-				fmt.Fprintf(os.Stderr, "  warning: systemctl enable --now %s: %v\n", svc, err)
-			} else {
-				fmt.Printf("  %s: enabled and started\n", svc)
-			}
+			ensureSystemdService(svc)
 		}
 	} else {
 		fmt.Println("Skipping dependency installation (--skip-install).")
 	}
 
-	// Step c: Domain/SSL choice
-	sslChoice := 1 // default: certbot
+	// --- First-run only: interactive prompts for SSL and rclone ---
 	certbotEmail := ""
+	if firstRun && !skipInstall {
+		sslChoice := 1
+		if !nonInteractive {
+			fmt.Println("\nDomain/SSL management:")
+			fmt.Println("  1. Certbot (Let's Encrypt) — recommended for direct server access")
+			fmt.Println("  2. Cloudflare Tunnel")
+			fmt.Println("  3. Tailscale")
+			fmt.Println("  4. None — I'll manage SSL myself")
+			fmt.Print("Choose [1-4, default 1]: ")
 
-	if !nonInteractive {
-		fmt.Println("\nDomain/SSL management:")
-		fmt.Println("  1. Certbot (Let's Encrypt) — recommended for direct server access")
-		fmt.Println("  2. Cloudflare Tunnel")
-		fmt.Println("  3. Tailscale")
-		fmt.Println("  4. None — I'll manage SSL myself")
-		fmt.Print("Choose [1-4, default 1]: ")
-
-		if scanner.Scan() {
-			choice := strings.TrimSpace(scanner.Text())
-			if choice != "" {
-				n, err := strconv.Atoi(choice)
-				if err != nil || n < 1 || n > 4 {
-					fmt.Println("Invalid choice, using default (1: Certbot).")
-				} else {
-					sslChoice = n
+			if scanner.Scan() {
+				choice := strings.TrimSpace(scanner.Text())
+				if choice != "" {
+					n, err := strconv.Atoi(choice)
+					if err != nil || n < 1 || n > 4 {
+						fmt.Println("Invalid choice, using default (1: Certbot).")
+					} else {
+						sslChoice = n
+					}
 				}
 			}
 		}
-	}
 
-	switch sslChoice {
-	case 1:
-		// Install certbot
-		if !skipInstall {
+		switch sslChoice {
+		case 1:
 			fmt.Println("\nInstalling certbot...")
 			installCmd := sudoCmd("apt-get", "install", "-y", "certbot", "python3-certbot-nginx")
 			installCmd.Stdout = os.Stdout
@@ -217,64 +152,193 @@ func runInit(cmd *cobra.Command, args []string) error {
 			if err := installCmd.Run(); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: certbot installation failed: %v\n", err)
 			}
+			if !nonInteractive {
+				fmt.Print("Email for Let's Encrypt notifications: ")
+				if scanner.Scan() {
+					certbotEmail = strings.TrimSpace(scanner.Text())
+				}
+			}
+		case 2:
+			fmt.Println("\nRun 'jib cloudflare setup' after init to configure.")
+		case 3:
+			fmt.Println("\nRun 'jib tailscale setup' after init to configure.")
+		case 4:
+			fmt.Println("\nSkipping SSL setup.")
 		}
 
 		if !nonInteractive {
-			fmt.Print("Email for Let's Encrypt notifications: ")
+			fmt.Print("\nInstall rclone for backups? [y/N]: ")
 			if scanner.Scan() {
-				certbotEmail = strings.TrimSpace(scanner.Text())
+				answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
+				if answer == "y" || answer == "yes" {
+					fmt.Println("Installing rclone...")
+					installCmd := sudoCmd("apt-get", "install", "-y", "rclone")
+					installCmd.Stdout = os.Stdout
+					installCmd.Stderr = os.Stderr
+					if err := installCmd.Run(); err != nil {
+						fmt.Fprintf(os.Stderr, "warning: rclone installation failed: %v\n", err)
+					}
+				}
 			}
 		}
-	case 2:
-		fmt.Println("\nRun 'jib cloudflare setup' after init to configure.")
-	case 3:
-		fmt.Println("\nRun 'jib tailscale setup' after init to configure.")
-	case 4:
-		fmt.Println("\nSkipping SSL setup.")
 	}
 
-	// Step d: Optional rclone for backups
-	installRclone := false
-	if !nonInteractive {
-		fmt.Print("\nInstall rclone for backups? [y/N]: ")
-		if scanner.Scan() {
-			answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
-			installRclone = answer == "y" || answer == "yes"
+	// --- Ensure: jib group exists and current user is a member ---
+	currentUser := ensureJibGroup()
+
+	// --- Ensure: directory structure with correct ownership/permissions ---
+	ensureDirs(root)
+
+	// --- Ensure: config.yml exists ---
+	if firstRun {
+		fmt.Println("\nGenerating config.yml...")
+		cfgContent := fmt.Sprintf("config_version: %d\npoll_interval: 5m\n", config.LatestConfigVersion)
+		if certbotEmail != "" {
+			cfgContent += fmt.Sprintf("certbot_email: %s\n", certbotEmail)
+		}
+		cfgContent += "apps: {}\n"
+
+		writeCfgCmd := sudoCmd("tee", cfgPath)
+		writeCfgCmd.Stdin = strings.NewReader(cfgContent)
+		writeCfgCmd.Stdout = nil
+		if err := writeCfgCmd.Run(); err != nil {
+			return fmt.Errorf("writing config: %w", err)
+		}
+		fmt.Printf("  Written to %s\n", cfgPath)
+	} else {
+		fmt.Println("\nConfig exists, skipping generation.")
+	}
+
+	// --- Ensure: systemd unit installed and running ---
+	ensureJibDaemon()
+
+	// --- Verify ---
+	fmt.Println("\n=== Verifying installation ===")
+	if err := runDoctor(cmd, nil); err != nil {
+		fmt.Fprintf(os.Stderr, "\nSome checks failed, but init completed. Run 'jib doctor' to review.\n")
+	}
+
+	fmt.Println()
+	fmt.Println("Jib initialized! Next:")
+	if currentUser != "" {
+		fmt.Printf("  Log out and back in (or run 'newgrp jib') for group membership to take effect.\n")
+	}
+	fmt.Println("  jib add <app> --repo org/repo --domain example.com")
+	fmt.Println("  jib deploy <app>")
+
+	return nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// ensureDeps checks core dependencies and installs any that are missing.
+func ensureDeps() error {
+	depResults := platform.CheckAllDependencies()
+
+	coreDeps := map[string]bool{
+		"Docker": false, "Docker Compose": false, "Nginx": false, "Git": false,
+	}
+	for _, r := range depResults {
+		if _, isCore := coreDeps[r.Name]; isCore {
+			coreDeps[r.Name] = r.Installed
+			if r.Installed {
+				fmt.Printf("  %s: OK (v%s)\n", r.Name, r.Version)
+			} else {
+				fmt.Printf("  %s: MISSING\n", r.Name)
+			}
 		}
 	}
 
-	if installRclone && !skipInstall {
-		fmt.Println("Installing rclone...")
-		installCmd := sudoCmd("apt-get", "install", "-y", "rclone")
-		installCmd.Stdout = os.Stdout
-		installCmd.Stderr = os.Stderr
-		if err := installCmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: rclone installation failed: %v\n", err)
-		} else {
-			fmt.Println("Run 'jib backup-dest add' to configure destinations.")
-		}
+	var toInstall []string
+	if !coreDeps["Docker"] {
+		toInstall = append(toInstall, "docker.io")
+	}
+	if !coreDeps["Docker Compose"] {
+		toInstall = append(toInstall, "docker-compose-v2")
+	}
+	if !coreDeps["Nginx"] {
+		toInstall = append(toInstall, "nginx")
+	}
+	if !coreDeps["Git"] {
+		toInstall = append(toInstall, "git")
 	}
 
-	// Step e: Create jib group and add current user (like Docker does with the docker group).
-	fmt.Println("\nSetting up jib group...")
+	if len(toInstall) == 0 {
+		return nil
+	}
+
+	fmt.Printf("\nInstalling: %s\n", strings.Join(toInstall, ", "))
+
+	updateCmd := sudoCmd("apt-get", "update")
+	updateCmd.Stdout = os.Stdout
+	updateCmd.Stderr = os.Stderr
+	if err := updateCmd.Run(); err != nil {
+		return fmt.Errorf("apt-get update failed: %w", err)
+	}
+
+	installArgs := append([]string{"install", "-y"}, toInstall...)
+	installCmd := sudoCmd("apt-get", installArgs...)
+	installCmd.Stdout = os.Stdout
+	installCmd.Stderr = os.Stderr
+	if err := installCmd.Run(); err != nil {
+		return fmt.Errorf("apt-get install failed: %w", err)
+	}
+
+	return nil
+}
+
+// ensureSystemdService enables and starts a systemd service if not already active.
+func ensureSystemdService(name string) {
+	// Check if already active.
+	if err := exec.Command("systemctl", "is-active", "--quiet", name).Run(); err == nil {
+		return
+	}
+	enableCmd := sudoCmd("systemctl", "enable", "--now", name)
+	enableCmd.Stdout = os.Stdout
+	enableCmd.Stderr = os.Stderr
+	if err := enableCmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: systemctl enable --now %s: %v\n", name, err)
+	} else {
+		fmt.Printf("  %s: enabled and started\n", name)
+	}
+}
+
+// ensureJibGroup ensures the jib group exists and the current user is a member.
+// Returns the username that was added (empty if root or already a member).
+func ensureJibGroup() string {
+	fmt.Println("\nEnsuring jib group...")
 	sudoCmd("groupadd", "-f", "jib").Run()
 
-	// Detect the real user even when running under sudo.
 	currentUser := os.Getenv("SUDO_USER")
 	if currentUser == "" {
 		currentUser = os.Getenv("USER")
 	}
-	if currentUser != "" && currentUser != "root" {
-		if err := sudoCmd("usermod", "-aG", "jib", currentUser).Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not add %s to jib group: %v\n", currentUser, err)
-		} else {
-			fmt.Printf("  Added user '%s' to jib group\n", currentUser)
-		}
+	if currentUser == "" || currentUser == "root" {
+		fmt.Println("  jib group: OK")
+		return ""
 	}
 
-	// Step f: Create directory structure
-	fmt.Println("\nCreating directory structure...")
-	root := jibRoot()
+	// Check if user is already in the group.
+	out, err := exec.Command("id", "-nG", currentUser).Output()
+	if err == nil && strings.Contains(" "+string(out)+" ", " jib ") {
+		fmt.Printf("  %s: already in jib group\n", currentUser)
+		return ""
+	}
+
+	if err := sudoCmd("usermod", "-aG", "jib", currentUser).Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: could not add %s to jib group: %v\n", currentUser, err)
+		return ""
+	}
+	fmt.Printf("  Added '%s' to jib group\n", currentUser)
+	return currentUser
+}
+
+// ensureDirs ensures /opt/jib directory structure exists with correct ownership and permissions.
+func ensureDirs(root string) {
+	fmt.Println("\nEnsuring directory structure...")
 	dirs := []string{
 		"state", "secrets", "repos", "overrides",
 		"nginx", "backups", "locks", "deploy-keys", "logs",
@@ -282,71 +346,42 @@ func runInit(cmd *cobra.Command, args []string) error {
 	for _, dir := range dirs {
 		dirPath := filepath.Join(root, dir)
 		if err := sudoCmd("mkdir", "-p", dirPath).Run(); err != nil {
-			return fmt.Errorf("creating directory %s: %w", dirPath, err)
+			fmt.Fprintf(os.Stderr, "  warning: creating %s: %v\n", dirPath, err)
 		}
 	}
-	// Own as root:jib. Group members can read/write without sudo.
+	// Converge ownership and permissions every run.
 	sudoCmd("chown", "-R", "root:jib", root).Run()
-	// Default: rwxrwx--- (dirs), rw-rw---- (files) for root:jib.
 	sudoCmd("chmod", "-R", "u=rwX,g=rwX,o=", root).Run()
-	// Secrets: rwxrwx--- but files inside get 0660 (set by secrets manager).
 	sudoCmd("chmod", "2770", filepath.Join(root, "secrets")).Run()
-	fmt.Printf("  Created %s/{%s}\n", root, strings.Join(dirs, ","))
+	fmt.Printf("  %s: OK (root:jib)\n", root)
+}
 
-	// Step g: Generate initial config.yml
-	fmt.Println("\nGenerating config.yml...")
-	cfgContent := fmt.Sprintf("config_version: %d\npoll_interval: 5m\n", config.LatestConfigVersion)
-	if certbotEmail != "" {
-		cfgContent += fmt.Sprintf("certbot_email: %s\n", certbotEmail)
-	}
-	cfgContent += "apps: {}\n"
-
-	writeCfgCmd := sudoCmd("tee", cfgPath)
-	writeCfgCmd.Stdin = strings.NewReader(cfgContent)
-	writeCfgCmd.Stdout = nil // suppress tee's stdout echo
-	if err := writeCfgCmd.Run(); err != nil {
-		return fmt.Errorf("writing config: %w", err)
-	}
-	fmt.Printf("  Written to %s\n", cfgPath)
-
-	// Step h: Install systemd service for jib daemon
-	fmt.Println("\nInstalling systemd service...")
+// ensureJibDaemon ensures the jib systemd unit is installed, loaded, and running.
+func ensureJibDaemon() {
+	fmt.Println("\nEnsuring jib daemon...")
 	unitPath := "/etc/systemd/system/jib.service"
-	writeUnitCmd := sudoCmd("tee", unitPath)
-	writeUnitCmd.Stdin = strings.NewReader(jibServiceUnit)
-	writeUnitCmd.Stdout = nil
-	if err := writeUnitCmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not write systemd unit file: %v\n", err)
+
+	// Always write the unit file to pick up any changes.
+	writeCmd := sudoCmd("tee", unitPath)
+	writeCmd.Stdin = strings.NewReader(jibServiceUnit)
+	writeCmd.Stdout = nil
+	if err := writeCmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: could not write %s: %v\n", unitPath, err)
+		return
+	}
+
+	sudoCmd("systemctl", "daemon-reload").Run()
+
+	// Enable and start if not already running.
+	if err := exec.Command("systemctl", "is-active", "--quiet", "jib").Run(); err == nil {
+		fmt.Println("  jib daemon: running")
+		return
+	}
+	if err := sudoCmd("systemctl", "enable", "--now", "jib").Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: systemctl enable --now jib: %v\n", err)
 	} else {
-		// Reload systemd, enable and start the daemon
-		reloadCmd := sudoCmd("systemctl", "daemon-reload")
-		if err := reloadCmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: systemctl daemon-reload: %v\n", err)
-		}
-		enableCmd := sudoCmd("systemctl", "enable", "--now", "jib")
-		if err := enableCmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: systemctl enable --now jib: %v\n", err)
-		} else {
-			fmt.Printf("  Installed and started %s\n", unitPath)
-		}
+		fmt.Println("  jib daemon: started")
 	}
-
-	// Step i: Run doctor checks
-	fmt.Println("\n=== Verifying installation ===")
-	if err := runDoctor(cmd, nil); err != nil {
-		fmt.Fprintf(os.Stderr, "\nSome checks failed, but init completed. Run 'jib doctor' to review.\n")
-	}
-
-	// Step j: Print next steps
-	fmt.Println()
-	fmt.Println("Jib initialized! Next:")
-	if currentUser != "" && currentUser != "root" {
-		fmt.Printf("  Log out and back in (or run 'newgrp jib') for group membership to take effect.\n")
-	}
-	fmt.Println("  jib add <app> --repo org/repo --domain example.com")
-	fmt.Println("  jib deploy <app>")
-
-	return nil
 }
 
 func runProvision(cmd *cobra.Command, args []string) error {
