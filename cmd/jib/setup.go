@@ -120,7 +120,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// --- First-run only: interactive prompts for SSL and rclone ---
 	certbotEmail := ""
-	if firstRun && !skipInstall {
+	if firstRun {
 		sslChoice := 1
 		if !nonInteractive {
 			fmt.Println("\nDomain/SSL management:")
@@ -145,12 +145,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 		switch sslChoice {
 		case 1:
-			fmt.Println("\nInstalling certbot...")
-			installCmd := sudoCmd("apt-get", "install", "-y", "certbot", "python3-certbot-nginx")
-			installCmd.Stdout = os.Stdout
-			installCmd.Stderr = os.Stderr
-			if err := installCmd.Run(); err != nil {
-				fmt.Fprintf(os.Stderr, "warning: certbot installation failed: %v\n", err)
+			if !skipInstall {
+				fmt.Println("\nInstalling certbot...")
+				installCmd := sudoCmd("apt-get", "install", "-y", "certbot", "python3-certbot-nginx")
+				installCmd.Stdout = os.Stdout
+				installCmd.Stderr = os.Stderr
+				if err := installCmd.Run(); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: certbot installation failed: %v\n", err)
+				}
 			}
 			if !nonInteractive {
 				fmt.Print("Email for Let's Encrypt notifications: ")
@@ -166,7 +168,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			fmt.Println("\nSkipping SSL setup.")
 		}
 
-		if !nonInteractive {
+		if !nonInteractive && !skipInstall {
 			fmt.Print("\nInstall rclone for backups? [y/N]: ")
 			if scanner.Scan() {
 				answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
@@ -310,7 +312,7 @@ func ensureSystemdService(name string) {
 // Returns the username that was added (empty if root or already a member).
 func ensureJibGroup() string {
 	fmt.Println("\nEnsuring jib group...")
-	sudoCmd("groupadd", "-f", "jib").Run()
+	_ = sudoCmd("groupadd", "-f", "jib").Run() // ignore: group may already exist
 
 	currentUser := os.Getenv("SUDO_USER")
 	if currentUser == "" {
@@ -323,7 +325,7 @@ func ensureJibGroup() string {
 
 	// Check if user is already in the group.
 	out, err := exec.Command("id", "-nG", currentUser).Output()
-	if err == nil && strings.Contains(" "+string(out)+" ", " jib ") {
+	if err == nil && strings.Contains(" "+strings.TrimSpace(string(out))+" ", " jib ") {
 		fmt.Printf("  %s: already in jib group\n", currentUser)
 		return ""
 	}
@@ -350,9 +352,15 @@ func ensureDirs(root string) {
 		}
 	}
 	// Converge ownership and permissions every run.
-	sudoCmd("chown", "-R", "root:jib", root).Run()
-	sudoCmd("chmod", "-R", "u=rwX,g=rwX,o=", root).Run()
-	sudoCmd("chmod", "2770", filepath.Join(root, "secrets")).Run()
+	if err := sudoCmd("chown", "-R", "root:jib", root).Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: chown %s: %v\n", root, err)
+	}
+	if err := sudoCmd("chmod", "-R", "u=rwX,g=rwX,o=", root).Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: chmod %s: %v\n", root, err)
+	}
+	if err := sudoCmd("chmod", "2770", filepath.Join(root, "secrets")).Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: chmod secrets: %v\n", err)
+	}
 	fmt.Printf("  %s: OK (root:jib)\n", root)
 }
 
@@ -370,7 +378,9 @@ func ensureJibDaemon() {
 		return
 	}
 
-	sudoCmd("systemctl", "daemon-reload").Run()
+	if err := sudoCmd("systemctl", "daemon-reload").Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: systemctl daemon-reload: %v\n", err)
+	}
 
 	// Enable and start if not already running.
 	if err := exec.Command("systemctl", "is-active", "--quiet", "jib").Run(); err == nil {
