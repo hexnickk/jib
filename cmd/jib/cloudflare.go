@@ -19,16 +19,9 @@ func registerCloudflareCommands(rootCmd *cobra.Command) {
 
 	cfCmd.AddCommand(&cobra.Command{
 		Use:   "setup",
-		Short: "Install cloudflared, authenticate, and create a tunnel",
+		Short: "Install cloudflared and connect a dashboard-managed tunnel",
 		Args:  cobra.NoArgs,
 		RunE:  runCloudflareSetup,
-	})
-
-	cfCmd.AddCommand(&cobra.Command{
-		Use:   "add <domain>",
-		Short: "Route a domain through the Cloudflare Tunnel",
-		Args:  exactArgs(1),
-		RunE:  runCloudflareAdd,
 	})
 
 	cfCmd.AddCommand(&cobra.Command{
@@ -91,68 +84,35 @@ func runCloudflareSetup(cmd *cobra.Command, args []string) error {
 		fmt.Println("cloudflared is already installed.")
 	}
 
-	// Step 2: Authenticate (interactive — opens browser)
+	// Step 2: Get tunnel token from user (dashboard-managed tunnel)
 	fmt.Println()
-	fmt.Println("Authenticating with Cloudflare (this will open a browser)...")
-	login := exec.Command("cloudflared", "tunnel", "login")
-	login.Stdout = os.Stdout
-	login.Stderr = os.Stderr
-	login.Stdin = os.Stdin
-	if err := login.Run(); err != nil {
-		return fmt.Errorf("cloudflared login failed: %w", err)
+	fmt.Println("Create a tunnel in the Cloudflare Zero Trust dashboard:")
+	fmt.Println("  https://one.dash.cloudflare.com → Networks → Tunnels → Create")
+	fmt.Println()
+	fmt.Print("Paste the tunnel token: ")
+	reader := bufio.NewReader(os.Stdin)
+	token, _ := reader.ReadString('\n')
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return fmt.Errorf("tunnel token is required")
 	}
 
-	// Step 3: Create tunnel named "jib"
-	fmt.Println()
-	fmt.Println("Creating tunnel 'jib'...")
-	create := exec.Command("cloudflared", "tunnel", "create", "jib")
-	create.Stdout = os.Stdout
-	create.Stderr = os.Stderr
-	if err := create.Run(); err != nil {
-		// Tunnel may already exist — that's fine
-		fmt.Println("Note: tunnel creation returned an error (it may already exist).")
-		fmt.Println("Run 'cloudflared tunnel list' to check.")
+	// Step 3: Install as systemd service with the token
+	fmt.Println("\nInstalling cloudflared as a system service...")
+	installSvc := sudoCmd("cloudflared", "service", "install", token)
+	installSvc.Stdout = os.Stdout
+	installSvc.Stderr = os.Stderr
+	if err := installSvc.Run(); err != nil {
+		return fmt.Errorf("cloudflared service install failed: %w", err)
 	}
 
-	fmt.Println()
-	fmt.Println("Cloudflare Tunnel setup complete.")
-	fmt.Println("Add domains with: jib cloudflare add <domain>")
-	fmt.Println()
-	fmt.Println("To start the tunnel, run:")
-	fmt.Println("  cloudflared tunnel run jib")
-	fmt.Println()
-	fmt.Println("Or install it as a system service:")
-	fmt.Println("  cloudflared service install")
-	return nil
-}
-
-func runCloudflareAdd(cmd *cobra.Command, args []string) error {
-	domain := args[0]
-
-	if !cloudflaredInstalled() {
-		return fmt.Errorf("cloudflared is not installed — run 'jib cloudflare setup' first")
-	}
-
-	fmt.Printf("Routing %s through tunnel 'jib'...\n", domain)
-	route := exec.Command("cloudflared", "tunnel", "route", "dns", "jib", domain)
-	route.Stdout = os.Stdout
-	route.Stderr = os.Stderr
-	if err := route.Run(); err != nil {
-		return fmt.Errorf("adding DNS route for %s: %w", domain, err)
+	if err := sudoCmd("systemctl", "enable", "--now", "cloudflared").Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: systemctl enable cloudflared: %v\n", err)
 	}
 
 	fmt.Println()
-	fmt.Printf("DNS route added: %s -> tunnel 'jib'\n", domain)
-	fmt.Println()
-	fmt.Println("Make sure your tunnel config includes an ingress rule for this domain.")
-	fmt.Println("Edit ~/.cloudflared/config.yml to add:")
-	fmt.Println()
-	fmt.Printf("  ingress:\n")
-	fmt.Printf("    - hostname: %s\n", domain)
-	fmt.Printf("      service: http://localhost:80\n")
-	fmt.Printf("    - service: http_status:404\n")
-	fmt.Println()
-	fmt.Println("Then restart the tunnel: cloudflared tunnel run jib")
+	fmt.Println("Cloudflare Tunnel is running as a system service.")
+	fmt.Println("Manage routes and ingress rules from the Zero Trust dashboard.")
 	return nil
 }
 
