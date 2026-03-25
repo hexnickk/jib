@@ -74,4 +74,8 @@ if [ "$(id -u)" -eq 0 ]; then
   "${INSTALL_DIR}/${BINARY}" init
 else
   sudo "${INSTALL_DIR}/${BINARY}" init
+  # Activate jib group in a new shell so jib commands work immediately.
+  if getent group jib >/dev/null 2>&1; then
+    exec newgrp jib
+  fi
 fi

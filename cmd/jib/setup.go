@@ -216,20 +216,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	fmt.Println()
 	fmt.Println("Jib initialized! Next:")
-	if needsGroupHint() {
-		fmt.Println("  Run 'newgrp jib' (or log out and back in) to activate group membership.")
-	}
 	fmt.Println("  jib add <app> --repo org/repo --domain example.com")
 	fmt.Println("  jib deploy <app>")
 
 	return nil
-}
-
-// needsGroupHint returns true if init is running via sudo on behalf of a
-// non-root user. We can't detect whether the calling shell has the jib group
-// active from inside a sudo process, so we always hint when SUDO_USER is set.
-func needsGroupHint() bool {
-	return os.Getenv("SUDO_USER") != ""
 }
 
 // userInGroup checks if a user belongs to a group (per /etc/group, not the active session).
