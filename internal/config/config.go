@@ -49,8 +49,10 @@ type GitHubConfig struct {
 
 // BackupDestination defines a remote backup target.
 type BackupDestination struct {
-	Driver      string `yaml:"driver"`
-	Bucket      string `yaml:"bucket"`
+	Driver      string `yaml:"driver"`                // r2, s3, ssh, local
+	Bucket      string `yaml:"bucket,omitempty"`       // for r2/s3
+	Host        string `yaml:"host,omitempty"`          // for ssh
+	Path        string `yaml:"path,omitempty"`          // for ssh/local
 	Retain      int    `yaml:"retain,omitempty"`
 	LocalRetain int    `yaml:"local_retain,omitempty"`
 	Encrypt     bool   `yaml:"encrypt,omitempty"`
@@ -104,10 +106,23 @@ type HealthCheck struct {
 
 // BackupConfig defines per-app backup settings.
 type BackupConfig struct {
-	Destination string   `yaml:"destination"`
-	Schedule    string   `yaml:"schedule"`
-	Volumes     []string `yaml:"volumes,omitempty"`
-	Hook        string   `yaml:"hook,omitempty"`
+	Destination  string   `yaml:"destination,omitempty"`   // deprecated single destination
+	Destinations []string `yaml:"destinations,omitempty"`  // list of destination names
+	Schedule     string   `yaml:"schedule,omitempty"`
+	Volumes      []string `yaml:"volumes,omitempty"`
+	Hook         string   `yaml:"hook,omitempty"`
+}
+
+// EffectiveDestinations returns the list of destination names, falling back to the
+// singular Destination field for backward compatibility.
+func (b *BackupConfig) EffectiveDestinations() []string {
+	if len(b.Destinations) > 0 {
+		return b.Destinations
+	}
+	if b.Destination != "" {
+		return []string{b.Destination}
+	}
+	return nil
 }
 
 // PreDeployHook names a service to run before the main deploy.

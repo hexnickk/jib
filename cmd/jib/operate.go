@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hexnickk/jib/internal/backup"
+	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
 	"github.com/spf13/cobra"
 )
@@ -54,37 +56,30 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	}
 	rootCmd.AddCommand(runCmd)
 
-	// jib backup <app>
-	rootCmd.AddCommand(&cobra.Command{
+	// jib backup <app> / jib backup list <app>
+	backupCmd := &cobra.Command{
 		Use:   "backup <app>",
 		Short: "Create a backup of app data",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("[backup] Would create a backup of app %q data.\n", args[0])
-			fmt.Println("  This requires backup destination configuration and rclone.")
-			return nil
-		},
-	})
+		RunE:  runBackup,
+	}
+	backupListCmd := &cobra.Command{
+		Use:   "list <app>",
+		Short: "List available backups for an app",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runBackupList,
+	}
+	backupCmd.AddCommand(backupListCmd)
+	rootCmd.AddCommand(backupCmd)
 
 	// jib restore <app>
 	restoreCmd := &cobra.Command{
 		Use:   "restore <app>",
 		Short: "Restore app data from a backup",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			from, _ := cmd.Flags().GetString("from")
-			dryRun, _ := cmd.Flags().GetBool("dry-run")
-			fmt.Printf("[restore] Would restore app %q data.\n", args[0])
-			if from != "" {
-				fmt.Printf("  From: %s\n", from)
-			}
-			if dryRun {
-				fmt.Println("  Dry-run mode: would download and verify without restoring.")
-			}
-			return nil
-		},
+		RunE:  runRestore,
 	}
-	restoreCmd.Flags().String("from", "", "Timestamp or backup ID to restore from")
+	restoreCmd.Flags().String("from", "", "Timestamp to restore from (e.g. 20260325-040000)")
 	restoreCmd.Flags().Bool("dry-run", false, "Download and verify without restoring")
 	restoreCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 	rootCmd.AddCommand(restoreCmd)
@@ -713,3 +708,112 @@ func copyFile(src, dst string) error {
 	}
 	return out.Close()
 }
+
+func newBackupManager(cfg *config.Config) *backup.Manager {
+	return backup.NewManager(cfg, filepath.Join(jibRoot(), "backups"))
+}
+
+func runBackup(cmd *cobra.Command, args []string) error {
+	appName := args[0]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	appCfg, ok := cfg.Apps[appName]
+	if !ok {
+		return fmt.Errorf("app %q not found in config", appName)
+	}
+
+	mgr := newBackupManager(cfg)
+	fmt.Printf("Backing up %s...\n", appName)
+
+	result, err := mgr.Backup(appName, appCfg)
+	if err != nil {
+		return fmt.Errorf("backup failed: %w", err)
+	}
+
+	fmt.Printf("\nBackup complete:\n")
+	fmt.Printf("  App:       %s\n", result.App)
+	fmt.Printf("  Timestamp: %s\n", result.Timestamp)
+	fmt.Printf("  Archive:   %s\n", result.ArchivePath)
+	fmt.Printf("  Size:      %s\n", backup.HumanSize(result.ArchiveSize))
+	fmt.Printf("  SHA256:    %s\n", result.SHA256)
+	fmt.Printf("  Volumes:   %s\n", strings.Join(result.Volumes, ", "))
+	if len(result.Uploaded) > 0 {
+		fmt.Printf("  Uploaded:  %s\n", strings.Join(result.Uploaded, ", "))
+	}
+	return nil
+}
+
+func runBackupList(cmd *cobra.Command, args []string) error {
+	appName := args[0]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	mgr := newBackupManager(cfg)
+	backups, err := mgr.List(appName)
+	if err != nil {
+		return fmt.Errorf("listing backups: %w", err)
+	}
+
+	if len(backups) == 0 {
+		fmt.Printf("No backups found for %s.\n", appName)
+		return nil
+	}
+
+	fmt.Printf("Backups for %s:\n\n", appName)
+	fmt.Printf("  %-20s  %-40s  %s\n", "TIMESTAMP", "FILENAME", "DESTINATION")
+	fmt.Printf("  %-20s  %-40s  %s\n", "---------", "--------", "-----------")
+	for _, b := range backups {
+		fmt.Printf("  %-20s  %-40s  %s\n", b.Timestamp, b.Filename, b.Destination)
+	}
+	return nil
+}
+
+func runRestore(cmd *cobra.Command, args []string) error {
+	appName := args[0]
+	from, _ := cmd.Flags().GetString("from")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	force, _ := cmd.Flags().GetBool("force")
+
+	if from == "" {
+		return fmt.Errorf("--from <timestamp> is required (use 'jib backup list %s' to see available backups)", appName)
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	if _, ok := cfg.Apps[appName]; !ok {
+		return fmt.Errorf("app %q not found in config", appName)
+	}
+
+	if !dryRun && !force {
+		fmt.Printf("This will restore %s from backup %s.\n", appName, from)
+		fmt.Printf("Containers will be stopped and volume data will be overwritten.\n")
+		fmt.Print("Continue? [y/N] ")
+		var answer string
+		fmt.Scanln(&answer)
+		answer = strings.TrimSpace(strings.ToLower(answer))
+		if answer != "y" && answer != "yes" {
+			fmt.Println("Aborted.")
+			return nil
+		}
+	}
+
+	mgr := newBackupManager(cfg)
+	fmt.Printf("Restoring %s from %s...\n", appName, from)
+
+	if err := mgr.Restore(appName, from, dryRun); err != nil {
+		return fmt.Errorf("restore failed: %w", err)
+	}
+
+	return nil
+}
+

@@ -41,10 +41,11 @@ func Validate(cfg *Config) error {
 	}
 
 	// Backup destinations.
+	validBackupDrivers := map[string]bool{"r2": true, "s3": true, "ssh": true, "local": true}
 	for name, dest := range cfg.BackupDests {
 		prefix := fmt.Sprintf("backup_destination '%s'", name)
-		if dest.Driver != "r2" && dest.Driver != "s3" {
-			ve.addf("%s: driver must be 'r2' or 's3', got %q", prefix, dest.Driver)
+		if !validBackupDrivers[dest.Driver] {
+			ve.addf("%s: driver must be r2, s3, ssh, or local, got %q", prefix, dest.Driver)
 		}
 	}
 
@@ -135,10 +136,14 @@ func validateApp(ve *ValidationErrors, name string, app *App, backupDests map[st
 
 	// Backup.
 	if app.Backup != nil {
-		if app.Backup.Destination == "" {
-			ve.addf("%s: backup: destination is required", prefix)
-		} else if _, ok := backupDests[app.Backup.Destination]; !ok {
-			ve.addf("%s: backup: destination %q not defined in backup_destinations", prefix, app.Backup.Destination)
+		dests := app.Backup.EffectiveDestinations()
+		if len(dests) == 0 {
+			ve.addf("%s: backup: at least one destination is required", prefix)
+		}
+		for _, d := range dests {
+			if _, ok := backupDests[d]; !ok {
+				ve.addf("%s: backup: destination %q not defined in backup_destinations", prefix, d)
+			}
 		}
 		if app.Backup.Schedule != "" {
 			validateCronSchedule(ve, fmt.Sprintf("%s: backup schedule", prefix), app.Backup.Schedule)
