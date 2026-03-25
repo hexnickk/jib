@@ -75,11 +75,3 @@ if [ "$(id -u)" -eq 0 ]; then
 else
   sudo "${INSTALL_DIR}/${BINARY}" init
 fi
-
-# Activate jib group in current shell so jib commands work immediately.
-if id -nG 2>/dev/null | grep -qw jib; then
-  : # already active
-elif getent group jib >/dev/null 2>&1; then
-  echo ""
-  echo "Run 'newgrp jib' or log out and back in to use jib commands."
-fi

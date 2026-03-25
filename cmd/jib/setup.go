@@ -186,7 +186,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// --- Ensure: jib group exists and current user is a member ---
-	currentUser := ensureJibGroup()
+	ensureJibGroup()
 
 	// --- Ensure: directory structure with correct ownership/permissions ---
 	ensureDirs(root)
@@ -216,13 +216,26 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	fmt.Println()
 	fmt.Println("Jib initialized! Next:")
-	if currentUser != "" {
-		fmt.Printf("  Log out and back in (or run 'newgrp jib') for group membership to take effect.\n")
+	if needsGroupHint() {
+		fmt.Println("  Run 'newgrp jib' (or log out and back in) to activate group membership.")
 	}
 	fmt.Println("  jib add <app> --repo org/repo --domain example.com")
 	fmt.Println("  jib deploy <app>")
 
 	return nil
+}
+
+// needsGroupHint returns true if the current process doesn't have the jib
+// group active (user needs newgrp/re-login).
+func needsGroupHint() bool {
+	if os.Getuid() == 0 {
+		return false
+	}
+	out, err := exec.Command("id", "-nG").Output()
+	if err != nil {
+		return false
+	}
+	return !strings.Contains(" "+strings.TrimSpace(string(out))+" ", " jib ")
 }
 
 func fileExists(path string) bool {
@@ -303,8 +316,7 @@ func ensureSystemdService(name string) {
 }
 
 // ensureJibGroup ensures the jib group exists and the current user is a member.
-// Returns the username that was added (empty if root or already a member).
-func ensureJibGroup() string {
+func ensureJibGroup() {
 	fmt.Println("\nEnsuring jib group...")
 	_ = sudoCmd("groupadd", "-f", "jib").Run() // ignore: group may already exist
 
@@ -314,22 +326,21 @@ func ensureJibGroup() string {
 	}
 	if currentUser == "" || currentUser == "root" {
 		fmt.Println("  jib group: OK")
-		return ""
+		return
 	}
 
 	// Check if user is already in the group.
 	out, err := exec.Command("id", "-nG", currentUser).Output()
 	if err == nil && strings.Contains(" "+strings.TrimSpace(string(out))+" ", " jib ") {
 		fmt.Printf("  %s: already in jib group\n", currentUser)
-		return ""
+		return
 	}
 
 	if err := sudoCmd("usermod", "-aG", "jib", currentUser).Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "  warning: could not add %s to jib group: %v\n", currentUser, err)
-		return ""
+		return
 	}
 	fmt.Printf("  Added '%s' to jib group\n", currentUser)
-	return currentUser
 }
 
 // ensureDirs ensures /opt/jib directory structure exists with correct ownership and permissions.
