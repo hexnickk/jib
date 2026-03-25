@@ -8,7 +8,7 @@ Jib lives on the server. You SSH in and run commands, or use `ssh <host> jib <co
 
 ```bash
 # Install on a fresh Ubuntu 22.04+ server (installs + runs jib init):
-curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/refs/heads/main/install.sh | bash
 
 # Add an app (port and health check inferred from docker-compose.yml):
 jib add myapp --repo myorg/myapp --domain myapp.com

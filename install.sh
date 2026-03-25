@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Jib installer — downloads the latest release binary to /usr/local/bin/jib
-# Usage: curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/refs/heads/main/install.sh | bash
 
 REPO="hexnickk/jib"
 INSTALL_DIR="/usr/local/bin"
