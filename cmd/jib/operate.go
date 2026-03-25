@@ -162,29 +162,6 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	})
 	rootCmd.AddCommand(cronCmd)
 
-	// jib tunnel
-	tunnelCmd := &cobra.Command{
-		Use:   "tunnel",
-		Short: "Manage Cloudflare Tunnel or Tailscale setup",
-	}
-	tunnelCmd.AddCommand(&cobra.Command{
-		Use:   "setup",
-		Short: "Interactive Cloudflare Tunnel or Tailscale setup",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("[tunnel setup] Would run interactive Cloudflare Tunnel or Tailscale setup.")
-			return nil
-		},
-	})
-	tunnelCmd.AddCommand(&cobra.Command{
-		Use:   "status",
-		Short: "Show tunnel connection status",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("[tunnel status] Would show tunnel connection status.")
-			return nil
-		},
-	})
-	rootCmd.AddCommand(tunnelCmd)
-
 	// jib upgrade
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "upgrade",

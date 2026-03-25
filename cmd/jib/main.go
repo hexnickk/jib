@@ -46,6 +46,8 @@ Jib lives on the server. You SSH in and run commands, or use
 	registerConfigCommands(rootCmd)
 	registerNotifyCommands(rootCmd)
 	registerGitHubCommands(rootCmd)
+	registerCloudflareCommands(rootCmd)
+	registerTailscaleCommands(rootCmd)
 	registerDaemonCommands(rootCmd)
 
 	return rootCmd
