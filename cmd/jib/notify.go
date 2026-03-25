@@ -36,7 +36,7 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	addCmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a notification channel (generic)",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runNotifyAdd,
 	}
 	addCmd.Flags().String("driver", "", "Channel driver: telegram, slack, discord, webhook")
@@ -47,7 +47,7 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	notifyCmd.AddCommand(&cobra.Command{
 		Use:   "remove <name>",
 		Short: "Remove a notification channel and its credentials",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runNotifyRemove,
 	})
 
@@ -55,7 +55,7 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	notifyCmd.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Send a test notification to a channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runNotifyTest,
 	})
 
@@ -67,13 +67,13 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	notifyTelegramCmd.AddCommand(&cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a Telegram notification channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runTelegramAdd,
 	})
 	notifyTelegramCmd.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Send a test message to a Telegram channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runNotifyTest,
 	})
 	notifyCmd.AddCommand(notifyTelegramCmd)
@@ -86,13 +86,13 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	notifySlackCmd.AddCommand(&cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a Slack notification channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runSlackAdd,
 	})
 	notifySlackCmd.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Send a test message to a Slack channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runNotifyTest,
 	})
 	notifyCmd.AddCommand(notifySlackCmd)
@@ -105,13 +105,13 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	notifyDiscordCmd.AddCommand(&cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a Discord notification channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runDiscordAdd,
 	})
 	notifyDiscordCmd.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Send a test message to a Discord channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runNotifyTest,
 	})
 	notifyCmd.AddCommand(notifyDiscordCmd)
@@ -127,13 +127,13 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	telegramAlias.AddCommand(&cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a Telegram notification channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runTelegramAdd,
 	})
 	telegramAlias.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Send a test message to a Telegram channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runNotifyTest,
 	})
 	rootCmd.AddCommand(telegramAlias)
@@ -146,13 +146,13 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	slackAlias.AddCommand(&cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a Slack notification channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runSlackAdd,
 	})
 	slackAlias.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Send a test message to a Slack channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runNotifyTest,
 	})
 	rootCmd.AddCommand(slackAlias)
@@ -165,13 +165,13 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	discordAlias.AddCommand(&cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a Discord notification channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runDiscordAdd,
 	})
 	discordAlias.AddCommand(&cobra.Command{
 		Use:   "test <name>",
 		Short: "Send a test message to a Discord channel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runNotifyTest,
 	})
 	rootCmd.AddCommand(discordAlias)

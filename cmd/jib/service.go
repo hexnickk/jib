@@ -24,7 +24,7 @@ Services run on the jib-shared Docker network and can be accessed by any app.`,
 		Use:   "add <type>",
 		Short: "Add a shared service",
 		Long:  "Add a shared service. Supported types: " + strings.Join(service.SupportedTypes(), ", "),
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runServiceAdd,
 	}
 	addCmd.Flags().String("name", "", "Name for the service (required)")
@@ -45,7 +45,7 @@ Services run on the jib-shared Docker network and can be accessed by any app.`,
 	statusCmd := &cobra.Command{
 		Use:   "status <name>",
 		Short: "Show detailed status of a shared service",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runServiceStatus,
 	}
 	serviceCmd.AddCommand(statusCmd)
@@ -54,7 +54,7 @@ Services run on the jib-shared Docker network and can be accessed by any app.`,
 	removeCmd := &cobra.Command{
 		Use:   "remove <name>",
 		Short: "Stop and remove a shared service",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runServiceRemove,
 	}
 	removeCmd.Flags().Bool("volumes", false, "Also remove data volumes")

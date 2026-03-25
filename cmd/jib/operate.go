@@ -136,7 +136,7 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	cronCmd.AddCommand(&cobra.Command{
 		Use:   "add <app>",
 		Short: "Add a scheduled task for an app",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Printf("[cron add] Would add a scheduled task for app %q.\n", args[0])
 			return nil
@@ -145,7 +145,7 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	cronCmd.AddCommand(&cobra.Command{
 		Use:   "list <app>",
 		Short: "List scheduled tasks for an app",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Printf("[cron list] Would list scheduled tasks for app %q.\n", args[0])
 			return nil
@@ -154,7 +154,7 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	cronCmd.AddCommand(&cobra.Command{
 		Use:   "remove <app>",
 		Short: "Remove a scheduled task for an app",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Printf("[cron remove] Would remove a scheduled task for app %q.\n", args[0])
 			return nil
@@ -163,7 +163,7 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	cronCmd.AddCommand(&cobra.Command{
 		Use:   "run <app>",
 		Short: "Run a scheduled task immediately",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Printf("[cron run] Would run a scheduled task for app %q immediately.\n", args[0])
 			return nil

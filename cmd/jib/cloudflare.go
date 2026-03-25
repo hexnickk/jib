@@ -25,7 +25,7 @@ func registerCloudflareCommands(rootCmd *cobra.Command) {
 	cfCmd.AddCommand(&cobra.Command{
 		Use:   "add <domain>",
 		Short: "Route a domain through the Cloudflare Tunnel",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runCloudflareAdd,
 	})
 

@@ -24,21 +24,21 @@ func registerGitHubCommands(rootCmd *cobra.Command) {
 	githubCmd.AddCommand(&cobra.Command{
 		Use:   "setup <app>",
 		Short: "Set up GitHub deploy key and webhook for an app",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runGitHubSetup,
 	})
 
 	githubCmd.AddCommand(&cobra.Command{
 		Use:   "status <app>",
 		Short: "Show deploy key fingerprint and webhook info",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runGitHubStatus,
 	})
 
 	githubCmd.AddCommand(&cobra.Command{
 		Use:   "remove <app>",
 		Short: "Remove deploy key and webhook secret for an app",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE:  runGitHubRemove,
 	})
 
