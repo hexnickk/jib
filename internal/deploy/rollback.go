@@ -59,7 +59,7 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 	defer func() { _ = lock.Release() }()
 
 	// 4. Git checkout previous_sha.
-	if err := gitCheckout(ctx, repoDir, previousSHA); err != nil {
+	if err := GitCheckout(ctx, repoDir, previousSHA); err != nil {
 		return nil, fmt.Errorf("git checkout %s: %w", previousSHA, err)
 	}
 

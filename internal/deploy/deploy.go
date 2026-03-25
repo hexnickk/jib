@@ -112,9 +112,9 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	previousSHA := appState.DeployedSHA
 
 	// 5. Git fetch and determine target ref.
-	hasRemote := gitHasRemote(ctx, repoDir)
+	hasRemote := GitHasRemote(ctx, repoDir)
 	if hasRemote {
-		if err := gitFetch(ctx, repoDir, branch); err != nil {
+		if err := GitFetch(ctx, repoDir, branch); err != nil {
 			return nil, fmt.Errorf("git fetch: %w", err)
 		}
 	}
@@ -122,14 +122,14 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	targetRef := opts.Ref
 	if targetRef == "" {
 		if hasRemote {
-			remoteSHA, err := gitRemoteSHA(ctx, repoDir, branch)
+			remoteSHA, err := GitRemoteSHA(ctx, repoDir, branch)
 			if err != nil {
 				return nil, fmt.Errorf("resolving remote HEAD: %w", err)
 			}
 			targetRef = remoteSHA
 		} else {
 			// Local-only repo: use current HEAD
-			localSHA, err := gitCurrentSHA(ctx, repoDir)
+			localSHA, err := GitCurrentSHA(ctx, repoDir)
 			if err != nil {
 				return nil, fmt.Errorf("resolving local HEAD: %w", err)
 			}
@@ -138,7 +138,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	}
 
 	// Check if already at target SHA (skip unless --force).
-	currentSHA, _ := gitCurrentSHA(ctx, repoDir)
+	currentSHA, _ := GitCurrentSHA(ctx, repoDir)
 	if currentSHA == targetRef && previousSHA == targetRef && !opts.Force {
 		return &DeployResult{
 			App:         opts.App,
@@ -179,7 +179,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	}
 
 	// 5 (cont). Git checkout target ref.
-	if err := gitCheckout(ctx, repoDir, targetRef); err != nil {
+	if err := GitCheckout(ctx, repoDir, targetRef); err != nil {
 		return nil, fmt.Errorf("git checkout: %w", err)
 	}
 
@@ -228,7 +228,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 		if err := compose.Run(ctx, hook.Service, nil); err != nil {
 			// Restore repo to previous SHA on hook failure.
 			if previousSHA != "" {
-				_ = gitCheckout(ctx, repoDir, previousSHA)
+				_ = GitCheckout(ctx, repoDir, previousSHA)
 			}
 			hookErr := fmt.Sprintf("pre_deploy hook %q failed: %v", hook.Service, err)
 			e.sendNotify(ctx, opts.App, "deploy", targetRef, opts.Trigger, opts.User, "failure", hookErr)
@@ -276,7 +276,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	_ = compose.TagRollbackImages(ctx)
 
 	// 14. Update state.
-	deployedSHA, _ := gitCurrentSHA(ctx, repoDir)
+	deployedSHA, _ := GitCurrentSHA(ctx, repoDir)
 	deployStatus := "success"
 	deployError := ""
 	if !healthOK {
@@ -405,15 +405,15 @@ func parseWarmup(s string) time.Duration {
 	return d
 }
 
-// gitHasRemote checks if the repo has an "origin" remote configured.
-func gitHasRemote(ctx context.Context, repoDir string) bool {
+// GitHasRemote checks if the repo has an "origin" remote configured.
+func GitHasRemote(ctx context.Context, repoDir string) bool {
 	cmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
 	cmd.Dir = repoDir
 	return cmd.Run() == nil
 }
 
-// gitFetch runs git fetch origin <branch> in the given directory.
-func gitFetch(ctx context.Context, repoDir, branch string) error {
+// GitFetch runs git fetch origin <branch> in the given directory.
+func GitFetch(ctx context.Context, repoDir, branch string) error {
 	cmd := exec.CommandContext(ctx, "git", "fetch", "origin", branch)
 	cmd.Dir = repoDir
 	out, err := cmd.CombinedOutput()
@@ -423,8 +423,8 @@ func gitFetch(ctx context.Context, repoDir, branch string) error {
 	return nil
 }
 
-// gitCheckout runs git checkout <ref> in the given directory.
-func gitCheckout(ctx context.Context, repoDir, ref string) error {
+// GitCheckout runs git checkout <ref> in the given directory.
+func GitCheckout(ctx context.Context, repoDir, ref string) error {
 	cmd := exec.CommandContext(ctx, "git", "checkout", ref)
 	cmd.Dir = repoDir
 	out, err := cmd.CombinedOutput()
@@ -434,8 +434,8 @@ func gitCheckout(ctx context.Context, repoDir, ref string) error {
 	return nil
 }
 
-// gitCurrentSHA runs git rev-parse HEAD and returns the current SHA.
-func gitCurrentSHA(ctx context.Context, repoDir string) (string, error) {
+// GitCurrentSHA runs git rev-parse HEAD and returns the current SHA.
+func GitCurrentSHA(ctx context.Context, repoDir string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", "rev-parse", "HEAD")
 	cmd.Dir = repoDir
 	out, err := cmd.CombinedOutput()
@@ -445,8 +445,8 @@ func gitCurrentSHA(ctx context.Context, repoDir string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// gitRemoteSHA runs git rev-parse origin/<branch> and returns the remote branch SHA.
-func gitRemoteSHA(ctx context.Context, repoDir, branch string) (string, error) {
+// GitRemoteSHA runs git rev-parse origin/<branch> and returns the remote branch SHA.
+func GitRemoteSHA(ctx context.Context, repoDir, branch string) (string, error) {
 	ref := "origin/" + branch
 	cmd := exec.CommandContext(ctx, "git", "rev-parse", ref)
 	cmd.Dir = repoDir

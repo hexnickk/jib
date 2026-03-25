@@ -200,7 +200,7 @@ func (d *Daemon) handleHealthEndpoint(w http.ResponseWriter, r *http.Request) {
 
 // loadWebhookSecret reads the webhook secret for an app from the secrets dir.
 func (d *Daemon) loadWebhookSecret(app string) (string, error) {
-	path := filepath.Join(d.Root, "secrets", "_jib", app+"-webhook.json")
+	path := filepath.Join(d.Root, "secrets", "_jib", app+"-github-webhook.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {

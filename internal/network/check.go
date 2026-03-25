@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -132,12 +133,19 @@ func ProbeReachability(ctx context.Context, domain string) (bool, error) {
 }
 
 func writeAndReload(path, content string) error {
-	cmd := exec.Command("bash", "-c", fmt.Sprintf("echo '%s' > %s && nginx -s reload 2>/dev/null", content, path))
-	return cmd.Run()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	cmd := exec.Command("nginx", "-s", "reload")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("nginx reload: %w: %s", err, string(out))
+	}
+	return nil
 }
 
 func cleanupProbe(path string) {
-	_ = exec.Command("bash", "-c", fmt.Sprintf("rm -f %s && nginx -s reload 2>/dev/null", path)).Run()
+	_ = os.Remove(path)
+	_ = exec.Command("nginx", "-s", "reload").Run()
 }
 
 // GetPublicIP returns this server's public IP address.

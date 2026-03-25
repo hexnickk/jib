@@ -42,7 +42,7 @@ ssh user@server jib <command> [args] [flags]
 | `jib add <app> ... --health /path:port` | Explicit health check (overrides compose inference) |
 | `jib add <app> ... --compose file1,file2` | Add with multi-compose |
 | `jib add <app> ... --config-only` | Write config only, skip provisioning |
-| `jib remove <app> [--force]` | Remove app (**stub — not yet implemented, only prints what it would do**) |
+| `jib remove <app> [--force] [--volumes]` | Remove app completely (containers, nginx, state, secrets, repo, config entry) |
 | `jib provision [app] [--skip-ssl]` | Regenerate nginx configs + SSL certs |
 | `jib down <app>` | Stop containers, keep config |
 | `jib restart <app>` | Restart containers without rebuild |

@@ -3,11 +3,8 @@ package daemon
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/hexnickk/jib/internal/deploy"
@@ -81,18 +78,18 @@ func (d *Daemon) pollOnce(ctx context.Context) {
 		}
 
 		// Check if repo has a remote.
-		if !gitHasRemote(ctx, repoDir) {
+		if !deploy.GitHasRemote(ctx, repoDir) {
 			continue
 		}
 
 		// Fetch from origin.
-		if err := gitFetch(ctx, repoDir, branch); err != nil {
+		if err := deploy.GitFetch(ctx, repoDir, branch); err != nil {
 			d.logger.Printf("poller: %s: fetch error: %v", appName, err)
 			continue
 		}
 
 		// Compare remote HEAD with deployed SHA.
-		remoteSHA, err := gitRemoteSHA(ctx, repoDir, branch)
+		remoteSHA, err := deploy.GitRemoteSHA(ctx, repoDir, branch)
 		if err != nil {
 			d.logger.Printf("poller: %s: error getting remote SHA: %v", appName, err)
 			continue
@@ -135,36 +132,6 @@ func (d *Daemon) pollOnce(ctx context.Context) {
 			d.logger.Printf("poller: %s: deploy failed: %s", appName, result.Error)
 		}
 	}
-}
-
-// gitHasRemote checks if the repo has an "origin" remote configured.
-func gitHasRemote(ctx context.Context, repoDir string) bool {
-	cmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
-	cmd.Dir = repoDir
-	return cmd.Run() == nil
-}
-
-// gitFetch runs git fetch origin <branch> in the given directory.
-func gitFetch(ctx context.Context, repoDir, branch string) error {
-	cmd := exec.CommandContext(ctx, "git", "fetch", "origin", branch)
-	cmd.Dir = repoDir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git fetch origin %s: %w: %s", branch, err, string(out))
-	}
-	return nil
-}
-
-// gitRemoteSHA runs git rev-parse origin/<branch> and returns the remote branch SHA.
-func gitRemoteSHA(ctx context.Context, repoDir, branch string) (string, error) {
-	ref := "origin/" + branch
-	cmd := exec.CommandContext(ctx, "git", "rev-parse", ref)
-	cmd.Dir = repoDir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git rev-parse %s: %w: %s", ref, err, string(out))
-	}
-	return strings.TrimSpace(string(out)), nil
 }
 
 // short returns the first 7 characters of a SHA, or the whole string if shorter.
