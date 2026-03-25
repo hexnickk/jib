@@ -225,17 +225,20 @@ func runInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// needsGroupHint returns true if the current process doesn't have the jib
-// group active (user needs newgrp/re-login).
+// needsGroupHint returns true if init is running via sudo on behalf of a
+// non-root user. We can't detect whether the calling shell has the jib group
+// active from inside a sudo process, so we always hint when SUDO_USER is set.
 func needsGroupHint() bool {
-	if os.Getuid() == 0 {
-		return false
-	}
-	out, err := exec.Command("id", "-nG").Output()
+	return os.Getenv("SUDO_USER") != ""
+}
+
+// userInGroup checks if a user belongs to a group (per /etc/group, not the active session).
+func userInGroup(user, group string) bool {
+	out, err := exec.Command("id", "-nG", user).Output()
 	if err != nil {
 		return false
 	}
-	return !strings.Contains(" "+strings.TrimSpace(string(out))+" ", " jib ")
+	return strings.Contains(" "+strings.TrimSpace(string(out))+" ", " "+group+" ")
 }
 
 func fileExists(path string) bool {
@@ -330,8 +333,7 @@ func ensureJibGroup() {
 	}
 
 	// Check if user is already in the group.
-	out, err := exec.Command("id", "-nG", currentUser).Output()
-	if err == nil && strings.Contains(" "+strings.TrimSpace(string(out))+" ", " jib ") {
+	if userInGroup(currentUser, "jib") {
 		fmt.Printf("  %s: already in jib group\n", currentUser)
 		return
 	}
