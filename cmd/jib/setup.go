@@ -287,23 +287,22 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("  Written to %s\n", cfgPath)
 
-	// Step g: Install systemd service
-	// TODO: Don't start the service yet — daemon implementation not complete.
+	// Step g: Install systemd service for jib daemon
 	fmt.Println("\nInstalling systemd service...")
 	unitPath := "/etc/systemd/system/jib.service"
 	if err := os.WriteFile(unitPath, []byte(jibServiceUnit), 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not write systemd unit file: %v\n", err)
 	} else {
-		// Reload systemd and enable (but don't start — daemon not implemented yet)
+		// Reload systemd, enable and start the daemon
 		reloadCmd := exec.Command("systemctl", "daemon-reload")
 		if err := reloadCmd.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: systemctl daemon-reload: %v\n", err)
 		}
-		enableCmd := exec.Command("systemctl", "enable", "jib")
+		enableCmd := exec.Command("systemctl", "enable", "--now", "jib")
 		if err := enableCmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: systemctl enable jib: %v\n", err)
+			fmt.Fprintf(os.Stderr, "warning: systemctl enable --now jib: %v\n", err)
 		} else {
-			fmt.Printf("  Installed %s (enabled, not started — daemon not yet implemented)\n", unitPath)
+			fmt.Printf("  Installed and started %s\n", unitPath)
 		}
 	}
 
