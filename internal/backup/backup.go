@@ -13,12 +13,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-
-	"github.com/hexnickk/jib/internal/util"
 	"strings"
 	"time"
 
 	"github.com/hexnickk/jib/internal/config"
+	"github.com/hexnickk/jib/internal/util"
 )
 
 // validVolumeName matches safe Docker volume name components.
@@ -273,7 +272,7 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 		return fmt.Errorf("creating extract dir: %w", err)
 	}
 
-	extractCmd := exec.Command("tar", "--no-same-owner", "xzf", localBundle, "-C", extractDir)
+	extractCmd := exec.Command("tar", "--no-same-owner", "-xzf", localBundle, "-C", extractDir)
 	extractCmd.Stdout = os.Stdout
 	extractCmd.Stderr = os.Stderr
 	if err := extractCmd.Run(); err != nil {

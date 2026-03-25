@@ -52,7 +52,13 @@ func ModifyRawConfig(cfgPath string, mutate func(raw map[string]interface{}) err
 		return fmt.Errorf("closing temp file: %w", err)
 	}
 
-	if err := os.Chmod(tmpPath, 0o644); err != nil {
+	// Preserve the permissions of the original config file.
+	origInfo, err := os.Stat(cfgPath)
+	if err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("stat config: %w", err)
+	}
+	if err := os.Chmod(tmpPath, origInfo.Mode().Perm()); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("setting permissions: %w", err)
 	}
