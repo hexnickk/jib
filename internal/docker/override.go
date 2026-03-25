@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	overrideFileName = "override.yml"
 	// DefaultOverrideDir is the default directory for generated override files.
 	DefaultOverrideDir = "/opt/jib/overrides"
 )

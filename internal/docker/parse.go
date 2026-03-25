@@ -12,10 +12,10 @@ import (
 
 // ComposeService represents a service from a docker-compose.yml (only fields we need).
 type ComposeService struct {
-	Name        string
-	HostPort    int    // First host-mapped port, 0 if none
-	HealthPath  string // Parsed from healthcheck.test if it's a curl/wget URL
-	HealthPort  int    // Parsed from healthcheck.test
+	Name       string
+	HostPort   int    // First host-mapped port, 0 if none
+	HealthPath string // Parsed from healthcheck.test if it's a curl/wget URL
+	HealthPort int    // Parsed from healthcheck.test
 }
 
 // composeFile is a minimal representation of docker-compose.yml.
@@ -160,8 +160,9 @@ func parseFirstHostPort(p interface{}) int {
 
 // parseHealthcheck extracts path and port from a healthcheck test command.
 // Handles: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-//          ["CMD-SHELL", "curl -f http://localhost:3000/health"]
-//          "curl -f http://localhost:3000/health"
+//
+//	["CMD-SHELL", "curl -f http://localhost:3000/health"]
+//	"curl -f http://localhost:3000/health"
 func parseHealthcheck(test interface{}) (string, int) {
 	var cmdStr string
 

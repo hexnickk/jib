@@ -165,7 +165,9 @@ func TestGitCheckout(t *testing.T) {
 	run(t, clone2, "git", "push", "origin", "main")
 
 	// Fetch and checkout.
-	gitFetch(ctx, repoDir, "main")
+	if err := gitFetch(ctx, repoDir, "main"); err != nil {
+		t.Fatalf("gitFetch failed: %v", err)
+	}
 	remoteSHA, _ := gitRemoteSHA(ctx, repoDir, "main")
 
 	if err := gitCheckout(ctx, repoDir, remoteSHA); err != nil {

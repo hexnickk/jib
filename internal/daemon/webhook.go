@@ -25,8 +25,8 @@ type webhookSecret struct {
 
 // githubPushEvent represents the relevant fields from a GitHub push webhook payload.
 type githubPushEvent struct {
-	Ref        string `json:"ref"`         // e.g. "refs/heads/main"
-	After      string `json:"after"`       // SHA of the new HEAD
+	Ref        string `json:"ref"`   // e.g. "refs/heads/main"
+	After      string `json:"after"` // SHA of the new HEAD
 	Repository struct {
 		FullName string `json:"full_name"` // e.g. "org/repo"
 	} `json:"repository"`
@@ -34,7 +34,7 @@ type githubPushEvent struct {
 
 // gitlabPushEvent represents the relevant fields from a GitLab push webhook payload.
 type gitlabPushEvent struct {
-	Ref    string `json:"ref"`     // e.g. "refs/heads/main"
+	Ref    string `json:"ref"` // e.g. "refs/heads/main"
 	After  string `json:"after"`
 	Object string `json:"object_kind"` // "push"
 }
@@ -74,7 +74,7 @@ func (d *Daemon) runWebhookServer(ctx context.Context) {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		server.Shutdown(shutdownCtx)
+		_ = server.Shutdown(shutdownCtx)
 	}()
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

@@ -96,11 +96,9 @@ func (m *Manager) Backup(app string, appCfg config.App) (*BackupResult, error) {
 	project := "jib-" + app
 
 	// Backup each volume
-	var volumeArchives []string
 	for _, vol := range volumes {
 		volumeName := project + "_" + vol
 		archiveName := vol + ".tar.gz"
-		archivePath := filepath.Join(tmpDir, archiveName)
 
 		fmt.Printf("  Backing up volume %s...\n", volumeName)
 
@@ -115,7 +113,6 @@ func (m *Manager) Backup(app string, appCfg config.App) (*BackupResult, error) {
 		if err := cmd.Run(); err != nil {
 			return nil, fmt.Errorf("backing up volume %s: %w", volumeName, err)
 		}
-		volumeArchives = append(volumeArchives, archivePath)
 	}
 
 	// Create manifest

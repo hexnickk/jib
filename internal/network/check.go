@@ -16,12 +16,12 @@ import (
 
 // DomainCheck holds the result of checking a domain's reachability.
 type DomainCheck struct {
-	Domain      string
-	IPs         []string
-	Reachable   bool
-	Transport   string // "direct", "cloudflare", "tailscale", "unknown"
-	Warning     string // Non-empty if there's a problem
-	Error       string // Non-empty if check itself failed
+	Domain    string
+	IPs       []string
+	Reachable bool
+	Transport string // "direct", "cloudflare", "tailscale", "unknown"
+	Warning   string // Non-empty if there's a problem
+	Error     string // Non-empty if check itself failed
 }
 
 // cloudflareRanges is a subset of Cloudflare IP prefixes for detection.
@@ -137,7 +137,7 @@ func writeAndReload(path, content string) error {
 }
 
 func cleanupProbe(path string) {
-	exec.Command("bash", "-c", fmt.Sprintf("rm -f %s && nginx -s reload 2>/dev/null", path)).Run()
+	_ = exec.Command("bash", "-c", fmt.Sprintf("rm -f %s && nginx -s reload 2>/dev/null", path)).Run()
 }
 
 // GetPublicIP returns this server's public IP address.

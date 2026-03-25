@@ -2,8 +2,8 @@ package daemon
 
 import (
 	"context"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hexnickk/jib/internal/history"

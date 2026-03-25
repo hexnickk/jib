@@ -11,10 +11,10 @@ import (
 
 // ServerResources holds detected server hardware info.
 type ServerResources struct {
-	TotalMemoryMB int     // Total RAM in megabytes
-	NumCPUs       int     // Number of logical CPUs
-	MemoryString  string  // Human-readable total (e.g. "2048M")
-	CPUString     string  // Human-readable total (e.g. "2")
+	TotalMemoryMB int    // Total RAM in megabytes
+	NumCPUs       int    // Number of logical CPUs
+	MemoryString  string // Human-readable total (e.g. "2048M")
+	CPUString     string // Human-readable total (e.g. "2")
 }
 
 // DetectResources reads total RAM from /proc/meminfo and CPU count from runtime.

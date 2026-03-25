@@ -327,10 +327,19 @@ func TestLoadFromSecretsWithAll(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	os.WriteFile(filepath.Join(jibDir, "telegram.env"), []byte("TELEGRAM_BOT_TOKEN=t\nTELEGRAM_CHAT_ID=c\n"), 0644)
-	os.WriteFile(filepath.Join(jibDir, "slack_webhook"), []byte("https://hooks.slack.com/test"), 0644)
-	os.WriteFile(filepath.Join(jibDir, "discord_webhook"), []byte("https://discord.com/api/webhooks/test"), 0644)
-	os.WriteFile(filepath.Join(jibDir, "webhook_url"), []byte("https://example.com/hook"), 0644)
+	for _, f := range []struct {
+		name    string
+		content string
+	}{
+		{"telegram.env", "TELEGRAM_BOT_TOKEN=t\nTELEGRAM_CHAT_ID=c\n"},
+		{"slack_webhook", "https://hooks.slack.com/test"},
+		{"discord_webhook", "https://discord.com/api/webhooks/test"},
+		{"webhook_url", "https://example.com/hook"},
+	} {
+		if err := os.WriteFile(filepath.Join(jibDir, f.name), []byte(f.content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	multi := LoadFromSecrets(dir)
 	if len(multi.channels) != 4 {
@@ -356,7 +365,9 @@ func TestLoadFromSecretsTelegramPartialCreds(t *testing.T) {
 	}
 
 	// Only token, no chat ID — should not create notifier
-	os.WriteFile(filepath.Join(jibDir, "telegram.env"), []byte("TELEGRAM_BOT_TOKEN=t\n"), 0644)
+	if err := os.WriteFile(filepath.Join(jibDir, "telegram.env"), []byte("TELEGRAM_BOT_TOKEN=t\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	multi := LoadFromSecrets(dir)
 	if len(multi.channels) != 0 {
@@ -367,15 +378,21 @@ func TestLoadFromSecretsTelegramPartialCreds(t *testing.T) {
 func TestLoadChannels(t *testing.T) {
 	dir := t.TempDir()
 	jibDir := filepath.Join(dir, "_jib")
-	os.MkdirAll(jibDir, 0755)
+	if err := os.MkdirAll(jibDir, 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	// Write telegram creds
 	tgCreds, _ := json.Marshal(map[string]string{"bot_token": "t123", "chat_id": "-100"})
-	os.WriteFile(filepath.Join(jibDir, "ops-tg.json"), tgCreds, 0600)
+	if err := os.WriteFile(filepath.Join(jibDir, "ops-tg.json"), tgCreds, 0600); err != nil {
+		t.Fatal(err)
+	}
 
 	// Write slack creds
 	slackCreds, _ := json.Marshal(map[string]string{"webhook_url": "https://hooks.slack.com/x"})
-	os.WriteFile(filepath.Join(jibDir, "dev-slack.json"), slackCreds, 0600)
+	if err := os.WriteFile(filepath.Join(jibDir, "dev-slack.json"), slackCreds, 0600); err != nil {
+		t.Fatal(err)
+	}
 
 	channels := map[string]ChannelConfig{
 		"ops-tg":    {Driver: "telegram"},
@@ -421,7 +438,9 @@ func TestWriteAndReadChannelCreds(t *testing.T) {
 func TestDeleteChannelCreds(t *testing.T) {
 	dir := t.TempDir()
 	creds := map[string]string{"url": "https://example.com"}
-	WriteChannelCreds(dir, "test-hook", creds)
+	if err := WriteChannelCreds(dir, "test-hook", creds); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := DeleteChannelCreds(dir, "test-hook"); err != nil {
 		t.Fatalf("delete: %v", err)

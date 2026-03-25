@@ -26,7 +26,7 @@ func TestNonBlockingReturnsBusy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first Acquire: %v", err)
 	}
-	defer lock1.Release()
+	defer func() { _ = lock1.Release() }()
 
 	_, err = Acquire("testapp", dir, false, 0)
 	if !errors.Is(err, ErrLockBusy) {
@@ -78,7 +78,7 @@ func TestBlockingTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first Acquire: %v", err)
 	}
-	defer lock1.Release()
+	defer func() { _ = lock1.Release() }()
 
 	_, err = Acquire("testapp", dir, true, 200*time.Millisecond)
 	if err == nil {

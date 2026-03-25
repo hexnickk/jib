@@ -7,20 +7,20 @@ import (
 	"time"
 )
 
-// ValidationErrors collects multiple validation problems.
-type ValidationErrors struct {
+// ValidationError collects multiple validation problems.
+type ValidationError struct {
 	Errors []string
 }
 
-func (ve *ValidationErrors) Error() string {
+func (ve *ValidationError) Error() string {
 	return strings.Join(ve.Errors, "\n")
 }
 
-func (ve *ValidationErrors) addf(format string, args ...any) {
+func (ve *ValidationError) addf(format string, args ...any) {
 	ve.Errors = append(ve.Errors, fmt.Sprintf(format, args...))
 }
 
-func (ve *ValidationErrors) hasErrors() bool {
+func (ve *ValidationError) hasErrors() bool {
 	return len(ve.Errors) > 0
 }
 
@@ -31,7 +31,7 @@ var (
 
 // Validate checks the entire config and returns all errors found.
 func Validate(cfg *Config) error {
-	ve := &ValidationErrors{}
+	ve := &ValidationError{}
 
 	// Poll interval must be a valid Go duration.
 	if cfg.PollInterval != "" {
@@ -81,7 +81,7 @@ func Validate(cfg *Config) error {
 	return nil
 }
 
-func validateApp(ve *ValidationErrors, name string, app *App, backupDests map[string]BackupDestination, notifications map[string]NotificationChannel) {
+func validateApp(ve *ValidationError, name string, app *App, backupDests map[string]BackupDestination, notifications map[string]NotificationChannel) {
 	prefix := fmt.Sprintf("app '%s'", name)
 
 	// App name format.
@@ -171,7 +171,7 @@ func validateApp(ve *ValidationErrors, name string, app *App, backupDests map[st
 }
 
 // validateCronSchedule checks that a cron expression has exactly 5 fields.
-func validateCronSchedule(ve *ValidationErrors, prefix, schedule string) {
+func validateCronSchedule(ve *ValidationError, prefix, schedule string) {
 	fields := strings.Fields(schedule)
 	if len(fields) != 5 {
 		ve.addf("%s: must have 5 fields, got %d", prefix, len(fields))

@@ -115,7 +115,7 @@ func (d *Daemon) pollOnce(ctx context.Context) {
 			continue
 		}
 		// Release the probe lock — Deploy() will acquire its own lock.
-		lock.Release()
+		_ = lock.Release()
 
 		// Trigger deploy.
 		engine := d.newEngine()

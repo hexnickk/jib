@@ -12,11 +12,11 @@ import (
 // Event represents a notification event.
 type Event struct {
 	App       string    `json:"app,omitempty"`
-	Type      string    `json:"event"`                 // deploy, rollback, restart, backup, cert_expiry, disk_warning, container_crash, serve_status, autodeploy_paused
+	Type      string    `json:"event"` // deploy, rollback, restart, backup, cert_expiry, disk_warning, container_crash, serve_status, autodeploy_paused
 	SHA       string    `json:"sha,omitempty"`
-	Trigger   string    `json:"trigger,omitempty"`      // manual, autodeploy
+	Trigger   string    `json:"trigger,omitempty"` // manual, autodeploy
 	User      string    `json:"user,omitempty"`
-	Status    string    `json:"status,omitempty"`       // success, failure, start
+	Status    string    `json:"status,omitempty"` // success, failure, start
 	Error     string    `json:"error,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
 	Machine   string    `json:"machine,omitempty"`

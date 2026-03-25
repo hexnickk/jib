@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -e
+
+# Check formatting
+unformatted=$(gofmt -l $(find . -name '*.go' -not -path './vendor/*') 2>/dev/null)
+if [ -n "$unformatted" ]; then
+    echo "ERROR: The following files are not formatted with gofmt:"
+    echo "$unformatted"
+    echo ""
+    echo "Run 'gofmt -w' on these files or 'make fmt' before committing."
+    exit 1
+fi
+
+# Run go vet
+if ! go vet ./... 2>&1; then
+    echo ""
+    echo "ERROR: go vet found issues. Fix them before committing."
+    exit 1
+fi

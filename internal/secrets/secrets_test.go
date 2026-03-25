@@ -61,8 +61,12 @@ func TestSetOverwritesExisting(t *testing.T) {
 	srcDir := t.TempDir()
 	src1 := filepath.Join(srcDir, "v1.env")
 	src2 := filepath.Join(srcDir, "v2.env")
-	os.WriteFile(src1, []byte("V=1\n"), 0644)
-	os.WriteFile(src2, []byte("V=2\n"), 0644)
+	if err := os.WriteFile(src1, []byte("V=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(src2, []byte("V=2\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := m.Set("myapp", src1, ""); err != nil {
 		t.Fatal(err)
@@ -89,7 +93,9 @@ func TestSetCustomEnvFileName(t *testing.T) {
 
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "prod.env")
-	os.WriteFile(srcPath, []byte("KEY=val\n"), 0644)
+	if err := os.WriteFile(srcPath, []byte("KEY=val\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := m.Set("myapp", srcPath, ".env.production"); err != nil {
 		t.Fatal(err)
@@ -117,8 +123,12 @@ func TestCheckReturnsTrueFalse(t *testing.T) {
 	// Set the secret.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	os.WriteFile(srcPath, []byte("X=1\n"), 0644)
-	m.Set("myapp", srcPath, "")
+	if err := os.WriteFile(srcPath, []byte("X=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Set("myapp", srcPath, ""); err != nil {
+		t.Fatal(err)
+	}
 
 	exists, _ = m.Check("myapp", "")
 	if !exists {
@@ -133,14 +143,18 @@ func TestCheckAllMixedApps(t *testing.T) {
 	// Create secrets for "appA" only.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	os.WriteFile(srcPath, []byte("X=1\n"), 0644)
-	m.Set("appA", srcPath, "")
+	if err := os.WriteFile(srcPath, []byte("X=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Set("appA", srcPath, ""); err != nil {
+		t.Fatal(err)
+	}
 
 	apps := map[string]config.App{
-		"appA":   {SecretsEnv: true},
-		"appB":   {SecretsEnv: true},
-		"appC":   {SecretsEnv: false}, // should be skipped
-		"appD":   {SecretsEnv: true, EnvFile: ".env.local"},
+		"appA": {SecretsEnv: true},
+		"appB": {SecretsEnv: true},
+		"appC": {SecretsEnv: false}, // should be skipped
+		"appD": {SecretsEnv: true, EnvFile: ".env.local"},
 	}
 
 	results := m.CheckAll(apps)
@@ -176,8 +190,12 @@ func TestRemoveDeletesDirectory(t *testing.T) {
 	// Set a secret first.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	os.WriteFile(srcPath, []byte("X=1\n"), 0644)
-	m.Set("myapp", srcPath, "")
+	if err := os.WriteFile(srcPath, []byte("X=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Set("myapp", srcPath, ""); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := m.Remove("myapp"); err != nil {
 		t.Fatalf("Remove failed: %v", err)
@@ -220,8 +238,12 @@ func TestSymlinkCreatesWorkingSymlink(t *testing.T) {
 	// Set up the secrets file.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	os.WriteFile(srcPath, []byte("DB=postgres://localhost\n"), 0644)
-	m.Set("myapp", srcPath, "")
+	if err := os.WriteFile(srcPath, []byte("DB=postgres://localhost\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Set("myapp", srcPath, ""); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a repo directory.
 	repoDir := t.TempDir()
@@ -268,13 +290,19 @@ func TestSymlinkReplacesExistingFile(t *testing.T) {
 	// Set up secrets.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	os.WriteFile(srcPath, []byte("NEW=value\n"), 0644)
-	m.Set("myapp", srcPath, "")
+	if err := os.WriteFile(srcPath, []byte("NEW=value\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Set("myapp", srcPath, ""); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a repo directory with an existing .env file.
 	repoDir := t.TempDir()
 	existingPath := filepath.Join(repoDir, ".env")
-	os.WriteFile(existingPath, []byte("OLD=stuff\n"), 0644)
+	if err := os.WriteFile(existingPath, []byte("OLD=stuff\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := m.Symlink("myapp", repoDir, ""); err != nil {
 		t.Fatalf("Symlink failed: %v", err)
@@ -312,8 +340,12 @@ func TestEnvRedacted(t *testing.T) {
 
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	os.WriteFile(srcPath, []byte(content), 0644)
-	m.Set("myapp", srcPath, "")
+	if err := os.WriteFile(srcPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Set("myapp", srcPath, ""); err != nil {
+		t.Fatal(err)
+	}
 
 	lines, err := m.EnvRedacted("myapp", "")
 	if err != nil {
@@ -324,11 +356,11 @@ func TestEnvRedacted(t *testing.T) {
 		"# Database config",
 		"",
 		"DATABASE_URL=file:./sto***",
-		"RESEND_API_KEY=***",               // <= 10 chars, fully redacted
-		"SHORT=***",                         // <= 10 chars, fully redacted
-		"EMPTY=",                            // empty, shown as-is
-		"EXACTLY10=***",                     // exactly 10, fully redacted
-		"ELEVEN_CHR=1234567890***",          // 11 chars, first 10 shown
+		"RESEND_API_KEY=***",       // <= 10 chars, fully redacted
+		"SHORT=***",                // <= 10 chars, fully redacted
+		"EMPTY=",                   // empty, shown as-is
+		"EXACTLY10=***",            // exactly 10, fully redacted
+		"ELEVEN_CHR=1234567890***", // 11 chars, first 10 shown
 	}
 
 	if len(lines) != len(expected) {

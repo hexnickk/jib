@@ -89,7 +89,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	if err != nil {
 		return nil, fmt.Errorf("acquiring lock: %w", err)
 	}
-	defer lock.Release()
+	defer func() { _ = lock.Release() }()
 
 	// 3. Check disk space.
 	if err := checkDiskSpace(repoDir, minDiskBytes); err != nil {

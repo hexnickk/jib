@@ -3,7 +3,7 @@ LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 BINARY := jib
 BUILD_DIR := bin
 
-.PHONY: build install clean version
+.PHONY: build install clean version test lint fmt check setup-hooks
 
 build:
 	@mkdir -p $(BUILD_DIR)
@@ -18,3 +18,19 @@ clean:
 
 version:
 	@echo $(VERSION)
+
+test:
+	go test ./...
+
+lint:
+	golangci-lint run ./...
+
+fmt:
+	gofmt -w $(shell find . -name '*.go' -not -path './vendor/*')
+
+check: fmt lint test
+
+# Configure git to use the project's hooks directory.
+# Run once after cloning: make setup-hooks
+setup-hooks:
+	git config core.hooksPath .githooks

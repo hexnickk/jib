@@ -27,8 +27,10 @@ var serviceTypes = map[string]serviceTemplate{
 				"POSTGRES_DB":       name,
 			}
 		},
-		HealthCmd:    []string{"pg_isready", "-U", "jib"},
-		ConnString:   func(name, password string, port int) string { return fmt.Sprintf("postgres://jib:%s@%s:%d/%s", password, name, port, name) },
+		HealthCmd: []string{"pg_isready", "-U", "jib"},
+		ConnString: func(name, password string, port int) string {
+			return fmt.Sprintf("postgres://jib:%s@%s:%d/%s", password, name, port, name)
+		},
 		HasAuth:      true,
 		CredentialFn: defaultCredentials,
 	},
@@ -39,13 +41,15 @@ var serviceTypes = map[string]serviceTemplate{
 		EnvVars: func(name, password string) map[string]string {
 			return map[string]string{
 				"MYSQL_ROOT_PASSWORD": password,
-				"MYSQL_USER":         "jib",
-				"MYSQL_PASSWORD":     password,
-				"MYSQL_DATABASE":     name,
+				"MYSQL_USER":          "jib",
+				"MYSQL_PASSWORD":      password,
+				"MYSQL_DATABASE":      name,
 			}
 		},
-		HealthCmd:    []string{"mysqladmin", "ping", "-h", "localhost", "-ujib", "-p__PASSWORD__"},
-		ConnString:   func(name, password string, port int) string { return fmt.Sprintf("mysql://jib:%s@%s:%d/%s", password, name, port, name) },
+		HealthCmd: []string{"mysqladmin", "ping", "-h", "localhost", "-ujib", "-p__PASSWORD__"},
+		ConnString: func(name, password string, port int) string {
+			return fmt.Sprintf("mysql://jib:%s@%s:%d/%s", password, name, port, name)
+		},
 		HasAuth:      true,
 		CredentialFn: defaultCredentials,
 	},
@@ -56,13 +60,15 @@ var serviceTypes = map[string]serviceTemplate{
 		EnvVars: func(name, password string) map[string]string {
 			return map[string]string{
 				"MARIADB_ROOT_PASSWORD": password,
-				"MARIADB_USER":         "jib",
-				"MARIADB_PASSWORD":     password,
-				"MARIADB_DATABASE":     name,
+				"MARIADB_USER":          "jib",
+				"MARIADB_PASSWORD":      password,
+				"MARIADB_DATABASE":      name,
 			}
 		},
-		HealthCmd:    []string{"healthcheck.sh", "--connect", "--innodb_initialized"},
-		ConnString:   func(name, password string, port int) string { return fmt.Sprintf("mysql://jib:%s@%s:%d/%s", password, name, port, name) },
+		HealthCmd: []string{"healthcheck.sh", "--connect", "--innodb_initialized"},
+		ConnString: func(name, password string, port int) string {
+			return fmt.Sprintf("mysql://jib:%s@%s:%d/%s", password, name, port, name)
+		},
 		HasAuth:      true,
 		CredentialFn: defaultCredentials,
 	},
@@ -324,7 +330,7 @@ func (m *Manager) getServiceInfo(name string) (*ServiceInfo, error) {
 	// Parse compose file to get image/type info
 	var compose struct {
 		Services map[string]struct {
-			Image  string `yaml:"image"`
+			Image  string            `yaml:"image"`
 			Labels map[string]string `yaml:"labels"`
 		} `yaml:"services"`
 	}
@@ -471,17 +477,17 @@ type composeFile struct {
 }
 
 type composeService struct {
-	Image       string            `yaml:"image"`
-	ContainerName string          `yaml:"container_name"`
-	Restart     string            `yaml:"restart"`
-	Environment map[string]string `yaml:"environment,omitempty"`
-	Command     []string          `yaml:"command,omitempty"`
-	Volumes     []string          `yaml:"volumes"`
-	Ports       []string          `yaml:"ports,omitempty"`
-	Networks    []string          `yaml:"networks"`
-	Labels      map[string]string `yaml:"labels"`
-	Healthcheck *healthcheck      `yaml:"healthcheck"`
-	Logging     *loggingConfig    `yaml:"logging"`
+	Image         string            `yaml:"image"`
+	ContainerName string            `yaml:"container_name"`
+	Restart       string            `yaml:"restart"`
+	Environment   map[string]string `yaml:"environment,omitempty"`
+	Command       []string          `yaml:"command,omitempty"`
+	Volumes       []string          `yaml:"volumes"`
+	Ports         []string          `yaml:"ports,omitempty"`
+	Networks      []string          `yaml:"networks"`
+	Labels        map[string]string `yaml:"labels"`
+	Healthcheck   *healthcheck      `yaml:"healthcheck"`
+	Logging       *loggingConfig    `yaml:"logging"`
 }
 
 type healthcheck struct {

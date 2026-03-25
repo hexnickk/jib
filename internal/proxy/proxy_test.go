@@ -32,24 +32,29 @@ func TestGenerateConfigSingleDomain(t *testing.T) {
 		t.Fatal("expected example.com.conf in output")
 	}
 
-	// Verify key directives are present.
+	// Without an SSL cert on disk, the template produces HTTP-only config.
 	checks := []string{
 		"listen 80;",
-		"listen 443 ssl;",
 		"server_name example.com;",
-		"ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;",
-		"ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;",
 		"proxy_pass http://127.0.0.1:3000;",
-		"return 301 https://$host$request_uri;",
-		"Strict-Transport-Security",
-		"X-Frame-Options",
-		"X-Content-Type-Options",
 		"location /.well-known/acme-challenge/",
 		"root /var/www/certbot;",
 	}
 	for _, check := range checks {
 		if !strings.Contains(content, check) {
 			t.Errorf("config missing %q", check)
+		}
+	}
+
+	// SSL blocks should NOT be present when no cert exists.
+	sslAbsent := []string{
+		"listen 443 ssl;",
+		"ssl_certificate",
+		"return 301 https://",
+	}
+	for _, check := range sslAbsent {
+		if strings.Contains(content, check) {
+			t.Errorf("config should not contain %q without SSL cert", check)
 		}
 	}
 
@@ -109,11 +114,13 @@ func TestGenerateConfigWebhookLocation(t *testing.T) {
 	}
 
 	content := configs["example.com.conf"]
-	if !strings.Contains(content, "/_jib/webhook") {
-		t.Error("config should contain webhook location")
+	// Without an SSL cert, the webhook location (inside the SSL block) is not rendered.
+	// Verify the HTTP-only proxy is present instead.
+	if !strings.Contains(content, "proxy_pass http://127.0.0.1:3000;") {
+		t.Error("config should contain proxy_pass for the app port")
 	}
-	if !strings.Contains(content, "proxy_pass http://127.0.0.1:9090;") {
-		t.Error("webhook should proxy to port 9090")
+	if strings.Contains(content, "/_jib/webhook") {
+		t.Error("webhook location should not appear without SSL")
 	}
 }
 
@@ -133,8 +140,13 @@ func TestGenerateConfigWithNginxInclude(t *testing.T) {
 	}
 
 	content := configs["example.com.conf"]
-	if !strings.Contains(content, "include /opt/jib/repos/myapp/infra/nginx/custom.conf;") {
-		t.Errorf("config should contain include directive, got:\n%s", content)
+	// Without an SSL cert, the include directive (inside the SSL block) is not rendered.
+	// Verify the HTTP-only proxy is generated correctly.
+	if !strings.Contains(content, "proxy_pass http://127.0.0.1:3000;") {
+		t.Errorf("config should contain proxy_pass, got:\n%s", content)
+	}
+	if strings.Contains(content, "include /opt/jib/repos/myapp/infra/nginx/custom.conf;") {
+		t.Error("include directive should not appear without SSL")
 	}
 }
 

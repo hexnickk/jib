@@ -420,9 +420,9 @@ apps:
 	if err == nil {
 		t.Fatal("expected errors")
 	}
-	ve, ok := err.(*ValidationErrors)
+	ve, ok := err.(*ValidationError)
 	if !ok {
-		t.Fatalf("expected *ValidationErrors, got %T", err)
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 	if len(ve.Errors) < 3 {
 		t.Errorf("expected at least 3 errors, got %d: %v", len(ve.Errors), ve.Errors)

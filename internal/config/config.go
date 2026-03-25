@@ -31,15 +31,15 @@ const LatestConfigVersion = 1
 
 // Config is the top-level Jib configuration.
 type Config struct {
-	ConfigVersion    int                          `yaml:"config_version,omitempty"`
-	PollInterval     string                       `yaml:"poll_interval"`
-	CertbotEmail     string                       `yaml:"certbot_email"`
-	GitHub           *GitHubConfig                `yaml:"github,omitempty"`
-	BackupDests      map[string]BackupDestination `yaml:"backup_destinations,omitempty"`
-	Apps             map[string]App               `yaml:"apps"`
-	Notifications    map[string]NotificationChannel `yaml:"notifications,omitempty"`
-	Webhook          *WebhookConfig               `yaml:"webhook,omitempty"`
-	Tunnel           *TunnelConfig                `yaml:"tunnel,omitempty"`
+	ConfigVersion int                            `yaml:"config_version,omitempty"`
+	PollInterval  string                         `yaml:"poll_interval"`
+	CertbotEmail  string                         `yaml:"certbot_email"`
+	GitHub        *GitHubConfig                  `yaml:"github,omitempty"`
+	BackupDests   map[string]BackupDestination   `yaml:"backup_destinations,omitempty"`
+	Apps          map[string]App                 `yaml:"apps"`
+	Notifications map[string]NotificationChannel `yaml:"notifications,omitempty"`
+	Webhook       *WebhookConfig                 `yaml:"webhook,omitempty"`
+	Tunnel        *TunnelConfig                  `yaml:"tunnel,omitempty"`
 }
 
 // GitHubConfig holds GitHub App settings.
@@ -49,10 +49,10 @@ type GitHubConfig struct {
 
 // BackupDestination defines a remote backup target.
 type BackupDestination struct {
-	Driver      string `yaml:"driver"`                // r2, s3, ssh, local
-	Bucket      string `yaml:"bucket,omitempty"`       // for r2/s3
-	Host        string `yaml:"host,omitempty"`          // for ssh
-	Path        string `yaml:"path,omitempty"`          // for ssh/local
+	Driver      string `yaml:"driver"`           // r2, s3, ssh, local
+	Bucket      string `yaml:"bucket,omitempty"` // for r2/s3
+	Host        string `yaml:"host,omitempty"`   // for ssh
+	Path        string `yaml:"path,omitempty"`   // for ssh/local
 	Retain      int    `yaml:"retain,omitempty"`
 	LocalRetain int    `yaml:"local_retain,omitempty"`
 	Encrypt     bool   `yaml:"encrypt,omitempty"`
@@ -106,8 +106,8 @@ type HealthCheck struct {
 
 // BackupConfig defines per-app backup settings.
 type BackupConfig struct {
-	Destination  string   `yaml:"destination,omitempty"`   // deprecated single destination
-	Destinations []string `yaml:"destinations,omitempty"`  // list of destination names
+	Destination  string   `yaml:"destination,omitempty"`  // deprecated single destination
+	Destinations []string `yaml:"destinations,omitempty"` // list of destination names
 	Schedule     string   `yaml:"schedule,omitempty"`
 	Volumes      []string `yaml:"volumes,omitempty"`
 	Hook         string   `yaml:"hook,omitempty"`

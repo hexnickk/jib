@@ -799,7 +799,7 @@ func runRestore(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Containers will be stopped and volume data will be overwritten.\n")
 		fmt.Print("Continue? [y/N] ")
 		var answer string
-		fmt.Scanln(&answer)
+		_, _ = fmt.Scanln(&answer)
 		answer = strings.TrimSpace(strings.ToLower(answer))
 		if answer != "y" && answer != "yes" {
 			fmt.Println("Aborted.")
@@ -816,4 +816,3 @@ func runRestore(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-
