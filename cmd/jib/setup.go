@@ -597,6 +597,15 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("at least one --domain is required (e.g. --domain example.com)")
 	}
 
+	// Check early if app already exists to avoid cloning/generating before failing.
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+	if _, exists := cfg.Apps[appName]; exists {
+		return fmt.Errorf("app %q already exists in config", appName)
+	}
+
 	ctx := context.Background()
 	root := jibRoot()
 	repoDirPath := repoDir(appName, repo)
@@ -786,7 +795,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	// --- Step 5: Deploy ---
 	fmt.Println("\nDeploying...")
-	cfg, err := loadConfig()
+	cfg, err = loadConfig()
 	if err != nil {
 		return fmt.Errorf("reloading config: %w", err)
 	}
