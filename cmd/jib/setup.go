@@ -12,7 +12,9 @@ import (
 	"strings"
 
 	"github.com/hexnickk/jib/internal/config"
+	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/docker"
+	gitPkg "github.com/hexnickk/jib/internal/git"
 	"github.com/hexnickk/jib/internal/network"
 	"github.com/hexnickk/jib/internal/platform"
 	"github.com/spf13/cobra"
@@ -566,25 +568,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("at least one --domain is required (e.g. --domain example.com)")
 	}
 
+	ctx := context.Background()
+	root := jibRoot()
+	repoDir := filepath.Join(root, "repos", appName)
+
 	// Parse compose files
 	var composeFiles config.StringOrSlice
 	if composeFlag != "" {
 		composeFiles = strings.Split(composeFlag, ",")
 	}
 
-	// Try to infer ports and health from compose file
-	repoDir := filepath.Join(jibRoot(), "repos", appName)
-	var composeSvcs []docker.ComposeService
-	files := []string(composeFiles)
-	if len(files) == 0 {
-		files = []string{"docker-compose.yml"}
-	}
-	composeSvcs, _ = docker.ParseComposeServices(repoDir, files)
-
-	inferredPath, inferredPort := docker.InferHealthAndPort(composeSvcs)
-	inferredPorts := docker.InferPorts(composeSvcs)
-
-	// Parse domains — port is optional, inferred from compose
+	// Parse domains (port will be filled in after clone + inference)
 	var domains []config.Domain
 	for _, d := range domainFlags {
 		if host, portStr, ok := strings.Cut(d, ":"); ok {
@@ -594,47 +588,113 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			}
 			domains = append(domains, config.Domain{Host: host, Port: port})
 		} else {
-			// No port — infer from compose
-			port := 0
-			if len(inferredPorts) > 0 {
-				port = inferredPorts[0]
-				fmt.Printf("  Inferred port %d from docker-compose.yml for %s\n", port, d)
-			}
-			if port == 0 {
-				fmt.Printf("  Could not infer port for %s — will be assigned during first deploy.\n", d)
-			}
-			domains = append(domains, config.Domain{Host: d, Port: port})
+			domains = append(domains, config.Domain{Host: d})
 		}
 	}
 
-	// Parse health checks — infer from compose if not provided
+	// Parse health checks if explicitly provided
 	var healthChecks []config.HealthCheck
-	if len(healthFlags) > 0 {
-		for _, h := range healthFlags {
-			path, portStr, ok := strings.Cut(h, ":")
-			if !ok {
-				return fmt.Errorf("invalid health check format %q, expected /path:port", h)
-			}
-			port, err := strconv.Atoi(portStr)
-			if err != nil {
-				return fmt.Errorf("invalid port in health check %q: %w", h, err)
-			}
-			healthChecks = append(healthChecks, config.HealthCheck{Path: path, Port: port})
+	for _, h := range healthFlags {
+		path, portStr, ok := strings.Cut(h, ":")
+		if !ok {
+			return fmt.Errorf("invalid health check format %q, expected /path:port", h)
 		}
-	} else if inferredPort > 0 {
-		healthChecks = []config.HealthCheck{{Path: inferredPath, Port: inferredPort}}
-		fmt.Printf("  Inferred health check: %s on port %d\n", inferredPath, inferredPort)
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			return fmt.Errorf("invalid port in health check %q: %w", h, err)
+		}
+		healthChecks = append(healthChecks, config.HealthCheck{Path: path, Port: port})
 	}
 
-	cfgPath := configPath()
+	// --- Step 1: Setup deploy key for private repos ---
+	if repo != "local" && !configOnly {
+		fmt.Println("\nSetting up deploy key...")
+		if err := setupDeployKey(ctx, appName, repo); err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: deploy key setup: %v\n", err)
+			fmt.Println("  If the repo is public, this is fine. Otherwise, set up access manually.")
+		}
+	}
 
-	// Marshal the new app struct to a generic map for YAML insertion.
-	// We need to determine resource limits first, which requires counting
-	// existing apps; ModifyRawConfig gives us access to the raw map for that.
+	// --- Step 2: Clone the repo ---
+	sshKeyPath := filepath.Join(root, "deploy-keys", appName)
+	if repo != "local" && !configOnly {
+		if !gitPkg.IsRepo(repoDir) {
+			branch := "main"
+			repoURL := fmt.Sprintf("git@github.com:%s.git", repo)
+			fmt.Printf("\nCloning %s...\n", repo)
+			keyPath := ""
+			if _, err := os.Stat(sshKeyPath); err == nil {
+				keyPath = sshKeyPath
+			}
+			if err := gitPkg.Clone(ctx, repoURL, repoDir, branch, keyPath); err != nil {
+				return fmt.Errorf("cloning repo: %w", err)
+			}
+			// Configure repo to use deploy key for subsequent fetches
+			if keyPath != "" {
+				if err := gitPkg.ConfigureSSHKey(repoDir, keyPath); err != nil {
+					fmt.Fprintf(os.Stderr, "  warning: configuring SSH key: %v\n", err)
+				}
+			}
+		} else {
+			fmt.Printf("\nRepo already cloned at %s\n", repoDir)
+		}
+	}
+
+	// --- Step 3: Infer ports and health from compose/Dockerfile ---
+	if !configOnly {
+		files := []string(composeFiles)
+		if len(files) == 0 {
+			files = []string{"docker-compose.yml"}
+		}
+
+		if docker.NeedsGeneratedCompose(repoDir, files) {
+			// Dockerfile-only repo — generate compose and assign port
+			fmt.Println("\nNo docker-compose.yml found, will generate from Dockerfile.")
+			overrideDir := filepath.Join(root, "overrides")
+			composePath, hostPort, err := docker.GenerateComposeForDockerfile(appName, repoDir, overrideDir, 0)
+			if err != nil {
+				return fmt.Errorf("generating compose from Dockerfile: %w", err)
+			}
+			composeFiles = config.StringOrSlice{composePath}
+			fmt.Printf("  Generated compose: %s (port %d)\n", composePath, hostPort)
+
+			for i := range domains {
+				if domains[i].Port == 0 {
+					domains[i].Port = hostPort
+				}
+			}
+		} else {
+			// Has compose file — infer from it
+			composeSvcs, _ := docker.ParseComposeServices(repoDir, files)
+			inferredPath, inferredPort := docker.InferHealthAndPort(composeSvcs)
+			inferredPorts := docker.InferPorts(composeSvcs)
+
+			for i := range domains {
+				if domains[i].Port == 0 && len(inferredPorts) > 0 {
+					domains[i].Port = inferredPorts[0]
+					fmt.Printf("  Inferred port %d for %s\n", inferredPorts[0], domains[i].Host)
+				}
+			}
+
+			if len(healthChecks) == 0 && inferredPort > 0 {
+				healthChecks = []config.HealthCheck{{Path: inferredPath, Port: inferredPort}}
+				fmt.Printf("  Inferred health check: %s:%d\n", inferredPath, inferredPort)
+			}
+		}
+	}
+
+	// Check all domains have ports
+	for _, d := range domains {
+		if d.Port == 0 {
+			return fmt.Errorf("could not determine port for domain %q — specify as domain:port", d.Host)
+		}
+	}
+
+	// --- Step 4: Save to config ---
+	cfgPath := configPath()
 	var resources *config.Resources
 
 	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
-		// Count existing apps
 		existingApps := 0
 		if appsRaw, ok := raw["apps"]; ok {
 			if appsMap, ok := appsRaw.(map[string]interface{}); ok {
@@ -642,15 +702,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		// Suggest resource limits based on server capacity
 		if sr, err := platform.DetectResources(); err == nil {
 			appCount := existingApps + 1
 			mem, cpus := platform.SuggestAppResources(sr, appCount)
 			resources = &config.Resources{Memory: mem, CPUs: cpus}
-			fmt.Printf("  Resource limits: memory=%s, cpus=%s (server: %s RAM, %s CPUs, %d app(s))\n",
-				mem, cpus, sr.MemoryString, sr.CPUString, appCount)
-		} else {
-			fmt.Fprintf(os.Stderr, "  warning: could not detect server resources: %v\n", err)
+			fmt.Printf("  Resource limits: memory=%s, cpus=%s (%d app(s))\n", mem, cpus, appCount)
 		}
 
 		newApp := config.App{
@@ -661,7 +717,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			Resources: resources,
 		}
 
-		// Marshal the new app to a generic map for YAML insertion
 		appData, err := yaml.Marshal(newApp)
 		if err != nil {
 			return fmt.Errorf("marshaling app config: %w", err)
@@ -671,7 +726,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("parsing app config: %w", err)
 		}
 
-		// Get or create apps section
 		appsRaw, ok := raw["apps"]
 		if !ok {
 			appsRaw = make(map[string]interface{})
@@ -681,7 +735,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		if !ok {
 			return fmt.Errorf("apps section in config is not a map")
 		}
-
 		if _, exists := appsMap[appName]; exists {
 			return fmt.Errorf("app %q already exists in config", appName)
 		}
@@ -692,26 +745,80 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Added app %q to config.\n", appName)
+	fmt.Printf("\nAdded app %q to config.\n", appName)
 
-	// Validate
-	if _, err := config.LoadConfig(cfgPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: config validation: %v\n", err)
+	if configOnly {
+		fmt.Println("Config-only mode: skipping deploy.")
+		return nil
 	}
 
-	// Run domain reachability checks (warnings only)
+	// --- Step 5: Deploy ---
+	fmt.Println("\nDeploying...")
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("reloading config: %w", err)
+	}
+
+	engine := newEngine(cfg)
+	result, err := engine.Deploy(ctx, deploy.DeployOptions{
+		App:     appName,
+		Force:   true,
+		Trigger: "add",
+		User:    currentUser(),
+	})
+	if err != nil {
+		return fmt.Errorf("deploy failed: %w", err)
+	}
+	if !result.Success {
+		return fmt.Errorf("deploy failed: %s", result.Error)
+	}
+
+	fmt.Printf("\nApp %q deployed successfully (SHA: %s)\n", appName, result.DeployedSHA[:8])
+
+	// --- Step 6: Domain checks (warnings only) ---
 	fmt.Println("\nChecking domains...")
 	for _, d := range domains {
 		checkDomainAndWarn(d.Host)
 	}
 
-	if configOnly {
-		fmt.Println("\nConfig-only mode: skipping provisioning.")
-	} else {
-		fmt.Println("\nTo provision (nginx + SSL), run:")
-		fmt.Printf("  jib provision %s\n", appName)
+	return nil
+}
+
+// setupDeployKey generates an SSH deploy key and waits for the user to add it to GitHub.
+func setupDeployKey(_ context.Context, appName, repo string) error {
+	root := jibRoot()
+	keyDir := filepath.Join(root, "deploy-keys")
+	if err := os.MkdirAll(keyDir, 0o700); err != nil {
+		return err
 	}
 
+	keyPath := filepath.Join(keyDir, appName)
+	if _, err := os.Stat(keyPath); err != nil {
+		// Generate new key
+		keygen := exec.Command("ssh-keygen", "-t", "ed25519", "-f", keyPath, "-N", "", "-C", "jib-deploy-"+appName)
+		keygen.Stdout = os.Stdout
+		keygen.Stderr = os.Stderr
+		if err := keygen.Run(); err != nil {
+			return fmt.Errorf("ssh-keygen: %w", err)
+		}
+		_ = os.Chmod(keyPath, 0o600)
+	}
+
+	pubKey, err := os.ReadFile(keyPath + ".pub")
+	if err != nil {
+		return fmt.Errorf("reading public key: %w", err)
+	}
+
+	fmt.Println()
+	fmt.Println("=== Deploy Key ===")
+	fmt.Println(strings.TrimSpace(string(pubKey)))
+	fmt.Println()
+	fmt.Printf("Add this key to: https://github.com/%s/settings/keys\n", repo)
+	fmt.Println("  Title: jib-deploy-" + appName)
+	fmt.Println("  Allow write access: No")
+	fmt.Println()
+	fmt.Print("Press Enter after adding the key...")
+	_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
 	return nil
 }
 

@@ -4,9 +4,44 @@ package git
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
+
+// Clone runs git clone <url> <dir>. If sshKeyPath is non-empty, it's used
+// as the identity file for SSH authentication.
+func Clone(ctx context.Context, url, dir, branch, sshKeyPath string) error {
+	args := []string{"clone", "--branch", branch, "--single-branch", url, dir}
+	cmd := exec.CommandContext(ctx, "git", args...)
+	if sshKeyPath != "" {
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=accept-new", sshKeyPath))
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git clone: %w: %s", err, string(out))
+	}
+	return nil
+}
+
+// IsRepo checks if the directory is a git repository.
+func IsRepo(dir string) bool {
+	cmd := exec.Command("git", "-C", dir, "rev-parse", "--git-dir")
+	return cmd.Run() == nil
+}
+
+// ConfigureSSHKey sets the core.sshCommand in the repo's local git config
+// so all git operations use the specified SSH key.
+func ConfigureSSHKey(repoDir, sshKeyPath string) error {
+	cmd := exec.Command("git", "config", "core.sshCommand",
+		fmt.Sprintf("ssh -i %s -o StrictHostKeyChecking=accept-new", sshKeyPath))
+	cmd.Dir = repoDir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git config core.sshCommand: %w: %s", err, string(out))
+	}
+	return nil
+}
 
 // HasRemote checks if the repo has an "origin" remote configured.
 func HasRemote(ctx context.Context, repoDir string) bool {
