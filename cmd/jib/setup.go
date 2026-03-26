@@ -816,7 +816,46 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\nApp %q deployed successfully (SHA: %s)\n", appName, result.DeployedSHA[:8])
 
-	// --- Step 6: Domain checks (warnings only) ---
+	// --- Step 6: Provision nginx + SSL ---
+	fmt.Println("\nProvisioning nginx...")
+	appCfg := cfg.Apps[appName]
+	p := newProxy(cfg)
+	configs, err := p.GenerateConfig(appName, appCfg)
+	if err != nil {
+		return fmt.Errorf("generating nginx config: %w", err)
+	}
+	if err := p.WriteConfigs(configs); err != nil {
+		return fmt.Errorf("writing nginx configs: %w", err)
+	}
+	for filename := range configs {
+		fmt.Printf("  nginx: %s\n", filename)
+	}
+	savePreviousDomains(appName, appCfg.Domains)
+	if err := p.Test(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: nginx config test failed: %v\n", err)
+	} else if err := p.Reload(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: nginx reload failed: %v\n", err)
+	} else {
+		fmt.Println("  nginx: reloaded")
+	}
+
+	// SSL
+	sslMgr := newSSLManager(cfg)
+	for _, d := range appCfg.Domains {
+		check := network.CheckDomain(d.Host)
+		if check.Warning != "" {
+			fmt.Fprintf(os.Stderr, "  ssl: skipping %s — %s\n", d.Host, check.Warning)
+			continue
+		}
+		fmt.Printf("  ssl: obtaining cert for %s...\n", d.Host)
+		if err := sslMgr.Obtain(ctx, d.Host); err != nil {
+			fmt.Fprintf(os.Stderr, "  ssl: warning: %s: %v\n", d.Host, err)
+		} else {
+			fmt.Printf("  ssl: %s OK\n", d.Host)
+		}
+	}
+
+	// --- Step 7: Domain checks (warnings only) ---
 	fmt.Println("\nChecking domains...")
 	for _, d := range domains {
 		checkDomainAndWarn(d.Host)
