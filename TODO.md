@@ -23,6 +23,9 @@ All items below have been implemented, reviewed, and tested.
 
 ## Up Next
 
+### GitHub App authentication
+Deploy keys work but are per-repo. GitHub Apps allow one installation to access multiple repos with fine-grained permissions. Implementation: store App ID, Installation ID, and private key PEM; generate short-lived installation access tokens (JWT → GitHub API) before each `git fetch`; clone via HTTPS (`x-access-token`). No new dependencies — Go stdlib handles JWT/RSA.
+
 ### Blue-green deploy strategy (zero-downtime)
 The `restart` strategy has brief downtime during container swap. Blue-green deploys to an inactive slot, health checks it, then swaps nginx — zero downtime. The config schema already supports `strategy: blue-green` but the engine only implements `restart`.
 

@@ -91,6 +91,10 @@ func runCloudflareSetup(cmd *cobra.Command, args []string) error {
 	fmt.Println("  https://dash.cloudflare.com → Networks → Connectors → Create a tunnel")
 	fmt.Println("  When asked, choose 'Cloudflared' (not WARP).")
 	fmt.Println()
+	fmt.Println("The dashboard will show an install command like:")
+	fmt.Println("  sudo cloudflared service install eyJhIjo...")
+	fmt.Println("Copy the token (the long eyJ... string at the end).")
+	fmt.Println()
 	fmt.Print("Paste the tunnel token: ")
 	token, _ := reader.ReadString('\n')
 	token = strings.TrimSpace(token)
@@ -113,7 +117,12 @@ func runCloudflareSetup(cmd *cobra.Command, args []string) error {
 
 	fmt.Println()
 	fmt.Println("Cloudflare Tunnel is running as a system service.")
-	fmt.Println("Manage routes and ingress rules from the Zero Trust dashboard.")
+	fmt.Println()
+	fmt.Println("Next, go back to the Cloudflare dashboard and:")
+	fmt.Println("  1. Click 'Next'")
+	fmt.Println("  2. Add a public hostname (your domain)")
+	fmt.Println("  3. Set service type to 'HTTP' and URL to 'localhost:80'")
+	fmt.Println("  4. Save")
 	return nil
 }
 

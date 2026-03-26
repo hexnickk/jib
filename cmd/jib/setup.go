@@ -601,7 +601,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 				fmt.Printf("  Inferred port %d from docker-compose.yml for %s\n", port, d)
 			}
 			if port == 0 {
-				return fmt.Errorf("could not infer port for domain %q — specify as domain:port or add ports to docker-compose.yml", d)
+				fmt.Printf("  Could not infer port for %s — will be assigned during first deploy.\n", d)
 			}
 			domains = append(domains, config.Domain{Host: d, Port: port})
 		}

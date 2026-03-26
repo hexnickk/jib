@@ -190,14 +190,38 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 		}
 	}
 
-	// Build the compose helper.
-	compose := e.newCompose(opts.App, appCfg, repoDir)
-
-	// 6b. Generate jib override file (labels, restart policy, log rotation).
+	// 6b. Generate compose file for Dockerfile-only repos.
 	overrideDir := e.OverrideDir
 	if overrideDir == "" {
 		overrideDir = docker.DefaultOverrideDir
 	}
+	if docker.NeedsGeneratedCompose(repoDir, []string(appCfg.Compose)) {
+		fmt.Printf("[deploy] No docker-compose.yml found, generating from Dockerfile...\n")
+		composePath, hostPort, err := docker.GenerateComposeForDockerfile(opts.App, repoDir, overrideDir, 0)
+		if err != nil {
+			return nil, fmt.Errorf("generating compose from Dockerfile: %w", err)
+		}
+		appCfg.Compose = config.StringOrSlice{composePath}
+		fmt.Printf("[deploy] Generated compose: port %d -> container\n", hostPort)
+
+		// Update domain ports if not yet assigned.
+		for i := range appCfg.Domains {
+			if appCfg.Domains[i].Port == 0 {
+				appCfg.Domains[i].Port = hostPort
+			}
+		}
+		// Update health check ports if not yet assigned.
+		for i := range appCfg.Health {
+			if appCfg.Health[i].Port == 0 {
+				appCfg.Health[i].Port = hostPort
+			}
+		}
+	}
+
+	// Build the compose helper.
+	compose := e.newCompose(opts.App, appCfg, repoDir)
+
+	// 6c. Generate jib override file (labels, restart policy, log rotation).
 	// Determine resource limits: use configured values, or compute defaults from server resources.
 	resources := appCfg.Resources
 	if resources == nil {
