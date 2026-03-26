@@ -44,6 +44,11 @@ func sudoBash(script string) *exec.Cmd {
 	return exec.Command("sudo", "bash", "-c", script)
 }
 
+// repoDir returns the on-disk path for an app's git checkout.
+func repoDir(appName string, repo string) string {
+	return deploy.RepoPath(filepath.Join(jibRoot(), "repos"), appName, repo)
+}
+
 func configPath() string {
 	return filepath.Join(jibRoot(), "config.yml")
 }
@@ -127,11 +132,11 @@ func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {
 		envFile = mgr.SymlinkPath(appName, appCfg.EnvFile)
 	}
 
-	repoDir := filepath.Join(root, "repos", appName)
+	dir := repoDir(appName, appCfg.Repo)
 
 	return &docker.Compose{
 		App:      appName,
-		Dir:      repoDir,
+		Dir:      dir,
 		Files:    files,
 		EnvFile:  envFile,
 		Override: docker.OverridePath(filepath.Join(root, "overrides"), appName),

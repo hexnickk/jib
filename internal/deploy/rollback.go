@@ -36,7 +36,7 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 		strategy = "restart"
 	}
 
-	repoDir := fmt.Sprintf("%s/%s", e.RepoBaseDir, opts.App)
+	repoDir := RepoPath(e.RepoBaseDir, opts.App, appCfg.Repo)
 
 	// 1. Load state, get previous_sha.
 	appState, err := e.StateStore.Load(opts.App)

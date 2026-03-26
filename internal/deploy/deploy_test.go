@@ -218,14 +218,14 @@ func TestDeployDryRunDoesNotModifyState(t *testing.T) {
 	appName := "testapp"
 
 	// Create a real git repo for the app.
-	appRepoDir := filepath.Join(repoBaseDir, appName)
+	appRepoDir := RepoPath(repoBaseDir, appName, "local")
 	initTestRepo2(t, tmpDir, appRepoDir)
 
 	eng := &Engine{
 		Config: &config.Config{
 			Apps: map[string]config.App{
 				appName: {
-					Repo:   "test/test",
+					Repo:   "local",
 					Branch: "main",
 				},
 			},
@@ -329,7 +329,7 @@ func TestRollbackNoPreviousDeploy(t *testing.T) {
 		Config: &config.Config{
 			Apps: map[string]config.App{
 				appName: {
-					Repo:   "test/test",
+					Repo:   "local",
 					Branch: "main",
 				},
 			},

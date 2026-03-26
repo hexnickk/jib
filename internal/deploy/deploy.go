@@ -28,6 +28,16 @@ const minDiskBytes uint64 = 2 * 1024 * 1024 * 1024
 // lockTimeout is the maximum time to wait for a deploy lock in blocking mode.
 const lockTimeout = 5 * time.Minute
 
+// RepoPath returns the on-disk path for an app's git checkout.
+// GitHub repos (org/name) go under repos/github/org/name.
+// Local repos go under repos/local/<appName>.
+func RepoPath(repoBaseDir, appName, repo string) string {
+	if repo == "local" || repo == "" {
+		return filepath.Join(repoBaseDir, "local", appName)
+	}
+	return filepath.Join(repoBaseDir, "github", repo)
+}
+
 // Engine orchestrates deploys and rollbacks.
 type Engine struct {
 	Config      *config.Config
@@ -77,7 +87,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 		strategy = "restart"
 	}
 
-	repoDir := filepath.Join(e.RepoBaseDir, opts.App)
+	repoDir := RepoPath(e.RepoBaseDir, opts.App, appCfg.Repo)
 	branch := appCfg.Branch
 	if branch == "" {
 		branch = "main"

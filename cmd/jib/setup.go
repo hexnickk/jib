@@ -570,7 +570,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	ctx := context.Background()
 	root := jibRoot()
-	repoDir := filepath.Join(root, "repos", appName)
+	repoDirPath := repoDir(appName, repo)
 
 	// Parse compose files
 	var composeFiles config.StringOrSlice
@@ -618,7 +618,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// --- Step 2: Clone the repo ---
 	sshKeyPath := filepath.Join(root, "deploy-keys", appName)
 	if repo != "local" && !configOnly {
-		if !gitPkg.IsRepo(repoDir) {
+		if !gitPkg.IsRepo(repoDirPath) {
 			branch := "main"
 			repoURL := fmt.Sprintf("git@github.com:%s.git", repo)
 			fmt.Printf("\nCloning %s...\n", repo)
@@ -626,17 +626,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			if _, err := os.Stat(sshKeyPath); err == nil {
 				keyPath = sshKeyPath
 			}
-			if err := gitPkg.Clone(ctx, repoURL, repoDir, branch, keyPath); err != nil {
+			if err := gitPkg.Clone(ctx, repoURL, repoDirPath, branch, keyPath); err != nil {
 				return fmt.Errorf("cloning repo: %w", err)
 			}
 			// Configure repo to use deploy key for subsequent fetches
 			if keyPath != "" {
-				if err := gitPkg.ConfigureSSHKey(repoDir, keyPath); err != nil {
+				if err := gitPkg.ConfigureSSHKey(repoDirPath, keyPath); err != nil {
 					fmt.Fprintf(os.Stderr, "  warning: configuring SSH key: %v\n", err)
 				}
 			}
 		} else {
-			fmt.Printf("\nRepo already cloned at %s\n", repoDir)
+			fmt.Printf("\nRepo already cloned at %s\n", repoDirPath)
 		}
 	}
 
@@ -647,11 +647,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			files = []string{"docker-compose.yml"}
 		}
 
-		if docker.NeedsGeneratedCompose(repoDir, files) {
+		if docker.NeedsGeneratedCompose(repoDirPath, files) {
 			// Dockerfile-only repo — generate compose and assign port
 			fmt.Println("\nNo docker-compose.yml found, will generate from Dockerfile.")
 			overrideDir := filepath.Join(root, "overrides")
-			composePath, hostPort, err := docker.GenerateComposeForDockerfile(appName, repoDir, overrideDir, 0)
+			composePath, hostPort, err := docker.GenerateComposeForDockerfile(appName, repoDirPath, overrideDir, 0)
 			if err != nil {
 				return fmt.Errorf("generating compose from Dockerfile: %w", err)
 			}
@@ -665,7 +665,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			}
 		} else {
 			// Has compose file — infer from it
-			composeSvcs, _ := docker.ParseComposeServices(repoDir, files)
+			composeSvcs, _ := docker.ParseComposeServices(repoDirPath, files)
 			inferredPath, inferredPort := docker.InferHealthAndPort(composeSvcs)
 			inferredPorts := docker.InferPorts(composeSvcs)
 
@@ -844,7 +844,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	stateFile := filepath.Join(root, "state", appName+".json")
 	domainStateFile := filepath.Join(root, "state", appName+".domains.json")
 	secretsDir := filepath.Join(root, "secrets", appName)
-	repoDir := filepath.Join(root, "repos", appName)
+	repoDirPath := repoDir(appName, appCfg.Repo)
 	overrideFile := docker.OverridePath(filepath.Join(root, "overrides"), appName)
 	historyFile := filepath.Join(root, "logs", appName+".jsonl")
 
@@ -861,7 +861,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  - Remove state file: %s\n", stateFile)
 		fmt.Printf("  - Remove domain state: %s\n", domainStateFile)
 		fmt.Printf("  - Remove secrets: %s\n", secretsDir)
-		fmt.Printf("  - Remove repo: %s\n", repoDir)
+		fmt.Printf("  - Remove repo: %s\n", repoDirPath)
 		fmt.Printf("  - Remove override: %s\n", overrideFile)
 		fmt.Printf("  - Remove history: %s\n", historyFile)
 		fmt.Println("  - Remove app from config.yml")
@@ -949,8 +949,8 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// 6. Remove repo directory
-	if _, statErr := os.Stat(repoDir); statErr == nil {
-		if err := os.RemoveAll(repoDir); err != nil {
+	if _, statErr := os.Stat(repoDirPath); statErr == nil {
+		if err := os.RemoveAll(repoDirPath); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: removing repo dir: %v\n", err)
 		} else {
 			removed = append(removed, "repo")

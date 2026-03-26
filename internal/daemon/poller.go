@@ -71,7 +71,7 @@ func (d *Daemon) pollOnce(ctx context.Context) {
 			branch = "main"
 		}
 
-		repoDir := filepath.Join(d.Root, "repos", appName)
+		repoDir := deploy.RepoPath(filepath.Join(d.Root, "repos"), appName, appCfg.Repo)
 
 		// Check repo directory exists.
 		if _, err := os.Stat(repoDir); os.IsNotExist(err) {
