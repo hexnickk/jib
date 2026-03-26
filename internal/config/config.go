@@ -42,9 +42,24 @@ type Config struct {
 	Tunnel        *TunnelConfig                  `yaml:"tunnel,omitempty"`
 }
 
-// GitHubConfig holds GitHub App settings.
+// GitHubProvider represents a named authentication provider (deploy key or GitHub App).
+type GitHubProvider struct {
+	Type  string `yaml:"type"`             // "key" or "app"
+	AppID int64  `yaml:"app_id,omitempty"` // only for type=app
+}
+
+// GitHubConfig holds GitHub provider settings.
 type GitHubConfig struct {
-	AppID int64 `yaml:"app_id"`
+	Providers map[string]GitHubProvider `yaml:"providers,omitempty"`
+}
+
+// LookupProvider returns the named provider and whether it exists.
+func (cfg *Config) LookupProvider(name string) (GitHubProvider, bool) {
+	if cfg.GitHub == nil || cfg.GitHub.Providers == nil {
+		return GitHubProvider{}, false
+	}
+	p, ok := cfg.GitHub.Providers[name]
+	return p, ok
 }
 
 // BackupDestination defines a remote backup target.
@@ -73,6 +88,7 @@ type AppWebhook struct {
 // App describes a single deployable application.
 type App struct {
 	Repo         string            `yaml:"repo"`
+	Provider     string            `yaml:"provider,omitempty"`
 	Branch       string            `yaml:"branch,omitempty"`
 	Compose      StringOrSlice     `yaml:"compose,omitempty"`
 	Strategy     string            `yaml:"strategy,omitempty"`

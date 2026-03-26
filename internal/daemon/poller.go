@@ -9,6 +9,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/git"
+	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/state"
 )
 
@@ -81,6 +82,21 @@ func (d *Daemon) pollOnce(ctx context.Context) {
 		// Check if repo has a remote.
 		if !git.HasRemote(ctx, repoDir) {
 			continue
+		}
+
+		// Refresh auth for GitHub App providers before fetch.
+		if appCfg.Provider != "" {
+			if provider, ok := cfg.LookupProvider(appCfg.Provider); ok && provider.Type == ghPkg.ProviderTypeApp {
+				token, err := ghPkg.GenerateInstallationToken(ctx, d.Root, appCfg.Provider, provider.AppID, appCfg.Repo)
+				if err != nil {
+					d.logger.Printf("poller: %s: token refresh error: %v", appName, err)
+					continue
+				}
+				if err := ghPkg.SetRemoteToken(ctx, repoDir, appCfg.Repo, token); err != nil {
+					d.logger.Printf("poller: %s: set remote URL error: %v", appName, err)
+					continue
+				}
+			}
 		}
 
 		// Fetch from origin.

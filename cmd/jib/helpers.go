@@ -111,6 +111,7 @@ func newEngine(cfg *config.Config) *deploy.Engine {
 		LockDir:     filepath.Join(root, "locks"),
 		RepoBaseDir: filepath.Join(root, "repos"),
 		OverrideDir: filepath.Join(root, "overrides"),
+		JibRoot:     root,
 	}
 }
 

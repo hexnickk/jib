@@ -70,9 +70,25 @@ func Validate(cfg *Config) error {
 		}
 	}
 
+	// GitHub providers.
+	if cfg.GitHub != nil {
+		for name, p := range cfg.GitHub.Providers {
+			prefix := fmt.Sprintf("github.providers '%s'", name)
+			if !appNameRe.MatchString(name) {
+				ve.addf("%s: name must match [a-z0-9-]+", prefix)
+			}
+			if p.Type != "key" && p.Type != "app" {
+				ve.addf("%s: type must be 'key' or 'app', got %q", prefix, p.Type)
+			}
+			if p.Type == "app" && p.AppID <= 0 {
+				ve.addf("%s: app_id is required for type 'app'", prefix)
+			}
+		}
+	}
+
 	// Apps.
 	for name, app := range cfg.Apps {
-		validateApp(ve, name, &app, cfg.BackupDests, cfg.Notifications)
+		validateApp(ve, name, &app, cfg.GitHub, cfg.BackupDests, cfg.Notifications)
 	}
 
 	if ve.hasErrors() {
@@ -81,7 +97,7 @@ func Validate(cfg *Config) error {
 	return nil
 }
 
-func validateApp(ve *ValidationError, name string, app *App, backupDests map[string]BackupDestination, notifications map[string]NotificationChannel) {
+func validateApp(ve *ValidationError, name string, app *App, github *GitHubConfig, backupDests map[string]BackupDestination, notifications map[string]NotificationChannel) {
 	prefix := fmt.Sprintf("app '%s'", name)
 
 	// App name format.
@@ -92,6 +108,19 @@ func validateApp(ve *ValidationError, name string, app *App, backupDests map[str
 	// Required: repo.
 	if app.Repo == "" {
 		ve.addf("%s: repo is required", prefix)
+	}
+
+	// Provider must reference an existing github provider (if set).
+	if app.Provider != "" && app.Repo != "local" {
+		found := false
+		if github != nil {
+			if _, ok := github.Providers[app.Provider]; ok {
+				found = true
+			}
+		}
+		if !found {
+			ve.addf("%s: provider %q not found in github.providers", prefix, app.Provider)
+		}
 	}
 
 	// Required: at least one domain.

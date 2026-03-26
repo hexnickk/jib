@@ -12,7 +12,12 @@ poll_interval: 5m
 certbot_email: nick@example.com
 
 github:
-  app_id: 123456
+  providers:
+    my-deploy-bot:
+      type: app
+      app_id: 123456
+    landing-key:
+      type: key
 
 backup_destinations:
   primary:
@@ -89,8 +94,14 @@ func TestLoadValidConfig(t *testing.T) {
 	if cfg.CertbotEmail != "nick@example.com" {
 		t.Errorf("certbot_email = %q", cfg.CertbotEmail)
 	}
-	if cfg.GitHub == nil || cfg.GitHub.AppID != 123456 {
-		t.Error("github.app_id wrong")
+	if cfg.GitHub == nil || len(cfg.GitHub.Providers) != 2 {
+		t.Error("github.providers wrong")
+	}
+	if p, ok := cfg.LookupProvider("my-deploy-bot"); !ok || p.Type != "app" || p.AppID != 123456 {
+		t.Error("provider my-deploy-bot wrong")
+	}
+	if p, ok := cfg.LookupProvider("landing-key"); !ok || p.Type != "key" {
+		t.Error("provider landing-key wrong")
 	}
 	if cfg.Webhook.Port != 9090 {
 		t.Errorf("webhook port = %d, want 9090 (default)", cfg.Webhook.Port)

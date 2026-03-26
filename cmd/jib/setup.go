@@ -15,6 +15,7 @@ import (
 	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/docker"
 	gitPkg "github.com/hexnickk/jib/internal/git"
+	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/network"
 	"github.com/hexnickk/jib/internal/platform"
 	"github.com/spf13/cobra"
@@ -40,6 +41,7 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 		RunE:  runAdd,
 	}
 	addCmd.Flags().String("repo", "", "GitHub repo (org/name)")
+	addCmd.Flags().String("provider", "", "Git auth provider name (from 'jib github key/app setup')")
 	addCmd.Flags().String("compose", "", "Compose file path (or comma-separated list)")
 	addCmd.Flags().StringSlice("domain", nil, "Domain or domain:port (repeatable). Port is inferred from compose if omitted.")
 	addCmd.Flags().StringSlice("health", nil, "Health check path:port (repeatable). Inferred from compose if omitted.")
@@ -556,6 +558,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	appName := args[0]
 
 	repo, _ := cmd.Flags().GetString("repo")
+	providerName, _ := cmd.Flags().GetString("provider")
 	composeFlag, _ := cmd.Flags().GetString("compose")
 	domainFlags, _ := cmd.Flags().GetStringSlice("domain")
 	healthFlags, _ := cmd.Flags().GetStringSlice("health")
@@ -606,34 +609,36 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		healthChecks = append(healthChecks, config.HealthCheck{Path: path, Port: port})
 	}
 
-	// --- Step 1: Setup deploy key for private repos ---
+	// --- Step 1: Resolve provider and clone ---
 	if repo != "local" && !configOnly {
-		fmt.Println("\nSetting up deploy key...")
-		if err := setupDeployKey(ctx, appName, repo); err != nil {
-			fmt.Fprintf(os.Stderr, "  warning: deploy key setup: %v\n", err)
-			fmt.Println("  If the repo is public, this is fine. Otherwise, set up access manually.")
+		// Resolve provider
+		var provider *config.GitHubProvider
+		if providerName == "" {
+			// Backward compat: check for legacy deploy key named by app
+			legacyKeyPath := filepath.Join(root, "deploy-keys", appName)
+			if _, err := os.Stat(legacyKeyPath); err == nil {
+				fmt.Printf("Using legacy deploy key at %s\n", legacyKeyPath)
+			} else {
+				return fmt.Errorf("--provider is required for remote repos\n\n  Set up a provider first:\n    jib github key setup <name>     (SSH deploy key)\n    jib github app setup <name>     (GitHub App)\n\n  Then: jib add %s --repo %s --domain %s --provider <name>", appName, repo, domainFlags[0])
+			}
+		} else {
+			cfg, err := loadConfig()
+			if err != nil {
+				return fmt.Errorf("loading config: %w", err)
+			}
+			p, ok := cfg.LookupProvider(providerName)
+			if !ok {
+				return fmt.Errorf("provider %q not found (see 'jib github key setup' or 'jib github app setup')", providerName)
+			}
+			provider = &p
 		}
-	}
 
-	// --- Step 2: Clone the repo ---
-	sshKeyPath := filepath.Join(root, "deploy-keys", appName)
-	if repo != "local" && !configOnly {
 		if !gitPkg.IsRepo(repoDirPath) {
 			branch := "main"
-			repoURL := fmt.Sprintf("git@github.com:%s.git", repo)
 			fmt.Printf("\nCloning %s...\n", repo)
-			keyPath := ""
-			if _, err := os.Stat(sshKeyPath); err == nil {
-				keyPath = sshKeyPath
-			}
-			if err := gitPkg.Clone(ctx, repoURL, repoDirPath, branch, keyPath); err != nil {
+
+			if err := cloneWithProvider(ctx, root, repo, repoDirPath, branch, provider, providerName, appName); err != nil {
 				return fmt.Errorf("cloning repo: %w", err)
-			}
-			// Configure repo to use deploy key for subsequent fetches
-			if keyPath != "" {
-				if err := gitPkg.ConfigureSSHKey(repoDirPath, keyPath); err != nil {
-					fmt.Fprintf(os.Stderr, "  warning: configuring SSH key: %v\n", err)
-				}
 			}
 		} else {
 			fmt.Printf("\nRepo already cloned at %s\n", repoDirPath)
@@ -711,6 +716,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 		newApp := config.App{
 			Repo:      repo,
+			Provider:  providerName,
 			Compose:   composeFiles,
 			Domains:   domains,
 			Health:    healthChecks,
@@ -784,41 +790,59 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// setupDeployKey generates an SSH deploy key and waits for the user to add it to GitHub.
-func setupDeployKey(_ context.Context, appName, repo string) error {
-	root := jibRoot()
-	keyDir := filepath.Join(root, "deploy-keys")
-	if err := os.MkdirAll(keyDir, 0o700); err != nil {
-		return err
-	}
-
-	keyPath := filepath.Join(keyDir, appName)
-	if _, err := os.Stat(keyPath); err != nil {
-		// Generate new key
-		keygen := exec.Command("ssh-keygen", "-t", "ed25519", "-f", keyPath, "-N", "", "-C", "jib-deploy-"+appName)
-		keygen.Stdout = os.Stdout
-		keygen.Stderr = os.Stderr
-		if err := keygen.Run(); err != nil {
-			return fmt.Errorf("ssh-keygen: %w", err)
+// cloneWithProvider clones a repo using the specified provider's credentials.
+// If provider is nil, falls back to a legacy deploy key at deploy-keys/<appName>.
+func cloneWithProvider(ctx context.Context, root, repo, repoDir, branch string, provider *config.GitHubProvider, providerName, appName string) error {
+	if provider == nil {
+		// Legacy: deploy key named by app
+		keyPath := filepath.Join(root, "deploy-keys", appName)
+		repoURL := ghPkg.SSHCloneURL(repo)
+		if err := gitPkg.Clone(ctx, repoURL, repoDir, branch, keyPath); err != nil {
+			return err
 		}
-		_ = os.Chmod(keyPath, 0o600)
+		if err := gitPkg.ConfigureSSHKey(repoDir, keyPath); err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: configuring SSH key: %v\n", err)
+		}
+		return nil
 	}
 
-	pubKey, err := os.ReadFile(keyPath + ".pub")
-	if err != nil {
-		return fmt.Errorf("reading public key: %w", err)
+	switch provider.Type {
+	case ghPkg.ProviderTypeKey:
+		keyPath := ghPkg.KeyPath(root, providerName)
+		repoURL := ghPkg.SSHCloneURL(repo)
+
+		// Verify access first
+		fmt.Println("Verifying repository access...")
+		if err := gitPkg.LsRemote(ctx, repoURL, keyPath); err != nil {
+			return fmt.Errorf("cannot access repo — is the deploy key added to GitHub?\n  %w", err)
+		}
+
+		if err := gitPkg.Clone(ctx, repoURL, repoDir, branch, keyPath); err != nil {
+			return err
+		}
+		if err := gitPkg.ConfigureSSHKey(repoDir, keyPath); err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: configuring SSH key: %v\n", err)
+		}
+
+	case ghPkg.ProviderTypeApp:
+		fmt.Println("Generating installation token...")
+		token, err := ghPkg.GenerateInstallationToken(ctx, root, providerName, provider.AppID, repo)
+		if err != nil {
+			return fmt.Errorf("generating installation token: %w", err)
+		}
+		repoURL := ghPkg.HTTPSCloneURL(repo, token)
+		if err := gitPkg.Clone(ctx, repoURL, repoDir, branch, ""); err != nil {
+			return err
+		}
+		// Set remote to tokenless URL (token is short-lived, will be refreshed on fetch)
+		if err := gitPkg.SetRemoteURL(ctx, repoDir, fmt.Sprintf("https://github.com/%s.git", repo)); err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: resetting remote URL: %v\n", err)
+		}
+
+	default:
+		return fmt.Errorf("unknown provider type %q", provider.Type)
 	}
 
-	fmt.Println()
-	fmt.Println("=== Deploy Key ===")
-	fmt.Println(strings.TrimSpace(string(pubKey)))
-	fmt.Println()
-	fmt.Printf("Add this key to: https://github.com/%s/settings/keys\n", repo)
-	fmt.Println("  Title: jib-deploy-" + appName)
-	fmt.Println("  Allow write access: No")
-	fmt.Println()
-	fmt.Print("Press Enter after adding the key...")
-	_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
 	return nil
 }
 

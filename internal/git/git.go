@@ -83,6 +83,30 @@ func CurrentSHA(ctx context.Context, repoDir string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// LsRemote runs git ls-remote to verify access to a repository.
+func LsRemote(ctx context.Context, url, sshKeyPath string) error {
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", url)
+	if sshKeyPath != "" {
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=accept-new", sshKeyPath))
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git ls-remote: %w: %s", err, string(out))
+	}
+	return nil
+}
+
+// SetRemoteURL updates the origin remote URL.
+func SetRemoteURL(ctx context.Context, repoDir, url string) error {
+	cmd := exec.CommandContext(ctx, "git", "remote", "set-url", "origin", url)
+	cmd.Dir = repoDir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git remote set-url: %w: %s", err, string(out))
+	}
+	return nil
+}
+
 // RemoteSHA runs git rev-parse origin/<branch> and returns the remote branch SHA.
 func RemoteSHA(ctx context.Context, repoDir, branch string) (string, error) {
 	ref := "origin/" + branch

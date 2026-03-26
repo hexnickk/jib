@@ -13,6 +13,7 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
 	"github.com/hexnickk/jib/internal/git"
+	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/notify"
 	"github.com/hexnickk/jib/internal/platform"
@@ -50,6 +51,7 @@ type Engine struct {
 	LockDir     string
 	RepoBaseDir string // e.g. /opt/jib/repos
 	OverrideDir string // e.g. /opt/jib/overrides
+	JibRoot     string // e.g. /opt/jib (needed for provider key paths)
 }
 
 // DeployOptions configures a single deploy invocation.
@@ -124,6 +126,10 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	// 5. Git fetch and determine target ref.
 	hasRemote := git.HasRemote(ctx, repoDir)
 	if hasRemote {
+		// For GitHub App providers, refresh the installation token before fetch.
+		if err := e.refreshFetchAuth(ctx, appCfg, repoDir); err != nil {
+			return nil, fmt.Errorf("refreshing auth: %w", err)
+		}
 		if err := git.Fetch(ctx, repoDir, branch); err != nil {
 			return nil, fmt.Errorf("git fetch: %w", err)
 		}
@@ -474,4 +480,27 @@ func checkDiskSpace(path string, minBytes uint64) error {
 		return fmt.Errorf("insufficient disk space: %d bytes free, need at least %d", free, minBytes)
 	}
 	return nil
+}
+
+// refreshFetchAuth sets up authentication for the next git fetch.
+// For GitHub App providers, this generates a fresh installation token and
+// updates the remote URL. For key providers, no action is needed (SSH key
+// is already configured in the repo's git config).
+func (e *Engine) refreshFetchAuth(ctx context.Context, appCfg config.App, repoDir string) error {
+	if appCfg.Provider == "" {
+		return nil // legacy key-based or local, already configured
+	}
+	provider, ok := e.Config.LookupProvider(appCfg.Provider)
+	if !ok {
+		return nil // provider not found, will fail on fetch anyway
+	}
+	if provider.Type != ghPkg.ProviderTypeApp {
+		return nil // key providers use core.sshCommand, no refresh needed
+	}
+
+	token, err := ghPkg.GenerateInstallationToken(ctx, e.JibRoot, appCfg.Provider, provider.AppID, appCfg.Repo)
+	if err != nil {
+		return fmt.Errorf("generating installation token: %w", err)
+	}
+	return ghPkg.SetRemoteToken(ctx, repoDir, appCfg.Repo, token)
 }
