@@ -22,18 +22,6 @@ func Clone(ctx context.Context, url, dir, branch, sshKeyPath string) error {
 	if err != nil {
 		return fmt.Errorf("git clone: %w: %s", err, string(out))
 	}
-	// Mark directory as safe so other users in the jib group can operate on it.
-	_ = MarkSafeDirectory(dir)
-	return nil
-}
-
-// MarkSafeDirectory adds a directory to git's global safe.directory list,
-// allowing users other than the repo owner to run git commands in it.
-func MarkSafeDirectory(dir string) error {
-	cmd := exec.Command("git", "config", "--global", "--add", "safe.directory", dir)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git config safe.directory: %w: %s", err, string(out))
-	}
 	return nil
 }
 
