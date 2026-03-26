@@ -378,34 +378,13 @@ func ensureDirs(root string) {
 			fmt.Fprintf(os.Stderr, "  warning: creating %s: %v\n", dirPath, err)
 		}
 	}
-
-	// Set ownership and permissions on the root and each managed directory,
-	// but NOT recursively on repos/ — repo contents must stay owned by the
-	// user who cloned them so git doesn't reject them as "dubious ownership".
-	for _, target := range append([]string{root}, dirs...) {
-		path := target
-		if target != root {
-			path = filepath.Join(root, target)
-		}
-		if err := sudoCmd("chown", "root:jib", path).Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "  warning: chown %s: %v\n", path, err)
-		}
-		if err := sudoCmd("chmod", "u=rwX,g=rwX,o=", path).Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "  warning: chmod %s: %v\n", path, err)
-		}
+	// Converge ownership and permissions every run.
+	if err := sudoCmd("chown", "-R", "root:jib", root).Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: chown %s: %v\n", root, err)
 	}
-
-	// Recursively fix ownership for directories that don't contain git repos.
-	for _, dir := range []string{"state", "secrets", "overrides", "nginx", "backups", "locks", "deploy-keys", "logs"} {
-		dirPath := filepath.Join(root, dir)
-		if err := sudoCmd("chown", "-R", "root:jib", dirPath).Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "  warning: chown %s: %v\n", dirPath, err)
-		}
-		if err := sudoCmd("chmod", "-R", "u=rwX,g=rwX,o=", dirPath).Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "  warning: chmod %s: %v\n", dirPath, err)
-		}
+	if err := sudoCmd("chmod", "-R", "u=rwX,g=rwX,o=", root).Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: chmod %s: %v\n", root, err)
 	}
-
 	if err := sudoCmd("chmod", "2770", filepath.Join(root, "secrets")).Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "  warning: chmod secrets: %v\n", err)
 	}
