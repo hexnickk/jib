@@ -192,6 +192,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// --- Ensure: jib group exists and current user is a member ---
 	ensureJibGroup()
 
+	// --- Ensure: current user can access Docker ---
+	ensureDockerGroup()
+
 	// --- Ensure: directory structure with correct ownership/permissions ---
 	ensureDirs(root)
 
@@ -337,6 +340,29 @@ func ensureJibGroup() {
 		return
 	}
 	fmt.Printf("  Added '%s' to jib group\n", currentUser)
+}
+
+// ensureDockerGroup ensures the current user is in the docker group.
+func ensureDockerGroup() {
+	currentUser := os.Getenv("SUDO_USER")
+	if currentUser == "" {
+		currentUser = os.Getenv("USER")
+	}
+	if currentUser == "" || currentUser == "root" {
+		return
+	}
+
+	if userInGroup(currentUser, "docker") {
+		return
+	}
+
+	fmt.Println("\nAdding user to docker group...")
+	if err := sudoCmd("usermod", "-aG", "docker", currentUser).Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: could not add %s to docker group: %v\n", currentUser, err)
+		return
+	}
+	fmt.Printf("  Added '%s' to docker group\n", currentUser)
+	fmt.Println("  NOTE: Log out and back in (or run 'newgrp docker') for this to take effect.")
 }
 
 // ensureDirs ensures /opt/jib directory structure exists with correct ownership and permissions.
