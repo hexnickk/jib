@@ -41,22 +41,13 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 		RunE:  runAdd,
 	}
 	addCmd.Flags().String("repo", "", "GitHub repo (org/name)")
-	addCmd.Flags().String("provider", "", "Git auth provider name (from 'jib github key/app setup')")
+	addCmd.Flags().String("git-provider", "", "Git auth provider name (from 'jib github key/app setup')")
+	addCmd.Flags().String("ingress", "direct", "Ingress type: direct, cloudflare-tunnel, tailscale")
 	addCmd.Flags().String("compose", "", "Compose file path (or comma-separated list)")
 	addCmd.Flags().StringSlice("domain", nil, "Domain or domain:port (repeatable). Port is inferred from compose if omitted.")
 	addCmd.Flags().StringSlice("health", nil, "Health check path:port (repeatable). Inferred from compose if omitted.")
 	addCmd.Flags().Bool("config-only", false, "Write config without provisioning")
 	rootCmd.AddCommand(addCmd)
-
-	// jib provision [app]
-	provisionCmd := &cobra.Command{
-		Use:   "provision [app]",
-		Short: "Re-reconcile infra for app (or all) -- idempotent",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  runProvision,
-	}
-	provisionCmd.Flags().Bool("skip-ssl", false, "Skip SSL certificate provisioning")
-	rootCmd.AddCommand(provisionCmd)
 
 	// jib remove <app>
 	removeCmd := &cobra.Command{
@@ -421,117 +412,6 @@ func ensureJibDaemon() {
 	}
 }
 
-func runProvision(cmd *cobra.Command, args []string) error {
-	cfg, err := loadConfig()
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
-	}
-
-	skipSSL, _ := cmd.Flags().GetBool("skip-ssl")
-	p := newProxy(cfg)
-	sslMgr := newSSLManager(cfg)
-
-	// Determine which apps to provision
-	apps := make(map[string]config.App)
-	if len(args) > 0 {
-		appCfg, err := requireApp(cfg, args[0])
-		if err != nil {
-			return err
-		}
-		apps[args[0]] = appCfg
-	} else {
-		apps = cfg.Apps
-	}
-
-	for name, appCfg := range apps {
-		fmt.Printf("Provisioning %s...\n", name)
-
-		// Remove stale nginx configs for domains no longer in config.
-		// Collect all domains currently configured for this app.
-		currentDomains := make(map[string]bool)
-		for _, d := range appCfg.Domains {
-			currentDomains[d.Host+".conf"] = true
-		}
-		// Check all existing nginx configs and remove any that belonged
-		// to this app's old domain list but are no longer configured.
-		// We identify stale configs by checking if a conf file exists
-		// that is NOT in the current domain set.
-		// First, collect all conf files from previous provision for this app.
-		if prevAppCfg, err := loadPreviousDomains(name); err == nil {
-			var staleDomains []config.Domain
-			for _, d := range prevAppCfg {
-				if !currentDomains[d.Host+".conf"] {
-					staleDomains = append(staleDomains, d)
-				}
-			}
-			if len(staleDomains) > 0 {
-				if err := p.RemoveConfigs(name, staleDomains); err != nil {
-					fmt.Fprintf(os.Stderr, "  warning: removing stale configs: %v\n", err)
-				}
-				for _, d := range staleDomains {
-					fmt.Printf("  nginx: removed stale %s.conf\n", d.Host)
-				}
-			}
-		}
-
-		// Generate and write nginx configs
-		configs, err := p.GenerateConfig(name, appCfg)
-		if err != nil {
-			return fmt.Errorf("generating nginx config for %s: %w", name, err)
-		}
-		if err := p.WriteConfigs(configs); err != nil {
-			return fmt.Errorf("writing nginx configs for %s: %w", name, err)
-		}
-		for filename := range configs {
-			fmt.Printf("  nginx: %s\n", filename)
-		}
-
-		// Save current domains for future stale detection.
-		savePreviousDomains(name, appCfg.Domains)
-
-		// Check domain reachability before SSL
-		if !skipSSL {
-			for _, d := range appCfg.Domains {
-				check := network.CheckDomain(d.Host)
-				if check.Warning != "" {
-					fmt.Fprintf(os.Stderr, "  ssl: skipping %s — %s\n", d.Host, check.Warning)
-					continue
-				}
-				fmt.Printf("  ssl: obtaining cert for %s...\n", d.Host)
-				if err := sslMgr.Obtain(context.Background(), d.Host); err != nil {
-					fmt.Fprintf(os.Stderr, "  ssl: warning: %s: %v\n", d.Host, err)
-				} else {
-					fmt.Printf("  ssl: %s OK\n", d.Host)
-				}
-			}
-		}
-	}
-
-	// Test and reload nginx
-	if err := p.Test(); err != nil {
-		return fmt.Errorf("nginx config test: %w", err)
-	}
-	if err := p.Reload(); err != nil {
-		return fmt.Errorf("nginx reload: %w", err)
-	}
-	fmt.Println("Nginx reloaded.")
-	return nil
-}
-
-// loadPreviousDomains reads the previously provisioned domain list for an app.
-func loadPreviousDomains(app string) ([]config.Domain, error) {
-	path := filepath.Join(jibRoot(), "state", app+".domains.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var domains []config.Domain
-	if err := json.Unmarshal(data, &domains); err != nil {
-		return nil, err
-	}
-	return domains, nil
-}
-
 // savePreviousDomains persists the current domain list for stale detection on next provision.
 func savePreviousDomains(app string, domains []config.Domain) {
 	dir := filepath.Join(jibRoot(), "state")
@@ -584,7 +464,8 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	appName := args[0]
 
 	repo, _ := cmd.Flags().GetString("repo")
-	providerName, _ := cmd.Flags().GetString("provider")
+	providerName, _ := cmd.Flags().GetString("git-provider")
+	ingress, _ := cmd.Flags().GetString("ingress")
 	composeFlag, _ := cmd.Flags().GetString("compose")
 	domainFlags, _ := cmd.Flags().GetStringSlice("domain")
 	healthFlags, _ := cmd.Flags().GetStringSlice("health")
@@ -654,7 +535,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			if _, err := os.Stat(legacyKeyPath); err == nil {
 				fmt.Printf("Using legacy deploy key at %s\n", legacyKeyPath)
 			} else {
-				return fmt.Errorf("--provider is required for remote repos\n\n  Set up a provider first:\n    jib github key setup <name>     (SSH deploy key)\n    jib github app setup <name>     (GitHub App)\n\n  Then: jib add %s --repo %s --domain %s --provider <name>", appName, repo, domainFlags[0])
+				return fmt.Errorf("--git-provider is required for remote repos\n\n  Set up a provider first:\n    jib github key setup <name>     (SSH deploy key)\n    jib github app setup <name>     (GitHub App)\n\n  Then: jib add %s --repo %s --domain %s --git-provider <name>", appName, repo, domainFlags[0])
 			}
 		} else {
 			cfg, err := loadConfig()
@@ -663,7 +544,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			}
 			p, ok := cfg.LookupProvider(providerName)
 			if !ok {
-				return fmt.Errorf("provider %q not found (see 'jib github key setup' or 'jib github app setup')", providerName)
+				return fmt.Errorf("git provider %q not found (see 'jib github key setup' or 'jib github app setup')", providerName)
 			}
 			provider = &p
 		}
@@ -752,6 +633,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		newApp := config.App{
 			Repo:      repo,
 			Provider:  providerName,
+			Ingress:   ingress,
 			Compose:   composeFiles,
 			Domains:   domains,
 			Health:    healthChecks,
@@ -839,19 +721,21 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		fmt.Println("  nginx: reloaded")
 	}
 
-	// SSL
-	sslMgr := newSSLManager(cfg)
-	for _, d := range appCfg.Domains {
-		check := network.CheckDomain(d.Host)
-		if check.Warning != "" {
-			fmt.Fprintf(os.Stderr, "  ssl: skipping %s — %s\n", d.Host, check.Warning)
-			continue
-		}
-		fmt.Printf("  ssl: obtaining cert for %s...\n", d.Host)
-		if err := sslMgr.Obtain(ctx, d.Host); err != nil {
-			fmt.Fprintf(os.Stderr, "  ssl: warning: %s: %v\n", d.Host, err)
-		} else {
-			fmt.Printf("  ssl: %s OK\n", d.Host)
+	// SSL — only for direct ingress (tunnels handle TLS at the edge)
+	if ingress == "" || ingress == "direct" {
+		sslMgr := newSSLManager(cfg)
+		for _, d := range appCfg.Domains {
+			check := network.CheckDomain(d.Host)
+			if check.Warning != "" {
+				fmt.Fprintf(os.Stderr, "  ssl: skipping %s — %s\n", d.Host, check.Warning)
+				continue
+			}
+			fmt.Printf("  ssl: obtaining cert for %s...\n", d.Host)
+			if err := sslMgr.Obtain(ctx, d.Host); err != nil {
+				fmt.Fprintf(os.Stderr, "  ssl: warning: %s: %v\n", d.Host, err)
+			} else {
+				fmt.Printf("  ssl: %s OK\n", d.Host)
+			}
 		}
 	}
 

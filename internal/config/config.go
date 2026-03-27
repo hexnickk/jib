@@ -89,6 +89,7 @@ type AppWebhook struct {
 type App struct {
 	Repo         string            `yaml:"repo"`
 	Provider     string            `yaml:"provider,omitempty"`
+	Ingress      string            `yaml:"ingress,omitempty"`
 	Branch       string            `yaml:"branch,omitempty"`
 	Compose      StringOrSlice     `yaml:"compose,omitempty"`
 	Strategy     string            `yaml:"strategy,omitempty"`

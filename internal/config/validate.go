@@ -123,6 +123,12 @@ func validateApp(ve *ValidationError, name string, app *App, github *GitHubConfi
 		}
 	}
 
+	// Ingress type.
+	validIngress := map[string]bool{"": true, "direct": true, "cloudflare-tunnel": true, "tailscale": true}
+	if !validIngress[app.Ingress] {
+		ve.addf("%s: ingress must be 'direct', 'cloudflare-tunnel', or 'tailscale', got %q", prefix, app.Ingress)
+	}
+
 	// Required: at least one domain.
 	if len(app.Domains) == 0 {
 		ve.addf("%s: at least one domain is required", prefix)

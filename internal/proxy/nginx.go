@@ -39,6 +39,7 @@ type templateData struct {
 	WebhookPort  int
 	NginxInclude string
 	HasSSL       bool
+	IsTunnel     bool // true for cloudflare-tunnel/tailscale — skips ACME challenge
 }
 
 // confFilename returns the config filename for a domain.
@@ -60,9 +61,14 @@ func (n *Nginx) GenerateConfig(app string, appCfg config.App) (map[string]string
 
 		filename := confFilename(d.Host)
 
-		certPath := fmt.Sprintf("/etc/letsencrypt/live/%s/fullchain.pem", d.Host)
-		_, certErr := os.Stat(certPath)
-		hasSSL := certErr == nil
+		isTunnel := appCfg.Ingress == "cloudflare-tunnel" || appCfg.Ingress == "tailscale"
+
+		hasSSL := false
+		if !isTunnel {
+			certPath := fmt.Sprintf("/etc/letsencrypt/live/%s/fullchain.pem", d.Host)
+			_, certErr := os.Stat(certPath)
+			hasSSL = certErr == nil
+		}
 
 		data := templateData{
 			Filename:     filename,
@@ -71,6 +77,7 @@ func (n *Nginx) GenerateConfig(app string, appCfg config.App) (map[string]string
 			WebhookPort:  n.WebhookPort,
 			NginxInclude: appCfg.NginxInclude,
 			HasSSL:       hasSSL,
+			IsTunnel:     isTunnel,
 		}
 
 		var buf bytes.Buffer
