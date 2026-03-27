@@ -59,6 +59,16 @@ func installTailscale() error {
 }
 
 func runTailscaleSetup(cmd *cobra.Command, args []string) error {
+	fmt.Println("Set up Tailscale for private networking and HTTPS.")
+	fmt.Println()
+	fmt.Println("This will:")
+	fmt.Println("  1. Install Tailscale (if needed)")
+	fmt.Println("  2. Connect this server to your Tailnet")
+	fmt.Println("  3. Enable access to your apps via Tailscale IPs/MagicDNS")
+	fmt.Println()
+	fmt.Println("You'll need a Tailscale account — sign up at https://tailscale.com")
+	fmt.Println()
+
 	// Step 1: Check / install tailscale
 	if !tailscaleInstalled() {
 		ok, err := tui.PromptConfirm("Tailscale is not installed. Install it now?", true)

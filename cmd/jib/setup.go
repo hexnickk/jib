@@ -453,6 +453,16 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	healthFlags, _ := cmd.Flags().GetStringSlice("health")
 	configOnly, _ := cmd.Flags().GetBool("config-only")
 
+	if repo == "" && len(domainFlags) == 0 && tui.IsInteractive() {
+		fmt.Println("Add a new app to jib.")
+		fmt.Println()
+		fmt.Println("You'll need:")
+		fmt.Println("  1. A GitHub repo (org/name) containing a docker-compose.yml or Dockerfile")
+		fmt.Println("  2. A domain pointed at this server (A/CNAME record)")
+		fmt.Println("  3. A git provider (set up with 'jib github app setup' or 'jib github key setup')")
+		fmt.Println()
+	}
+
 	if repo == "" {
 		var err error
 		repo, err = tui.PromptString("repo", "GitHub repo (org/name)")

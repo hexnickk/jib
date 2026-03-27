@@ -293,6 +293,13 @@ func runNotifyAdd(cmd *cobra.Command, args []string) error {
 	// Slack, discord, and webhook all need a single URL.
 	url := urlFlag
 	if url == "" {
+		if driver == "webhook" {
+			fmt.Println("Add a generic webhook notification channel.")
+			fmt.Println()
+			fmt.Println("Jib will POST JSON to your URL on deploy events.")
+			fmt.Println("The payload includes: app name, status, timestamp, and commit info.")
+			fmt.Println()
+		}
 		promptLabel := strings.ToUpper(driver[:1]) + driver[1:] + " webhook URL"
 		if driver == "webhook" {
 			promptLabel = "Webhook URL"
