@@ -12,6 +12,14 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 )
 
+// sudoCommand creates an exec.Cmd that prepends "sudo" when not running as root.
+func sudoCommand(name string, args ...string) *exec.Cmd {
+	if os.Getuid() == 0 {
+		return exec.Command(name, args...)
+	}
+	return exec.Command("sudo", append([]string{name}, args...)...)
+}
+
 // Nginx implements the Proxy interface using nginx.
 type Nginx struct {
 	ConfigDir   string // e.g. /opt/jib/nginx/
@@ -143,7 +151,7 @@ func (n *Nginx) RemoveConfigs(app string, domains []config.Domain) error {
 
 // Reload signals nginx to reload its configuration.
 func (n *Nginx) Reload() error {
-	cmd := exec.Command("nginx", "-s", "reload")
+	cmd := sudoCommand("nginx", "-s", "reload")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("nginx reload failed: %s: %w", string(out), err)
 	}
@@ -152,7 +160,7 @@ func (n *Nginx) Reload() error {
 
 // Test validates the nginx configuration.
 func (n *Nginx) Test() error {
-	cmd := exec.Command("nginx", "-t")
+	cmd := sudoCommand("nginx", "-t")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("nginx config test failed: %s: %w", string(out), err)
 	}
