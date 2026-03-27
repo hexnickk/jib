@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	ghPkg "github.com/hexnickk/jib/internal/github"
+	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -23,10 +24,8 @@ func registerGitHubAppCommands(githubCmd *cobra.Command) {
 		Args:  exactArgs(1),
 		RunE:  runGitHubAppSetup,
 	}
-	setupCmd.Flags().Int64("app-id", 0, "GitHub App ID (required)")
-	setupCmd.Flags().String("private-key", "", "Path to PEM file, or - to read from stdin (required)")
-	_ = setupCmd.MarkFlagRequired("app-id")
-	_ = setupCmd.MarkFlagRequired("private-key")
+	setupCmd.Flags().Int64("app-id", 0, "GitHub App ID")
+	setupCmd.Flags().String("private-key", "", "Path to PEM file, or - to read from stdin")
 	appCmd.AddCommand(setupCmd)
 
 	appCmd.AddCommand(&cobra.Command{
@@ -49,8 +48,6 @@ func registerGitHubAppCommands(githubCmd *cobra.Command) {
 func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	root := jibRoot()
-	appID, _ := cmd.Flags().GetInt64("app-id")
-	keyFile, _ := cmd.Flags().GetString("private-key")
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -61,18 +58,35 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Read PEM from file or stdin (--private-key -)
+	// Resolve app-id (flag or interactive prompt)
+	appID, _ := cmd.Flags().GetInt64("app-id")
+	if appID == 0 {
+		appID, err = tui.PromptInt64("app-id", "GitHub App ID")
+		if err != nil {
+			return err
+		}
+	}
+
+	// Resolve private key (flag, stdin, or interactive prompt)
+	keyFile, _ := cmd.Flags().GetString("private-key")
 	var src io.Reader
 	if keyFile == "-" {
 		fmt.Println("Paste the private key PEM, then press Ctrl+D:")
 		src = os.Stdin
-	} else {
+	} else if keyFile != "" {
 		f, err := os.Open(keyFile)
 		if err != nil {
 			return fmt.Errorf("opening private key file: %w", err)
 		}
 		defer f.Close()
 		src = f
+	} else {
+		// No flag provided — prompt interactively
+		pemData, err := tui.PromptMultiline("private-key", "Paste the private key PEM")
+		if err != nil {
+			return err
+		}
+		src = strings.NewReader(pemData)
 	}
 
 	pemPath := ghPkg.AppPEMPath(root, name)

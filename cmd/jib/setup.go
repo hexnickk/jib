@@ -17,6 +17,7 @@ import (
 	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/network"
 	"github.com/hexnickk/jib/internal/platform"
+	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -460,10 +461,18 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	configOnly, _ := cmd.Flags().GetBool("config-only")
 
 	if repo == "" {
-		return fmt.Errorf("--repo is required (e.g. --repo org/repo-name)")
+		var err error
+		repo, err = tui.PromptString("repo", "GitHub repo (org/name)")
+		if err != nil {
+			return err
+		}
 	}
 	if len(domainFlags) == 0 {
-		return fmt.Errorf("at least one --domain is required (e.g. --domain example.com)")
+		domain, err := tui.PromptString("domain", "Domain (e.g. example.com)")
+		if err != nil {
+			return err
+		}
+		domainFlags = []string{domain}
 	}
 
 	// Check early if app already exists to avoid cloning/generating before failing.
@@ -523,9 +532,13 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			if _, err := os.Stat(legacyKeyPath); err == nil {
 				fmt.Printf("Using legacy deploy key at %s\n", legacyKeyPath)
 			} else {
-				return fmt.Errorf("--git-provider is required for remote repos\n\n  Set up a provider first:\n    jib github key setup <name>     (SSH deploy key)\n    jib github app setup <name>     (GitHub App)\n\n  Then: jib add %s --repo %s --domain %s --git-provider <name>", appName, repo, domainFlags[0])
+				providerName, err = tui.PromptString("git-provider", "Git provider name (from 'jib github key/app setup')")
+				if err != nil {
+					return err
+				}
 			}
-		} else {
+		}
+		if providerName != "" {
 			cfg, err := loadConfig()
 			if err != nil {
 				return fmt.Errorf("loading config: %w", err)
