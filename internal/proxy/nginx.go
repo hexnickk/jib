@@ -58,6 +58,7 @@ func confFilename(domain string) string {
 // GenerateConfig produces per-domain nginx conf files for an app.
 func (n *Nginx) GenerateConfig(app string, appCfg config.App) (map[string]string, error) {
 	configs := make(map[string]string, len(appCfg.Domains))
+	isTunnel := appCfg.IsTunnelIngress()
 
 	for _, d := range appCfg.Domains {
 		if d.Host == "" {
@@ -68,8 +69,6 @@ func (n *Nginx) GenerateConfig(app string, appCfg config.App) (map[string]string
 		}
 
 		filename := confFilename(d.Host)
-
-		isTunnel := appCfg.IsTunnelIngress()
 
 		hasSSL := false
 		if !isTunnel {
