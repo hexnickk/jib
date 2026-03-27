@@ -24,7 +24,7 @@ func registerGitHubAppCommands(githubCmd *cobra.Command) {
 		RunE:  runGitHubAppSetup,
 	}
 	setupCmd.Flags().Int64("app-id", 0, "GitHub App ID (required)")
-	setupCmd.Flags().String("private-key", "", "Path to GitHub App private key PEM file (required)")
+	setupCmd.Flags().String("private-key", "", "Path to PEM file, or - to read from stdin (required)")
 	_ = setupCmd.MarkFlagRequired("app-id")
 	_ = setupCmd.MarkFlagRequired("private-key")
 	appCmd.AddCommand(setupCmd)
@@ -61,15 +61,21 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Read and copy PEM file
-	src, err := os.Open(keyFile)
-	if err != nil {
-		return fmt.Errorf("opening private key file: %w", err)
+	// Read PEM from file or stdin (--private-key -)
+	var src io.Reader
+	if keyFile == "-" {
+		fmt.Println("Paste the private key PEM, then press Ctrl+D:")
+		src = os.Stdin
+	} else {
+		f, err := os.Open(keyFile)
+		if err != nil {
+			return fmt.Errorf("opening private key file: %w", err)
+		}
+		defer f.Close()
+		src = f
 	}
-	defer src.Close()
 
 	pemPath := ghPkg.AppPEMPath(root, name)
-	// Ensure secrets dir exists
 	if err := os.MkdirAll(filepath.Dir(pemPath), 0o700); err != nil {
 		return fmt.Errorf("creating secrets directory: %w", err)
 	}
