@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -86,7 +85,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 	skipInstall, _ := cmd.Flags().GetBool("skip-install")
 
-	scanner := bufio.NewScanner(os.Stdin)
 	cfgPath := configPath()
 	root := jibRoot()
 	firstRun := !fileExists(cfgPath)
@@ -116,30 +114,23 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// --- First-run only: interactive prompts for SSL and rclone ---
 	certbotEmail := ""
 	if firstRun {
-		sslChoice := 1
+		sslChoice := "certbot"
 		if !nonInteractive {
-			fmt.Println("\nDomain/SSL management:")
-			fmt.Println("  1. Certbot (Let's Encrypt) — recommended for direct server access")
-			fmt.Println("  2. Cloudflare Tunnel")
-			fmt.Println("  3. Tailscale")
-			fmt.Println("  4. None — I'll manage SSL myself")
-			fmt.Print("Choose [1-4, default 1]: ")
-
-			if scanner.Scan() {
-				choice := strings.TrimSpace(scanner.Text())
-				if choice != "" {
-					n, err := strconv.Atoi(choice)
-					if err != nil || n < 1 || n > 4 {
-						fmt.Println("Invalid choice, using default (1: Certbot).")
-					} else {
-						sslChoice = n
-					}
-				}
+			fmt.Println()
+			choice, err := tui.PromptSelect("Domain/SSL management", []tui.SelectOption{
+				{Label: "Certbot (Let's Encrypt) — recommended for direct server access", Value: "certbot"},
+				{Label: "Cloudflare Tunnel", Value: "cloudflare"},
+				{Label: "Tailscale", Value: "tailscale"},
+				{Label: "None — I'll manage SSL myself", Value: "none"},
+			})
+			if err != nil {
+				return err
 			}
+			sslChoice = choice
 		}
 
 		switch sslChoice {
-		case 1:
+		case "certbot":
 			if !skipInstall {
 				fmt.Println("\nInstalling certbot...")
 				installCmd := sudoCmd("apt-get", "install", "-y", "certbot", "python3-certbot-nginx")
@@ -150,31 +141,33 @@ func runInit(cmd *cobra.Command, args []string) error {
 				}
 			}
 			if !nonInteractive {
-				fmt.Print("Email for Let's Encrypt notifications: ")
-				if scanner.Scan() {
-					certbotEmail = strings.TrimSpace(scanner.Text())
+				email, err := tui.PromptStringOptional("Email for Let's Encrypt notifications (optional)")
+				if err != nil {
+					return err
 				}
+				certbotEmail = email
 			}
-		case 2:
+		case "cloudflare":
 			fmt.Println("\nRun 'jib cloudflare setup' after init to configure.")
-		case 3:
+		case "tailscale":
 			fmt.Println("\nRun 'jib tailscale setup' after init to configure.")
-		case 4:
+		case "none":
 			fmt.Println("\nSkipping SSL setup.")
 		}
 
 		if !nonInteractive && !skipInstall {
-			fmt.Print("\nInstall rclone for backups? [y/N]: ")
-			if scanner.Scan() {
-				answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
-				if answer == "y" || answer == "yes" {
-					fmt.Println("Installing rclone...")
-					installCmd := sudoCmd("apt-get", "install", "-y", "rclone")
-					installCmd.Stdout = os.Stdout
-					installCmd.Stderr = os.Stderr
-					if err := installCmd.Run(); err != nil {
-						fmt.Fprintf(os.Stderr, "warning: rclone installation failed: %v\n", err)
-					}
+			fmt.Println()
+			installRclone, err := tui.PromptConfirm("Install rclone for backups?", false)
+			if err != nil {
+				return err
+			}
+			if installRclone {
+				fmt.Println("Installing rclone...")
+				installCmd := sudoCmd("apt-get", "install", "-y", "rclone")
+				installCmd.Stdout = os.Stdout
+				installCmd.Stderr = os.Stderr
+				if err := installCmd.Run(); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: rclone installation failed: %v\n", err)
 				}
 			}
 		}
@@ -848,18 +841,11 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  - Remove history: %s\n", historyFile)
 		fmt.Println("  - Remove app from config.yml")
 		fmt.Println()
-		fmt.Print("Continue? [y/N] ")
-
-		scanner := bufio.NewScanner(os.Stdin)
-		if !scanner.Scan() {
-			if err := scanner.Err(); err != nil {
-				return fmt.Errorf("reading confirmation: %w", err)
-			}
-			fmt.Println("Aborted.")
-			return nil
+		ok, err := tui.PromptConfirm("Continue?", false)
+		if err != nil {
+			return err
 		}
-		answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
-		if answer != "y" && answer != "yes" {
+		if !ok {
 			fmt.Println("Aborted.")
 			return nil
 		}

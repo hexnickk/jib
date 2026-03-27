@@ -58,8 +58,26 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Resolve app-id (flag or interactive prompt)
+	// Show setup guide when running interactively without flags.
 	appID, _ := cmd.Flags().GetInt64("app-id")
+	keyFile, _ := cmd.Flags().GetString("private-key")
+	if appID == 0 && keyFile == "" && tui.IsInteractive() {
+		fmt.Println("Register a GitHub App as a git provider for jib.")
+		fmt.Println()
+		fmt.Println("You'll need:")
+		fmt.Println("  1. A GitHub App — create one at https://github.com/settings/apps/new")
+		fmt.Println("     - Set Homepage URL to any valid URL")
+		fmt.Println("     - Under Repository permissions, set Contents to Read-only")
+		fmt.Println("     - Disable webhooks (uncheck Active)")
+		fmt.Println("  2. The App ID — shown on the app's settings page after creation")
+		fmt.Println("  3. A private key — generate one under the app's settings → Private keys")
+		fmt.Println()
+		fmt.Println("After setup, install the app on your repo:")
+		fmt.Println("  https://github.com/settings/apps/<app-slug>/installations")
+		fmt.Println()
+	}
+
+	// Resolve app-id (flag or interactive prompt)
 	if appID == 0 {
 		appID, err = tui.PromptInt64("app-id", "GitHub App ID")
 		if err != nil {
@@ -68,7 +86,6 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve private key (flag, stdin, or interactive prompt)
-	keyFile, _ := cmd.Flags().GetString("private-key")
 	var src io.Reader
 	if keyFile == "-" {
 		fmt.Println("Paste the private key PEM, then press Ctrl+D:")
@@ -81,8 +98,8 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		defer func() { _ = f.Close() }()
 		src = f
 	} else {
-		// No flag provided — prompt interactively
-		pemData, err := tui.PromptMultiline("private-key", "Paste the private key PEM")
+		// No flag provided — prompt interactively (auto-detects END marker)
+		pemData, err := tui.PromptPEM("private-key", "Paste the private key PEM")
 		if err != nil {
 			return err
 		}

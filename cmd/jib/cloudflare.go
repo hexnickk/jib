@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 
+	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -68,14 +67,13 @@ func installCloudflared() error {
 }
 
 func runCloudflareSetup(cmd *cobra.Command, args []string) error {
-	reader := bufio.NewReader(os.Stdin)
-
 	// Step 1: Check / install cloudflared
 	if !cloudflaredInstalled() {
-		fmt.Print("cloudflared is not installed. Install it now? [Y/n]: ")
-		answer, _ := reader.ReadString('\n')
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		if answer != "" && answer != "y" && answer != "yes" {
+		ok, err := tui.PromptConfirm("cloudflared is not installed. Install it now?", true)
+		if err != nil {
+			return err
+		}
+		if !ok {
 			return fmt.Errorf("cloudflared is required for Cloudflare Tunnel setup")
 		}
 		if err := installCloudflared(); err != nil {
@@ -95,11 +93,9 @@ func runCloudflareSetup(cmd *cobra.Command, args []string) error {
 	fmt.Println("  sudo cloudflared service install eyJhIjo...")
 	fmt.Println("Copy the token (the long eyJ... string at the end).")
 	fmt.Println()
-	fmt.Print("Paste the tunnel token: ")
-	token, _ := reader.ReadString('\n')
-	token = strings.TrimSpace(token)
-	if token == "" {
-		return fmt.Errorf("tunnel token is required")
+	token, err := tui.PromptString("token", "Tunnel token")
+	if err != nil {
+		return err
 	}
 
 	// Step 3: Install as systemd service with the token

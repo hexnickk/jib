@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/notify"
+	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -283,28 +283,25 @@ func runNotifyAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid driver %q; must be telegram, slack, discord, or webhook", driver)
 	}
 
-	scanner := bufio.NewScanner(os.Stdin)
 	secretsDir := filepath.Join(jibRoot(), "secrets")
 
 	// Telegram needs bot_token + chat_id; handle separately.
 	if driver == "telegram" {
-		return addTelegramChannel(name, scanner, secretsDir)
+		return addTelegramChannel(name, secretsDir)
 	}
 
 	// Slack, discord, and webhook all need a single URL.
 	url := urlFlag
 	if url == "" {
-		promptLabel := strings.ToUpper(driver[:1]) + driver[1:] + " webhook URL: "
+		promptLabel := strings.ToUpper(driver[:1]) + driver[1:] + " webhook URL"
 		if driver == "webhook" {
-			promptLabel = "Webhook URL: "
+			promptLabel = "Webhook URL"
 		}
-		fmt.Print(promptLabel)
-		if scanner.Scan() {
-			url = strings.TrimSpace(scanner.Text())
+		var err error
+		url, err = tui.PromptString("url", promptLabel)
+		if err != nil {
+			return err
 		}
-	}
-	if url == "" {
-		return fmt.Errorf("webhook URL is required")
 	}
 
 	credKey := "webhook_url" //nolint:gosec // G101 false positive: this is a map key name, not a credential
@@ -431,28 +428,29 @@ func runNotifyTest(cmd *cobra.Command, args []string) error {
 // runTelegramAdd prompts for Telegram credentials and adds the channel.
 func runTelegramAdd(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	scanner := bufio.NewScanner(os.Stdin)
 	secretsDir := filepath.Join(jibRoot(), "secrets")
-	return addTelegramChannel(name, scanner, secretsDir)
+	return addTelegramChannel(name, secretsDir)
 }
 
-func addTelegramChannel(name string, scanner *bufio.Scanner, secretsDir string) error {
-	fmt.Print("Bot token: ")
-	var token string
-	if scanner.Scan() {
-		token = strings.TrimSpace(scanner.Text())
-	}
-	if token == "" {
-		return fmt.Errorf("bot token is required")
+func addTelegramChannel(name string, secretsDir string) error {
+	fmt.Println("Add a Telegram notification channel.")
+	fmt.Println()
+	fmt.Println("You'll need:")
+	fmt.Println("  1. A bot token — message @BotFather on Telegram, send /newbot,")
+	fmt.Println("     and follow the prompts. The token looks like 123456:ABC-DEF...")
+	fmt.Println("  2. A chat ID — add the bot to a group or start a chat with it,")
+	fmt.Println("     then visit https://api.telegram.org/bot<TOKEN>/getUpdates")
+	fmt.Println("     to find your chat ID in the response.")
+	fmt.Println()
+
+	token, err := tui.PromptPassword("bot-token", "Bot token")
+	if err != nil {
+		return err
 	}
 
-	fmt.Print("Chat ID: ")
-	var chatID string
-	if scanner.Scan() {
-		chatID = strings.TrimSpace(scanner.Text())
-	}
-	if chatID == "" {
-		return fmt.Errorf("chat ID is required")
+	chatID, err := tui.PromptString("chat-id", "Chat ID")
+	if err != nil {
+		return err
 	}
 
 	creds := map[string]string{"bot_token": token, "chat_id": chatID}
@@ -470,24 +468,39 @@ func addTelegramChannel(name string, scanner *bufio.Scanner, secretsDir string) 
 
 // runSlackAdd prompts for Slack webhook URL and adds the channel.
 func runSlackAdd(cmd *cobra.Command, args []string) error {
-	return addWebhookChannel(args[0], "slack", "Slack webhook URL: ", "webhook_url")
+	return addWebhookChannel(args[0], "slack", "Slack webhook URL", "webhook_url")
 }
 
 // runDiscordAdd prompts for Discord webhook URL and adds the channel.
 func runDiscordAdd(cmd *cobra.Command, args []string) error {
-	return addWebhookChannel(args[0], "discord", "Discord webhook URL: ", "webhook_url")
+	return addWebhookChannel(args[0], "discord", "Discord webhook URL", "webhook_url")
 }
 
 // addWebhookChannel is a shared helper for drivers that need a single URL credential.
-func addWebhookChannel(name, driver, prompt, credKey string) error {
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Print(prompt)
-	var url string
-	if scanner.Scan() {
-		url = strings.TrimSpace(scanner.Text())
+func addWebhookChannel(name, driver, promptLabel, credKey string) error {
+	switch driver {
+	case "slack":
+		fmt.Println("Add a Slack notification channel.")
+		fmt.Println()
+		fmt.Println("You'll need a Slack Incoming Webhook URL:")
+		fmt.Println("  1. Go to https://api.slack.com/apps → Create New App → From scratch")
+		fmt.Println("  2. Go to Incoming Webhooks → Activate Incoming Webhooks")
+		fmt.Println("  3. Click 'Add New Webhook to Workspace' and pick a channel")
+		fmt.Println("  4. Copy the webhook URL (starts with https://hooks.slack.com/...)")
+		fmt.Println()
+	case "discord":
+		fmt.Println("Add a Discord notification channel.")
+		fmt.Println()
+		fmt.Println("You'll need a Discord Webhook URL:")
+		fmt.Println("  1. Open Server Settings → Integrations → Webhooks")
+		fmt.Println("  2. Click 'New Webhook', pick a channel, and optionally rename it")
+		fmt.Println("  3. Click 'Copy Webhook URL' (starts with https://discord.com/api/webhooks/...)")
+		fmt.Println()
 	}
-	if url == "" {
-		return fmt.Errorf("webhook URL is required")
+
+	url, err := tui.PromptString("url", promptLabel)
+	if err != nil {
+		return err
 	}
 
 	secretsDir := filepath.Join(jibRoot(), "secrets")

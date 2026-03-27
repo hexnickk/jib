@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -61,11 +61,11 @@ func installTailscale() error {
 func runTailscaleSetup(cmd *cobra.Command, args []string) error {
 	// Step 1: Check / install tailscale
 	if !tailscaleInstalled() {
-		fmt.Print("Tailscale is not installed. Install it now? [Y/n]: ")
-		reader := bufio.NewReader(os.Stdin)
-		answer, _ := reader.ReadString('\n')
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		if answer != "" && answer != "y" && answer != "yes" {
+		ok, err := tui.PromptConfirm("Tailscale is not installed. Install it now?", true)
+		if err != nil {
+			return err
+		}
+		if !ok {
 			return fmt.Errorf("tailscale is required for Tailscale setup")
 		}
 		if err := installTailscale(); err != nil {

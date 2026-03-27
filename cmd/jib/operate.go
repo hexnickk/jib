@@ -16,6 +16,7 @@ import (
 	"github.com/hexnickk/jib/internal/backup"
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
+	"github.com/hexnickk/jib/internal/tui"
 	"github.com/hexnickk/jib/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -854,11 +855,11 @@ func runRestore(cmd *cobra.Command, args []string) error {
 	if !dryRun && !force {
 		fmt.Printf("This will restore %s from backup %s.\n", appName, from)
 		fmt.Printf("Containers will be stopped and volume data will be overwritten.\n")
-		fmt.Print("Continue? [y/N] ")
-		var answer string
-		_, _ = fmt.Scanln(&answer)
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		if answer != "y" && answer != "yes" {
+		ok, err := tui.PromptConfirm("Continue?", false)
+		if err != nil {
+			return err
+		}
+		if !ok {
 			fmt.Println("Aborted.")
 			return nil
 		}

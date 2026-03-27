@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	ghPkg "github.com/hexnickk/jib/internal/github"
+	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -78,8 +78,9 @@ func runGitHubKeySetup(cmd *cobra.Command, args []string) error {
 	fmt.Println("  4. Paste the key above")
 	fmt.Println("  5. Leave 'Allow write access' unchecked")
 	fmt.Println()
-	fmt.Print("Press Enter after adding the key...")
-	_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
+	if err := tui.PromptContinue("Press Enter after adding the key"); err != nil {
+		return err
+	}
 
 	// Save provider to config
 	if err := saveProvider(name, map[string]interface{}{
