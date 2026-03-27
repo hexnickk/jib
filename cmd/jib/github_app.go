@@ -102,7 +102,7 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Provider %q (GitHub App, app_id=%d) created.\n", name, appID)
 	fmt.Printf("Private key stored at %s\n", pemPath)
-	fmt.Printf("\nUse it with: jib add <app> --repo <org/repo> --domain <domain> --provider %s\n", name)
+	fmt.Printf("\nUse it with: jib add <app> --repo <org/repo> --domain <domain> --git-provider %s\n", name)
 	return nil
 }
 

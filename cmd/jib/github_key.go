@@ -89,7 +89,7 @@ func runGitHubKeySetup(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("\nProvider %q (deploy key) created.\n", name)
-	fmt.Printf("Use it with: jib add <app> --repo <org/repo> --domain <domain> --provider %s\n", name)
+	fmt.Printf("Use it with: jib add <app> --repo <org/repo> --domain <domain> --git-provider %s\n", name)
 	return nil
 }
 
