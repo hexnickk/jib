@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -412,17 +411,6 @@ func ensureJibDaemon() {
 	}
 }
 
-// savePreviousDomains persists the current domain list for stale detection on next provision.
-func savePreviousDomains(app string, domains []config.Domain) {
-	dir := filepath.Join(jibRoot(), "state")
-	_ = os.MkdirAll(dir, 0o755)
-	data, err := json.Marshal(domains)
-	if err != nil {
-		return
-	}
-	_ = os.WriteFile(filepath.Join(dir, app+".domains.json"), data, 0o644)
-}
-
 func runEdit(cmd *cobra.Command, args []string) error {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
@@ -561,7 +549,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// --- Step 3: Infer ports and health from compose/Dockerfile ---
+	// --- Step 2: Infer ports and health from compose/Dockerfile ---
 	if !configOnly {
 		files := []string(composeFiles)
 		if len(files) == 0 {
@@ -611,7 +599,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// --- Step 4: Save to config ---
+	// --- Step 3: Save to config ---
 	cfgPath := configPath()
 	var resources *config.Resources
 
@@ -675,7 +663,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// --- Step 5: Deploy ---
+	// --- Step 4: Deploy ---
 	fmt.Println("\nDeploying...")
 	cfg, err = loadConfig()
 	if err != nil {
@@ -698,7 +686,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\nApp %q deployed successfully (SHA: %s)\n", appName, result.DeployedSHA[:8])
 
-	// --- Step 6: Provision nginx + SSL ---
+	// --- Step 5: Provision nginx + SSL ---
 	fmt.Println("\nProvisioning nginx...")
 	appCfg := cfg.Apps[appName]
 	p := newProxy(cfg)
@@ -712,7 +700,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	for filename := range configs {
 		fmt.Printf("  nginx: %s\n", filename)
 	}
-	savePreviousDomains(appName, appCfg.Domains)
 	if err := p.Test(); err != nil {
 		fmt.Fprintf(os.Stderr, "  warning: nginx config test failed: %v\n", err)
 	} else if err := p.Reload(); err != nil {
@@ -722,7 +709,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// SSL — only for direct ingress (tunnels handle TLS at the edge)
-	if ingress == "" || ingress == "direct" {
+	if !appCfg.IsTunnelIngress() {
 		sslMgr := newSSLManager(cfg)
 		for _, d := range appCfg.Domains {
 			check := network.CheckDomain(d.Host)
@@ -739,7 +726,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// --- Step 7: Domain checks (warnings only) ---
+	// --- Step 6: Domain checks (warnings only) ---
 	fmt.Println("\nChecking domains...")
 	for _, d := range domains {
 		checkDomainAndWarn(d.Host)

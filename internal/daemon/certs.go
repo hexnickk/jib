@@ -57,7 +57,7 @@ func (d *Daemon) checkCerts(ctx context.Context) {
 		}
 
 		// Skip apps using tunnels — they handle TLS at the edge.
-		if appCfg.Ingress == "cloudflare-tunnel" || appCfg.Ingress == "tailscale" {
+		if appCfg.IsTunnelIngress() {
 			continue
 		}
 

@@ -85,6 +85,12 @@ type AppWebhook struct {
 	Provider string `yaml:"provider"` // github, gitlab, etc.
 }
 
+// IsTunnelIngress returns true if the app uses a tunnel-based ingress (Cloudflare or Tailscale)
+// where TLS is handled at the edge, not by the server.
+func (a *App) IsTunnelIngress() bool {
+	return a.Ingress == "cloudflare-tunnel" || a.Ingress == "tailscale"
+}
+
 // App describes a single deployable application.
 type App struct {
 	Repo         string            `yaml:"repo"`

@@ -61,7 +61,7 @@ func (n *Nginx) GenerateConfig(app string, appCfg config.App) (map[string]string
 
 		filename := confFilename(d.Host)
 
-		isTunnel := appCfg.Ingress == "cloudflare-tunnel" || appCfg.Ingress == "tailscale"
+		isTunnel := appCfg.IsTunnelIngress()
 
 		hasSSL := false
 		if !isTunnel {
