@@ -107,7 +107,7 @@ func CheckDependency(dep Dependency) (installed bool, version string, meetsMin b
 	// Build the command. For "docker compose version", we split the version
 	// flag into multiple args.
 	args := strings.Fields(dep.VersionFlag)
-	cmd := exec.Command(dep.Command, args...)
+	cmd := exec.Command(dep.Command, args...) //nolint:gosec // dep.Command is from a hardcoded dependency list
 
 	// Some tools (e.g. nginx -v) write to stderr, so capture both.
 	out, cmdErr := cmd.CombinedOutput()

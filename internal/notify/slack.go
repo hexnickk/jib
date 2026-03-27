@@ -45,7 +45,7 @@ func (s *Slack) Send(ctx context.Context, event Event) error {
 	if err != nil {
 		return fmt.Errorf("send slack message: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("slack webhook returned status %d", resp.StatusCode)

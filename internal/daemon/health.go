@@ -79,7 +79,7 @@ func (d *Daemon) checkSingleHealth(ctx context.Context, client *http.Client, end
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	return resp.StatusCode >= 200 && resp.StatusCode < 300
 }

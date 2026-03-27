@@ -30,18 +30,18 @@ func jibRoot() string {
 // sudoCmd creates an exec.Cmd that prepends "sudo" when not running as root.
 func sudoCmd(name string, args ...string) *exec.Cmd {
 	if os.Getuid() == 0 {
-		return exec.Command(name, args...)
+		return exec.Command(name, args...) //nolint:gosec // trusted CLI subprocess
 	}
-	return exec.Command("sudo", append([]string{name}, args...)...)
+	return exec.Command("sudo", append([]string{name}, args...)...) //nolint:gosec // args are trusted internal values
 }
 
 // sudoBash creates an exec.Cmd that runs a shell command via "bash -c",
 // prepending "sudo" when not running as root.
 func sudoBash(script string) *exec.Cmd {
 	if os.Getuid() == 0 {
-		return exec.Command("bash", "-c", script)
+		return exec.Command("bash", "-c", script) //nolint:gosec // trusted CLI subprocess
 	}
-	return exec.Command("sudo", "bash", "-c", script)
+	return exec.Command("sudo", "bash", "-c", script) //nolint:gosec // trusted CLI subprocess
 }
 
 // repoDir returns the on-disk path for an app's git checkout.

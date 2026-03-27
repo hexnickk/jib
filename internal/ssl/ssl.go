@@ -59,7 +59,7 @@ func (cm *CertManager) Obtain(ctx context.Context, domain string) error {
 		return nil
 	}
 
-	cmd := exec.CommandContext(ctx, "certbot", "certonly",
+	cmd := exec.CommandContext(ctx, "certbot", "certonly", //nolint:gosec // args are from trusted config
 		"--webroot",
 		"-w", cm.Webroot,
 		"--email", cm.Email,
@@ -92,7 +92,7 @@ func (cm *CertManager) ObtainAll(ctx context.Context, domains []string) error {
 func (cm *CertManager) CheckExpiry(domain string) (daysRemaining int, err error) {
 	certFile := cm.CertPath(domain)
 
-	data, err := os.ReadFile(certFile)
+	data, err := os.ReadFile(certFile) //nolint:gosec // path constructed from trusted config
 	if err != nil {
 		return 0, fmt.Errorf("reading cert for %s: %w", domain, err)
 	}

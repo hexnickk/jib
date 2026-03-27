@@ -74,7 +74,7 @@ func (d *Daemon) runWebhookServer(ctx context.Context) {
 	d.logger.Printf("webhook: listening on %s", addr)
 
 	// Run server in a goroutine; shut down when ctx is cancelled.
-	go func() {
+	go func() { //nolint:gosec // intentional: shutdown goroutine must outlive request contexts
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -173,7 +173,7 @@ func (d *Daemon) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	if pushBranch != branch {
 		d.logger.Printf("webhook: %s: push to %s, configured branch is %s — ignoring", appName, pushBranch, branch)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "ignored: branch %s != %s\n", pushBranch, branch)
+		_, _ = fmt.Fprintf(w, "ignored: branch %s != %s\n", pushBranch, branch)
 		return
 	}
 
@@ -200,20 +200,20 @@ func (d *Daemon) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	w.WriteHeader(http.StatusAccepted)
-	fmt.Fprintf(w, "deploy triggered for %s\n", appName)
+	_, _ = fmt.Fprintf(w, "deploy triggered for %s\n", appName) //nolint:gosec // not HTML; plain text response to webhook caller
 }
 
 // handleHealthEndpoint is a simple health check for the daemon itself.
 func (d *Daemon) handleHealthEndpoint(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status":"ok","pid":%d}`, os.Getpid())
+	_, _ = fmt.Fprintf(w, `{"status":"ok","pid":%d}`, os.Getpid())
 }
 
 // loadWebhookSecret reads the webhook secret for an app from the secrets dir.
 func (d *Daemon) loadWebhookSecret(app string) (string, error) {
 	path := filepath.Join(d.Root, "secrets", "_jib", app+"-github-webhook.json")
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path from trusted config
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", nil

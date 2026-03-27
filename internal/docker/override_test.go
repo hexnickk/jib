@@ -21,7 +21,7 @@ services:
   migrations:
     image: node:18
 `
-	if err := os.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(compose), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(compose), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -54,7 +54,7 @@ services:
   web:
     image: nginx
 `
-	if err := os.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(compose), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(compose), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,7 +127,7 @@ services:
   web:
     image: nginx
 `
-	if err := os.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(compose), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(compose), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -194,7 +194,7 @@ services:
   api:
     image: node:18
 `
-	if err := os.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(compose), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(compose), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

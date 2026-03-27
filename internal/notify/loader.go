@@ -23,7 +23,7 @@ func LoadChannels(secretsDir string, channels map[string]ChannelConfig) *Multi {
 
 	for name, ch := range channels {
 		credPath := filepath.Join(dir, name+".json")
-		data, err := os.ReadFile(credPath)
+		data, err := os.ReadFile(credPath) //nolint:gosec // path is constructed from trusted secrets directory
 		if err != nil {
 			// No credentials file — skip silently.
 			continue
@@ -107,7 +107,7 @@ func LoadFromSecrets(secretsDir string) *Multi {
 // ReadChannelCreds reads the credential JSON for a named channel.
 func ReadChannelCreds(secretsDir, name string) (map[string]string, error) {
 	path := filepath.Join(secretsDir, "_jib", name+".json")
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path is constructed from trusted secrets directory
 	if err != nil {
 		return nil, fmt.Errorf("reading credentials for %q: %w", name, err)
 	}
@@ -147,11 +147,11 @@ func DeleteChannelCreds(secretsDir, name string) error {
 // parseEnvFile reads a file of KEY=VALUE lines. Blank lines and lines
 // starting with # are ignored.
 func parseEnvFile(path string) (map[string]string, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path is constructed from trusted secrets directory
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	return parseEnvReader(f)
 }
@@ -178,7 +178,7 @@ func parseEnvReader(r io.Reader) (map[string]string, error) {
 
 // readFileString reads a file and returns its trimmed content.
 func readFileString(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path constructed from trusted secrets directory
 	if err != nil {
 		return "", err
 	}

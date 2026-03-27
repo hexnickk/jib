@@ -34,7 +34,7 @@ func initTestRepo(t *testing.T, tmpDir string) (string, string) {
 
 	// Create initial commit on main.
 	testFile := filepath.Join(repoDir, "hello.txt")
-	if err := os.WriteFile(testFile, []byte("hello"), 0o644); err != nil {
+	if err := os.WriteFile(testFile, []byte("hello"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	run(t, repoDir, "git", "add", ".")
@@ -47,7 +47,7 @@ func initTestRepo(t *testing.T, tmpDir string) (string, string) {
 // run executes a command and fails the test on error.
 func run(t *testing.T, dir string, name string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(name, args...)
+	cmd := exec.Command(name, args...) //nolint:gosec // test helper
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -125,7 +125,7 @@ func TestGitFetch(t *testing.T) {
 	run(t, "", "git", "clone", "-b", "main", remoteDir, clone2)
 	run(t, clone2, "git", "config", "user.email", "test@test.com")
 	run(t, clone2, "git", "config", "user.name", "Test")
-	if err := os.WriteFile(filepath.Join(clone2, "new.txt"), []byte("new"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(clone2, "new.txt"), []byte("new"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	run(t, clone2, "git", "add", ".")
@@ -158,7 +158,7 @@ func TestGitCheckout(t *testing.T) {
 	run(t, "", "git", "clone", "-b", "main", remoteDir, clone2)
 	run(t, clone2, "git", "config", "user.email", "test@test.com")
 	run(t, clone2, "git", "config", "user.name", "Test")
-	if err := os.WriteFile(filepath.Join(clone2, "new.txt"), []byte("data"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(clone2, "new.txt"), []byte("data"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	run(t, clone2, "git", "add", ".")
@@ -291,7 +291,7 @@ func initTestRepo2(t *testing.T, tmpDir, repoDir string) {
 
 	// Create initial commit.
 	testFile := filepath.Join(repoDir, "hello.txt")
-	if err := os.WriteFile(testFile, []byte("hello"), 0o644); err != nil {
+	if err := os.WriteFile(testFile, []byte("hello"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	run(t, repoDir, "git", "add", ".")

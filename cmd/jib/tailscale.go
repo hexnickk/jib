@@ -47,7 +47,7 @@ func installTailscale() error {
 	}
 
 	fmt.Println("Installing Tailscale...")
-	install := exec.Command("bash", "-c", "curl -fsSL https://tailscale.com/install.sh | sh")
+	install := exec.Command("bash", "-c", "curl -fsSL https://tailscale.com/install.sh | sh") //nolint:gosec // trusted CLI subprocess
 	install.Stdout = os.Stdout
 	install.Stderr = os.Stderr
 	if err := install.Run(); err != nil {
@@ -78,7 +78,7 @@ func runTailscaleSetup(cmd *cobra.Command, args []string) error {
 	// Step 2: Bring Tailscale up (interactive — may require auth URL)
 	fmt.Println()
 	fmt.Println("Connecting to Tailscale network...")
-	up := exec.Command("tailscale", "up")
+	up := exec.Command("tailscale", "up") //nolint:gosec // trusted CLI subprocess
 	up.Stdout = os.Stdout
 	up.Stderr = os.Stderr
 	up.Stdin = os.Stdin
@@ -109,7 +109,7 @@ func runTailscaleStatus(cmd *cobra.Command, args []string) error {
 	fmt.Println("Tailscale status:")
 	fmt.Println()
 
-	status := exec.Command("tailscale", "status")
+	status := exec.Command("tailscale", "status") //nolint:gosec // trusted CLI subprocess
 	status.Stdout = os.Stdout
 	status.Stderr = os.Stderr
 	if err := status.Run(); err != nil {
@@ -126,7 +126,7 @@ func runTailscaleStatus(cmd *cobra.Command, args []string) error {
 // printTailscaleInfo prints the Tailscale IP and hostname if available.
 func printTailscaleInfo() {
 	// Get Tailscale IP
-	ipCmd := exec.Command("tailscale", "ip", "-4")
+	ipCmd := exec.Command("tailscale", "ip", "-4") //nolint:gosec // trusted CLI subprocess
 	ipOut, err := ipCmd.Output()
 	if err == nil {
 		ip := strings.TrimSpace(string(ipOut))
@@ -136,7 +136,7 @@ func printTailscaleInfo() {
 	}
 
 	// Get MagicDNS hostname from the Self section of tailscale status JSON.
-	statusCmd := exec.Command("tailscale", "status", "--json")
+	statusCmd := exec.Command("tailscale", "status", "--json") //nolint:gosec // trusted CLI subprocess
 	statusOut, err := statusCmd.Output()
 	if err == nil {
 		var status struct {

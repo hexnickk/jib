@@ -28,20 +28,20 @@ type Lock struct {
 // is false (e.g. for autodeploy), it returns ErrLockBusy immediately if the
 // lock cannot be acquired.
 func Acquire(app string, dir string, blocking bool, timeout time.Duration) (*Lock, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("creating lock directory: %w", err)
 	}
 
 	path := filepath.Join(dir, app+".lock")
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // path constructed from trusted app name
 	if err != nil {
 		return nil, fmt.Errorf("opening lock file %s: %w", path, err)
 	}
 
 	if !blocking {
-		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) //nolint:gosec // uintptr->int is safe for file descriptors
 		if err != nil {
-			f.Close()
+			_ = f.Close()
 			if errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN) {
 				return nil, ErrLockBusy
 			}
@@ -56,20 +56,20 @@ func Acquire(app string, dir string, blocking bool, timeout time.Duration) (*Loc
 	}
 	ch := make(chan result, 1)
 	go func() {
-		ch <- result{err: syscall.Flock(int(f.Fd()), syscall.LOCK_EX)}
+		ch <- result{err: syscall.Flock(int(f.Fd()), syscall.LOCK_EX)} //nolint:gosec // uintptr->int is safe for file descriptors
 	}()
 
 	select {
 	case r := <-ch:
 		if r.err != nil {
-			f.Close()
+			_ = f.Close()
 			return nil, fmt.Errorf("flock %s: %w", path, r.err)
 		}
 		return &Lock{file: f}, nil
 	case <-time.After(timeout):
 		// The goroutine is still blocked on flock. We can't cancel it,
 		// but closing the file will cause it to fail.
-		f.Close()
+		_ = f.Close()
 		return nil, fmt.Errorf("timed out waiting for lock on %s", app)
 	}
 }
@@ -79,8 +79,8 @@ func (l *Lock) Release() error {
 	if l.file == nil {
 		return nil
 	}
-	if err := syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN); err != nil {
-		l.file.Close()
+	if err := syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN); err != nil { //nolint:gosec // uintptr->int is safe for file descriptors
+		_ = l.file.Close()
 		return fmt.Errorf("releasing flock: %w", err)
 	}
 	return l.file.Close()

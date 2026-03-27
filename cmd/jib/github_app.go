@@ -74,11 +74,11 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		fmt.Println("Paste the private key PEM, then press Ctrl+D:")
 		src = os.Stdin
 	} else if keyFile != "" {
-		f, err := os.Open(keyFile)
+		f, err := os.Open(keyFile) //nolint:gosec // CLI reads user-specified key file
 		if err != nil {
 			return fmt.Errorf("opening private key file: %w", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		src = f
 	} else {
 		// No flag provided — prompt interactively
@@ -94,12 +94,12 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating secrets directory: %w", err)
 	}
 
-	dst, err := os.OpenFile(pemPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	dst, err := os.OpenFile(pemPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600) //nolint:gosec // path from trusted config
 	if err != nil {
 		return fmt.Errorf("creating PEM file: %w", err)
 	}
 	if _, err := io.Copy(dst, src); err != nil {
-		dst.Close()
+		_ = dst.Close()
 		return fmt.Errorf("copying PEM file: %w", err)
 	}
 	if err := dst.Close(); err != nil {

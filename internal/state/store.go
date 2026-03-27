@@ -24,7 +24,7 @@ func NewStore(dir string) *Store {
 // files with a schema_version newer than CurrentSchemaVersion.
 func (s *Store) Load(app string) (*AppState, error) {
 	path := s.path(app)
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path constructed from trusted app name
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return &AppState{}, nil
@@ -70,22 +70,22 @@ func (s *Store) Save(app string, state *AppState) error {
 	tmpName := tmp.Name()
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
 		return fmt.Errorf("writing temp file: %w", err)
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
 		return fmt.Errorf("syncing temp file: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
+		_ = os.Remove(tmpName)
 		return fmt.Errorf("closing temp file: %w", err)
 	}
 
 	if err := os.Rename(tmpName, target); err != nil {
-		os.Remove(tmpName)
+		_ = os.Remove(tmpName)
 		return fmt.Errorf("renaming temp file to %s: %w", target, err)
 	}
 

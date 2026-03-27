@@ -49,7 +49,7 @@ func GenerateDeployKey(root, providerName string) (string, error) {
 
 	keyPath := KeyPath(root, providerName)
 
-	keygen := exec.Command("ssh-keygen", "-t", "ed25519", "-f", keyPath, "-N", "", "-C", "jib-deploy-"+providerName)
+	keygen := exec.Command("ssh-keygen", "-t", "ed25519", "-f", keyPath, "-N", "", "-C", "jib-deploy-"+providerName) //nolint:gosec // args from trusted config
 	keygen.Stdout = os.Stdout
 	keygen.Stderr = os.Stderr
 	if err := keygen.Run(); err != nil {
@@ -57,7 +57,7 @@ func GenerateDeployKey(root, providerName string) (string, error) {
 	}
 	_ = os.Chmod(keyPath, 0o600)
 
-	pubKey, err := os.ReadFile(keyPath + ".pub")
+	pubKey, err := os.ReadFile(keyPath + ".pub") //nolint:gosec // path constructed from trusted config
 	if err != nil {
 		return "", fmt.Errorf("reading public key: %w", err)
 	}
@@ -86,7 +86,7 @@ func ProviderNameAvailable(cfg *config.Config, name string) error {
 // GenerateInstallationToken generates a short-lived GitHub App installation access token.
 func GenerateInstallationToken(ctx context.Context, root, providerName string, appID int64, repo string) (string, error) {
 	pemPath := AppPEMPath(root, providerName)
-	pemData, err := os.ReadFile(pemPath)
+	pemData, err := os.ReadFile(pemPath) //nolint:gosec // path constructed from trusted config
 	if err != nil {
 		return "", fmt.Errorf("reading GitHub App PEM: %w", err)
 	}
@@ -174,7 +174,7 @@ func findInstallation(ctx context.Context, jwt, org string) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("listing installations: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
@@ -213,7 +213,7 @@ func createAccessToken(ctx context.Context, jwt string, installationID int64) (s
 	if err != nil {
 		return "", fmt.Errorf("creating access token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 201 {
 		body, _ := io.ReadAll(resp.Body)

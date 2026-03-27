@@ -17,7 +17,7 @@ func TestSetCopiesFileWithCorrectPermissions(t *testing.T) {
 	// Create a source file.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "source.env")
-	if err := os.WriteFile(srcPath, []byte("SECRET=hello\n"), 0644); err != nil {
+	if err := os.WriteFile(srcPath, []byte("SECRET=hello\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -45,7 +45,7 @@ func TestSetCopiesFileWithCorrectPermissions(t *testing.T) {
 	}
 
 	// Check content.
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filePath) //nolint:gosec // test file
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,10 +61,10 @@ func TestSetOverwritesExisting(t *testing.T) {
 	srcDir := t.TempDir()
 	src1 := filepath.Join(srcDir, "v1.env")
 	src2 := filepath.Join(srcDir, "v2.env")
-	if err := os.WriteFile(src1, []byte("V=1\n"), 0644); err != nil {
+	if err := os.WriteFile(src1, []byte("V=1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(src2, []byte("V=2\n"), 0644); err != nil {
+	if err := os.WriteFile(src2, []byte("V=2\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -75,7 +75,7 @@ func TestSetOverwritesExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, _ := os.ReadFile(filepath.Join(base, "myapp", ".env"))
+	data, _ := os.ReadFile(filepath.Join(base, "myapp", ".env")) //nolint:gosec // test file
 	if string(data) != "V=2\n" {
 		t.Errorf("content after overwrite = %q, want %q", string(data), "V=2\n")
 	}
@@ -93,7 +93,7 @@ func TestSetCustomEnvFileName(t *testing.T) {
 
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "prod.env")
-	if err := os.WriteFile(srcPath, []byte("KEY=val\n"), 0644); err != nil {
+	if err := os.WriteFile(srcPath, []byte("KEY=val\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -123,7 +123,7 @@ func TestCheckReturnsTrueFalse(t *testing.T) {
 	// Set the secret.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	if err := os.WriteFile(srcPath, []byte("X=1\n"), 0644); err != nil {
+	if err := os.WriteFile(srcPath, []byte("X=1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.Set("myapp", srcPath, ""); err != nil {
@@ -143,7 +143,7 @@ func TestCheckAllMixedApps(t *testing.T) {
 	// Create secrets for "appA" only.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	if err := os.WriteFile(srcPath, []byte("X=1\n"), 0644); err != nil {
+	if err := os.WriteFile(srcPath, []byte("X=1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.Set("appA", srcPath, ""); err != nil {
@@ -190,7 +190,7 @@ func TestRemoveDeletesDirectory(t *testing.T) {
 	// Set a secret first.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	if err := os.WriteFile(srcPath, []byte("X=1\n"), 0644); err != nil {
+	if err := os.WriteFile(srcPath, []byte("X=1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.Set("myapp", srcPath, ""); err != nil {
@@ -238,7 +238,7 @@ func TestSymlinkCreatesWorkingSymlink(t *testing.T) {
 	// Set up the secrets file.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	if err := os.WriteFile(srcPath, []byte("DB=postgres://localhost\n"), 0644); err != nil {
+	if err := os.WriteFile(srcPath, []byte("DB=postgres://localhost\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.Set("myapp", srcPath, ""); err != nil {
@@ -274,7 +274,7 @@ func TestSymlinkCreatesWorkingSymlink(t *testing.T) {
 	}
 
 	// Verify content is readable through the symlink.
-	data, err := os.ReadFile(linkPath)
+	data, err := os.ReadFile(linkPath) //nolint:gosec // test file
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +290,7 @@ func TestSymlinkReplacesExistingFile(t *testing.T) {
 	// Set up secrets.
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	if err := os.WriteFile(srcPath, []byte("NEW=value\n"), 0644); err != nil {
+	if err := os.WriteFile(srcPath, []byte("NEW=value\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.Set("myapp", srcPath, ""); err != nil {
@@ -300,7 +300,7 @@ func TestSymlinkReplacesExistingFile(t *testing.T) {
 	// Create a repo directory with an existing .env file.
 	repoDir := t.TempDir()
 	existingPath := filepath.Join(repoDir, ".env")
-	if err := os.WriteFile(existingPath, []byte("OLD=stuff\n"), 0644); err != nil {
+	if err := os.WriteFile(existingPath, []byte("OLD=stuff\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -317,7 +317,7 @@ func TestSymlinkReplacesExistingFile(t *testing.T) {
 		t.Error("expected a symlink, got a regular file")
 	}
 
-	data, _ := os.ReadFile(existingPath)
+	data, _ := os.ReadFile(existingPath) //nolint:gosec // test file
 	if string(data) != "NEW=value\n" {
 		t.Errorf("content = %q, want %q", string(data), "NEW=value\n")
 	}
@@ -340,7 +340,7 @@ func TestEnvRedacted(t *testing.T) {
 
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "s.env")
-	if err := os.WriteFile(srcPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(srcPath, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.Set("myapp", srcPath, ""); err != nil {

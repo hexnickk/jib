@@ -186,7 +186,7 @@ func TestWriteConfigs(t *testing.T) {
 
 	// Check config file exists with correct content.
 	confPath := filepath.Join(configDir, "example.com.conf")
-	data, err := os.ReadFile(confPath)
+	data, err := os.ReadFile(confPath) //nolint:gosec // test file with known path
 	if err != nil {
 		t.Fatalf("config file not found: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestRemoveConfigs(t *testing.T) {
 
 	// Create a config file and symlink first.
 	confPath := filepath.Join(configDir, "example.com.conf")
-	if err := os.WriteFile(confPath, []byte("# test"), 0o644); err != nil {
+	if err := os.WriteFile(confPath, []byte("# test"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	linkPath := filepath.Join(symlinkDir, "example.com.conf")

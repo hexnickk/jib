@@ -424,7 +424,7 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 	if dryRun {
 		fmt.Println("Dry run: showing reclaimable space (nothing will be deleted).")
 		fmt.Println()
-		out, err := exec.CommandContext(context.Background(), "docker", "system", "df").CombinedOutput()
+		out, err := exec.CommandContext(context.Background(), "docker", "system", "df").CombinedOutput() //nolint:gosec // trusted CLI subprocess
 		if err != nil {
 			return fmt.Errorf("docker system df failed: %w", err)
 		}
@@ -624,7 +624,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("checking for updates failed (network error): %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -679,7 +679,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("downloading binary (network error): %w", err)
 	}
-	defer dlResp.Body.Close()
+	defer func() { _ = dlResp.Body.Close() }()
 
 	if dlResp.StatusCode == 404 {
 		return fmt.Errorf("binary not found for %s/%s at %s — this platform may not be supported", goos, goarch, latestTag)
@@ -696,23 +696,23 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 	removeTmp := true
 	defer func() {
 		if removeTmp {
-			os.Remove(tmpPath)
+			_ = os.Remove(tmpPath)
 		}
 	}()
 
 	if _, err := io.Copy(tmpFile, dlResp.Body); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fmt.Errorf("writing binary to temp file: %w", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// 5. Make executable
-	if err := os.Chmod(tmpPath, 0755); err != nil {
+	if err := os.Chmod(tmpPath, 0o755); err != nil { //nolint:gosec // binary must be executable
 		return fmt.Errorf("making binary executable: %w", err)
 	}
 
 	// 6. Verify: run <tmp>/jib version
-	verifyCmd := exec.Command(tmpPath, "--version")
+	verifyCmd := exec.Command(tmpPath, "--version") //nolint:gosec // trusted CLI subprocess
 	verifyOut, err := verifyCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("verification failed — downloaded binary does not run correctly: %w\nOutput: %s", err, string(verifyOut))

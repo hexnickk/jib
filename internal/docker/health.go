@@ -80,7 +80,7 @@ func CheckHealth(ctx context.Context, checks []config.HealthCheck, warmup time.D
 				}
 				break
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 
 			result.StatusCode = resp.StatusCode
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {

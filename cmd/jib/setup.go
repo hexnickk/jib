@@ -222,7 +222,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 // userInGroup checks if a user belongs to a group (per /etc/group, not the active session).
 func userInGroup(user, group string) bool {
-	out, err := exec.Command("id", "-nG", user).Output()
+	out, err := exec.Command("id", "-nG", user).Output() //nolint:gosec // trusted CLI subprocess
 	if err != nil {
 		return false
 	}
@@ -293,7 +293,7 @@ func ensureDeps() error {
 // ensureSystemdService enables and starts a systemd service if not already active.
 func ensureSystemdService(name string) {
 	// Check if already active.
-	if err := exec.Command("systemctl", "is-active", "--quiet", name).Run(); err == nil {
+	if err := exec.Command("systemctl", "is-active", "--quiet", name).Run(); err == nil { //nolint:gosec // trusted CLI subprocess
 		return
 	}
 	enableCmd := sudoCmd("systemctl", "enable", "--now", name)
@@ -401,7 +401,7 @@ func ensureJibDaemon() {
 	}
 
 	// Enable and start if not already running.
-	if err := exec.Command("systemctl", "is-active", "--quiet", "jib").Run(); err == nil {
+	if err := exec.Command("systemctl", "is-active", "--quiet", "jib").Run(); err == nil { //nolint:gosec // trusted CLI subprocess
 		fmt.Println("  jib daemon: running")
 		return
 	}
@@ -428,7 +428,7 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config file not found at %s: %w", cfgPath, err)
 	}
 
-	editorCmd := exec.Command(editor, cfgPath)
+	editorCmd := exec.Command(editor, cfgPath) //nolint:gosec // trusted CLI subprocess
 	editorCmd.Stdin = os.Stdin
 	editorCmd.Stdout = os.Stdout
 	editorCmd.Stderr = os.Stderr

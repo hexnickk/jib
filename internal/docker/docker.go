@@ -47,7 +47,7 @@ func (c *Compose) envFileArgs() []string {
 
 // runInteractive runs a docker command with stdout/stderr piped to os.Stdout/os.Stderr.
 func (c *Compose) runInteractive(ctx context.Context, args []string, extraEnv []string) error {
-	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd := exec.CommandContext(ctx, "docker", args...) //nolint:gosec // args constructed internally
 	cmd.Dir = c.Dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -59,7 +59,7 @@ func (c *Compose) runInteractive(ctx context.Context, args []string, extraEnv []
 
 // runCapture runs a docker command and returns its combined output.
 func (c *Compose) runCapture(ctx context.Context, args []string) (string, error) {
-	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd := exec.CommandContext(ctx, "docker", args...) //nolint:gosec // args constructed internally
 	cmd.Dir = c.Dir
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err

@@ -132,7 +132,7 @@ func runServiceList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tTYPE\tVERSION\tSTATUS\tHEALTH\tPORT")
+	_, _ = fmt.Fprintln(w, "NAME\tTYPE\tVERSION\tSTATUS\tHEALTH\tPORT")
 	for _, svc := range services {
 		health := svc.Health
 		if health == "" {
@@ -146,10 +146,10 @@ func runServiceList(cmd *cobra.Command, args []string) error {
 		if svc.Port > 0 {
 			portStr = fmt.Sprintf("%d", svc.Port)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			svc.Name, svc.Type, version, svc.Status, health, portStr)
 	}
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 

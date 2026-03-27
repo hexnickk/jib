@@ -68,7 +68,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 	if err := d.writePID(pidPath); err != nil {
 		return fmt.Errorf("writing PID file: %w", err)
 	}
-	defer os.Remove(pidPath)
+	defer func() { _ = os.Remove(pidPath) }()
 
 	d.logger.Printf("daemon started (pid %d)", os.Getpid())
 
@@ -222,10 +222,10 @@ func (d *Daemon) newEngine() *deploy.Engine {
 
 // writePID writes the current process ID to the given path.
 func (d *Daemon) writePID(path string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o644)
+	return os.WriteFile(path, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o600)
 }
 
 // parsePollInterval parses the poll_interval config value, defaulting to 5m.

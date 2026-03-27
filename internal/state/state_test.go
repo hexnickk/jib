@@ -95,7 +95,7 @@ func TestLoadRefusesFutureSchema(t *testing.T) {
 
 	future := AppState{SchemaVersion: CurrentSchemaVersion + 1, App: "futureapp"}
 	data, _ := json.Marshal(future)
-	if err := os.WriteFile(filepath.Join(dir, "futureapp.json"), data, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "futureapp.json"), data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,7 +127,7 @@ func TestAtomicWriteNoTmpLeftover(t *testing.T) {
 	}
 
 	// Verify the final file exists and is valid JSON.
-	data, err := os.ReadFile(filepath.Join(dir, "atomictest.json"))
+	data, err := os.ReadFile(filepath.Join(dir, "atomictest.json")) //nolint:gosec // test file with known path
 	if err != nil {
 		t.Fatalf("state file not found: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestList(t *testing.T) {
 func TestListEmptyDir(t *testing.T) {
 	dir := t.TempDir()
 	// Remove the dir so it doesn't exist
-	os.Remove(dir)
+	_ = os.Remove(dir)
 
 	store := NewStore(dir)
 	apps, err := store.List()

@@ -122,7 +122,7 @@ func ProbeReachability(ctx context.Context, domain string) (bool, error) {
 	if err != nil {
 		return false, nil // Not reachable, but not an error in the check itself
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -133,10 +133,10 @@ func ProbeReachability(ctx context.Context, domain string) (bool, error) {
 }
 
 func writeAndReload(path, content string) error {
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil { //nolint:gosec // nginx config must be world-readable
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
-	cmd := exec.Command("nginx", "-s", "reload")
+	cmd := exec.Command("nginx", "-s", "reload") //nolint:gosec // trusted CLI subprocess
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("nginx reload: %w: %s", err, string(out))
 	}
@@ -145,7 +145,7 @@ func writeAndReload(path, content string) error {
 
 func cleanupProbe(path string) {
 	_ = os.Remove(path)
-	_ = exec.Command("nginx", "-s", "reload").Run()
+	_ = exec.Command("nginx", "-s", "reload").Run() //nolint:gosec // trusted CLI subprocess
 }
 
 // GetPublicIP returns this server's public IP address.
@@ -161,7 +161,7 @@ func GetPublicIP() string {
 			continue
 		}
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			continue
 		}
@@ -175,12 +175,12 @@ func GetPublicIP() string {
 
 // HasTailscale checks if Tailscale is active on this machine.
 func HasTailscale() bool {
-	cmd := exec.Command("tailscale", "status")
+	cmd := exec.Command("tailscale", "status") //nolint:gosec // trusted CLI subprocess
 	return cmd.Run() == nil
 }
 
 // HasCloudflareTunnel checks if cloudflared is running.
 func HasCloudflareTunnel() bool {
-	cmd := exec.Command("pgrep", "-x", "cloudflared")
+	cmd := exec.Command("pgrep", "-x", "cloudflared") //nolint:gosec // trusted CLI subprocess
 	return cmd.Run() == nil
 }

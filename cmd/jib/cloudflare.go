@@ -134,7 +134,7 @@ func runCloudflareStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check systemd service status (no sudo needed for viewing)
-	status := exec.Command("systemctl", "status", "cloudflared", "--no-pager")
+	status := exec.Command("systemctl", "status", "cloudflared", "--no-pager") //nolint:gosec // trusted CLI subprocess
 	status.Stdout = os.Stdout
 	status.Stderr = os.Stderr
 	if err := status.Run(); err != nil {

@@ -14,7 +14,7 @@ func DefaultConfigPath() string {
 
 // LoadConfig reads a YAML config file, applies defaults, and validates it.
 func LoadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // CLI tool reads user-specified config
 	if err != nil {
 		return nil, fmt.Errorf("reading config: %w", err)
 	}

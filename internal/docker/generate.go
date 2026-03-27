@@ -34,12 +34,12 @@ services:
       - "%d:%d"
 `, repoDir, hostPort, containerPort)
 
-	if err := os.MkdirAll(overrideDir, 0755); err != nil {
+	if err := os.MkdirAll(overrideDir, 0o750); err != nil {
 		return "", 0, fmt.Errorf("creating override directory: %w", err)
 	}
 
 	outPath := filepath.Join(overrideDir, app+"-compose.yml")
-	if err := os.WriteFile(outPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(outPath, []byte(content), 0o600); err != nil {
 		return "", 0, fmt.Errorf("writing generated compose: %w", err)
 	}
 
@@ -53,7 +53,7 @@ func findFreePort() int {
 		return 8080 // fallback
 	}
 	port := l.Addr().(*net.TCPAddr).Port
-	l.Close()
+	_ = l.Close()
 	return port
 }
 
@@ -79,11 +79,11 @@ func NeedsGeneratedCompose(repoDir string, composeFiles []string) bool {
 
 // ParseExposeFromDockerfile reads the first EXPOSE directive from a Dockerfile.
 func ParseExposeFromDockerfile(repoDir string) int {
-	f, err := os.Open(filepath.Join(repoDir, "Dockerfile"))
+	f, err := os.Open(filepath.Join(repoDir, "Dockerfile")) //nolint:gosec // path from trusted repo directory
 	if err != nil {
 		return 0
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {

@@ -13,7 +13,7 @@ import (
 )
 
 // DefaultSecretsDir is the default base directory for secrets on the server.
-const DefaultSecretsDir = "/opt/jib/secrets"
+const DefaultSecretsDir = "/opt/jib/secrets" //nolint:gosec // G101 false positive: this is a directory path, not a credential
 
 // Manager handles secrets file operations.
 type Manager struct {
@@ -49,29 +49,29 @@ func (m *Manager) Set(app string, srcPath string, envFileName string) error {
 		return fmt.Errorf("creating secrets directory: %w", err)
 	}
 	// Ensure directory permissions even if it already existed.
-	if err := os.Chmod(appDir, 0700); err != nil {
+	if err := os.Chmod(appDir, 0700); err != nil { //nolint:gosec // G302: directory needs execute bit for traversal
 		return fmt.Errorf("setting directory permissions: %w", err)
 	}
 
-	src, err := os.Open(srcPath)
+	src, err := os.Open(srcPath) //nolint:gosec // CLI tool reads user-specified secrets file
 	if err != nil {
 		return fmt.Errorf("opening source file: %w", err)
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	dstPath := filepath.Join(appDir, envFileName)
-	dst, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	dst, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600) //nolint:gosec // path constructed from trusted config
 	if err != nil {
 		return fmt.Errorf("creating secrets file: %w", err)
 	}
 
 	if _, err := io.Copy(dst, src); err != nil {
-		dst.Close()
+		_ = dst.Close()
 		return fmt.Errorf("copying secrets file: %w", err)
 	}
 
 	if err := dst.Sync(); err != nil {
-		dst.Close()
+		_ = dst.Close()
 		return fmt.Errorf("syncing secrets file: %w", err)
 	}
 
@@ -124,7 +124,7 @@ func (m *Manager) SetVar(app string, envFileName string, vars map[string]string)
 	if err := os.MkdirAll(appDir, 0700); err != nil {
 		return fmt.Errorf("creating secrets directory: %w", err)
 	}
-	if err := os.Chmod(appDir, 0700); err != nil {
+	if err := os.Chmod(appDir, 0700); err != nil { //nolint:gosec // G302: directory needs execute bit for traversal
 		return fmt.Errorf("setting directory permissions: %w", err)
 	}
 
@@ -208,11 +208,11 @@ func (m *Manager) DelVar(app string, envFileName string, keys []string) error {
 
 // readLines reads all lines from a file. Returns nil, nil if the file is empty.
 func readLines(path string) ([]string, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path constructed from trusted config
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var lines []string
 	scanner := bufio.NewScanner(f)
@@ -272,11 +272,11 @@ func (m *Manager) Symlink(app string, repoDir string, envFileName string) error 
 // Empty values, comments, and blank lines are preserved.
 func (m *Manager) EnvRedacted(app string, envFileName string) ([]string, error) {
 	path := filepath.Join(m.Dir, app, envFile(envFileName))
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path constructed from trusted config
 	if err != nil {
 		return nil, fmt.Errorf("opening secrets file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var lines []string
 	scanner := bufio.NewScanner(f)

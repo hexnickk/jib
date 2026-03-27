@@ -15,9 +15,9 @@ import (
 // sudoCommand creates an exec.Cmd that prepends "sudo" when not running as root.
 func sudoCommand(name string, args ...string) *exec.Cmd {
 	if os.Getuid() == 0 {
-		return exec.Command(name, args...)
+		return exec.Command(name, args...) //nolint:gosec // name is a trusted command like "nginx"
 	}
-	return exec.Command("sudo", append([]string{name}, args...)...)
+	return exec.Command("sudo", append([]string{name}, args...)...) //nolint:gosec // args are trusted internal values
 }
 
 // Nginx implements the Proxy interface using nginx.
@@ -100,13 +100,13 @@ func (n *Nginx) GenerateConfig(app string, appCfg config.App) (map[string]string
 
 // WriteConfigs writes config files to ConfigDir and creates symlinks in SymlinkDir.
 func (n *Nginx) WriteConfigs(configs map[string]string) error {
-	if err := os.MkdirAll(n.ConfigDir, 0o755); err != nil {
+	if err := os.MkdirAll(n.ConfigDir, 0o755); err != nil { //nolint:gosec // nginx config dir needs to be world-readable
 		return fmt.Errorf("creating config dir %s: %w", n.ConfigDir, err)
 	}
 
 	for filename, content := range configs {
 		confPath := filepath.Join(n.ConfigDir, filename)
-		if err := os.WriteFile(confPath, []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(confPath, []byte(content), 0o644); err != nil { //nolint:gosec // nginx config must be world-readable
 			return fmt.Errorf("writing %s: %w", confPath, err)
 		}
 
@@ -178,13 +178,13 @@ func (n *Nginx) MaintenanceOn(app string, domains []config.Domain, message strin
 
 	// Write the maintenance HTML page
 	htmlDir := filepath.Join(n.ConfigDir, "maintenance")
-	if err := os.MkdirAll(htmlDir, 0o755); err != nil {
+	if err := os.MkdirAll(htmlDir, 0o755); err != nil { //nolint:gosec // nginx html dir needs to be world-readable
 		return fmt.Errorf("creating maintenance html dir: %w", err)
 	}
 
 	htmlContent := strings.ReplaceAll(maintenanceHTMLTemplate, "{{MESSAGE}}", html.EscapeString(message))
 	htmlPath := filepath.Join(htmlDir, "maintenance.html")
-	if err := os.WriteFile(htmlPath, []byte(htmlContent), 0o644); err != nil {
+	if err := os.WriteFile(htmlPath, []byte(htmlContent), 0o644); err != nil { //nolint:gosec // nginx html must be world-readable
 		return fmt.Errorf("writing maintenance html: %w", err)
 	}
 
@@ -236,7 +236,7 @@ func (n *Nginx) MaintenanceOn(app string, domains []config.Domain, message strin
 			return fmt.Errorf("generating maintenance config for %s: %w", d.Host, err)
 		}
 
-		if err := os.WriteFile(confPath, buf.Bytes(), 0o644); err != nil {
+		if err := os.WriteFile(confPath, buf.Bytes(), 0o644); err != nil { //nolint:gosec // nginx config must be world-readable
 			_ = os.Rename(bakPath, confPath)
 			rollback()
 			return fmt.Errorf("writing maintenance config for %s: %w", d.Host, err)

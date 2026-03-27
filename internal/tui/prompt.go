@@ -15,7 +15,7 @@ import (
 
 // IsInteractive returns true if stdin is a terminal (not piped or scripted).
 func IsInteractive() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
+	return term.IsTerminal(int(os.Stdin.Fd())) //nolint:gosec // uintptr->int is safe for file descriptors
 }
 
 // PromptString asks the user for a string value. In non-interactive mode,
@@ -56,8 +56,8 @@ func PromptPassword(flag, description string) (string, error) {
 		return "", fmt.Errorf("--%s is required", flag)
 	}
 	fmt.Printf("%s: ", description)
-	val, err := term.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Println() // newline after hidden input
+	val, err := term.ReadPassword(int(os.Stdin.Fd())) //nolint:gosec // uintptr->int is safe for file descriptors
+	fmt.Println()                                     // newline after hidden input
 	if err != nil {
 		return "", fmt.Errorf("reading %s: %w", flag, err)
 	}

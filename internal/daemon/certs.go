@@ -92,7 +92,7 @@ func (d *Daemon) checkCerts(ctx context.Context) {
 // certDaysLeft checks a domain's TLS certificate and returns days until expiry.
 func certDaysLeft(host string) (int, error) {
 	dialer := &tls.Dialer{
-		Config: &tls.Config{InsecureSkipVerify: true},
+		Config: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // intentional: checking cert expiry requires connecting without verification
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -101,7 +101,7 @@ func certDaysLeft(host string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("connecting to %s:443: %w", host, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	tlsConn, ok := conn.(*tls.Conn)
 	if !ok {
@@ -120,7 +120,7 @@ func certDaysLeft(host string) (int, error) {
 
 // renewCert attempts to renew a certificate using certbot.
 func (d *Daemon) renewCert(ctx context.Context, domain string) error {
-	cmd := exec.CommandContext(ctx, "certbot", "renew", "--cert-name", domain, "--non-interactive")
+	cmd := exec.CommandContext(ctx, "certbot", "renew", "--cert-name", domain, "--non-interactive") //nolint:gosec // trusted CLI subprocess
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("certbot renew: %w: %s", err, string(out))

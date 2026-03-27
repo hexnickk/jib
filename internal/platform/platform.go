@@ -30,7 +30,7 @@ func Detect() (Platform, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unsupported platform: cannot read /etc/os-release. Jib currently supports Ubuntu 22.04+")
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var id, versionID string
 	scanner := bufio.NewScanner(f)

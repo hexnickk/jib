@@ -14,19 +14,19 @@ import (
 type UbuntuPlatform struct{}
 
 func (u *UbuntuPlatform) InstallPackage(name string) error {
-	cmd := exec.Command("apt-get", "install", "-y", name)
+	cmd := exec.Command("apt-get", "install", "-y", name) //nolint:gosec // name is from hardcoded dependency list
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
 func (u *UbuntuPlatform) IsPackageInstalled(name string) bool {
-	cmd := exec.Command("dpkg", "-s", name)
+	cmd := exec.Command("dpkg", "-s", name) //nolint:gosec // name is from hardcoded dependency list
 	return cmd.Run() == nil
 }
 
 func (u *UbuntuPlatform) PackageVersion(name string) (string, error) {
-	cmd := exec.Command("dpkg", "-s", name)
+	cmd := exec.Command("dpkg", "-s", name) //nolint:gosec // name is from hardcoded dependency list
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("package %s is not installed", name)
@@ -43,19 +43,19 @@ func (u *UbuntuPlatform) PackageVersion(name string) (string, error) {
 }
 
 func (u *UbuntuPlatform) StartService(name string) error {
-	return exec.Command("systemctl", "start", name).Run()
+	return exec.Command("systemctl", "start", name).Run() //nolint:gosec // name is from hardcoded service list
 }
 
 func (u *UbuntuPlatform) StopService(name string) error {
-	return exec.Command("systemctl", "stop", name).Run()
+	return exec.Command("systemctl", "stop", name).Run() //nolint:gosec // name is from hardcoded service list
 }
 
 func (u *UbuntuPlatform) EnableService(name string) error {
-	return exec.Command("systemctl", "enable", name).Run()
+	return exec.Command("systemctl", "enable", name).Run() //nolint:gosec // name is from hardcoded service list
 }
 
 func (u *UbuntuPlatform) ServiceStatus(name string) (string, error) {
-	out, err := exec.Command("systemctl", "is-active", name).Output()
+	out, err := exec.Command("systemctl", "is-active", name).Output() //nolint:gosec // name is from hardcoded service list
 	// systemctl is-active returns exit code 3 for inactive services,
 	// but still produces output. We return the output regardless.
 	status := strings.TrimSpace(string(out))
@@ -67,10 +67,10 @@ func (u *UbuntuPlatform) ServiceStatus(name string) (string, error) {
 
 func (u *UbuntuPlatform) InstallServiceUnit(name, content string) error {
 	unitPath := filepath.Join("/etc/systemd/system", name+".service")
-	if err := os.WriteFile(unitPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(unitPath, []byte(content), 0o644); err != nil { //nolint:gosec // systemd unit files must be world-readable
 		return fmt.Errorf("writing service unit %s: %w", unitPath, err)
 	}
-	return exec.Command("systemctl", "daemon-reload").Run()
+	return exec.Command("systemctl", "daemon-reload").Run() //nolint:gosec // trusted CLI subprocess
 }
 
 func (u *UbuntuPlatform) NginxConfigDir() string {

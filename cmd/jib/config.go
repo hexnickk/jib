@@ -400,14 +400,14 @@ func runBackupDestTest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating test file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	testContent := "jib backup destination test"
 	if _, err := tmpFile.WriteString(testContent); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fmt.Errorf("writing test file: %w", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	testRemotePath := path.Join("_jib-test", "test-file.txt")
 
@@ -444,13 +444,13 @@ func runBackupDestTest(cmd *cobra.Command, args []string) error {
 	// Download
 	fmt.Print("  Download... ")
 	dlPath := tmpPath + ".dl"
-	defer os.Remove(dlPath)
+	defer func() { _ = os.Remove(dlPath) }()
 	if err := dest.Download(testRemotePath, dlPath); err != nil {
 		fmt.Println("FAIL")
 		_ = dest.Delete(testRemotePath)
 		return fmt.Errorf("download failed: %w", err)
 	}
-	dlContent, err := os.ReadFile(dlPath)
+	dlContent, err := os.ReadFile(dlPath) //nolint:gosec // trusted temp file
 	if err != nil || string(dlContent) != testContent {
 		fmt.Println("FAIL (content mismatch)")
 		_ = dest.Delete(testRemotePath)

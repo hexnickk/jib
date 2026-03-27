@@ -91,7 +91,7 @@ func runGitHubWebhookSetup(cmd *cobra.Command, args []string) error {
 	webhookSecretPath := filepath.Join(secretsDir, appName+"-github-webhook.json")
 	var webhookSecret string
 
-	if data, err := os.ReadFile(webhookSecretPath); err == nil {
+	if data, err := os.ReadFile(webhookSecretPath); err == nil { //nolint:gosec // path from trusted config
 		var secretData map[string]string
 		if err := json.Unmarshal(data, &secretData); err == nil {
 			webhookSecret = secretData["secret"]
@@ -161,7 +161,7 @@ func runGitHubWebhookStatus(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Webhook status for %q:\n\n", appName)
 
-	if data, err := os.ReadFile(webhookSecretPath); err == nil {
+	if data, err := os.ReadFile(webhookSecretPath); err == nil { //nolint:gosec // path from trusted config
 		var secretData map[string]string
 		if err := json.Unmarshal(data, &secretData); err == nil {
 			secret := secretData["secret"]

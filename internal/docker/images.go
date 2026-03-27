@@ -26,7 +26,7 @@ func (c *Compose) TagRollbackImages(ctx context.Context) error {
 		}
 		service, imageID := fields[0], fields[1]
 		rollbackTag := fmt.Sprintf("%s-%s:rollback", c.ProjectName(), service)
-		tagCmd := exec.CommandContext(ctx, "docker", "tag", imageID, rollbackTag)
+		tagCmd := exec.CommandContext(ctx, "docker", "tag", imageID, rollbackTag) //nolint:gosec // args constructed internally
 		if tagOut, tagErr := tagCmd.CombinedOutput(); tagErr != nil {
 			return fmt.Errorf("tagging image %s as %s: %w: %s", imageID, rollbackTag, tagErr, string(tagOut))
 		}
@@ -37,7 +37,7 @@ func (c *Compose) TagRollbackImages(ctx context.Context) error {
 
 // PruneImages runs docker image prune -f.
 func PruneImages(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, "docker", "image", "prune", "-f")
+	cmd := exec.CommandContext(ctx, "docker", "image", "prune", "-f") //nolint:gosec // trusted CLI subprocess
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("pruning images: %w: %s", err, string(out))
@@ -47,6 +47,6 @@ func PruneImages(ctx context.Context) error {
 
 // ImageExists checks if a docker image with the given tag exists locally.
 func ImageExists(ctx context.Context, tag string) bool {
-	cmd := exec.CommandContext(ctx, "docker", "image", "inspect", tag)
+	cmd := exec.CommandContext(ctx, "docker", "image", "inspect", tag) //nolint:gosec // args constructed internally
 	return cmd.Run() == nil
 }

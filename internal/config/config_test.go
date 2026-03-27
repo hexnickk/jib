@@ -76,7 +76,7 @@ func writeTemp(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.yml")
-	if err := os.WriteFile(p, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return p

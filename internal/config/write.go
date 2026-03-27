@@ -12,7 +12,7 @@ import (
 // map[string]interface{}, calls mutate to modify it, then atomically writes
 // the result back (via temp file + rename).
 func ModifyRawConfig(cfgPath string, mutate func(raw map[string]interface{}) error) error {
-	data, err := os.ReadFile(cfgPath)
+	data, err := os.ReadFile(cfgPath) //nolint:gosec // CLI tool reads its own config file
 	if err != nil {
 		return fmt.Errorf("reading config: %w", err)
 	}
@@ -43,28 +43,28 @@ func ModifyRawConfig(cfgPath string, mutate func(raw map[string]interface{}) err
 	tmpPath := tmp.Name()
 
 	if _, err := tmp.Write(out); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("writing temp file: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("closing temp file: %w", err)
 	}
 
 	// Preserve the permissions of the original config file.
 	origInfo, err := os.Stat(cfgPath)
 	if err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("stat config: %w", err)
 	}
 	if err := os.Chmod(tmpPath, origInfo.Mode().Perm()); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("setting permissions: %w", err)
 	}
 
 	if err := os.Rename(tmpPath, cfgPath); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("renaming temp file: %w", err)
 	}
 

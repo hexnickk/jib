@@ -40,7 +40,7 @@ func ParseComposeServices(repoDir string, composeFiles []string) ([]ComposeServi
 	merged := make(map[string]composeServiceDef)
 	for _, f := range composeFiles {
 		path := filepath.Join(repoDir, f)
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // path from trusted compose file list
 		if err != nil {
 			return nil, fmt.Errorf("reading %s: %w", f, err)
 		}

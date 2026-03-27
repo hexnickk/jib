@@ -114,7 +114,7 @@ func runGitHubKeyStatus(cmd *cobra.Command, args []string) error {
 
 	keyPath := ghPkg.KeyPath(root, name)
 	if _, err := os.Stat(keyPath); err == nil {
-		fingerprintCmd := exec.Command("ssh-keygen", "-l", "-f", keyPath)
+		fingerprintCmd := exec.Command("ssh-keygen", "-l", "-f", keyPath) //nolint:gosec // trusted CLI subprocess
 		output, err := fingerprintCmd.Output()
 		if err != nil {
 			fmt.Printf("  Key: %s (could not read fingerprint)\n", keyPath)

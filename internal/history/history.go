@@ -51,15 +51,15 @@ func (l *Logger) logPath(app string) string {
 // Append writes an event as a JSON line to the app's log file.
 // Creates the log directory and file if they don't exist.
 func (l *Logger) Append(app string, event Event) error {
-	if err := os.MkdirAll(l.LogDir, 0755); err != nil {
+	if err := os.MkdirAll(l.LogDir, 0o750); err != nil {
 		return fmt.Errorf("creating log dir: %w", err)
 	}
 
-	f, err := os.OpenFile(l.logPath(app), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(l.logPath(app), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fmt.Errorf("opening log file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	data, err := json.Marshal(event)
 	if err != nil {
@@ -82,7 +82,7 @@ func (l *Logger) Read(app string, limit int) ([]Event, error) {
 		}
 		return nil, fmt.Errorf("opening log file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var events []Event
 	scanner := bufio.NewScanner(f)

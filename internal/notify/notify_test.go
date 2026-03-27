@@ -256,7 +256,7 @@ TELEGRAM_CHAT_ID=-1001234567890
 EXTRA_KEY = some value
 invalid line without equals
 `
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -302,12 +302,12 @@ func TestLoadFromSecretsEmpty(t *testing.T) {
 func TestLoadFromSecretsWithTelegram(t *testing.T) {
 	dir := t.TempDir()
 	jibDir := filepath.Join(dir, "_jib")
-	if err := os.MkdirAll(jibDir, 0755); err != nil {
+	if err := os.MkdirAll(jibDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
 	content := "TELEGRAM_BOT_TOKEN=mytoken\nTELEGRAM_CHAT_ID=mychat\n"
-	if err := os.WriteFile(filepath.Join(jibDir, "telegram.env"), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(jibDir, "telegram.env"), []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -323,7 +323,7 @@ func TestLoadFromSecretsWithTelegram(t *testing.T) {
 func TestLoadFromSecretsWithAll(t *testing.T) {
 	dir := t.TempDir()
 	jibDir := filepath.Join(dir, "_jib")
-	if err := os.MkdirAll(jibDir, 0755); err != nil {
+	if err := os.MkdirAll(jibDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
@@ -336,7 +336,7 @@ func TestLoadFromSecretsWithAll(t *testing.T) {
 		{"discord_webhook", "https://discord.com/api/webhooks/test"},
 		{"webhook_url", "https://example.com/hook"},
 	} {
-		if err := os.WriteFile(filepath.Join(jibDir, f.name), []byte(f.content), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(jibDir, f.name), []byte(f.content), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -360,12 +360,12 @@ func TestLoadFromSecretsWithAll(t *testing.T) {
 func TestLoadFromSecretsTelegramPartialCreds(t *testing.T) {
 	dir := t.TempDir()
 	jibDir := filepath.Join(dir, "_jib")
-	if err := os.MkdirAll(jibDir, 0755); err != nil {
+	if err := os.MkdirAll(jibDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
 	// Only token, no chat ID — should not create notifier
-	if err := os.WriteFile(filepath.Join(jibDir, "telegram.env"), []byte("TELEGRAM_BOT_TOKEN=t\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(jibDir, "telegram.env"), []byte("TELEGRAM_BOT_TOKEN=t\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -378,7 +378,7 @@ func TestLoadFromSecretsTelegramPartialCreds(t *testing.T) {
 func TestLoadChannels(t *testing.T) {
 	dir := t.TempDir()
 	jibDir := filepath.Join(dir, "_jib")
-	if err := os.MkdirAll(jibDir, 0755); err != nil {
+	if err := os.MkdirAll(jibDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 

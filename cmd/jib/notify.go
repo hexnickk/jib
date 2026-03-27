@@ -307,7 +307,7 @@ func runNotifyAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("webhook URL is required")
 	}
 
-	credKey := "webhook_url"
+	credKey := "webhook_url" //nolint:gosec // G101 false positive: this is a map key name, not a credential
 	if driver == "webhook" {
 		credKey = "url"
 	}

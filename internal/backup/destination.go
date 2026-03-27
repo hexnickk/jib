@@ -82,7 +82,7 @@ func (d *RcloneDest) remote(path string) string {
 func (d *RcloneDest) Upload(src, remotePath string) error {
 	remote := d.remote(remotePath)
 	// rclone copyto copies a single file to a destination path
-	cmd := exec.Command("rclone", "copyto", src, remote)
+	cmd := exec.Command("rclone", "copyto", src, remote) //nolint:gosec // args from trusted config
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -93,7 +93,7 @@ func (d *RcloneDest) Upload(src, remotePath string) error {
 
 func (d *RcloneDest) Download(remotePath, dst string) error {
 	remote := d.remote(remotePath)
-	cmd := exec.Command("rclone", "copyto", remote, dst)
+	cmd := exec.Command("rclone", "copyto", remote, dst) //nolint:gosec // args from trusted config
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -104,7 +104,7 @@ func (d *RcloneDest) Download(remotePath, dst string) error {
 
 func (d *RcloneDest) List(prefix string) ([]string, error) {
 	remote := d.remote(prefix)
-	cmd := exec.Command("rclone", "ls", remote)
+	cmd := exec.Command("rclone", "ls", remote) //nolint:gosec // args from trusted config
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("rclone list %s: %w", remote, err)
@@ -126,7 +126,7 @@ func (d *RcloneDest) List(prefix string) ([]string, error) {
 
 func (d *RcloneDest) Delete(remotePath string) error {
 	remote := d.remote(remotePath)
-	cmd := exec.Command("rclone", "deletefile", remote)
+	cmd := exec.Command("rclone", "deletefile", remote) //nolint:gosec // args from trusted config
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -153,13 +153,13 @@ func (d *SSHDest) remoteFull(path string) string {
 func (d *SSHDest) Upload(src, remotePath string) error {
 	// Ensure the remote directory exists
 	dir := filepath.Dir(remotePath)
-	mkdirCmd := exec.Command("ssh", d.Host, "mkdir", "-p", filepath.Join(d.RemotePath, dir))
+	mkdirCmd := exec.Command("ssh", d.Host, "mkdir", "-p", filepath.Join(d.RemotePath, dir)) //nolint:gosec // args from trusted config
 	if out, err := mkdirCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ssh mkdir on %s: %w: %s", d.Host, err, string(out))
 	}
 
 	remote := d.remoteFull(remotePath)
-	cmd := exec.Command("rsync", "-avz", src, remote)
+	cmd := exec.Command("rsync", "-avz", src, remote) //nolint:gosec // trusted CLI subprocess
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -170,7 +170,7 @@ func (d *SSHDest) Upload(src, remotePath string) error {
 
 func (d *SSHDest) Download(remotePath, dst string) error {
 	remote := d.remoteFull(remotePath)
-	cmd := exec.Command("rsync", "-avz", remote, dst)
+	cmd := exec.Command("rsync", "-avz", remote, dst) //nolint:gosec // trusted CLI subprocess
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -181,7 +181,7 @@ func (d *SSHDest) Download(remotePath, dst string) error {
 
 func (d *SSHDest) List(prefix string) ([]string, error) {
 	dir := filepath.Join(d.RemotePath, prefix)
-	cmd := exec.Command("ssh", d.Host, "ls", "-1", dir)
+	cmd := exec.Command("ssh", d.Host, "ls", "-1", dir) //nolint:gosec // args from trusted config
 	out, err := cmd.Output()
 	if err != nil {
 		// Empty directory or not found — return empty
@@ -199,7 +199,7 @@ func (d *SSHDest) List(prefix string) ([]string, error) {
 
 func (d *SSHDest) Delete(remotePath string) error {
 	remote := filepath.Join(d.RemotePath, remotePath)
-	cmd := exec.Command("ssh", d.Host, "rm", "-f", remote)
+	cmd := exec.Command("ssh", d.Host, "rm", "-f", remote) //nolint:gosec // args from trusted config
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ssh delete %s: %w: %s", remote, err, string(out))
 	}
@@ -222,7 +222,7 @@ func (d *LocalDest) fullPath(remotePath string) string {
 
 func (d *LocalDest) Upload(src, remotePath string) error {
 	dst := d.fullPath(remotePath)
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 		return fmt.Errorf("creating directory for %s: %w", dst, err)
 	}
 	return util.CopyFile(src, dst)
@@ -230,7 +230,7 @@ func (d *LocalDest) Upload(src, remotePath string) error {
 
 func (d *LocalDest) Download(remotePath, dst string) error {
 	src := d.fullPath(remotePath)
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 		return fmt.Errorf("creating directory for %s: %w", dst, err)
 	}
 	return util.CopyFile(src, dst)

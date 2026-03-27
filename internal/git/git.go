@@ -13,7 +13,7 @@ import (
 // as the identity file for SSH authentication.
 func Clone(ctx context.Context, url, dir, branch, sshKeyPath string) error {
 	args := []string{"clone", "--branch", branch, "--single-branch", url, dir}
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...) //nolint:gosec // args are constructed internally by the CLI
 	if sshKeyPath != "" {
 		cmd.Env = append(os.Environ(),
 			fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=accept-new", sshKeyPath))
@@ -30,7 +30,7 @@ func Clone(ctx context.Context, url, dir, branch, sshKeyPath string) error {
 // MarkSafeDirectory adds a directory to git's global safe.directory list,
 // allowing users other than the repo owner to run git commands in it.
 func MarkSafeDirectory(dir string) error {
-	cmd := exec.Command("git", "config", "--global", "--add", "safe.directory", dir)
+	cmd := exec.Command("git", "config", "--global", "--add", "safe.directory", dir) //nolint:gosec // dir is a trusted internal path
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git config safe.directory: %w: %s", err, string(out))
 	}
@@ -39,14 +39,14 @@ func MarkSafeDirectory(dir string) error {
 
 // IsRepo checks if the directory is a git repository.
 func IsRepo(dir string) bool {
-	cmd := exec.Command("git", "-C", dir, "rev-parse", "--git-dir")
+	cmd := exec.Command("git", "-C", dir, "rev-parse", "--git-dir") //nolint:gosec // dir is a trusted internal path
 	return cmd.Run() == nil
 }
 
 // ConfigureSSHKey sets the core.sshCommand in the repo's local git config
 // so all git operations use the specified SSH key.
 func ConfigureSSHKey(repoDir, sshKeyPath string) error {
-	cmd := exec.Command("git", "config", "core.sshCommand",
+	cmd := exec.Command("git", "config", "core.sshCommand", //nolint:gosec // sshKeyPath is a trusted internal path
 		fmt.Sprintf("ssh -i %s -o StrictHostKeyChecking=accept-new", sshKeyPath))
 	cmd.Dir = repoDir
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -64,7 +64,7 @@ func HasRemote(ctx context.Context, repoDir string) bool {
 
 // Fetch runs git fetch origin <branch> in the given directory.
 func Fetch(ctx context.Context, repoDir, branch string) error {
-	cmd := exec.CommandContext(ctx, "git", "fetch", "origin", branch)
+	cmd := exec.CommandContext(ctx, "git", "fetch", "origin", branch) //nolint:gosec // args are trusted internal values
 	cmd.Dir = repoDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -75,7 +75,7 @@ func Fetch(ctx context.Context, repoDir, branch string) error {
 
 // Checkout runs git checkout <ref> in the given directory.
 func Checkout(ctx context.Context, repoDir, ref string) error {
-	cmd := exec.CommandContext(ctx, "git", "checkout", ref)
+	cmd := exec.CommandContext(ctx, "git", "checkout", ref) //nolint:gosec // args are trusted internal values
 	cmd.Dir = repoDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -97,7 +97,7 @@ func CurrentSHA(ctx context.Context, repoDir string) (string, error) {
 
 // LsRemote runs git ls-remote to verify access to a repository.
 func LsRemote(ctx context.Context, url, sshKeyPath string) error {
-	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", url)
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", url) //nolint:gosec // args are trusted internal values
 	if sshKeyPath != "" {
 		cmd.Env = append(os.Environ(),
 			fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=accept-new", sshKeyPath))
@@ -111,7 +111,7 @@ func LsRemote(ctx context.Context, url, sshKeyPath string) error {
 
 // SetRemoteURL updates the origin remote URL.
 func SetRemoteURL(ctx context.Context, repoDir, url string) error {
-	cmd := exec.CommandContext(ctx, "git", "remote", "set-url", "origin", url)
+	cmd := exec.CommandContext(ctx, "git", "remote", "set-url", "origin", url) //nolint:gosec // args are trusted internal values
 	cmd.Dir = repoDir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git remote set-url: %w: %s", err, string(out))
@@ -122,7 +122,7 @@ func SetRemoteURL(ctx context.Context, repoDir, url string) error {
 // RemoteSHA runs git rev-parse origin/<branch> and returns the remote branch SHA.
 func RemoteSHA(ctx context.Context, repoDir, branch string) (string, error) {
 	ref := "origin/" + branch
-	cmd := exec.CommandContext(ctx, "git", "rev-parse", ref)
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", ref) //nolint:gosec // args are trusted internal values
 	cmd.Dir = repoDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {

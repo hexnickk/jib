@@ -194,17 +194,17 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "APP\tSHA\tSTATUS\tLAST DEPLOY\tFAILURES\tPINNED")
+	_, _ = fmt.Fprintln(w, "APP\tSHA\tSTATUS\tLAST DEPLOY\tFAILURES\tPINNED")
 	for _, s := range statuses {
 		status := s.LastDeployStatus
 		if s.Maintenance {
 			status = "maintenance"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%v\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%v\n",
 			s.Name, s.DeployedSHA, status, s.LastDeploy,
 			s.ConsecutiveFailures, s.Pinned)
 	}
-	w.Flush()
+	_ = w.Flush()
 	fmt.Println("\nRun 'jib apps' for config details (repo, domains, strategy)")
 	return nil
 }
@@ -261,7 +261,7 @@ func runApps(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "APP\tREPO\tBRANCH\tSTRATEGY\tDOMAINS")
+	_, _ = fmt.Fprintln(w, "APP\tREPO\tBRANCH\tSTRATEGY\tDOMAINS")
 
 	for _, name := range names {
 		app := cfg.Apps[name]
@@ -269,10 +269,10 @@ func runApps(cmd *cobra.Command, args []string) error {
 		for _, d := range app.Domains {
 			domains = append(domains, fmt.Sprintf("%s:%d", d.Host, d.Port))
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			name, app.Repo, app.Branch, app.Strategy, strings.Join(domains, ", "))
 	}
-	w.Flush()
+	_ = w.Flush()
 	fmt.Println("\nRun 'jib status' for deploy status (SHA, failures, last deploy)")
 	return nil
 }
@@ -466,7 +466,7 @@ func runHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "TIME\tTYPE\tSHA\tSTATUS\tUSER\tDURATION")
+	_, _ = fmt.Fprintln(w, "TIME\tTYPE\tSHA\tSTATUS\tUSER\tDURATION")
 	for _, ev := range events {
 		sha := ev.SHA
 		if len(sha) > 7 {
@@ -481,10 +481,10 @@ func runHistory(cmd *cobra.Command, args []string) error {
 		if ev.Error != "" {
 			status = status + " (" + ev.Error + ")"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			ts, ev.Type, sha, status, ev.User, dur)
 	}
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 

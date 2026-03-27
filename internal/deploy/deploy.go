@@ -475,7 +475,7 @@ func checkDiskSpace(path string, minBytes uint64) error {
 	if err := syscall.Statfs(checkPath, &st); err != nil {
 		return fmt.Errorf("statfs %s: %w", checkPath, err)
 	}
-	free := st.Bavail * uint64(st.Bsize)
+	free := st.Bavail * uint64(st.Bsize) //nolint:gosec // Bsize is always positive, int64->uint64 overflow not possible
 	if free < minBytes {
 		return fmt.Errorf("insufficient disk space: %d bytes free, need at least %d", free, minBytes)
 	}

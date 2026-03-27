@@ -1,28 +1,23 @@
+version: "2"
+
 run:
   timeout: 5m
+
+formatters:
+  enable:
+    - gofmt
 
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
     - misspell
-    - gofmt
     - gosec
     - bodyclose
     - errname
-
-linters-settings:
-  errcheck:
-    check-type-assertions: false
-  gosec:
-    excludes:
-      - G101  # false positives on path constants and variable names
-      - G115  # integer overflow conversion in syscall usage
-      - G204  # subprocess with variable — we intentionally shell out
-      - G304  # file path from variable — we read config files by design
-      - G306  # WriteFile permissions > 0600 — config files need 0644
-      - G402  # TLS InsecureSkipVerify — intentional for cert expiry checks
+  settings:
+    errcheck:
+      check-type-assertions: false

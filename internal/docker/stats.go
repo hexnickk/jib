@@ -11,7 +11,7 @@ import (
 // It runs docker stats --no-stream filtered to containers with the jib-<app> prefix.
 func (c *Compose) Stats(ctx context.Context) (string, error) {
 	// Get container IDs matching the project prefix
-	psCmd := exec.CommandContext(ctx, "docker", "ps", "-q", "--filter", fmt.Sprintf("label=com.docker.compose.project=%s", c.ProjectName()))
+	psCmd := exec.CommandContext(ctx, "docker", "ps", "-q", "--filter", fmt.Sprintf("label=com.docker.compose.project=%s", c.ProjectName())) //nolint:gosec // args from trusted config
 	psOut, err := psCmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("listing containers: %w: %s", err, string(psOut))
@@ -25,7 +25,7 @@ func (c *Compose) Stats(ctx context.Context) (string, error) {
 	args := []string{"stats", "--no-stream", "--format", "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"}
 	args = append(args, ids...)
 
-	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd := exec.CommandContext(ctx, "docker", args...) //nolint:gosec // trusted CLI subprocess
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("getting stats: %w: %s", err, string(out))

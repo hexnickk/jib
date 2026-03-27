@@ -127,15 +127,15 @@ func writeSelfSignedCert(t *testing.T, base, domain string, validity time.Durati
 	}
 
 	dir := filepath.Join(base, domain)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
-	f, err := os.Create(filepath.Join(dir, "fullchain.pem"))
+	f, err := os.Create(filepath.Join(dir, "fullchain.pem")) //nolint:gosec // test file with known path
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if err := pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
 		t.Fatal(err)

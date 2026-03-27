@@ -95,7 +95,7 @@ func (m *Manager) Backup(app string, appCfg config.App) (*BackupResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Docker project name
 	project := "jib-" + app
@@ -107,7 +107,7 @@ func (m *Manager) Backup(app string, appCfg config.App) (*BackupResult, error) {
 
 		fmt.Printf("  Backing up volume %s...\n", volumeName)
 
-		cmd := exec.Command("docker", "run", "--rm",
+		cmd := exec.Command("docker", "run", "--rm", //nolint:gosec // args are constructed from trusted app config
 			"-v", volumeName+":/data:ro",
 			"-v", tmpDir+":/backup",
 			"alpine",
@@ -133,7 +133,7 @@ func (m *Manager) Backup(app string, appCfg config.App) (*BackupResult, error) {
 		return nil, fmt.Errorf("marshaling manifest: %w", err)
 	}
 	manifestPath := filepath.Join(tmpDir, "manifest.json")
-	if err := os.WriteFile(manifestPath, manifestData, 0o644); err != nil {
+	if err := os.WriteFile(manifestPath, manifestData, 0o600); err != nil {
 		return nil, fmt.Errorf("writing manifest: %w", err)
 	}
 
@@ -150,7 +150,7 @@ func (m *Manager) Backup(app string, appCfg config.App) (*BackupResult, error) {
 	for _, vol := range volumes {
 		tarArgs = append(tarArgs, vol+".tar.gz")
 	}
-	tarCmd := exec.Command("tar", tarArgs...)
+	tarCmd := exec.Command("tar", tarArgs...) //nolint:gosec // args from trusted config
 	tarCmd.Stdout = os.Stdout
 	tarCmd.Stderr = os.Stderr
 	if err := tarCmd.Run(); err != nil {
@@ -229,7 +229,7 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 	if err != nil {
 		return fmt.Errorf("creating temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	localBundle := filepath.Join(tmpDir, bundleName)
 
@@ -268,11 +268,11 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 
 	// Extract the bundle
 	extractDir := filepath.Join(tmpDir, "extracted")
-	if err := os.MkdirAll(extractDir, 0o755); err != nil {
+	if err := os.MkdirAll(extractDir, 0o750); err != nil {
 		return fmt.Errorf("creating extract dir: %w", err)
 	}
 
-	extractCmd := exec.Command("tar", "--no-same-owner", "-xzf", localBundle, "-C", extractDir)
+	extractCmd := exec.Command("tar", "--no-same-owner", "-xzf", localBundle, "-C", extractDir) //nolint:gosec // args from trusted paths
 	extractCmd.Stdout = os.Stdout
 	extractCmd.Stderr = os.Stderr
 	if err := extractCmd.Run(); err != nil {
@@ -281,7 +281,7 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 
 	// Read manifest
 	manifestPath := filepath.Join(extractDir, "manifest.json")
-	manifestData, err := os.ReadFile(manifestPath)
+	manifestData, err := os.ReadFile(manifestPath) //nolint:gosec // path from trusted temp directory
 	if err != nil {
 		return fmt.Errorf("reading manifest: %w", err)
 	}
@@ -313,7 +313,7 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 
 	// Stop app containers
 	fmt.Println("Stopping containers...")
-	stopCmd := exec.Command("docker", "compose", "-p", project, "down")
+	stopCmd := exec.Command("docker", "compose", "-p", project, "down") //nolint:gosec // args from trusted config
 	stopCmd.Stdout = os.Stdout
 	stopCmd.Stderr = os.Stderr
 	if err := stopCmd.Run(); err != nil {
@@ -340,7 +340,7 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 		fmt.Printf("  Restoring volume %s...\n", volumeName)
 
 		// Clear existing data and restore
-		cmd := exec.Command("docker", "run", "--rm",
+		cmd := exec.Command("docker", "run", "--rm", //nolint:gosec // args are constructed from trusted app config
 			"-v", volumeName+":/data",
 			"-v", extractDir+":/backup:ro",
 			"alpine",
@@ -355,7 +355,7 @@ func (m *Manager) Restore(app string, timestamp string, dryRun bool) error {
 
 	// Start app containers back up
 	fmt.Println("Starting containers...")
-	startCmd := exec.Command("docker", "compose", "-p", project, "up", "-d")
+	startCmd := exec.Command("docker", "compose", "-p", project, "up", "-d") //nolint:gosec // args from trusted config
 	startCmd.Stdout = os.Stdout
 	startCmd.Stderr = os.Stderr
 	if err := startCmd.Run(); err != nil {
@@ -516,11 +516,11 @@ func extractTimestamp(app, filename string) string {
 
 // fileSHA256 computes the SHA256 hash of a file.
 func fileSHA256(path string) (string, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path from trusted backup directory
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
