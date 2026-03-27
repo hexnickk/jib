@@ -104,9 +104,6 @@ func (n *Nginx) WriteConfigs(configs map[string]string) error {
 	if err := os.MkdirAll(n.ConfigDir, 0o755); err != nil {
 		return fmt.Errorf("creating config dir %s: %w", n.ConfigDir, err)
 	}
-	if err := os.MkdirAll(n.SymlinkDir, 0o755); err != nil {
-		return fmt.Errorf("creating symlink dir %s: %w", n.SymlinkDir, err)
-	}
 
 	for filename, content := range configs {
 		confPath := filepath.Join(n.ConfigDir, filename)
@@ -115,10 +112,13 @@ func (n *Nginx) WriteConfigs(configs map[string]string) error {
 		}
 
 		linkPath := filepath.Join(n.SymlinkDir, filename)
-		// Remove existing symlink/file before creating a new one.
 		_ = os.Remove(linkPath)
 		if err := os.Symlink(confPath, linkPath); err != nil {
-			return fmt.Errorf("symlinking %s → %s: %w", linkPath, confPath, err)
+			// Fall back to sudo for system dirs like /etc/nginx/conf.d/
+			cmd := sudoCommand("ln", "-sf", confPath, linkPath)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("symlinking %s → %s: %w: %s", linkPath, confPath, err, out)
+			}
 		}
 	}
 
@@ -140,8 +140,11 @@ func (n *Nginx) RemoveConfigs(app string, domains []config.Domain) error {
 
 		linkPath := filepath.Join(n.SymlinkDir, filename)
 		if err := os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
-			if firstErr == nil {
-				firstErr = fmt.Errorf("removing symlink %s: %w", linkPath, err)
+			// Fall back to sudo for system dirs
+			if out, err := sudoCommand("rm", "-f", linkPath).CombinedOutput(); err != nil {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("removing symlink %s: %w: %s", linkPath, err, out)
+				}
 			}
 		}
 	}
