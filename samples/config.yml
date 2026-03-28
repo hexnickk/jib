@@ -1,4 +1,4 @@
-config_version: 1
+config_version: 2
 certbot_email: you@example.com
 
 apps:
@@ -78,6 +78,23 @@ apps:
     domains:
       - host: multi.example.com
         port: 9000
+
+  # App with mixed ingress (public via tunnel, admin via tailscale)
+  mixedingress:
+    repo: org/mixedingress
+    branch: main
+    compose: docker-compose.yml
+    strategy: restart
+    health:
+      - path: /health
+        port: 5000
+    domains:
+      - host: app.example.com
+        port: 5000
+        ingress: cloudflare-tunnel
+      - host: admin.example.com
+        port: 5000
+        ingress: tailscale
 
   # App with build-time args
   buildargapp:

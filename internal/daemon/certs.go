@@ -56,14 +56,14 @@ func (d *Daemon) checkCerts(ctx context.Context) {
 			return
 		}
 
-		// Skip apps using tunnels — they handle TLS at the edge.
-		if appCfg.IsTunnelIngress() {
-			continue
-		}
-
 		for _, domain := range appCfg.Domains {
 			if ctx.Err() != nil {
 				return
+			}
+
+			// Skip tunnel domains — they handle TLS at the edge.
+			if domain.IsTunnelIngress() {
+				continue
 			}
 
 			daysLeft, err := certDaysLeft(domain.Host)

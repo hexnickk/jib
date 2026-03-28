@@ -15,6 +15,7 @@ type ComposeService struct {
 	Name       string
 	HostPort   int    // First host-mapped port, 0 if none
 	Domain     string // From jib.domain label, if set
+	Ingress    string // From jib.ingress label, if set
 	HealthPath string // Parsed from healthcheck.test if it's a curl/wget URL
 	HealthPort int    // Parsed from healthcheck.test
 }
@@ -106,9 +107,12 @@ func ParseComposeServices(repoDir string, composeFiles []string) ([]ComposeServi
 			cs.HostPort = parseFirstHostPort(svc.Ports[0])
 		}
 
-		// Parse jib.domain label
+		// Parse jib labels
 		if d, ok := svc.Labels["jib.domain"]; ok {
 			cs.Domain = d
+		}
+		if ing, ok := svc.Labels["jib.ingress"]; ok {
+			cs.Ingress = ing
 		}
 
 		// Parse health check from healthcheck.test

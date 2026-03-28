@@ -41,7 +41,7 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	}
 	addCmd.Flags().String("repo", "", "GitHub repo (org/name)")
 	addCmd.Flags().String("git-provider", "", "Git auth provider name (from 'jib github key/app setup')")
-	addCmd.Flags().String("ingress", "direct", "Ingress type: direct, cloudflare-tunnel, tailscale")
+	addCmd.Flags().String("ingress", "direct", "Default ingress for all domains: direct, cloudflare-tunnel, tailscale (override per-domain with @suffix)")
 	addCmd.Flags().String("compose", "", "Compose file path (or comma-separated list)")
 	addCmd.Flags().StringSlice("domain", nil, "Domain mapping (repeatable): example.com, web=example.com, or example.com:8080. Omit to use jib.domain labels from compose.")
 	addCmd.Flags().StringSlice("health", nil, "Health check path:port (repeatable). Inferred from compose if omitted.")
@@ -442,6 +442,26 @@ func runEdit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// pendingDomain tracks a domain being configured before compose parsing resolves all fields.
+type pendingDomain struct {
+	Host    string
+	Port    int
+	Service string // non-empty if using service=domain format
+	Ingress string // per-domain ingress, overrides --ingress flag
+}
+
+// pendingToDomain converts a pendingDomain to a config.Domain, applying the fallback ingress.
+func pendingToDomain(p pendingDomain, fallbackIngress string) config.Domain {
+	ing := p.Ingress
+	if ing == "" {
+		ing = fallbackIngress
+	}
+	if ing == "direct" {
+		ing = "" // normalize: empty = direct
+	}
+	return config.Domain{Host: p.Host, Port: p.Port, Ingress: ing}
+}
+
 func runAdd(cmd *cobra.Command, args []string) error {
 	appName := args[0]
 
@@ -462,12 +482,13 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		fmt.Println("  3. A git provider (set up with 'jib github app setup' or 'jib github key setup')")
 		fmt.Println()
 		fmt.Println("Domain formats:")
-		fmt.Println("  example.com          single-service app (port auto-detected)")
-		fmt.Println("  web=example.com      map domain to a specific compose service")
-		fmt.Println("  example.com:8080     map domain to an explicit port")
+		fmt.Println("  example.com                    single-service app (port auto-detected)")
+		fmt.Println("  web=example.com                map domain to a specific compose service")
+		fmt.Println("  example.com:8080               map domain to an explicit port")
+		fmt.Println("  example.com@cloudflare-tunnel  specify ingress per domain")
 		fmt.Println()
-		fmt.Println("Or add jib.domain labels to your docker-compose.yml services")
-		fmt.Println("and omit --domain entirely.")
+		fmt.Println("Or add jib.domain/jib.ingress labels to your docker-compose.yml")
+		fmt.Println("services and omit --domain entirely.")
 		fmt.Println()
 	}
 
@@ -508,30 +529,37 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Parse domains. Supported formats:
-	//   example.com        — port inferred (single-service shortcut)
-	//   example.com:8080   — explicit port
-	//   web=example.com    — service name, port resolved from compose
-	type pendingDomain struct {
-		Host    string
-		Port    int
-		Service string // non-empty if using service=domain format
-	}
+	//   example.com                    — port inferred (single-service shortcut)
+	//   example.com:8080               — explicit port
+	//   web=example.com                — service name, port resolved from compose
+	//   example.com@cloudflare-tunnel  — with ingress type
+	//   web=example.com@tailscale      — service + ingress
 	var pending []pendingDomain
 	for _, d := range domainFlags {
+		// Extract @ingress suffix first
+		var domIngress string
+		if idx := strings.LastIndex(d, "@"); idx > 0 {
+			domIngress = d[idx+1:]
+			d = d[:idx]
+		}
+
+		var pd pendingDomain
 		if svc, host, ok := strings.Cut(d, "="); ok && !strings.Contains(svc, ".") {
 			// service=domain format (svc won't contain dots, domains will)
 			// Strip any trailing :port from host — service name already determines the port
 			host, _, _ = strings.Cut(host, ":")
-			pending = append(pending, pendingDomain{Host: host, Service: svc})
+			pd = pendingDomain{Host: host, Service: svc}
 		} else if host, portStr, ok := strings.Cut(d, ":"); ok {
 			port, err := strconv.Atoi(portStr)
 			if err != nil {
 				return fmt.Errorf("invalid port in domain %q: %w", d, err)
 			}
-			pending = append(pending, pendingDomain{Host: host, Port: port})
+			pd = pendingDomain{Host: host, Port: port}
 		} else {
-			pending = append(pending, pendingDomain{Host: d})
+			pd = pendingDomain{Host: d}
 		}
+		pd.Ingress = domIngress
+		pending = append(pending, pd)
 	}
 	domainsFromFlags := len(pending) > 0
 
@@ -612,7 +640,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 				if p.Port == 0 {
 					p.Port = hostPort
 				}
-				domains = append(domains, config.Domain{Host: p.Host, Port: p.Port})
+				domains = append(domains, pendingToDomain(p, ingress))
 			}
 		} else {
 			// Has compose file — infer from it
@@ -625,7 +653,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 				labeled := docker.ServicesWithDomainLabels(composeSvcs)
 				for _, svc := range labeled {
 					if svc.HostPort > 0 {
-						pending = append(pending, pendingDomain{Host: svc.Domain, Port: svc.HostPort})
+						pending = append(pending, pendingDomain{Host: svc.Domain, Port: svc.HostPort, Ingress: svc.Ingress})
 						fmt.Printf("  Found jib.domain label: %s → %s (port %d)\n", svc.Name, svc.Domain, svc.HostPort)
 					} else {
 						fmt.Printf("  Warning: service %q has jib.domain=%s but no exposed port, skipping\n", svc.Name, svc.Domain)
@@ -636,7 +664,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			// Resolve service names and fill missing ports
 			singleService := len(inferredPorts) == 1
 			for _, p := range pending {
-				d := config.Domain{Host: p.Host, Port: p.Port}
 				if p.Service != "" {
 					// service=domain format — resolve port from compose
 					svc, ok := docker.ServiceByName(composeSvcs, p.Service)
@@ -646,18 +673,18 @@ func runAdd(cmd *cobra.Command, args []string) error {
 					if svc.HostPort == 0 {
 						return fmt.Errorf("service %q has no exposed port", p.Service)
 					}
-					d.Port = svc.HostPort
+					p.Port = svc.HostPort
 					fmt.Printf("  Resolved %s → port %d (service %s)\n", p.Host, svc.HostPort, p.Service)
-				} else if d.Port == 0 {
+				} else if p.Port == 0 {
 					if singleService {
-						d.Port = inferredPorts[0]
-						fmt.Printf("  Inferred port %d for %s\n", d.Port, d.Host)
+						p.Port = inferredPorts[0]
+						fmt.Printf("  Inferred port %d for %s\n", p.Port, p.Host)
 					} else if len(inferredPorts) > 0 {
-						d.Port = inferredPorts[0]
-						fmt.Printf("  Inferred port %d for %s (first exposed port — use service=domain for multi-service apps)\n", d.Port, d.Host)
+						p.Port = inferredPorts[0]
+						fmt.Printf("  Inferred port %d for %s (first exposed port — use service=domain for multi-service apps)\n", p.Port, p.Host)
 					}
 				}
-				domains = append(domains, d)
+				domains = append(domains, pendingToDomain(p, ingress))
 			}
 
 			if len(healthChecks) == 0 && inferredPort > 0 {
@@ -668,7 +695,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	} else {
 		// config-only mode — no compose parsing, use pending as-is
 		for _, p := range pending {
-			domains = append(domains, config.Domain{Host: p.Host, Port: p.Port})
+			domains = append(domains, pendingToDomain(p, ingress))
 		}
 	}
 
@@ -704,7 +731,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		newApp := config.App{
 			Repo:      repo,
 			Provider:  providerName,
-			Ingress:   ingress,
 			Compose:   composeFiles,
 			Domains:   domains,
 			Health:    healthChecks,
@@ -791,25 +817,42 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		fmt.Println("  nginx: reloaded")
 	}
 
-	// SSL — only for direct ingress (tunnels handle TLS at the edge)
-	if !appCfg.IsTunnelIngress() {
-		sslMgr := newSSLManager(cfg)
-		for _, d := range appCfg.Domains {
-			check := network.CheckDomain(d.Host)
-			if check.Warning != "" {
-				fmt.Fprintf(os.Stderr, "  ssl: skipping %s — %s\n", d.Host, check.Warning)
-				continue
-			}
-			fmt.Printf("  ssl: obtaining cert for %s...\n", d.Host)
-			if err := sslMgr.Obtain(ctx, d.Host); err != nil {
-				fmt.Fprintf(os.Stderr, "  ssl: warning: %s: %v\n", d.Host, err)
-			} else {
-				fmt.Printf("  ssl: %s OK\n", d.Host)
-			}
+	// SSL — per-domain: skip tunnel domains (they handle TLS at the edge)
+	sslMgr := newSSLManager(cfg)
+	for _, d := range appCfg.Domains {
+		if d.IsTunnelIngress() {
+			fmt.Printf("  ssl: skipping %s (tunnel: %s)\n", d.Host, d.Ingress)
+			continue
+		}
+		check := network.CheckDomain(d.Host)
+		if check.Warning != "" {
+			fmt.Fprintf(os.Stderr, "  ssl: skipping %s — %s\n", d.Host, check.Warning)
+			continue
+		}
+		fmt.Printf("  ssl: obtaining cert for %s...\n", d.Host)
+		if err := sslMgr.Obtain(ctx, d.Host); err != nil {
+			fmt.Fprintf(os.Stderr, "  ssl: warning: %s: %v\n", d.Host, err)
+		} else {
+			fmt.Printf("  ssl: %s OK\n", d.Host)
 		}
 	}
 
-	// --- Step 6: Domain checks (warnings only) ---
+	// --- Step 6: Cloudflare tunnel routes (if applicable) ---
+	var cfDomains []string
+	for _, d := range domains {
+		if d.Ingress == "cloudflare-tunnel" {
+			cfDomains = append(cfDomains, d.Host)
+		}
+	}
+	if len(cfDomains) > 0 {
+		fmt.Println("\nSetting up Cloudflare tunnel routes...")
+		if err := addCloudflareRoutes(ctx, cfDomains); err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: %v\n", err)
+			fmt.Fprintln(os.Stderr, "  You may need to add DNS records and tunnel routes manually.")
+		}
+	}
+
+	// --- Step 7: Domain checks (warnings only) ---
 	fmt.Println("\nChecking domains...")
 	for _, d := range domains {
 		checkDomainAndWarn(d.Host)
@@ -951,7 +994,23 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// 2. Remove nginx configs
+	// 2. Remove Cloudflare tunnel routes (if applicable)
+	var cfDomains []string
+	for _, d := range appCfg.Domains {
+		if d.Ingress == "cloudflare-tunnel" {
+			cfDomains = append(cfDomains, d.Host)
+		}
+	}
+	if len(cfDomains) > 0 {
+		ctx := context.Background()
+		if err := removeCloudflareRoutes(ctx, cfDomains); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: removing cloudflare routes: %v\n", err)
+		} else {
+			removed = append(removed, "cloudflare routes")
+		}
+	}
+
+	// 3. Remove nginx configs
 	if len(appCfg.Domains) > 0 {
 		p := newProxy(cfg)
 		if err := p.RemoveConfigs(appName, appCfg.Domains); err != nil {

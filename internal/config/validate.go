@@ -123,9 +123,8 @@ func validateApp(ve *ValidationError, name string, app *App, github *GitHubConfi
 		}
 	}
 
-	// Ingress type.
-	validIngress := map[string]bool{"": true, "direct": true, "cloudflare-tunnel": true, "tailscale": true}
-	if !validIngress[app.Ingress] {
+	// App-level ingress (deprecated, kept for backward compat).
+	if app.Ingress != "" && !ValidIngressValues[app.Ingress] {
 		ve.addf("%s: ingress must be 'direct', 'cloudflare-tunnel', or 'tailscale', got %q", prefix, app.Ingress)
 	}
 
@@ -149,6 +148,9 @@ func validateApp(ve *ValidationError, name string, app *App, github *GitHubConfi
 		}
 		if d.Port < 1 || d.Port > 65535 {
 			ve.addf("%s: invalid port %d", dprefix, d.Port)
+		}
+		if d.Ingress != "" && !ValidIngressValues[d.Ingress] {
+			ve.addf("%s: ingress must be 'direct', 'cloudflare-tunnel', or 'tailscale', got %q", dprefix, d.Ingress)
 		}
 	}
 

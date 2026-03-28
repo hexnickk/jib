@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -61,8 +62,21 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 	// Show setup guide when running interactively without flags.
 	appID, _ := cmd.Flags().GetInt64("app-id")
 	keyFile, _ := cmd.Flags().GetString("private-key")
+
 	if appID == 0 && keyFile == "" && tui.IsInteractive() {
-		fmt.Println("Register a GitHub App as a git provider for jib.")
+		method, err := tui.PromptSelect("How would you like to create the GitHub App?", []tui.SelectOption{
+			{Label: "Automatic (recommended) — creates the app in your browser", Value: "manifest"},
+			{Label: "Manual — you create the app and paste credentials", Value: "manual"},
+		})
+		if err != nil {
+			return err
+		}
+
+		if method == "manifest" {
+			return runGitHubAppManifest(name, root)
+		}
+
+		// Manual flow — show guide
 		fmt.Println()
 		fmt.Println("You'll need:")
 		fmt.Println("  1. A GitHub App — create one at https://github.com/settings/apps/new")
@@ -71,9 +85,6 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		fmt.Println("     - Disable webhooks (uncheck Active)")
 		fmt.Println("  2. The App ID — shown on the app's settings page after creation")
 		fmt.Println("  3. A private key — generate one under the app's settings → Private keys")
-		fmt.Println()
-		fmt.Println("After setup, install the app on your repo:")
-		fmt.Println("  https://github.com/settings/apps/<app-slug>/installations")
 		fmt.Println()
 	}
 
@@ -106,6 +117,24 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		src = strings.NewReader(pemData)
 	}
 
+	return saveGitHubAppProvider(name, root, appID, src)
+}
+
+// runGitHubAppManifest handles the automatic GitHub App creation via manifest flow.
+func runGitHubAppManifest(name, root string) error {
+	ctx := context.Background()
+	result, err := ghPkg.RunManifestFlow(ctx, name)
+	if err != nil {
+		return fmt.Errorf("manifest flow: %w", err)
+	}
+
+	fmt.Printf("\nGitHub App %q created (ID: %d).\n", result.Slug, result.AppID)
+
+	return saveGitHubAppProvider(name, root, result.AppID, strings.NewReader(result.PEM))
+}
+
+// saveGitHubAppProvider saves the app ID to config and the PEM key to disk.
+func saveGitHubAppProvider(name, root string, appID int64, pemSrc io.Reader) error {
 	pemPath := ghPkg.AppPEMPath(root, name)
 	if err := os.MkdirAll(filepath.Dir(pemPath), 0o700); err != nil {
 		return fmt.Errorf("creating secrets directory: %w", err)
@@ -115,7 +144,7 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("creating PEM file: %w", err)
 	}
-	if _, err := io.Copy(dst, src); err != nil {
+	if _, err := io.Copy(dst, pemSrc); err != nil {
 		_ = dst.Close()
 		return fmt.Errorf("copying PEM file: %w", err)
 	}
@@ -133,7 +162,10 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Provider %q (GitHub App, app_id=%d) created.\n", name, appID)
 	fmt.Printf("Private key stored at %s\n", pemPath)
-	fmt.Printf("\nUse it with: jib add <app> --repo <org/repo> --domain <domain> --git-provider %s\n", name)
+	fmt.Println()
+	fmt.Println("Next: install the app on your GitHub org/repo:")
+	fmt.Printf("  https://github.com/settings/apps/%s/installations\n", name)
+	fmt.Printf("\nThen use it with: jib add <app> --repo <org/repo> --domain <domain> --git-provider %s\n", name)
 	return nil
 }
 

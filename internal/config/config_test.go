@@ -554,3 +554,108 @@ func TestDefaultConfigPath(t *testing.T) {
 		t.Errorf("DefaultConfigPath() = %q", DefaultConfigPath())
 	}
 }
+
+func TestDomainIsTunnelIngress(t *testing.T) {
+	tests := []struct {
+		ingress string
+		want    bool
+	}{
+		{"", false},
+		{"direct", false},
+		{"cloudflare-tunnel", true},
+		{"tailscale", true},
+	}
+	for _, tt := range tests {
+		d := Domain{Host: "example.com", Port: 80, Ingress: tt.ingress}
+		if got := d.IsTunnelIngress(); got != tt.want {
+			t.Errorf("Domain{Ingress: %q}.IsTunnelIngress() = %v, want %v", tt.ingress, got, tt.want)
+		}
+	}
+}
+
+func TestMigrateV1AppIngress(t *testing.T) {
+	yml := `
+config_version: 1
+apps:
+  myapp:
+    repo: org/repo
+    ingress: cloudflare-tunnel
+    domains:
+      - host: example.com
+        port: 80
+      - host: api.example.com
+        port: 3000
+`
+	cfg, err := LoadConfig(writeTemp(t, yml))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	app := cfg.Apps["myapp"]
+	// App-level ingress should be cleared after migration
+	if app.Ingress != "" {
+		t.Errorf("app.Ingress = %q, want empty (migrated to domains)", app.Ingress)
+	}
+	// Both domains should have the ingress
+	for i, d := range app.Domains {
+		if d.Ingress != "cloudflare-tunnel" {
+			t.Errorf("domain[%d].Ingress = %q, want cloudflare-tunnel", i, d.Ingress)
+		}
+	}
+	if cfg.ConfigVersion != 2 {
+		t.Errorf("config_version = %d, want 2", cfg.ConfigVersion)
+	}
+}
+
+func TestPerDomainIngress(t *testing.T) {
+	yml := `
+config_version: 2
+apps:
+  myapp:
+    repo: org/repo
+    domains:
+      - host: example.com
+        port: 80
+        ingress: cloudflare-tunnel
+      - host: admin.example.com
+        port: 80
+        ingress: tailscale
+      - host: staging.example.com
+        port: 80
+`
+	cfg, err := LoadConfig(writeTemp(t, yml))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	app := cfg.Apps["myapp"]
+	if app.Domains[0].Ingress != "cloudflare-tunnel" {
+		t.Errorf("domain[0].Ingress = %q", app.Domains[0].Ingress)
+	}
+	if app.Domains[1].Ingress != "tailscale" {
+		t.Errorf("domain[1].Ingress = %q", app.Domains[1].Ingress)
+	}
+	if app.Domains[2].Ingress != "" {
+		t.Errorf("domain[2].Ingress = %q, want empty (direct)", app.Domains[2].Ingress)
+	}
+}
+
+func TestValidation_BadDomainIngress(t *testing.T) {
+	yml := `
+config_version: 2
+apps:
+  myapp:
+    repo: org/repo
+    domains:
+      - host: example.com
+        port: 80
+        ingress: wireguard
+`
+	_, err := LoadConfig(writeTemp(t, yml))
+	if err == nil {
+		t.Fatal("expected error for bad domain ingress")
+	}
+	if !strings.Contains(err.Error(), "ingress must be") {
+		t.Errorf("error = %v", err)
+	}
+}

@@ -34,7 +34,21 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("config version %d is newer than this jib binary supports (v%d). Run 'jib upgrade' first", cfg.ConfigVersion, LatestConfigVersion)
 	}
 
-	// TODO: run migrations here when config_version < LatestConfigVersion
+	// Migrate v1 → v2: move app-level ingress to per-domain.
+	if cfg.ConfigVersion < 2 {
+		for name, app := range cfg.Apps {
+			if app.Ingress != "" && app.Ingress != "direct" {
+				for i := range app.Domains {
+					if app.Domains[i].Ingress == "" {
+						app.Domains[i].Ingress = app.Ingress
+					}
+				}
+			}
+			app.Ingress = ""
+			cfg.Apps[name] = app
+		}
+		cfg.ConfigVersion = 2
+	}
 
 	applyDefaults(&cfg)
 

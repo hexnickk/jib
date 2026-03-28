@@ -78,6 +78,46 @@ services:
 	}
 }
 
+func TestParseComposeServicesWithIngressLabel(t *testing.T) {
+	dir := t.TempDir()
+	compose := `
+services:
+  web:
+    image: nginx
+    ports:
+      - "8080:80"
+    labels:
+      jib.domain: example.com
+      jib.ingress: cloudflare-tunnel
+  api:
+    image: node
+    ports:
+      - "3000:3000"
+    labels:
+      jib.domain: api.example.com
+`
+	if err := os.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(compose), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	svcs, err := ParseComposeServices(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	byName := make(map[string]ComposeService)
+	for _, s := range svcs {
+		byName[s.Name] = s
+	}
+
+	if byName["web"].Ingress != "cloudflare-tunnel" {
+		t.Errorf("web ingress = %q, want cloudflare-tunnel", byName["web"].Ingress)
+	}
+	if byName["api"].Ingress != "" {
+		t.Errorf("api ingress = %q, want empty", byName["api"].Ingress)
+	}
+}
+
 func TestParseComposeLabelsOverride(t *testing.T) {
 	dir := t.TempDir()
 	base := `

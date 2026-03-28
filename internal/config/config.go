@@ -27,7 +27,7 @@ func (s *StringOrSlice) UnmarshalYAML(value *yaml.Node) error {
 }
 
 // LatestConfigVersion is the current config schema version.
-const LatestConfigVersion = 1
+const LatestConfigVersion = 2
 
 // Config is the top-level Jib configuration.
 type Config struct {
@@ -85,10 +85,13 @@ type AppWebhook struct {
 	Provider string `yaml:"provider"` // github, gitlab, etc.
 }
 
-// IsTunnelIngress returns true if the app uses a tunnel-based ingress (Cloudflare or Tailscale)
+// ValidIngressValues contains the allowed ingress types.
+var ValidIngressValues = map[string]bool{"": true, "direct": true, "cloudflare-tunnel": true, "tailscale": true}
+
+// IsTunnelIngress returns true if the domain uses tunnel-based ingress (Cloudflare or Tailscale)
 // where TLS is handled at the edge, not by the server.
-func (a *App) IsTunnelIngress() bool {
-	return a.Ingress == "cloudflare-tunnel" || a.Ingress == "tailscale"
+func (d *Domain) IsTunnelIngress() bool {
+	return d.Ingress == "cloudflare-tunnel" || d.Ingress == "tailscale"
 }
 
 // App describes a single deployable application.
@@ -115,10 +118,11 @@ type App struct {
 	Webhook      *AppWebhook       `yaml:"webhook,omitempty"`
 }
 
-// Domain maps a hostname to a container port.
+// Domain maps a hostname to a container port with optional ingress method.
 type Domain struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Host    string `yaml:"host"`
+	Port    int    `yaml:"port"`
+	Ingress string `yaml:"ingress,omitempty"` // "", "direct", "cloudflare-tunnel", "tailscale"
 }
 
 // HealthCheck defines an HTTP health endpoint.
@@ -182,5 +186,7 @@ type WebhookConfig struct {
 
 // TunnelConfig controls tunnel integration.
 type TunnelConfig struct {
-	Provider string `yaml:"provider"`
+	Provider  string `yaml:"provider"`
+	TunnelID  string `yaml:"tunnel_id,omitempty"`
+	AccountID string `yaml:"account_id,omitempty"`
 }
