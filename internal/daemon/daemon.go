@@ -142,21 +142,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		d.runScheduler(ctx)
 	}()
 
-	// 3. Health monitor.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		d.runHealthMonitor(ctx)
-	}()
-
-	// 4. Cert watcher.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		d.runCertWatcher(ctx)
-	}()
-
-	// 5. Heartbeat (only if NATS connected).
+	// 3. Heartbeat (only if NATS connected).
 	if d.bus != nil {
 		wg.Add(1)
 		go func() {

@@ -244,12 +244,12 @@ NATS uses token auth. Separate tokens for:
 - [ ] Add webhook container to stack compose (deferred to Stage 7)
 - [ ] Dockerfile (deferred to Stage 7)
 
-### Stage 5: Extract health monitor + cert watcher into containers
-- [ ] New `cmd/jib-health/` — HTTP health checks, publishes events
-- [ ] Uses `network_mode: host` to reach app ports on localhost
-- [ ] New `cmd/jib-certs/` — cert expiry monitor, publishes events + renew commands
-- [ ] Delete `internal/daemon/health.go` and `internal/daemon/certs.go`
-- [ ] Daemon now: poller + backup scheduler + NATS command handler
+### Stage 5: Extract health monitor + cert watcher into containers [DONE]
+- [x] New `cmd/jib-health/` — HTTP health checks with state tracking (transitions only)
+- [x] New `cmd/jib-certs/` — cert expiry monitor, publishes events + renew commands
+- [x] Delete `internal/daemon/health.go` and `internal/daemon/certs.go`
+- [x] Daemon now: poller + backup scheduler + NATS command handler + heartbeat
+- [x] Removed dead `publishHealthEvent` from daemon
 
 ### Stage 6: Extract notifiers into containers
 - [ ] New `cmd/jib-notify/` — generic notifier with --driver flag

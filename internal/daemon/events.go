@@ -31,18 +31,6 @@ func (d *Daemon) publishDeployEvent(result *deploy.DeployResult, trigger, user, 
 	d.publish(ev.Subject(), ev)
 }
 
-// publishHealthEvent publishes a health check event to the NATS bus.
-func (d *Daemon) publishHealthEvent(app, endpoint, status, errMsg string) {
-	ev := bus.HealthEvent{
-		Message:  bus.NewMessage("daemon"),
-		App:      app,
-		Endpoint: endpoint,
-		Status:   status,
-		Error:    errMsg,
-	}
-	d.publish(ev.Subject(), ev)
-}
-
 // publishCertEvent publishes a certificate expiry event to the NATS bus.
 func (d *Daemon) publishCertEvent(domain string, daysLeft int, errMsg string) {
 	ev := bus.CertEvent{

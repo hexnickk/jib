@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -220,8 +221,9 @@ func (d *Daemon) handleCertRenewCmd(subject string, data []byte) (interface{}, e
 	}
 
 	go func() {
-		if err := d.renewCert(d.ctx, cmd.Domain); err != nil {
-			d.logger.Printf("bus: cert renew %s failed: %v", cmd.Domain, err)
+		out, err := exec.CommandContext(d.ctx, "certbot", "renew", "--cert-name", cmd.Domain, "--non-interactive").CombinedOutput() //nolint:gosec // domain from validated command
+		if err != nil {
+			d.logger.Printf("bus: cert renew %s failed: %v: %s", cmd.Domain, err, out)
 			d.publishCertEvent(cmd.Domain, 0, err.Error())
 		} else {
 			d.logger.Printf("bus: cert renewed %s", cmd.Domain)
