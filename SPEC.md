@@ -236,13 +236,13 @@ NATS uses token auth. Separate tokens for:
 - [x] Publish result events after execution
 - [x] Immediate ACK via request-reply
 
-### Stage 4: Extract webhook into container
-- [ ] New `cmd/jib-webhook/` — standalone HTTP server
-- [ ] Validates signatures, publishes DeployCommand to NATS
-- [ ] Returns 202 to caller immediately
-- [ ] Delete `internal/daemon/webhook.go`
-- [ ] Add webhook container to stack compose
-- [ ] Mount only webhook secrets (not all secrets)
+### Stage 4: Extract webhook into container [DONE]
+- [x] New `cmd/jib-webhook/` — standalone HTTP server
+- [x] Validates signatures, publishes DeployCommand to NATS
+- [x] Returns 202 to caller immediately (or 409 if rejected)
+- [x] Delete `internal/daemon/webhook.go`
+- [ ] Add webhook container to stack compose (deferred to Stage 7)
+- [ ] Dockerfile (deferred to Stage 7)
 
 ### Stage 5: Extract health monitor + cert watcher into containers
 - [ ] New `cmd/jib-health/` — HTTP health checks, publishes events

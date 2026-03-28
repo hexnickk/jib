@@ -135,35 +135,28 @@ func (d *Daemon) Run(ctx context.Context) error {
 		d.runPoller(ctx)
 	}()
 
-	// 2. Webhook server.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		d.runWebhookServer(ctx)
-	}()
-
-	// 3. Backup scheduler.
+	// 2. Backup scheduler.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		d.runScheduler(ctx)
 	}()
 
-	// 4. Health monitor.
+	// 3. Health monitor.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		d.runHealthMonitor(ctx)
 	}()
 
-	// 5. Cert watcher.
+	// 4. Cert watcher.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		d.runCertWatcher(ctx)
 	}()
 
-	// 6. Heartbeat (only if NATS connected).
+	// 5. Heartbeat (only if NATS connected).
 	if d.bus != nil {
 		wg.Add(1)
 		go func() {
