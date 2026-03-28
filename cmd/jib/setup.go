@@ -43,7 +43,7 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	addCmd.Flags().String("git-provider", "", "Git auth provider name (from 'jib github key/app setup')")
 	addCmd.Flags().String("ingress", "direct", "Ingress type: direct, cloudflare-tunnel, tailscale")
 	addCmd.Flags().String("compose", "", "Compose file path (or comma-separated list)")
-	addCmd.Flags().StringSlice("domain", nil, "Domain or domain:port (repeatable). Port is inferred from compose if omitted.")
+	addCmd.Flags().StringSlice("domain", nil, "Domain mapping (repeatable): example.com, web=example.com, or example.com:8080. Omit to use jib.domain labels from compose.")
 	addCmd.Flags().StringSlice("health", nil, "Health check path:port (repeatable). Inferred from compose if omitted.")
 	addCmd.Flags().Bool("config-only", false, "Write config without provisioning")
 	rootCmd.AddCommand(addCmd)
@@ -461,6 +461,14 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		fmt.Println("  2. A domain pointed at this server (A/CNAME record)")
 		fmt.Println("  3. A git provider (set up with 'jib github app setup' or 'jib github key setup')")
 		fmt.Println()
+		fmt.Println("Domain formats:")
+		fmt.Println("  example.com          single-service app (port auto-detected)")
+		fmt.Println("  web=example.com      map domain to a specific compose service")
+		fmt.Println("  example.com:8080     map domain to an explicit port")
+		fmt.Println()
+		fmt.Println("Or add jib.domain labels to your docker-compose.yml services")
+		fmt.Println("and omit --domain entirely.")
+		fmt.Println()
 	}
 
 	if repo == "" {
@@ -471,11 +479,13 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if len(domainFlags) == 0 {
-		domain, err := tui.PromptString("domain", "Domain (e.g. example.com)")
+		domain, err := tui.PromptStringOptional("Domain (leave empty to use jib.domain labels from compose)")
 		if err != nil {
 			return err
 		}
-		domainFlags = []string{domain}
+		if domain != "" {
+			domainFlags = []string{domain}
+		}
 	}
 
 	// Check early if app already exists to avoid cloning/generating before failing.
@@ -497,19 +507,33 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		composeFiles = strings.Split(composeFlag, ",")
 	}
 
-	// Parse domains (port will be filled in after clone + inference)
-	var domains []config.Domain
+	// Parse domains. Supported formats:
+	//   example.com        — port inferred (single-service shortcut)
+	//   example.com:8080   — explicit port
+	//   web=example.com    — service name, port resolved from compose
+	type pendingDomain struct {
+		Host    string
+		Port    int
+		Service string // non-empty if using service=domain format
+	}
+	var pending []pendingDomain
 	for _, d := range domainFlags {
-		if host, portStr, ok := strings.Cut(d, ":"); ok {
+		if svc, host, ok := strings.Cut(d, "="); ok && !strings.Contains(svc, ".") {
+			// service=domain format (svc won't contain dots, domains will)
+			// Strip any trailing :port from host — service name already determines the port
+			host, _, _ = strings.Cut(host, ":")
+			pending = append(pending, pendingDomain{Host: host, Service: svc})
+		} else if host, portStr, ok := strings.Cut(d, ":"); ok {
 			port, err := strconv.Atoi(portStr)
 			if err != nil {
 				return fmt.Errorf("invalid port in domain %q: %w", d, err)
 			}
-			domains = append(domains, config.Domain{Host: host, Port: port})
+			pending = append(pending, pendingDomain{Host: host, Port: port})
 		} else {
-			domains = append(domains, config.Domain{Host: d})
+			pending = append(pending, pendingDomain{Host: d})
 		}
 	}
+	domainsFromFlags := len(pending) > 0
 
 	// Parse health checks if explicitly provided
 	var healthChecks []config.HealthCheck
@@ -566,6 +590,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// --- Step 2: Infer ports and health from compose/Dockerfile ---
+	var domains []config.Domain
 	if !configOnly {
 		files := []string(composeFiles)
 		if len(files) == 0 {
@@ -583,10 +608,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			composeFiles = config.StringOrSlice{composePath}
 			fmt.Printf("  Generated compose: %s (port %d)\n", composePath, hostPort)
 
-			for i := range domains {
-				if domains[i].Port == 0 {
-					domains[i].Port = hostPort
+			for _, p := range pending {
+				if p.Port == 0 {
+					p.Port = hostPort
 				}
+				domains = append(domains, config.Domain{Host: p.Host, Port: p.Port})
 			}
 		} else {
 			// Has compose file — infer from it
@@ -594,11 +620,44 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			inferredPath, inferredPort := docker.InferHealthAndPort(composeSvcs)
 			inferredPorts := docker.InferPorts(composeSvcs)
 
-			for i := range domains {
-				if domains[i].Port == 0 && len(inferredPorts) > 0 {
-					domains[i].Port = inferredPorts[0]
-					fmt.Printf("  Inferred port %d for %s\n", inferredPorts[0], domains[i].Host)
+			// If no --domain flags, check for jib.domain labels in compose
+			if !domainsFromFlags {
+				labeled := docker.ServicesWithDomainLabels(composeSvcs)
+				for _, svc := range labeled {
+					if svc.HostPort > 0 {
+						pending = append(pending, pendingDomain{Host: svc.Domain, Port: svc.HostPort})
+						fmt.Printf("  Found jib.domain label: %s → %s (port %d)\n", svc.Name, svc.Domain, svc.HostPort)
+					} else {
+						fmt.Printf("  Warning: service %q has jib.domain=%s but no exposed port, skipping\n", svc.Name, svc.Domain)
+					}
 				}
+			}
+
+			// Resolve service names and fill missing ports
+			singleService := len(inferredPorts) == 1
+			for _, p := range pending {
+				d := config.Domain{Host: p.Host, Port: p.Port}
+				if p.Service != "" {
+					// service=domain format — resolve port from compose
+					svc, ok := docker.ServiceByName(composeSvcs, p.Service)
+					if !ok {
+						return fmt.Errorf("service %q not found in compose file", p.Service)
+					}
+					if svc.HostPort == 0 {
+						return fmt.Errorf("service %q has no exposed port", p.Service)
+					}
+					d.Port = svc.HostPort
+					fmt.Printf("  Resolved %s → port %d (service %s)\n", p.Host, svc.HostPort, p.Service)
+				} else if d.Port == 0 {
+					if singleService {
+						d.Port = inferredPorts[0]
+						fmt.Printf("  Inferred port %d for %s\n", d.Port, d.Host)
+					} else if len(inferredPorts) > 0 {
+						d.Port = inferredPorts[0]
+						fmt.Printf("  Inferred port %d for %s (first exposed port — use service=domain for multi-service apps)\n", d.Port, d.Host)
+					}
+				}
+				domains = append(domains, d)
 			}
 
 			if len(healthChecks) == 0 && inferredPort > 0 {
@@ -606,12 +665,20 @@ func runAdd(cmd *cobra.Command, args []string) error {
 				fmt.Printf("  Inferred health check: %s:%d\n", inferredPath, inferredPort)
 			}
 		}
+	} else {
+		// config-only mode — no compose parsing, use pending as-is
+		for _, p := range pending {
+			domains = append(domains, config.Domain{Host: p.Host, Port: p.Port})
+		}
 	}
 
 	// Check all domains have ports
+	if len(domains) == 0 {
+		return fmt.Errorf("no domains configured — use --domain or add jib.domain labels to your docker-compose.yml")
+	}
 	for _, d := range domains {
 		if d.Port == 0 {
-			return fmt.Errorf("could not determine port for domain %q — specify as domain:port", d.Host)
+			return fmt.Errorf("could not determine port for domain %q — specify as domain:port or service=domain", d.Host)
 		}
 	}
 

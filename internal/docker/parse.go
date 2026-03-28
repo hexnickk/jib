@@ -14,6 +14,7 @@ import (
 type ComposeService struct {
 	Name       string
 	HostPort   int    // First host-mapped port, 0 if none
+	Domain     string // From jib.domain label, if set
 	HealthPath string // Parsed from healthcheck.test if it's a curl/wget URL
 	HealthPort int    // Parsed from healthcheck.test
 }
@@ -25,9 +26,36 @@ type composeFile struct {
 
 type composeServiceDef struct {
 	Ports       []interface{} `yaml:"ports"`
+	Labels      composeLabels `yaml:"labels,omitempty"`
 	Healthcheck *struct {
 		Test interface{} `yaml:"test"`
 	} `yaml:"healthcheck,omitempty"`
+}
+
+// composeLabels handles both map and list forms of docker-compose labels.
+type composeLabels map[string]string
+
+func (cl *composeLabels) UnmarshalYAML(value *yaml.Node) error {
+	*cl = make(map[string]string)
+	switch value.Kind {
+	case yaml.MappingNode:
+		var m map[string]string
+		if err := value.Decode(&m); err != nil {
+			return err
+		}
+		*cl = m
+	case yaml.SequenceNode:
+		var items []string
+		if err := value.Decode(&items); err != nil {
+			return err
+		}
+		for _, item := range items {
+			if k, v, ok := strings.Cut(item, "="); ok {
+				(*cl)[k] = v
+			}
+		}
+	}
+	return nil
 }
 
 // ParseComposeServices reads a compose file and extracts port/health info per service.
@@ -56,6 +84,9 @@ func ParseComposeServices(repoDir string, composeFiles []string) ([]ComposeServi
 				if len(svc.Ports) > 0 {
 					existing.Ports = svc.Ports
 				}
+				if len(svc.Labels) > 0 {
+					existing.Labels = svc.Labels
+				}
 				if svc.Healthcheck != nil {
 					existing.Healthcheck = svc.Healthcheck
 				}
@@ -73,6 +104,11 @@ func ParseComposeServices(repoDir string, composeFiles []string) ([]ComposeServi
 		// Parse first host port
 		if len(svc.Ports) > 0 {
 			cs.HostPort = parseFirstHostPort(svc.Ports[0])
+		}
+
+		// Parse jib.domain label
+		if d, ok := svc.Labels["jib.domain"]; ok {
+			cs.Domain = d
 		}
 
 		// Parse health check from healthcheck.test
@@ -117,6 +153,27 @@ func InferPorts(services []ComposeService) []int {
 		}
 	}
 	return ports
+}
+
+// ServiceByName returns the ComposeService with the given name, or false if not found.
+func ServiceByName(services []ComposeService, name string) (ComposeService, bool) {
+	for _, svc := range services {
+		if svc.Name == name {
+			return svc, true
+		}
+	}
+	return ComposeService{}, false
+}
+
+// ServicesWithDomainLabels returns services that have a jib.domain label set.
+func ServicesWithDomainLabels(services []ComposeService) []ComposeService {
+	var out []ComposeService
+	for _, svc := range services {
+		if svc.Domain != "" {
+			out = append(out, svc)
+		}
+	}
+	return out
 }
 
 // parseFirstHostPort extracts the host port from a port mapping.
