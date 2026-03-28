@@ -53,17 +53,11 @@ type apiResponse struct {
 	Success bool            `json:"success"`
 	Errors  []apiError      `json:"errors"`
 	Result  json.RawMessage `json:"result"`
-	Info    *apiResultInfo  `json:"result_info,omitempty"`
 }
 
 type apiError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
-}
-
-type apiResultInfo struct {
-	Count      int `json:"count"`
-	TotalCount int `json:"total_count"`
 }
 
 // VerifyToken validates the API token and returns the first account ID.
@@ -116,13 +110,16 @@ func (c *Client) GetTunnelToken(ctx context.Context, accountID, tunnelID string)
 
 // GetTunnelIngress retrieves the current ingress rules for a tunnel.
 func (c *Client) GetTunnelIngress(ctx context.Context, accountID, tunnelID string) ([]IngressRule, error) {
+	// CF API result shape: {"config": {"ingress": [...]}}
 	var cfg struct {
-		Ingress []IngressRule `json:"ingress"`
+		Config struct {
+			Ingress []IngressRule `json:"ingress"`
+		} `json:"config"`
 	}
 	if err := c.doJSON(ctx, "GET", fmt.Sprintf("/accounts/%s/cfd_tunnel/%s/configurations", accountID, tunnelID), nil, &cfg); err != nil {
 		return nil, fmt.Errorf("getting tunnel config: %w", err)
 	}
-	return cfg.Ingress, nil
+	return cfg.Config.Ingress, nil
 }
 
 // PutTunnelIngress replaces the tunnel's ingress rules.
@@ -228,15 +225,20 @@ func (c *Client) AddTunnelRoutes(ctx context.Context, accountID, tunnelID string
 		return err
 	}
 
-	// Build new rules: existing (minus catch-all) + new domains + catch-all
+	// Build new rules: existing (minus catch-all and duplicates) + new domains + catch-all
+	newHostnames := make(map[string]bool)
+	for _, domain := range domains {
+		newHostnames[domain] = true
+		newHostnames["*."+domain] = true
+	}
+
 	var rules []IngressRule
 	for _, r := range existing {
-		if r.Hostname != "" {
+		if r.Hostname != "" && !newHostnames[r.Hostname] {
 			rules = append(rules, r)
 		}
 	}
 	for _, domain := range domains {
-		// Add both domain and wildcard ingress pointing to nginx
 		rules = append(rules,
 			IngressRule{Hostname: domain, Service: "http://localhost:80"},
 			IngressRule{Hostname: "*." + domain, Service: "http://localhost:80"},

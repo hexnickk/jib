@@ -117,7 +117,7 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		src = strings.NewReader(pemData)
 	}
 
-	return saveGitHubAppProvider(name, root, appID, src)
+	return saveGitHubAppProvider(name, root, appID, "", src)
 }
 
 // runGitHubAppManifest handles the automatic GitHub App creation via manifest flow.
@@ -130,11 +130,12 @@ func runGitHubAppManifest(name, root string) error {
 
 	fmt.Printf("\nGitHub App %q created (ID: %d).\n", result.Slug, result.AppID)
 
-	return saveGitHubAppProvider(name, root, result.AppID, strings.NewReader(result.PEM))
+	return saveGitHubAppProvider(name, root, result.AppID, result.Slug, strings.NewReader(result.PEM))
 }
 
 // saveGitHubAppProvider saves the app ID to config and the PEM key to disk.
-func saveGitHubAppProvider(name, root string, appID int64, pemSrc io.Reader) error {
+// slug is the GitHub App slug (used for the installation URL); empty for manual flow.
+func saveGitHubAppProvider(name, root string, appID int64, slug string, pemSrc io.Reader) error {
 	pemPath := ghPkg.AppPEMPath(root, name)
 	if err := os.MkdirAll(filepath.Dir(pemPath), 0o700); err != nil {
 		return fmt.Errorf("creating secrets directory: %w", err)
@@ -164,7 +165,10 @@ func saveGitHubAppProvider(name, root string, appID int64, pemSrc io.Reader) err
 	fmt.Printf("Private key stored at %s\n", pemPath)
 	fmt.Println()
 	fmt.Println("Next: install the app on your GitHub org/repo:")
-	fmt.Printf("  https://github.com/settings/apps/%s/installations\n", name)
+	if slug == "" {
+		slug = name // best guess for manual flow
+	}
+	fmt.Printf("  https://github.com/settings/apps/%s/installations\n", slug)
 	fmt.Printf("\nThen use it with: jib add <app> --repo <org/repo> --domain <domain> --git-provider %s\n", name)
 	return nil
 }

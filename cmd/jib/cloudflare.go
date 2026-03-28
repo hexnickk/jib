@@ -15,7 +15,6 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 func registerCloudflareCommands(rootCmd *cobra.Command) {
@@ -279,25 +278,14 @@ func loadCloudflareAPIToken() (string, error) {
 
 // loadTunnelConfig reads tunnel_id and account_id from the jib config.
 func loadTunnelConfig() (tunnelID, accountID string, err error) {
-	cfgPath := configPath()
-	data, err := os.ReadFile(cfgPath) //nolint:gosec // trusted config path
+	cfg, err := loadConfig()
 	if err != nil {
-		return "", "", fmt.Errorf("reading config: %w", err)
+		return "", "", fmt.Errorf("loading config: %w", err)
 	}
-
-	var raw struct {
-		Tunnel *struct {
-			TunnelID  string `yaml:"tunnel_id"`
-			AccountID string `yaml:"account_id"`
-		} `yaml:"tunnel"`
-	}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return "", "", fmt.Errorf("parsing config: %w", err)
-	}
-	if raw.Tunnel == nil || raw.Tunnel.TunnelID == "" {
+	if cfg.Tunnel == nil || cfg.Tunnel.TunnelID == "" {
 		return "", "", fmt.Errorf("no tunnel configured — run 'jib cloudflare setup' first")
 	}
-	return raw.Tunnel.TunnelID, raw.Tunnel.AccountID, nil
+	return cfg.Tunnel.TunnelID, cfg.Tunnel.AccountID, nil
 }
 
 // addCloudflareRoutes creates DNS records and tunnel ingress rules for the given domains.

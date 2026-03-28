@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net"
 	"net/http"
@@ -138,18 +139,19 @@ func serveManifestForm(w http.ResponseWriter, state, manifestJSON string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// The form auto-submits a POST to GitHub with the manifest.
 	// This is the official documented approach for the manifest flow.
+	// HTML-escape the JSON to prevent attribute breakout.
 	_, _ = fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
 <body>
   <h2>Creating GitHub App...</h2>
   <p>If you are not redirected, click the button below.</p>
   <form id="mf" action="https://github.com/settings/apps/new?state=%s" method="post">
-    <input type="hidden" name="manifest" value='%s'>
+    <input type="hidden" name="manifest" value="%s">
     <button type="submit">Create GitHub App</button>
   </form>
   <script>document.getElementById('mf').submit();</script>
 </body>
-</html>`, state, manifestJSON)
+</html>`, state, html.EscapeString(manifestJSON))
 }
 
 func exchangeManifestCode(ctx context.Context, code string) (*ManifestResult, error) {

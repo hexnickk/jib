@@ -972,13 +972,13 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	var removed []string
+	ctx := context.Background()
 
 	// 1. Docker compose down
 	compose, err := newCompose(cfg, appName)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not create compose handle: %v\n", err)
 	} else {
-		ctx := context.Background()
 		if volumes {
 			err = compose.DownVolumes(ctx)
 		} else {
@@ -1002,7 +1002,6 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if len(cfDomains) > 0 {
-		ctx := context.Background()
 		if err := removeCloudflareRoutes(ctx, cfDomains); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: removing cloudflare routes: %v\n", err)
 		} else {
