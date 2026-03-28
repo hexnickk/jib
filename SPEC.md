@@ -251,11 +251,12 @@ NATS uses token auth. Separate tokens for:
 - [x] Daemon now: poller + backup scheduler + NATS command handler + heartbeat
 - [x] Removed dead `publishHealthEvent` from daemon
 
-### Stage 6: Extract notifiers into containers
-- [ ] New `cmd/jib-notify/` — generic notifier with --driver flag
-- [ ] Subscribes to `jib.event.>`, reads config for routing
-- [ ] One container per notification channel in stack
-- [ ] Remove direct notification from daemon/deploy engine
+### Stage 6: Extract notifiers into containers [DONE]
+- [x] New `cmd/jib-notify/` — subscribes to all events, routes to channels
+- [x] Reads config for per-app channel routing (app.notify field)
+- [x] Reuses existing notify package drivers (telegram, slack, discord, webhook)
+- [x] Removed direct notifyBackup calls from daemon scheduler
+- [ ] Remove notifier from deploy engine (deferred — engine still uses it as fallback)
 
 ### Stage 7: Update CLI — init, status, stack management
 - [ ] `jib init` generates stack compose and starts it

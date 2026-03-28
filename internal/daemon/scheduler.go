@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hexnickk/jib/internal/bus"
 	"github.com/hexnickk/jib/internal/history"
-	"github.com/hexnickk/jib/internal/notify"
 )
 
 // runScheduler checks every minute whether any app's backup schedule matches
@@ -57,15 +57,13 @@ func (d *Daemon) checkSchedules(ctx context.Context) {
 		if err != nil {
 			d.logger.Printf("scheduler: %s: backup failed: %v", appName, err)
 			d.logBackupEvent(appName, "failure", err.Error(), start, duration)
-			d.publishBackupEvent(appName, "failure", err.Error(), duration)
-			d.notifyBackup(ctx, appName, "failure", err.Error())
+			d.publishBackupEvent(appName, bus.StatusFailure, err.Error(), duration)
 			continue
 		}
 
 		d.logger.Printf("scheduler: %s: backup complete (%s, %d volumes)", appName, result.Timestamp, len(result.Volumes))
 		d.logBackupEvent(appName, "success", "", start, duration)
-		d.publishBackupEvent(appName, "success", "", duration)
-		d.notifyBackup(ctx, appName, "success", "")
+		d.publishBackupEvent(appName, bus.StatusSuccess, "", duration)
 
 		// Update state with last backup time.
 		appState, err := d.stateStore.Load(appName)
@@ -91,29 +89,6 @@ func (d *Daemon) logBackupEvent(app, status, errMsg string, start time.Time, dur
 		Error:      errMsg,
 		DurationMs: duration.Milliseconds(),
 	})
-}
-
-// notifyBackup sends a backup notification event.
-func (d *Daemon) notifyBackup(ctx context.Context, app, status, errMsg string) {
-	if d.notifier == nil {
-		return
-	}
-	event := notify.Event{
-		App:       app,
-		Type:      "backup",
-		Trigger:   "scheduled",
-		User:      "daemon",
-		Status:    status,
-		Error:     errMsg,
-		Timestamp: time.Now(),
-	}
-
-	cfg := d.getConfig()
-	if appCfg, ok := cfg.Apps[app]; ok && len(appCfg.Notify) > 0 {
-		_ = d.notifier.SendForApp(ctx, appCfg.Notify, event)
-		return
-	}
-	_ = d.notifier.Send(ctx, event)
 }
 
 // cronMatches checks if the given time matches a simplified cron expression.
