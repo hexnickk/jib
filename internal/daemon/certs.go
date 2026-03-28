@@ -77,12 +77,14 @@ func (d *Daemon) checkCerts(ctx context.Context) {
 				d.logger.Printf("certs: %s: %s expires in %d days, attempting renewal", appName, domain.Host, daysLeft)
 				if err := d.renewCert(ctx, domain.Host); err != nil {
 					d.logger.Printf("certs: %s/%s: renewal failed: %v", appName, domain.Host, err)
+					d.publishCertEvent(domain.Host, daysLeft, err.Error())
 					d.notifyCert(ctx, appName, domain.Host, daysLeft, err)
 				} else {
 					d.logger.Printf("certs: %s: %s renewed successfully", appName, domain.Host)
 				}
 			} else if daysLeft <= certWarnDays {
 				d.logger.Printf("certs: %s: %s expires in %d days", appName, domain.Host, daysLeft)
+				d.publishCertEvent(domain.Host, daysLeft, "")
 				d.notifyCert(ctx, appName, domain.Host, daysLeft, nil)
 			}
 		}

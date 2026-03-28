@@ -57,12 +57,14 @@ func (d *Daemon) checkSchedules(ctx context.Context) {
 		if err != nil {
 			d.logger.Printf("scheduler: %s: backup failed: %v", appName, err)
 			d.logBackupEvent(appName, "failure", err.Error(), start, duration)
+			d.publishBackupEvent(appName, "failure", err.Error(), duration)
 			d.notifyBackup(ctx, appName, "failure", err.Error())
 			continue
 		}
 
 		d.logger.Printf("scheduler: %s: backup complete (%s, %d volumes)", appName, result.Timestamp, len(result.Volumes))
 		d.logBackupEvent(appName, "success", "", start, duration)
+		d.publishBackupEvent(appName, "success", "", duration)
 		d.notifyBackup(ctx, appName, "success", "")
 
 		// Update state with last backup time.

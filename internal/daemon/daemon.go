@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/hexnickk/jib/internal/backup"
+	"github.com/hexnickk/jib/internal/bus"
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/history"
@@ -42,7 +43,10 @@ type Daemon struct {
 	historyLog *history.Logger
 	backupMgr  *backup.Manager
 
-	logger *log.Logger
+	bus       *bus.Bus        // nil if NATS is unavailable
+	ctx       context.Context // daemon lifecycle context, used by background tasks
+	startTime time.Time
+	logger    *log.Logger
 }
 
 // New creates a new Daemon.
@@ -70,11 +74,22 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	defer func() { _ = os.Remove(pidPath) }()
 
+	d.startTime = time.Now()
 	d.logger.Printf("daemon started (pid %d)", os.Getpid())
+
+	// Connect to NATS (optional — daemon works without it).
+	b, err := bus.Connect(bus.Options{URL: bus.DefaultURL}, d.logger)
+	if err != nil {
+		d.logger.Printf("warning: NATS unavailable, events will not be published: %v", err)
+	} else {
+		d.bus = b
+		defer d.bus.Close()
+	}
 
 	// Create a cancellable context for subsystems.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	d.ctx = ctx
 
 	// Signal handling: SIGTERM/SIGINT cancel context, SIGHUP reloads config.
 	sigCh := make(chan os.Signal, 4)
@@ -141,6 +156,15 @@ func (d *Daemon) Run(ctx context.Context) error {
 		defer wg.Done()
 		d.runCertWatcher(ctx)
 	}()
+
+	// 6. Heartbeat (only if NATS connected).
+	if d.bus != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			d.runHeartbeat(ctx)
+		}()
+	}
 
 	// Block until context is cancelled.
 	<-ctx.Done()

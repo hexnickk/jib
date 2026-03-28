@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hexnickk/jib/internal/bus"
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/notify"
 )
@@ -62,6 +63,7 @@ func (d *Daemon) checkAllHealth(ctx context.Context) {
 
 			if !ok {
 				d.logger.Printf("health: %s unhealthy (%s)", appName, endpoint)
+				d.publishHealthEvent(appName, endpoint, bus.StatusFailed, fmt.Sprintf("health check failed: %s", endpoint))
 				d.notifyHealth(ctx, appName, appCfg, endpoint)
 			}
 		}

@@ -179,11 +179,12 @@ func (d *Daemon) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	d.logger.Printf("webhook: %s: push to %s, triggering deploy", appName, pushBranch)
 
-	// Trigger deploy in background. Use the request's base context (which is
-	// the daemon context set via BaseContext) so deploys are cancelled on shutdown.
+	// Trigger deploy in background using the daemon context (d.ctx), not
+	// r.Context() which is cancelled when the handler returns.
 	go func() {
 		engine := d.newEngine()
-		result, err := engine.Deploy(r.Context(), deploy.DeployOptions{
+		deployStart := time.Now()
+		result, err := engine.Deploy(d.ctx, deploy.DeployOptions{
 			App:     appName,
 			Trigger: "webhook",
 			User:    "webhook",
@@ -192,6 +193,7 @@ func (d *Daemon) handleWebhook(w http.ResponseWriter, r *http.Request) {
 			d.logger.Printf("webhook: %s: deploy error: %v", appName, err)
 			return
 		}
+		d.publishDeployEvent(result, "webhook", "webhook", "", time.Since(deployStart))
 		if result.Success {
 			d.logger.Printf("webhook: %s: deployed %s", appName, short(result.DeployedSHA))
 		} else {

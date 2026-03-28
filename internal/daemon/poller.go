@@ -133,6 +133,7 @@ func (d *Daemon) pollOnce(ctx context.Context) {
 
 		// Trigger deploy.
 		engine := d.newEngine()
+		deployStart := time.Now()
 		result, err := engine.Deploy(ctx, deploy.DeployOptions{
 			App:     appName,
 			Trigger: "autodeploy",
@@ -143,6 +144,7 @@ func (d *Daemon) pollOnce(ctx context.Context) {
 			continue
 		}
 
+		d.publishDeployEvent(result, "autodeploy", "autodeploy", "", time.Since(deployStart))
 		if result.Success {
 			d.logger.Printf("poller: %s: deployed %s", appName, short(result.DeployedSHA))
 		} else {

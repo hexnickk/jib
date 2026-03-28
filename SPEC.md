@@ -220,14 +220,14 @@ NATS uses token auth. Separate tokens for:
 - [x] Add `github.com/nats-io/nats.go` dependency
 - [x] No behavior changes — everything still works as before
 
-### Stage 2: Daemon publishes events to NATS
-- [ ] Daemon connects to NATS on startup (optional, works without)
-- [ ] Publish deploy events after engine.Deploy()
-- [ ] Publish health events from health monitor
-- [ ] Publish cert events from cert watcher
-- [ ] Publish backup events from scheduler
-- [ ] Publish heartbeat every 30s
-- [ ] Purely additive — existing notification still works alongside
+### Stage 2: Daemon publishes events to NATS [DONE]
+- [x] Daemon connects to NATS on startup (optional, works without)
+- [x] Publish deploy events after engine.Deploy()
+- [x] Publish health events from health monitor
+- [x] Publish cert events from cert watcher
+- [x] Publish backup events from scheduler
+- [x] Publish heartbeat every 30s
+- [x] Purely additive — existing notification still works alongside
 
 ### Stage 3: Daemon subscribes to commands + dedup
 - [ ] Subscribe to `jib.command.deploy.>`, `jib.command.rollback.>`, etc.
