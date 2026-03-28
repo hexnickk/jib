@@ -87,9 +87,15 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 
 	// Create a cancellable context for subsystems.
+	// (must be set before subscribeCommands which launches goroutines using d.ctx)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	d.ctx = ctx
+
+	// Subscribe to NATS commands.
+	if err := d.subscribeCommands(); err != nil {
+		d.logger.Printf("warning: NATS command subscription failed: %v", err)
+	}
 
 	// Signal handling: SIGTERM/SIGINT cancel context, SIGHUP reloads config.
 	sigCh := make(chan os.Signal, 4)

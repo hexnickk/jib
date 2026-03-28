@@ -229,12 +229,12 @@ NATS uses token auth. Separate tokens for:
 - [x] Publish heartbeat every 30s
 - [x] Purely additive — existing notification still works alongside
 
-### Stage 3: Daemon subscribes to commands + dedup
-- [ ] Subscribe to `jib.command.deploy.>`, `jib.command.rollback.>`, etc.
-- [ ] Command handler decodes message, calls deploy/rollback engine
-- [ ] Deploy dedup: reject if app is already deploying (check file lock non-blocking)
-- [ ] Publish result events after execution
-- [ ] Immediate ACK via request-reply
+### Stage 3: Daemon subscribes to commands + dedup [DONE]
+- [x] Subscribe to `jib.command.deploy.>`, `jib.command.rollback.>`, etc.
+- [x] Command handler decodes message, calls deploy/rollback engine
+- [x] Deploy dedup: reject if app is already deploying (check file lock non-blocking)
+- [x] Publish result events after execution
+- [x] Immediate ACK via request-reply
 
 ### Stage 4: Extract webhook into container
 - [ ] New `cmd/jib-webhook/` — standalone HTTP server
