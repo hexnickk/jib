@@ -6,21 +6,21 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/hexnickk/jib/internal/config"
+	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/spf13/cobra"
 )
 
 func registerObserveCommands(rootCmd *cobra.Command) {
-	// jib status [app]
+	// jib status [name]
 	statusCmd := &cobra.Command{
-		Use:   "status [app]",
-		Short: "Show status of all apps or a specific app",
+		Use:   "status [name]",
+		Short: "Show server overview, or detail for a specific app/provider",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  runStatus,
 	}
@@ -246,6 +246,7 @@ func runStatusDetail(cfg *config.Config, name string, jsonOutput bool) error {
 	}
 
 	// Try provider
+	root := jibRoot()
 	if p, ok := cfg.LookupProvider(name); ok {
 		if jsonOutput {
 			data, err := json.MarshalIndent(p, "", "  ")
@@ -260,7 +261,7 @@ func runStatusDetail(cfg *config.Config, name string, jsonOutput bool) error {
 		case "app":
 			fmt.Printf("Provider: %s (github app)\n\n", name)
 			fmt.Printf("  App ID:             %d\n", p.AppID)
-			pemPath := filepath.Join(jibRoot(), "secrets", "_jib", "github-app-"+name+".pem")
+			pemPath := ghPkg.AppPEMPath(root, name)
 			if _, err := os.Stat(pemPath); err == nil {
 				fmt.Printf("  Private Key:        %s\n", pemPath)
 			} else {
@@ -268,7 +269,7 @@ func runStatusDetail(cfg *config.Config, name string, jsonOutput bool) error {
 			}
 		case "key":
 			fmt.Printf("Provider: %s (deploy key)\n\n", name)
-			keyPath := filepath.Join(jibRoot(), "deploy-keys", name)
+			keyPath := ghPkg.KeyPath(root, name)
 			if _, err := os.Stat(keyPath); err == nil {
 				fmt.Printf("  Key Path:           %s\n", keyPath)
 			} else {
@@ -541,15 +542,9 @@ func printInfraStatus(cfg *config.Config) {
 			}
 			label += " (managed, " + id + ")"
 		}
-		switch cfg.Tunnel.Provider {
-		case "cloudflare":
-			if isServiceRunning("cloudflared") {
-				label += " [running]"
-			} else {
-				label += " [not running]"
-			}
-		case "tailscale":
-			if isServiceRunning("tailscaled") {
+		svcName := map[string]string{"cloudflare": "cloudflared", "tailscale": "tailscaled"}
+		if svc, ok := svcName[cfg.Tunnel.Provider]; ok {
+			if isServiceRunning(svc) {
 				label += " [running]"
 			} else {
 				label += " [not running]"
@@ -579,7 +574,8 @@ func printInfraStatus(cfg *config.Config) {
 	}
 
 	// If nothing is configured, give a hint
-	if cfg.Tunnel == nil && cfg.CertbotEmail == "" && len(cfg.Notifications) == 0 {
+	hasWebhook := cfg.Webhook != nil && cfg.Webhook.Enabled
+	if cfg.Tunnel == nil && cfg.CertbotEmail == "" && len(cfg.Notifications) == 0 && !hasWebhook {
 		fmt.Println("  (not configured) — run 'jib init' to set up")
 	}
 }
