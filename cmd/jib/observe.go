@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -76,11 +77,12 @@ func registerObserveCommands(rootCmd *cobra.Command) {
 
 	rootCmd.AddCommand(envCmd)
 
-	// jib apps
+	// jib apps (alias for jib status)
 	appsCmd := &cobra.Command{
 		Use:   "apps",
-		Short: "List all apps with status summary",
-		RunE:  runApps,
+		Short: "Alias for 'jib status'",
+		Args:  cobra.MaximumNArgs(1),
+		RunE:  runStatus,
 	}
 	appsCmd.Flags().Bool("json", false, "Output in JSON format")
 	rootCmd.AddCommand(appsCmd)
@@ -102,54 +104,16 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	store := newStateStore()
 	jsonOutput, _ := cmd.Flags().GetBool("json")
 
-	// If a specific app is requested
+	// Detail view for a specific entity
 	if len(args) == 1 {
-		appName := args[0]
-		if _, err := requireApp(cfg, appName); err != nil {
-			return err
-		}
-		appState, err := store.Load(appName)
-		if err != nil {
-			return fmt.Errorf("loading state for %s: %w", appName, err)
-		}
-
-		if jsonOutput {
-			data, err := json.MarshalIndent(appState, "", "  ")
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(data))
-			return nil
-		}
-
-		fmt.Printf("App:                  %s\n", appName)
-		fmt.Printf("Strategy:             %s\n", appState.Strategy)
-		fmt.Printf("Deployed SHA:         %s\n", appState.DeployedSHA)
-		fmt.Printf("Previous SHA:         %s\n", appState.PreviousSHA)
-		fmt.Printf("Pinned:               %v\n", appState.Pinned)
-		if !appState.LastDeploy.IsZero() {
-			fmt.Printf("Last Deploy:          %s\n", appState.LastDeploy.Format("2006-01-02 15:04:05"))
-		}
-		fmt.Printf("Last Deploy Status:   %s\n", appState.LastDeployStatus)
-		if appState.LastDeployError != "" {
-			fmt.Printf("Last Deploy Error:    %s\n", appState.LastDeployError)
-		}
-		fmt.Printf("Last Deploy Trigger:  %s\n", appState.LastDeployTrigger)
-		fmt.Printf("Last Deploy User:     %s\n", appState.LastDeployUser)
-		fmt.Printf("Consecutive Failures: %d\n", appState.ConsecutiveFailures)
-		return nil
+		return runStatusDetail(cfg, args[0], jsonOutput)
 	}
 
-	// Infrastructure summary (only for non-JSON, all-apps view)
-	if !jsonOutput {
-		printInfraStatus(cfg)
-		fmt.Println()
-	}
+	// Overview: apps first, then infrastructure
+	store := newStateStore()
 
-	// All apps
 	type appStatus struct {
 		Name                string `json:"name"`
 		DeployedSHA         string `json:"deployed_sha"`
@@ -201,88 +165,134 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "APP\tSHA\tSTATUS\tLAST DEPLOY\tFAILURES\tPINNED")
-	for _, s := range statuses {
-		status := s.LastDeployStatus
-		if s.Maintenance {
-			status = "maintenance"
+	// Apps table
+	if len(statuses) > 0 {
+		fmt.Println("Apps:")
+		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+		_, _ = fmt.Fprintln(w, "  NAME\tSHA\tSTATUS\tLAST DEPLOY\tFAILURES")
+		for _, s := range statuses {
+			status := s.LastDeployStatus
+			if s.Maintenance {
+				status = "maintenance"
+			}
+			if s.Pinned {
+				status += " (pinned)"
+			}
+			_, _ = fmt.Fprintf(w, "  %s\t%s\t%s\t%s\t%d\n",
+				s.Name, s.DeployedSHA, status, s.LastDeploy,
+				s.ConsecutiveFailures)
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%v\n",
-			s.Name, s.DeployedSHA, status, s.LastDeploy,
-			s.ConsecutiveFailures, s.Pinned)
+		_ = w.Flush()
+	} else {
+		fmt.Println("Apps:    (none) — run 'jib add <name>' to deploy an app")
 	}
-	_ = w.Flush()
-	fmt.Println("\nRun 'jib apps' for config details (repo, domains, strategy)")
+
+	fmt.Println()
+	printInfraStatus(cfg)
 	return nil
 }
 
-func runApps(cmd *cobra.Command, args []string) error {
-	cfg, err := loadConfig()
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
-	}
+// runStatusDetail shows detailed status for a named entity (app or provider).
+func runStatusDetail(cfg *config.Config, name string, jsonOutput bool) error {
+	// Try app first
+	if appCfg, ok := cfg.Apps[name]; ok {
+		store := newStateStore()
+		appState, err := store.Load(name)
+		if err != nil {
+			return fmt.Errorf("loading state for %s: %w", name, err)
+		}
 
-	jsonOutput, _ := cmd.Flags().GetBool("json")
-
-	if len(cfg.Apps) == 0 {
 		if jsonOutput {
-			fmt.Println("[]")
+			data, err := json.MarshalIndent(appState, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(data))
 			return nil
 		}
-		fmt.Println("No apps configured.")
-		return nil
-	}
 
-	type appInfo struct {
-		Name     string   `json:"name"`
-		Repo     string   `json:"repo"`
-		Branch   string   `json:"branch"`
-		Strategy string   `json:"strategy"`
-		Domains  []string `json:"domains"`
-	}
-
-	names := sortedAppNames(cfg.Apps)
-
-	if jsonOutput {
-		var items []appInfo
-		for _, name := range names {
-			app := cfg.Apps[name]
-			var domains []string
-			for _, d := range app.Domains {
-				domains = append(domains, fmt.Sprintf("%s:%d", d.Host, d.Port))
+		fmt.Printf("App: %s\n\n", name)
+		fmt.Printf("  Repo:               %s\n", appCfg.Repo)
+		fmt.Printf("  Branch:             %s\n", appCfg.Branch)
+		fmt.Printf("  Strategy:           %s\n", appCfg.Strategy)
+		for _, d := range appCfg.Domains {
+			ingress := "direct"
+			if d.Ingress != "" {
+				ingress = d.Ingress
 			}
-			items = append(items, appInfo{
-				Name:     name,
-				Repo:     app.Repo,
-				Branch:   app.Branch,
-				Strategy: app.Strategy,
-				Domains:  domains,
-			})
+			fmt.Printf("  Domain:             %s:%d (%s)\n", d.Host, d.Port, ingress)
 		}
-		data, err := json.MarshalIndent(items, "", "  ")
-		if err != nil {
-			return err
+		if appCfg.Provider != "" {
+			fmt.Printf("  Provider:           %s\n", appCfg.Provider)
 		}
-		fmt.Println(string(data))
+		fmt.Println()
+		fmt.Printf("  Deployed SHA:       %s\n", appState.DeployedSHA)
+		fmt.Printf("  Previous SHA:       %s\n", appState.PreviousSHA)
+		if !appState.LastDeploy.IsZero() {
+			fmt.Printf("  Last Deploy:        %s\n", appState.LastDeploy.Format("2006-01-02 15:04:05"))
+		}
+		fmt.Printf("  Deploy Status:      %s\n", appState.LastDeployStatus)
+		if appState.LastDeployError != "" {
+			fmt.Printf("  Deploy Error:       %s\n", appState.LastDeployError)
+		}
+		fmt.Printf("  Deploy Trigger:     %s\n", appState.LastDeployTrigger)
+		if appState.Pinned {
+			fmt.Printf("  Pinned:             true\n")
+		}
+		if appState.ConsecutiveFailures > 0 {
+			fmt.Printf("  Failures:           %d\n", appState.ConsecutiveFailures)
+		}
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "APP\tREPO\tBRANCH\tSTRATEGY\tDOMAINS")
-
-	for _, name := range names {
-		app := cfg.Apps[name]
-		var domains []string
-		for _, d := range app.Domains {
-			domains = append(domains, fmt.Sprintf("%s:%d", d.Host, d.Port))
+	// Try provider
+	if p, ok := cfg.LookupProvider(name); ok {
+		if jsonOutput {
+			data, err := json.MarshalIndent(p, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(data))
+			return nil
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			name, app.Repo, app.Branch, app.Strategy, strings.Join(domains, ", "))
+
+		switch p.Type {
+		case "app":
+			fmt.Printf("Provider: %s (github app)\n\n", name)
+			fmt.Printf("  App ID:             %d\n", p.AppID)
+			pemPath := filepath.Join(jibRoot(), "secrets", "_jib", "github-app-"+name+".pem")
+			if _, err := os.Stat(pemPath); err == nil {
+				fmt.Printf("  Private Key:        %s\n", pemPath)
+			} else {
+				fmt.Printf("  Private Key:        (missing!)\n")
+			}
+		case "key":
+			fmt.Printf("Provider: %s (deploy key)\n\n", name)
+			keyPath := filepath.Join(jibRoot(), "deploy-keys", name)
+			if _, err := os.Stat(keyPath); err == nil {
+				fmt.Printf("  Key Path:           %s\n", keyPath)
+			} else {
+				fmt.Printf("  Key Path:           (missing!)\n")
+			}
+		}
+
+		// Show which apps use this provider
+		var apps []string
+		for appName, app := range cfg.Apps {
+			if app.Provider == name {
+				apps = append(apps, appName)
+			}
+		}
+		sort.Strings(apps)
+		if len(apps) > 0 {
+			fmt.Printf("  Used by:            %s\n", strings.Join(apps, ", "))
+		} else {
+			fmt.Printf("  Used by:            (none)\n")
+		}
+		return nil
 	}
-	_ = w.Flush()
-	fmt.Println("\nRun 'jib status' for deploy status (SHA, failures, last deploy)")
-	return nil
+
+	return fmt.Errorf("%q not found (not an app or provider)", name)
 }
 
 func runLogs(cmd *cobra.Command, args []string) error {
@@ -498,22 +508,29 @@ func runHistory(cmd *cobra.Command, args []string) error {
 
 // printInfraStatus prints a summary of infrastructure setup.
 func printInfraStatus(cfg *config.Config) {
-	fmt.Println("Infrastructure:")
-
 	// Git providers
 	if cfg.GitHub != nil && len(cfg.GitHub.Providers) > 0 {
+		fmt.Println("Providers:")
+		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+		_, _ = fmt.Fprintln(w, "  NAME\tTYPE\tDETAIL")
 		for _, name := range sortedAppNames(cfg.GitHub.Providers) {
 			p := cfg.GitHub.Providers[name]
 			switch p.Type {
 			case "app":
-				fmt.Printf("  git provider:    %s (github app, id=%d)\n", name, p.AppID)
+				_, _ = fmt.Fprintf(w, "  %s\tgithub app\tid=%d\n", name, p.AppID)
 			case "key":
-				fmt.Printf("  git provider:    %s (deploy key)\n", name)
+				_, _ = fmt.Fprintf(w, "  %s\tdeploy key\t\n", name)
 			}
 		}
+		_ = w.Flush()
 	} else {
-		fmt.Println("  git provider:    (none) — run 'jib github app setup' or 'jib github key setup'")
+		fmt.Println("Providers: (none) — run 'jib github app setup' or 'jib github key setup'")
 	}
+
+	fmt.Println()
+
+	// Tunnel / SSL / other infra as key-value pairs
+	fmt.Println("Server:")
 
 	// Tunnel
 	if cfg.Tunnel != nil {
@@ -522,9 +539,8 @@ func printInfraStatus(cfg *config.Config) {
 			if len(id) > 8 {
 				id = id[:8] + "..."
 			}
-			label += " (managed, tunnel=" + id + ")"
+			label += " (managed, " + id + ")"
 		}
-		// Check if cloudflared/tailscale is actually running
 		switch cfg.Tunnel.Provider {
 		case "cloudflare":
 			if isServiceRunning("cloudflared") {
@@ -540,15 +556,11 @@ func printInfraStatus(cfg *config.Config) {
 			}
 		}
 		fmt.Printf("  tunnel:          %s\n", label)
-	} else {
-		fmt.Println("  tunnel:          (none) — direct ingress or run 'jib cloudflare setup'")
 	}
 
 	// SSL
 	if cfg.CertbotEmail != "" {
 		fmt.Printf("  ssl:             certbot (%s)\n", cfg.CertbotEmail)
-	} else {
-		fmt.Println("  ssl:             (not configured) — run 'jib init' to set up")
 	}
 
 	// Notifications
@@ -563,7 +575,12 @@ func printInfraStatus(cfg *config.Config) {
 
 	// Webhook
 	if cfg.Webhook != nil && cfg.Webhook.Enabled {
-		fmt.Printf("  webhook:         enabled (port %d)\n", cfg.Webhook.Port)
+		fmt.Printf("  webhook:         port %d\n", cfg.Webhook.Port)
+	}
+
+	// If nothing is configured, give a hint
+	if cfg.Tunnel == nil && cfg.CertbotEmail == "" && len(cfg.Notifications) == 0 {
+		fmt.Println("  (not configured) — run 'jib init' to set up")
 	}
 }
 
