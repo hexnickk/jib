@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
 
+	"github.com/hexnickk/jib/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -139,6 +141,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Last Deploy User:     %s\n", appState.LastDeployUser)
 		fmt.Printf("Consecutive Failures: %d\n", appState.ConsecutiveFailures)
 		return nil
+	}
+
+	// Infrastructure summary (only for non-JSON, all-apps view)
+	if !jsonOutput {
+		printInfraStatus(cfg)
+		fmt.Println()
 	}
 
 	// All apps
@@ -486,6 +494,83 @@ func runHistory(cmd *cobra.Command, args []string) error {
 	}
 	_ = w.Flush()
 	return nil
+}
+
+// printInfraStatus prints a summary of infrastructure setup.
+func printInfraStatus(cfg *config.Config) {
+	fmt.Println("Infrastructure:")
+
+	// Git providers
+	if cfg.GitHub != nil && len(cfg.GitHub.Providers) > 0 {
+		for _, name := range sortedAppNames(cfg.GitHub.Providers) {
+			p := cfg.GitHub.Providers[name]
+			switch p.Type {
+			case "app":
+				fmt.Printf("  git provider:    %s (github app, id=%d)\n", name, p.AppID)
+			case "key":
+				fmt.Printf("  git provider:    %s (deploy key)\n", name)
+			}
+		}
+	} else {
+		fmt.Println("  git provider:    (none) — run 'jib github app setup' or 'jib github key setup'")
+	}
+
+	// Tunnel
+	if cfg.Tunnel != nil {
+		label := cfg.Tunnel.Provider
+		if id := cfg.Tunnel.TunnelID; id != "" {
+			if len(id) > 8 {
+				id = id[:8] + "..."
+			}
+			label += " (managed, tunnel=" + id + ")"
+		}
+		// Check if cloudflared/tailscale is actually running
+		switch cfg.Tunnel.Provider {
+		case "cloudflare":
+			if isServiceRunning("cloudflared") {
+				label += " [running]"
+			} else {
+				label += " [not running]"
+			}
+		case "tailscale":
+			if isServiceRunning("tailscaled") {
+				label += " [running]"
+			} else {
+				label += " [not running]"
+			}
+		}
+		fmt.Printf("  tunnel:          %s\n", label)
+	} else {
+		fmt.Println("  tunnel:          (none) — direct ingress or run 'jib cloudflare setup'")
+	}
+
+	// SSL
+	if cfg.CertbotEmail != "" {
+		fmt.Printf("  ssl:             certbot (%s)\n", cfg.CertbotEmail)
+	} else {
+		fmt.Println("  ssl:             (not configured) — run 'jib init' to set up")
+	}
+
+	// Notifications
+	if len(cfg.Notifications) > 0 {
+		var chans []string
+		for name, ch := range cfg.Notifications {
+			chans = append(chans, name+" ("+ch.Driver+")")
+		}
+		sort.Strings(chans)
+		fmt.Printf("  notifications:   %s\n", strings.Join(chans, ", "))
+	}
+
+	// Webhook
+	if cfg.Webhook != nil && cfg.Webhook.Enabled {
+		fmt.Printf("  webhook:         enabled (port %d)\n", cfg.Webhook.Port)
+	}
+}
+
+// isServiceRunning checks if a systemd service is active.
+func isServiceRunning(service string) bool {
+	err := exec.Command("systemctl", "is-active", "--quiet", service).Run() //nolint:gosec // trusted service name
+	return err == nil
 }
 
 func sortedAppNames[V any](apps map[string]V) []string {
