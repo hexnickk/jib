@@ -13,6 +13,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	ghPkg "github.com/hexnickk/jib/internal/github"
+	"github.com/hexnickk/jib/internal/stack"
 	"github.com/spf13/cobra"
 )
 
@@ -189,6 +190,18 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	fmt.Println()
 	printInfraStatus(cfg)
+
+	// Service stack status.
+	fmt.Println()
+	stackStatus, err := stack.Status(context.Background())
+	if err == nil && stackStatus != "" {
+		fmt.Println("Services:")
+		// Indent each line.
+		for _, line := range strings.Split(stackStatus, "\n") {
+			fmt.Printf("  %s\n", line)
+		}
+	}
+
 	return nil
 }
 

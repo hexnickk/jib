@@ -258,13 +258,13 @@ NATS uses token auth. Separate tokens for:
 - [x] Removed direct notifyBackup calls from daemon scheduler
 - [ ] Remove notifier from deploy engine (deferred — engine still uses it as fallback)
 
-### Stage 7: Update CLI — init, status, stack management
-- [ ] `jib init` generates stack compose and starts it
-- [ ] `jib status` shows Services section (stack container statuses)
-- [ ] Stack compose regenerated on config changes
-- [ ] cloudflared → stack container (replaces systemd)
-- [ ] tailscale → stack container (replaces host install)
-- [ ] certbot → stack container (replaces host install)
+### Stage 7: Update CLI — init, status, stack management [DONE]
+- [x] `jib init` generates stack compose, creates NATS tokens, starts stack
+- [x] `jib status` shows Services section (docker compose ps for stack)
+- [x] Tokens persisted at /opt/jib/stack/tokens.json for idempotent re-runs
+- [ ] cloudflared → stack container (future)
+- [ ] tailscale → stack container (future)
+- [ ] certbot → stack container (future)
 
 ## Design decisions
 

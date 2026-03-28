@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/network"
 	"github.com/hexnickk/jib/internal/platform"
+	"github.com/hexnickk/jib/internal/stack"
 	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -204,6 +206,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// --- Ensure: systemd unit installed and running ---
 	ensureJibDaemon()
+
+	// --- Ensure: service stack (NATS) ---
+	ensureStack()
 
 	fmt.Println()
 	fmt.Println("Jib initialized! Next:")
@@ -402,6 +407,47 @@ func ensureJibDaemon() {
 		fmt.Fprintf(os.Stderr, "  warning: systemctl enable --now jib: %v\n", err)
 	} else {
 		fmt.Println("  jib daemon: started")
+	}
+}
+
+// ensureStack sets up the jib service stack (NATS message bus).
+func ensureStack() {
+	fmt.Println("\nEnsuring service stack (NATS)...")
+
+	// Check if tokens already exist.
+	tokensPath := filepath.Join(stack.StackDir, "tokens.json")
+	var tokens *stack.Tokens
+	if data, err := os.ReadFile(tokensPath); err == nil { //nolint:gosec // trusted path
+		var t stack.Tokens
+		if json.Unmarshal(data, &t) == nil && t.Daemon != "" {
+			tokens = &t
+		}
+	}
+
+	// Generate new tokens if needed.
+	if tokens == nil {
+		t, err := stack.GenerateTokens()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: generating NATS tokens: %v\n", err)
+			return
+		}
+		tokens = t
+		// Save tokens for future runs.
+		if tokenData, err := json.Marshal(tokens); err == nil {
+			_ = os.WriteFile(tokensPath, tokenData, 0o600)
+		}
+	}
+
+	if err := stack.EnsureStack(tokens); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: writing stack files: %v\n", err)
+		return
+	}
+
+	ctx := context.Background()
+	if err := stack.Up(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: starting stack: %v\n", err)
+	} else {
+		fmt.Println("  service stack: running")
 	}
 }
 
