@@ -410,14 +410,20 @@ func ensureJibDaemon() {
 	}
 }
 
-// ensureStack sets up the jib service stack (NATS message bus).
+// ensureStack sets up the jib service stack (NATS + configured services).
 func ensureStack() {
-	fmt.Println("\nEnsuring service stack (NATS)...")
+	cfg, err := loadConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: loading config for stack: %v\n", err)
+		return
+	}
+
+	fmt.Println("\nEnsuring service stack...")
 
 	// Check if tokens already exist.
 	tokensPath := filepath.Join(stack.StackDir, "tokens.json")
 	var tokens *stack.Tokens
-	if data, err := os.ReadFile(tokensPath); err == nil { //nolint:gosec // trusted path
+	if data, readErr := os.ReadFile(tokensPath); readErr == nil { //nolint:gosec // trusted path
 		var t stack.Tokens
 		if json.Unmarshal(data, &t) == nil && t.Daemon != "" {
 			tokens = &t
@@ -426,19 +432,18 @@ func ensureStack() {
 
 	// Generate new tokens if needed.
 	if tokens == nil {
-		t, err := stack.GenerateTokens()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "  warning: generating NATS tokens: %v\n", err)
+		t, genErr := stack.GenerateTokens()
+		if genErr != nil {
+			fmt.Fprintf(os.Stderr, "  warning: generating NATS tokens: %v\n", genErr)
 			return
 		}
 		tokens = t
-		// Save tokens for future runs.
-		if tokenData, err := json.Marshal(tokens); err == nil {
+		if tokenData, marshalErr := json.Marshal(tokens); marshalErr == nil {
 			_ = os.WriteFile(tokensPath, tokenData, 0o600)
 		}
 	}
 
-	if err := stack.EnsureStack(tokens); err != nil {
+	if err := stack.EnsureStack(cfg, tokens); err != nil {
 		fmt.Fprintf(os.Stderr, "  warning: writing stack files: %v\n", err)
 		return
 	}

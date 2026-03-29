@@ -3,6 +3,8 @@ package stack
 import (
 	"strings"
 	"testing"
+
+	"github.com/hexnickk/jib/internal/config"
 )
 
 func TestGenerateTokens(t *testing.T) {
@@ -36,8 +38,17 @@ func TestGenerateNATSConf(t *testing.T) {
 	}
 }
 
-func TestGenerateCompose(t *testing.T) {
-	compose := GenerateCompose()
+func TestGenerateCompose_MinimalConfig(t *testing.T) {
+	cfg := &config.Config{
+		ConfigVersion: 2,
+		PollInterval:  "5m",
+		Apps: map[string]config.App{
+			"myapp": {Repo: "org/repo", Strategy: "restart", Branch: "main",
+				Domains: []config.Domain{{Host: "example.com", Port: 80}}},
+		},
+	}
+	tokens := &Tokens{Daemon: "d", Trigger: "t", Monitor: "m", Notifier: "n"}
+	compose := GenerateCompose(cfg, tokens)
 
 	if !strings.Contains(compose, "jib-bus:") {
 		t.Error("jib-bus service missing")
@@ -45,16 +56,55 @@ func TestGenerateCompose(t *testing.T) {
 	if !strings.Contains(compose, "nats:alpine") {
 		t.Error("NATS image missing")
 	}
-	if !strings.Contains(compose, "127.0.0.1:4222:4222") {
-		t.Error("NATS port binding missing")
+	// Minimal config: no webhook, no health, no notifiers
+	if strings.Contains(compose, "jib-webhook") {
+		t.Error("webhook should not be included without config")
 	}
-	if !strings.Contains(compose, NetworkName) {
-		t.Error("network name missing")
+	if strings.Contains(compose, "jib-health") {
+		t.Error("health should not be included without health checks")
 	}
-	if !strings.Contains(compose, ProjectName) {
-		t.Error("project name missing")
+	if strings.Contains(compose, "jib-notify") {
+		t.Error("notifiers should not be included without notifications config")
 	}
-	if !strings.Contains(compose, "nats.conf") {
-		t.Error("NATS config mount missing")
+}
+
+func TestGenerateCompose_FullConfig(t *testing.T) {
+	cfg := &config.Config{
+		ConfigVersion: 2,
+		PollInterval:  "5m",
+		CertbotEmail:  "test@example.com",
+		Webhook:       &config.WebhookConfig{Enabled: true, Port: 9090},
+		Notifications: map[string]config.NotificationChannel{
+			"ops-tg":    {Driver: "telegram"},
+			"dev-slack": {Driver: "slack"},
+		},
+		Tunnel: &config.TunnelConfig{Provider: "cloudflare", TunnelID: "abc123"},
+		Apps: map[string]config.App{
+			"myapp": {Repo: "org/repo", Strategy: "restart", Branch: "main",
+				Domains: []config.Domain{{Host: "example.com", Port: 80}},
+				Health:  []config.HealthCheck{{Path: "/health", Port: 80}}},
+		},
+	}
+	tokens := &Tokens{Daemon: "d", Trigger: "t", Monitor: "m", Notifier: "n"}
+	compose := GenerateCompose(cfg, tokens)
+
+	for _, want := range []string{
+		"jib-bus:", "jib-webhook:", "jib-health:", "jib-certs:",
+		"jib-notify-telegram:", "jib-notify-slack:",
+		"cloudflared:", "cloudflare/cloudflared",
+	} {
+		if !strings.Contains(compose, want) {
+			t.Errorf("missing %q in compose", want)
+		}
+	}
+
+	// Discord should NOT be present (not in config)
+	if strings.Contains(compose, "jib-notify-discord") {
+		t.Error("discord notifier should not be present")
+	}
+
+	// Tailscale should NOT be present
+	if strings.Contains(compose, "tailscale") {
+		t.Error("tailscale should not be present with cloudflare tunnel")
 	}
 }
