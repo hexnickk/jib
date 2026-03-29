@@ -207,8 +207,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// --- Ensure: systemd unit installed and running ---
 	ensureJibDaemon()
 
-	// --- Ensure: service stack (NATS) ---
-	ensureStack()
+	// --- Ensure: service stack (NATS + configured services) ---
+	fmt.Println("\nEnsuring service stack...")
+	syncStack()
 
 	fmt.Println()
 	fmt.Println("Jib initialized! Next:")
@@ -410,54 +411,10 @@ func ensureJibDaemon() {
 	}
 }
 
-// ensureStack sets up the jib service stack (NATS + configured services).
-func ensureStack() {
-	cfg, err := loadConfig()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "  warning: loading config for stack: %v\n", err)
-		return
-	}
-
-	fmt.Println("\nEnsuring service stack...")
-
-	// Check if tokens already exist.
-	tokensPath := filepath.Join(stack.StackDir, "tokens.json")
-	var tokens *stack.Tokens
-	if data, readErr := os.ReadFile(tokensPath); readErr == nil { //nolint:gosec // trusted path
-		var t stack.Tokens
-		if json.Unmarshal(data, &t) == nil && t.Daemon != "" {
-			tokens = &t
-		}
-	}
-
-	// Generate new tokens if needed.
-	if tokens == nil {
-		t, genErr := stack.GenerateTokens()
-		if genErr != nil {
-			fmt.Fprintf(os.Stderr, "  warning: generating NATS tokens: %v\n", genErr)
-			return
-		}
-		tokens = t
-		if tokenData, marshalErr := json.Marshal(tokens); marshalErr == nil {
-			_ = os.WriteFile(tokensPath, tokenData, 0o600)
-		}
-	}
-
-	if err := stack.EnsureStack(cfg, tokens); err != nil {
-		fmt.Fprintf(os.Stderr, "  warning: writing stack files: %v\n", err)
-		return
-	}
-
-	ctx := context.Background()
-	if err := stack.Up(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "  warning: starting stack: %v\n", err)
-	} else {
-		fmt.Println("  service stack: running")
-	}
-}
-
 // syncStack regenerates the service stack compose file from the current config
-// and converges running containers. Call after any config change that affects services.
+// and converges running containers. Creates tokens on first run.
+// Call after any config change that affects services (notify add/remove,
+// cloudflare setup, jib init, etc.).
 func syncStack() {
 	cfg, err := loadConfig()
 	if err != nil {
@@ -473,9 +430,18 @@ func syncStack() {
 			tokens = &t
 		}
 	}
+
+	// Generate new tokens if needed (first run).
 	if tokens == nil {
-		// No tokens yet — stack hasn't been initialized via jib init.
-		return
+		t, genErr := stack.GenerateTokens()
+		if genErr != nil {
+			fmt.Fprintf(os.Stderr, "  stack: warning: generating NATS tokens: %v\n", genErr)
+			return
+		}
+		tokens = t
+		if tokenData, marshalErr := json.Marshal(tokens); marshalErr == nil {
+			_ = os.WriteFile(tokensPath, tokenData, 0o600)
+		}
 	}
 
 	if err := stack.EnsureStack(cfg, tokens); err != nil {

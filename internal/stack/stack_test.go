@@ -63,7 +63,7 @@ func TestGenerateCompose_MinimalConfig(t *testing.T) {
 	if strings.Contains(compose, "jib-health") {
 		t.Error("health should not be included without health checks")
 	}
-	if strings.Contains(compose, "jib-notifications") {
+	if strings.Contains(compose, "jib-notifications-") {
 		t.Error("notifiers should not be included without notifications config")
 	}
 }
@@ -90,15 +90,16 @@ func TestGenerateCompose_FullConfig(t *testing.T) {
 
 	for _, want := range []string{
 		"jib-bus:", "jib-webhook:", "jib-health:", "jib-certs:",
-		"jib-notifications-telegram:", "jib-notifications-slack:",
+		"jib-notifications-ops-tg:", "jib-notifications-dev-slack:",
 		"cloudflared:", "cloudflare/cloudflared",
+		`CHANNEL_NAME: "ops-tg"`, `CHANNEL_NAME: "dev-slack"`,
 	} {
 		if !strings.Contains(compose, want) {
 			t.Errorf("missing %q in compose", want)
 		}
 	}
 
-	// Discord should NOT be present (not in config)
+	// No discord channel in config
 	if strings.Contains(compose, "jib-notifications-discord") {
 		t.Error("discord notifier should not be present")
 	}

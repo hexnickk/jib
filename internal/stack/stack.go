@@ -153,6 +153,14 @@ func GenerateCompose(cfg *config.Config, tokens *Tokens) string {
 		}
 	}
 	if hasHealth {
+		// Health monitor uses host network to reach app ports on localhost.
+		// Must use localhost NATS URL since Docker DNS is unavailable in host mode.
+		healthEnv := fmt.Sprintf(`    environment:
+      JIB_CONFIG: /opt/jib/config.yml
+      JIB_SECRETS: /opt/jib/secrets
+      NATS_URL: nats://localhost:4222
+      NATS_USER: %s
+      NATS_PASS: %s`, "monitor", tokens.Monitor)
 		fmt.Fprintf(&b, `
   jib-health:
     build:
@@ -162,7 +170,7 @@ func GenerateCompose(cfg *config.Config, tokens *Tokens) string {
     network_mode: host
 %s
 %s
-`, RepoRoot, sharedEnv("monitor", tokens.Monitor), sharedVolumes)
+`, RepoRoot, healthEnv, sharedVolumes)
 	}
 
 	// Cert watcher (if certbot is configured and any domain needs certs).
@@ -180,13 +188,10 @@ func GenerateCompose(cfg *config.Config, tokens *Tokens) string {
 `, RepoRoot, sharedEnv("monitor", tokens.Monitor), sharedVolumes, NetworkName)
 	}
 
-	// Per-driver notifiers.
-	drivers := make(map[string]bool) // track which drivers are needed
-	for _, ch := range cfg.Notifications {
-		drivers[ch.Driver] = true
-	}
-	for driver := range drivers {
-		svcName := "jib-notifications-" + driver
+	// Per-channel notifiers. One container per configured channel.
+	for name, ch := range cfg.Notifications {
+		imageName := "jib-notifications-" + ch.Driver
+		svcName := "jib-notifications-" + name
 		fmt.Fprintf(&b, `
   %s:
     build:
@@ -194,10 +199,12 @@ func GenerateCompose(cfg *config.Config, tokens *Tokens) string {
       dockerfile: services/%s/Dockerfile
     restart: unless-stopped
 %s
+      CHANNEL_NAME: "%s"
+      CREDS_FILE: "/opt/jib/secrets/_jib/%s.json"
 %s
     networks:
       - %s
-`, svcName, RepoRoot, svcName, sharedEnv("notifier", tokens.Notifier), sharedVolumes, NetworkName)
+`, svcName, RepoRoot, imageName, sharedEnv("notifier", tokens.Notifier), name, name, sharedVolumes, NetworkName)
 	}
 
 	// Cloudflare tunnel.

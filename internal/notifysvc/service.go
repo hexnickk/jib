@@ -55,10 +55,9 @@ func Run(channelName string, notifier notify.Notifier) {
 	}
 
 	handler := &eventHandler{
-		channelName: channelName,
-		notifier:    notifier,
-		appSet:      appSet,
-		logger:      logger,
+		notifier: notifier,
+		appSet:   appSet,
+		logger:   logger,
 	}
 
 	if _, err := b.Subscribe(bus.SubAllEvents, handler.handle); err != nil {
@@ -82,14 +81,13 @@ func EnvOr(key, fallback string) string {
 }
 
 type eventHandler struct {
-	channelName string
-	notifier    notify.Notifier
-	appSet      map[string]bool // apps that route to this channel
-	logger      *log.Logger
+	notifier notify.Notifier
+	appSet   map[string]bool // apps that route to this channel
+	logger   *log.Logger
 }
 
-func (h *eventHandler) handle(_ string, data []byte) error {
-	event := h.parseEvent(data)
+func (h *eventHandler) handle(subject string, data []byte) error {
+	event := h.parseEvent(subject, data)
 	if event == nil {
 		return nil
 	}
@@ -109,7 +107,7 @@ func (h *eventHandler) handle(_ string, data []byte) error {
 	return nil
 }
 
-func (h *eventHandler) parseEvent(data []byte) *notify.Event {
+func (h *eventHandler) parseEvent(subject string, data []byte) *notify.Event {
 	var raw struct {
 		App     string `json:"app"`
 		Domain  string `json:"domain"`
@@ -118,18 +116,24 @@ func (h *eventHandler) parseEvent(data []byte) *notify.Event {
 		Trigger string `json:"trigger"`
 		User    string `json:"user"`
 		Error   string `json:"error"`
-		Source  string `json:"source"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil
 	}
 
-	// Detect event type from source + status.
-	eventType := raw.Source
-	if strings.Contains(raw.Source, "health") {
+	// Detect event type from NATS subject prefix.
+	var eventType string
+	switch {
+	case strings.HasPrefix(subject, bus.TopicDeployEvent+"."):
+		eventType = "deploy"
+	case strings.HasPrefix(subject, bus.TopicHealthEvent+"."):
 		eventType = "health_check"
-	} else if strings.Contains(raw.Source, "cert") {
+	case strings.HasPrefix(subject, bus.TopicCertEvent+"."):
 		eventType = "cert_expiry"
+	case strings.HasPrefix(subject, bus.TopicBackupEvent+"."):
+		eventType = "backup"
+	default:
+		return nil
 	}
 
 	event := &notify.Event{
