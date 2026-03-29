@@ -1,13 +1,14 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"runtime"
+	"path/filepath"
 	"strings"
 
+	"github.com/hexnickk/jib/internal/config"
+	"github.com/hexnickk/jib/internal/stack"
 	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
 )
@@ -35,127 +36,67 @@ func registerTailscaleCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(tsCmd)
 }
 
-// tailscaleInstalled checks whether the tailscale CLI is on PATH.
-func tailscaleInstalled() bool {
-	_, err := exec.LookPath("tailscale")
-	return err == nil
-}
-
-func installTailscale() error {
-	if runtime.GOOS != "linux" {
-		return fmt.Errorf("automatic install is only supported on Linux — install Tailscale manually: https://tailscale.com/download")
-	}
-
-	fmt.Println("Installing Tailscale...")
-	install := exec.Command("bash", "-c", "curl -fsSL https://tailscale.com/install.sh | sh") //nolint:gosec // trusted CLI subprocess
-	install.Stdout = os.Stdout
-	install.Stderr = os.Stderr
-	if err := install.Run(); err != nil {
-		return fmt.Errorf("tailscale install script failed: %w", err)
-	}
-
-	fmt.Println("Tailscale installed successfully.")
-	return nil
-}
-
 func runTailscaleSetup(cmd *cobra.Command, args []string) error {
 	fmt.Println("Set up Tailscale for private networking and HTTPS.")
 	fmt.Println()
-	fmt.Println("This will:")
-	fmt.Println("  1. Install Tailscale (if needed)")
-	fmt.Println("  2. Connect this server to your Tailnet")
-	fmt.Println("  3. Enable access to your apps via Tailscale IPs/MagicDNS")
+	fmt.Println("This will start a Tailscale container connected to your Tailnet.")
 	fmt.Println()
-	fmt.Println("You'll need a Tailscale account — sign up at https://tailscale.com")
+	fmt.Println("You'll need:")
+	fmt.Println("  1. A Tailscale account — sign up at https://tailscale.com")
+	fmt.Println("  2. An auth key — generate at https://login.tailscale.com/admin/settings/keys")
+	fmt.Println("     (use a reusable key for server nodes)")
 	fmt.Println()
 
-	// Step 1: Check / install tailscale
-	if !tailscaleInstalled() {
-		ok, err := tui.PromptConfirm("Tailscale is not installed. Install it now?", true)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return fmt.Errorf("tailscale is required for Tailscale setup")
-		}
-		if err := installTailscale(); err != nil {
-			return fmt.Errorf("installing tailscale: %w", err)
-		}
-	} else {
-		fmt.Println("Tailscale is already installed.")
+	authKey, err := tui.PromptPassword("auth-key", "Tailscale auth key")
+	if err != nil {
+		return err
 	}
 
-	// Step 2: Bring Tailscale up (interactive — may require auth URL)
-	fmt.Println()
-	fmt.Println("Connecting to Tailscale network...")
-	up := exec.Command("tailscale", "up") //nolint:gosec // trusted CLI subprocess
-	up.Stdout = os.Stdout
-	up.Stderr = os.Stderr
-	up.Stdin = os.Stdin
-	if err := up.Run(); err != nil {
-		return fmt.Errorf("tailscale up failed: %w", err)
+	// Save auth key.
+	authKeyPath := filepath.Join(jibRoot(), "secrets", "_jib", "tailscale-authkey")
+	if err := os.MkdirAll(filepath.Dir(authKeyPath), 0o700); err != nil {
+		return fmt.Errorf("creating secrets dir: %w", err)
+	}
+	if err := os.WriteFile(authKeyPath, []byte(authKey), 0o600); err != nil {
+		return fmt.Errorf("saving auth key: %w", err)
 	}
 
-	// Step 3: Display IP and hostname
-	fmt.Println()
-	printTailscaleInfo()
+	// Save tunnel config.
+	cfgPath := configPath()
+	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
+		raw["tunnel"] = map[string]interface{}{"provider": "tailscale"}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("saving tunnel config: %w", err)
+	}
 
 	fmt.Println()
-	fmt.Println("Tailscale setup complete.")
-	fmt.Println("Your server is now accessible over your Tailscale network.")
+	fmt.Println("Tailscale configured.")
+	syncStack()
 	fmt.Println()
-	fmt.Println("For HTTPS certificates via Tailscale, run:")
-	fmt.Println("  tailscale cert <your-machine-name>.<tailnet>.ts.net")
+	fmt.Println("Your server will be accessible over your Tailscale network.")
+	fmt.Println("Use 'jib status' to check the tailscale container status.")
 	return nil
 }
 
 func runTailscaleStatus(cmd *cobra.Command, args []string) error {
-	if !tailscaleInstalled() {
-		fmt.Println("Tailscale is not installed.")
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	if cfg.Tunnel == nil || cfg.Tunnel.Provider != "tailscale" {
+		fmt.Println("Tailscale is not configured.")
 		fmt.Println("Run 'jib tailscale setup' to get started.")
 		return nil
 	}
 
-	fmt.Println("Tailscale status:")
-	fmt.Println()
-
-	status := exec.Command("tailscale", "status") //nolint:gosec // trusted CLI subprocess
-	status.Stdout = os.Stdout
-	status.Stderr = os.Stderr
-	if err := status.Run(); err != nil {
-		fmt.Println("Tailscale is not connected or not running.")
-		fmt.Println("Run 'jib tailscale setup' to connect.")
+	fmt.Println("Tailscale: configured")
+	out, err := stack.Status(context.Background())
+	if err == nil && strings.Contains(out, "tailscale") {
+		fmt.Println("  Container: running")
+	} else {
+		fmt.Println("  Container: not running")
 	}
-
-	fmt.Println()
-	printTailscaleInfo()
 
 	return nil
-}
-
-// printTailscaleInfo prints the Tailscale IP and hostname if available.
-func printTailscaleInfo() {
-	// Get Tailscale IP
-	ipCmd := exec.Command("tailscale", "ip", "-4") //nolint:gosec // trusted CLI subprocess
-	ipOut, err := ipCmd.Output()
-	if err == nil {
-		ip := strings.TrimSpace(string(ipOut))
-		if ip != "" {
-			fmt.Printf("Tailscale IPv4: %s\n", ip)
-		}
-	}
-
-	// Get MagicDNS hostname from the Self section of tailscale status JSON.
-	statusCmd := exec.Command("tailscale", "status", "--json") //nolint:gosec // trusted CLI subprocess
-	statusOut, err := statusCmd.Output()
-	if err == nil {
-		var status struct {
-			Self struct {
-				DNSName string `json:"DNSName"`
-			} `json:"Self"`
-		}
-		if json.Unmarshal(statusOut, &status) == nil && status.Self.DNSName != "" {
-			fmt.Printf("MagicDNS:      %s\n", strings.TrimSuffix(status.Self.DNSName, "."))
-		}
-	}
 }

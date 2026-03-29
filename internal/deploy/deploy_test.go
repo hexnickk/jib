@@ -9,7 +9,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/git"
-	"github.com/hexnickk/jib/internal/notify"
+
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
 )
@@ -190,9 +190,9 @@ func TestDeployNonExistentApp(t *testing.T) {
 		Config: &config.Config{
 			Apps: map[string]config.App{},
 		},
-		StateStore:  state.NewStore(filepath.Join(tmpDir, "state")),
-		Secrets:     secrets.NewManager(filepath.Join(tmpDir, "secrets")),
-		Notifier:    notify.NewMulti(),
+		StateStore: state.NewStore(filepath.Join(tmpDir, "state")),
+		Secrets:    secrets.NewManager(filepath.Join(tmpDir, "secrets")),
+
 		LockDir:     filepath.Join(tmpDir, "locks"),
 		RepoBaseDir: filepath.Join(tmpDir, "repos"),
 	}
@@ -230,9 +230,9 @@ func TestDeployDryRunDoesNotModifyState(t *testing.T) {
 				},
 			},
 		},
-		StateStore:  state.NewStore(stateDir),
-		Secrets:     secrets.NewManager(filepath.Join(tmpDir, "secrets")),
-		Notifier:    notify.NewMulti(),
+		StateStore: state.NewStore(stateDir),
+		Secrets:    secrets.NewManager(filepath.Join(tmpDir, "secrets")),
+
 		LockDir:     lockDir,
 		RepoBaseDir: repoBaseDir,
 	}
@@ -305,9 +305,9 @@ func TestRollbackNonExistentApp(t *testing.T) {
 		Config: &config.Config{
 			Apps: map[string]config.App{},
 		},
-		StateStore:  state.NewStore(filepath.Join(tmpDir, "state")),
-		Secrets:     secrets.NewManager(filepath.Join(tmpDir, "secrets")),
-		Notifier:    notify.NewMulti(),
+		StateStore: state.NewStore(filepath.Join(tmpDir, "state")),
+		Secrets:    secrets.NewManager(filepath.Join(tmpDir, "secrets")),
+
 		LockDir:     filepath.Join(tmpDir, "locks"),
 		RepoBaseDir: filepath.Join(tmpDir, "repos"),
 	}
@@ -334,9 +334,9 @@ func TestRollbackNoPreviousDeploy(t *testing.T) {
 				},
 			},
 		},
-		StateStore:  state.NewStore(filepath.Join(tmpDir, "state")),
-		Secrets:     secrets.NewManager(filepath.Join(tmpDir, "secrets")),
-		Notifier:    notify.NewMulti(),
+		StateStore: state.NewStore(filepath.Join(tmpDir, "state")),
+		Secrets:    secrets.NewManager(filepath.Join(tmpDir, "secrets")),
+
 		LockDir:     filepath.Join(tmpDir, "locks"),
 		RepoBaseDir: filepath.Join(tmpDir, "repos"),
 	}

@@ -20,7 +20,6 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/history"
-	"github.com/hexnickk/jib/internal/notify"
 	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/ssl"
@@ -37,7 +36,6 @@ type Daemon struct {
 
 	stateStore *state.Store
 	secrets    *secrets.Manager
-	notifier   *notify.Multi
 	proxyMgr   proxy.Proxy
 	sslMgr     *ssl.CertManager
 	historyLog *history.Logger
@@ -189,18 +187,6 @@ func (d *Daemon) loadConfig() error {
 		webhookPort,
 	)
 
-	// Build notifier.
-	secretsDir := filepath.Join(d.Root, "secrets")
-	if len(cfg.Notifications) > 0 {
-		channels := make(map[string]notify.ChannelConfig, len(cfg.Notifications))
-		for name, ch := range cfg.Notifications {
-			channels[name] = notify.ChannelConfig{Driver: ch.Driver}
-		}
-		d.notifier = notify.LoadChannels(secretsDir, channels)
-	} else {
-		d.notifier = notify.LoadFromSecrets(secretsDir)
-	}
-
 	return nil
 }
 
@@ -219,7 +205,6 @@ func (d *Daemon) newEngine() *deploy.Engine {
 		Config:      d.config,
 		StateStore:  d.stateStore,
 		Secrets:     d.secrets,
-		Notifier:    d.notifier,
 		Proxy:       d.proxyMgr,
 		SSL:         d.sslMgr,
 		History:     d.historyLog,

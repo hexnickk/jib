@@ -10,7 +10,7 @@ import (
 	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/docker"
 	"github.com/hexnickk/jib/internal/history"
-	"github.com/hexnickk/jib/internal/notify"
+
 	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/ssl"
@@ -35,15 +35,6 @@ func sudoCmd(name string, args ...string) *exec.Cmd {
 	return exec.Command("sudo", append([]string{name}, args...)...) //nolint:gosec // args are trusted internal values
 }
 
-// sudoBash creates an exec.Cmd that runs a shell command via "bash -c",
-// prepending "sudo" when not running as root.
-func sudoBash(script string) *exec.Cmd {
-	if os.Getuid() == 0 {
-		return exec.Command("bash", "-c", script) //nolint:gosec // trusted CLI subprocess
-	}
-	return exec.Command("sudo", "bash", "-c", script) //nolint:gosec // trusted CLI subprocess
-}
-
 // repoDir returns the on-disk path for an app's git checkout.
 func repoDir(appName string, repo string) string {
 	return deploy.RepoPath(filepath.Join(jibRoot(), "repos"), appName, repo)
@@ -63,19 +54,6 @@ func newStateStore() *state.Store {
 
 func newSecretsManager() *secrets.Manager {
 	return secrets.NewManager(filepath.Join(jibRoot(), "secrets"))
-}
-
-func newNotifier(cfg *config.Config) *notify.Multi {
-	secretsDir := filepath.Join(jibRoot(), "secrets")
-	if len(cfg.Notifications) > 0 {
-		channels := make(map[string]notify.ChannelConfig, len(cfg.Notifications))
-		for name, ch := range cfg.Notifications {
-			channels[name] = notify.ChannelConfig{Driver: ch.Driver}
-		}
-		return notify.LoadChannels(secretsDir, channels)
-	}
-	// Fallback to legacy loader for configs without named channels.
-	return notify.LoadFromSecrets(secretsDir)
 }
 
 func newSSLManager(cfg *config.Config) *ssl.CertManager {
@@ -104,7 +82,6 @@ func newEngine(cfg *config.Config) *deploy.Engine {
 		Config:      cfg,
 		StateStore:  newStateStore(),
 		Secrets:     newSecretsManager(),
-		Notifier:    newNotifier(cfg),
 		Proxy:       newProxy(cfg),
 		SSL:         newSSLManager(cfg),
 		History:     newHistoryLogger(),

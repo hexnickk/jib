@@ -130,10 +130,7 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 		return nil, fmt.Errorf("saving state: %w", err)
 	}
 
-	// 10. Notify.
-	e.sendNotify(ctx, opts.App, "rollback", previousSHA, "manual", opts.User, rollbackStatus, rollbackError)
-
-	// 11. Log event to history.
+	// 10. Log event to history.
 	e.logHistory(opts.App, history.EventRollback, previousSHA, currentSHA, "manual", opts.User, rollbackStatus, rollbackError, rollbackStart)
 
 	return &DeployResult{

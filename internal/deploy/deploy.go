@@ -15,7 +15,6 @@ import (
 	"github.com/hexnickk/jib/internal/git"
 	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/history"
-	"github.com/hexnickk/jib/internal/notify"
 	"github.com/hexnickk/jib/internal/platform"
 	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
@@ -44,7 +43,6 @@ type Engine struct {
 	Config      *config.Config
 	StateStore  *state.Store
 	Secrets     *secrets.Manager
-	Notifier    *notify.Multi
 	Proxy       proxy.Proxy
 	SSL         *ssl.CertManager
 	History     *history.Logger
@@ -271,7 +269,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 				_ = git.Checkout(ctx, repoDir, previousSHA)
 			}
 			hookErr := fmt.Sprintf("pre_deploy hook %q failed: %v", hook.Service, err)
-			e.sendNotify(ctx, opts.App, "deploy", targetRef, opts.Trigger, opts.User, "failure", hookErr)
+
 			e.logHistory(opts.App, history.EventDeploy, targetRef, previousSHA, opts.Trigger, opts.User, "failure", hookErr, deployStart)
 			return &DeployResult{
 				App:         opts.App,
@@ -307,11 +305,6 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 		}
 	}
 
-	// 12. If healthcheck fails: notify, log error (don't rollback automatically).
-	if !healthOK {
-		e.sendNotify(ctx, opts.App, "deploy", targetRef, opts.Trigger, opts.User, "failure", "health check failed: "+healthErr)
-	}
-
 	// 13. Tag previous images as rollback.
 	if err := compose.TagRollbackImages(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: tagging rollback images: %v\n", err)
@@ -345,12 +338,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 
 	// 15. Lock released by defer.
 
-	// 16. Notify success.
-	if healthOK {
-		e.sendNotify(ctx, opts.App, "deploy", deployedSHA, opts.Trigger, opts.User, "success", "")
-	}
-
-	// 17. Prune old images.
+	// 16. Prune old images.
 	if err := docker.PruneImages(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: pruning images: %v\n", err)
 	}
@@ -411,38 +399,6 @@ func (e *Engine) logHistory(app, eventType, sha, previousSHA, trigger, user, sta
 		DurationMs:  time.Since(start).Milliseconds(),
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: history: %v\n", err)
-	}
-}
-
-// sendNotify sends a notification event, ignoring errors.
-// It uses the app's notify list if available, otherwise sends to all channels.
-func (e *Engine) sendNotify(ctx context.Context, app, eventType, sha, trigger, user, status, errMsg string) {
-	if e.Notifier == nil {
-		return
-	}
-
-	event := notify.Event{
-		App:       app,
-		Type:      eventType,
-		SHA:       sha,
-		Trigger:   trigger,
-		User:      user,
-		Status:    status,
-		Error:     errMsg,
-		Timestamp: time.Now(),
-	}
-
-	// Use per-app routing if the app has a notify list configured.
-	if appCfg, ok := e.Config.Apps[app]; ok && len(appCfg.Notify) > 0 {
-		if err := e.Notifier.SendForApp(ctx, appCfg.Notify, event); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: notify: %v\n", err)
-		}
-		return
-	}
-
-	// Fallback: send to all channels.
-	if err := e.Notifier.Send(ctx, event); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: notify: %v\n", err)
 	}
 }
 

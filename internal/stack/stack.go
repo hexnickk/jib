@@ -208,15 +208,17 @@ func GenerateCompose(cfg *config.Config, tokens *Tokens) string {
 	}
 
 	// Cloudflare tunnel.
-	if cfg.Tunnel != nil && cfg.Tunnel.Provider == "cloudflare" && cfg.Tunnel.TunnelID != "" {
+	if cfg.Tunnel != nil && cfg.Tunnel.Provider == "cloudflare" {
+		// cloudflared reads the token from TUNNEL_TOKEN env var.
+		// The token file is bind-mounted and read by an entrypoint wrapper.
 		fmt.Fprintf(&b, `
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     network_mode: host
-    command: ["tunnel", "run"]
-    environment:
-      TUNNEL_TOKEN: "${CF_TUNNEL_TOKEN}"
+    entrypoint: ["/bin/sh", "-c", "exec cloudflared tunnel --no-autoupdate run --token $(cat /run/secrets/tunnel-token)"]
+    volumes:
+      - /opt/jib/secrets/_jib/cloudflare-tunnel-token:/run/secrets/tunnel-token:ro
 `)
 	}
 
@@ -234,9 +236,10 @@ func GenerateCompose(cfg *config.Config, tokens *Tokens) string {
       - /dev/net/tun:/dev/net/tun
     volumes:
       - /opt/jib/tailscale:/var/lib/tailscale
+      - /opt/jib/secrets/_jib/tailscale-authkey:/run/secrets/ts-authkey:ro
     environment:
       TS_STATE_DIR: /var/lib/tailscale
-      TS_AUTHKEY: "${TS_AUTHKEY}"
+      TS_AUTHKEY_FILE: /run/secrets/ts-authkey
 `)
 	}
 

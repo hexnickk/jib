@@ -256,15 +256,15 @@ NATS uses token auth. Separate tokens for:
 - [x] Reads config for per-app channel routing (app.notify field)
 - [x] Reuses existing notify package drivers (telegram, slack, discord, webhook)
 - [x] Removed direct notifyBackup calls from daemon scheduler
-- [ ] Remove notifier from deploy engine (deferred — engine still uses it as fallback)
+- [x] Remove notifier from deploy engine
 
 ### Stage 7: Update CLI — init, status, stack management [DONE]
 - [x] `jib init` generates stack compose, creates NATS tokens, starts stack
 - [x] `jib status` shows Services section (docker compose ps for stack)
 - [x] Tokens persisted at /opt/jib/stack/tokens.json for idempotent re-runs
-- [ ] cloudflared → stack container (future)
-- [ ] tailscale → stack container (future)
-- [ ] certbot → stack container (future)
+- [x] cloudflared → stack container (reads token from mounted secret)
+- [x] tailscale → stack container (reads auth key from mounted secret)
+- [ ] certbot → stack container (future — currently runs on host via daemon command handler)
 
 ## Design decisions
 
