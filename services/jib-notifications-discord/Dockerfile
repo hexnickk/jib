@@ -3,7 +3,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o /app ./services/jib-notify-telegram
+RUN CGO_ENABLED=0 go build -o /app ./services/jib-notifications-discord
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates

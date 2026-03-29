@@ -326,6 +326,7 @@ func runNotifyAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Added %s channel %q.\n", driver, name)
+	syncStack()
 	return nil
 }
 
@@ -389,6 +390,7 @@ func runNotifyRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Removed channel %q.\n", name)
+	syncStack()
 	return nil
 }
 
@@ -470,6 +472,7 @@ func addTelegramChannel(name string, secretsDir string) error {
 	}
 
 	fmt.Printf("Added telegram channel %q.\n", name)
+	syncStack()
 	return nil
 }
 
@@ -519,6 +522,7 @@ func addWebhookChannel(name, driver, promptLabel, credKey string) error {
 	}
 
 	fmt.Printf("Added %s channel %q.\n", driver, name)
+	syncStack()
 	return nil
 }
 

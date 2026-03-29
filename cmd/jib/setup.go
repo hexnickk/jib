@@ -456,6 +456,39 @@ func ensureStack() {
 	}
 }
 
+// syncStack regenerates the service stack compose file from the current config
+// and converges running containers. Call after any config change that affects services.
+func syncStack() {
+	cfg, err := loadConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  stack: warning: loading config: %v\n", err)
+		return
+	}
+
+	tokensPath := filepath.Join(stack.StackDir, "tokens.json")
+	var tokens *stack.Tokens
+	if data, readErr := os.ReadFile(tokensPath); readErr == nil { //nolint:gosec // trusted path
+		var t stack.Tokens
+		if json.Unmarshal(data, &t) == nil && t.Daemon != "" {
+			tokens = &t
+		}
+	}
+	if tokens == nil {
+		// No tokens yet — stack hasn't been initialized via jib init.
+		return
+	}
+
+	if err := stack.EnsureStack(cfg, tokens); err != nil {
+		fmt.Fprintf(os.Stderr, "  stack: warning: writing stack files: %v\n", err)
+		return
+	}
+
+	ctx := context.Background()
+	if err := stack.Up(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "  stack: warning: converging: %v\n", err)
+	}
+}
+
 func runEdit(cmd *cobra.Command, args []string) error {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {

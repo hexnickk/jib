@@ -218,6 +218,7 @@ func runCloudflareAPISetup(apiToken, tunnelName string) error {
 
 	fmt.Println()
 	fmt.Println("Cloudflare Tunnel setup complete.")
+	syncStack()
 	fmt.Println("When you add apps with cloudflare-tunnel ingress, jib will automatically")
 	fmt.Println("create DNS records and tunnel routes.")
 	return nil

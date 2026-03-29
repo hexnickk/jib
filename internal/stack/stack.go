@@ -186,7 +186,7 @@ func GenerateCompose(cfg *config.Config, tokens *Tokens) string {
 		drivers[ch.Driver] = true
 	}
 	for driver := range drivers {
-		svcName := "jib-notify-" + driver
+		svcName := "jib-notifications-" + driver
 		fmt.Fprintf(&b, `
   %s:
     build:
