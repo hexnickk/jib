@@ -241,8 +241,8 @@ NATS uses token auth. Separate tokens for:
 - [x] Validates signatures, publishes DeployCommand to NATS
 - [x] Returns 202 to caller immediately (or 409 if rejected)
 - [x] Delete `internal/daemon/webhook.go`
-- [ ] Add webhook container to stack compose (deferred to Stage 7)
-- [ ] Dockerfile (deferred to Stage 7)
+- [x] Add webhook container to stack compose
+- [x] Dockerfile
 
 ### Stage 5: Extract health monitor + cert watcher into containers [DONE]
 - [x] New `cmd/jib-health/` — HTTP health checks with state tracking (transitions only)
