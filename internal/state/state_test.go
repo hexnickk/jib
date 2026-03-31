@@ -15,10 +15,9 @@ func TestSaveLoadRoundtrip(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	original := &AppState{
 		App:                 "myapp",
-		Strategy:            "blue-green",
+		Strategy:            "restart",
 		DeployedSHA:         "abc123",
 		PreviousSHA:         "def456",
-		ActiveSlot:          "blue",
 		Pinned:              true,
 		LastDeploy:          now,
 		LastDeployStatus:    "success",
@@ -26,20 +25,6 @@ func TestSaveLoadRoundtrip(t *testing.T) {
 		LastDeployTrigger:   "manual",
 		LastDeployUser:      "nick",
 		ConsecutiveFailures: 0,
-		LastBackup:          now,
-		LastBackupStatus:    "success",
-		Slots: map[string]SlotState{
-			"blue": {
-				SHA:         "abc123",
-				ProjectName: "myapp-blue",
-				DeployedAt:  now,
-			},
-			"green": {
-				SHA:         "def456",
-				ProjectName: "myapp-green",
-				DeployedAt:  now.Add(-12 * time.Hour),
-			},
-		},
 	}
 
 	if err := store.Save("myapp", original); err != nil {
@@ -57,20 +42,11 @@ func TestSaveLoadRoundtrip(t *testing.T) {
 	if loaded.DeployedSHA != original.DeployedSHA {
 		t.Errorf("DeployedSHA = %q, want %q", loaded.DeployedSHA, original.DeployedSHA)
 	}
-	if loaded.ActiveSlot != original.ActiveSlot {
-		t.Errorf("ActiveSlot = %q, want %q", loaded.ActiveSlot, original.ActiveSlot)
-	}
 	if loaded.Pinned != original.Pinned {
 		t.Errorf("Pinned = %v, want %v", loaded.Pinned, original.Pinned)
 	}
 	if !loaded.LastDeploy.Equal(original.LastDeploy) {
 		t.Errorf("LastDeploy = %v, want %v", loaded.LastDeploy, original.LastDeploy)
-	}
-	if len(loaded.Slots) != 2 {
-		t.Errorf("Slots count = %d, want 2", len(loaded.Slots))
-	}
-	if loaded.Slots["blue"].SHA != "abc123" {
-		t.Errorf("Slots[blue].SHA = %q, want %q", loaded.Slots["blue"].SHA, "abc123")
 	}
 }
 

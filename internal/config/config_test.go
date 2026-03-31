@@ -9,7 +9,6 @@ import (
 
 const validConfig = `
 poll_interval: 5m
-certbot_email: nick@example.com
 
 github:
   providers:
@@ -19,24 +18,12 @@ github:
     landing-key:
       type: key
 
-backup_destinations:
-  primary:
-    driver: r2
-    bucket: my-backups
-    retain: 7
-    local_retain: 3
-
-webhook:
-  enabled: true
-
 tunnel:
   provider: cloudflare
 
 notifications:
   ops-telegram:
     driver: telegram
-  dev-slack:
-    driver: slack
 
 apps:
   myapp:
@@ -57,19 +44,9 @@ apps:
         port: 3000
       - host: api.example.com
         port: 3001
-    nginx_include: infra/nginx/custom.conf
-    backup:
-      destination: primary
-      schedule: "0 4 * * *"
-      volumes: [db_data]
-      hook: scripts/backup.sh
     secrets_env: true
     env_file: .env.prod
     services: [api, web]
-    cron:
-      - schedule: "0 9 * * *"
-        service: api
-        command: npm run digest
 `
 
 func writeTemp(t *testing.T, content string) string {
@@ -91,9 +68,6 @@ func TestLoadValidConfig(t *testing.T) {
 	if cfg.PollInterval != "5m" {
 		t.Errorf("poll_interval = %q, want 5m", cfg.PollInterval)
 	}
-	if cfg.CertbotEmail != "nick@example.com" {
-		t.Errorf("certbot_email = %q", cfg.CertbotEmail)
-	}
 	if cfg.GitHub == nil || len(cfg.GitHub.Providers) != 2 {
 		t.Error("github.providers wrong")
 	}
@@ -102,9 +76,6 @@ func TestLoadValidConfig(t *testing.T) {
 	}
 	if p, ok := cfg.LookupProvider("landing-key"); !ok || p.Type != "key" {
 		t.Error("provider landing-key wrong")
-	}
-	if cfg.Webhook.Port != 9090 {
-		t.Errorf("webhook port = %d, want 9090 (default)", cfg.Webhook.Port)
 	}
 	if cfg.Tunnel.Provider != "cloudflare" {
 		t.Errorf("tunnel provider = %q", cfg.Tunnel.Provider)
@@ -128,12 +99,6 @@ func TestLoadValidConfig(t *testing.T) {
 	}
 	if len(app.Health) != 1 || app.Health[0].Path != "/health" || app.Health[0].Port != 3000 {
 		t.Errorf("health = %+v", app.Health)
-	}
-	if app.Backup == nil || app.Backup.Schedule != "0 4 * * *" {
-		t.Error("backup config wrong")
-	}
-	if len(app.Cron) != 1 || app.Cron[0].Service != "api" {
-		t.Errorf("cron = %+v", app.Cron)
 	}
 	if app.EnvFile != ".env.prod" {
 		t.Errorf("env_file = %q", app.EnvFile)
@@ -355,28 +320,6 @@ apps:
 	}
 }
 
-func TestValidation_BadBackupDriver(t *testing.T) {
-	yml := `
-backup_destinations:
-  main:
-    driver: gcs
-    bucket: b
-apps:
-  myapp:
-    repo: org/repo
-    domains:
-      - host: example.com
-        port: 80
-`
-	_, err := LoadConfig(writeTemp(t, yml))
-	if err == nil {
-		t.Fatal("expected error for bad backup driver")
-	}
-	if !strings.Contains(err.Error(), "driver must be") {
-		t.Errorf("error = %v", err)
-	}
-}
-
 func TestValidation_BadTunnelProvider(t *testing.T) {
 	yml := `
 tunnel:
@@ -393,28 +336,6 @@ apps:
 		t.Fatal("expected error for bad tunnel provider")
 	}
 	if !strings.Contains(err.Error(), "provider must be") {
-		t.Errorf("error = %v", err)
-	}
-}
-
-func TestValidation_BadCronSchedule(t *testing.T) {
-	yml := `
-apps:
-  myapp:
-    repo: org/repo
-    domains:
-      - host: example.com
-        port: 80
-    cron:
-      - schedule: "* *"
-        service: api
-        command: run
-`
-	_, err := LoadConfig(writeTemp(t, yml))
-	if err == nil {
-		t.Fatal("expected error for bad cron schedule")
-	}
-	if !strings.Contains(err.Error(), "must have 5 fields") {
 		t.Errorf("error = %v", err)
 	}
 }
@@ -456,51 +377,6 @@ apps:
 	}
 	if !strings.Contains(err.Error(), "warmup: invalid duration") {
 		t.Errorf("error = %v", err)
-	}
-}
-
-func TestValidation_BackupDestNotDefined(t *testing.T) {
-	yml := `
-apps:
-  myapp:
-    repo: org/repo
-    domains:
-      - host: example.com
-        port: 80
-    backup:
-      destination: nonexistent
-      schedule: "0 4 * * *"
-`
-	_, err := LoadConfig(writeTemp(t, yml))
-	if err == nil {
-		t.Fatal("expected error for undefined backup destination")
-	}
-	if !strings.Contains(err.Error(), "not defined in backup_destinations") {
-		t.Errorf("error = %v", err)
-	}
-}
-
-func TestValidation_CronMissingServiceCommand(t *testing.T) {
-	yml := `
-apps:
-  myapp:
-    repo: org/repo
-    domains:
-      - host: example.com
-        port: 80
-    cron:
-      - schedule: "0 9 * * *"
-`
-	_, err := LoadConfig(writeTemp(t, yml))
-	if err == nil {
-		t.Fatal("expected error for cron missing service/command")
-	}
-	errStr := err.Error()
-	if !strings.Contains(errStr, "service is required") {
-		t.Errorf("expected service error, got: %v", errStr)
-	}
-	if !strings.Contains(errStr, "command is required") {
-		t.Errorf("expected command error, got: %v", errStr)
 	}
 }
 
@@ -563,7 +439,6 @@ func TestDomainIsTunnelIngress(t *testing.T) {
 		{"", false},
 		{"direct", false},
 		{"cloudflare-tunnel", true},
-		{"tailscale", true},
 	}
 	for _, tt := range tests {
 		d := Domain{Host: "example.com", Port: 80, Ingress: tt.ingress}
@@ -617,9 +492,6 @@ apps:
       - host: example.com
         port: 80
         ingress: cloudflare-tunnel
-      - host: admin.example.com
-        port: 80
-        ingress: tailscale
       - host: staging.example.com
         port: 80
 `
@@ -632,11 +504,8 @@ apps:
 	if app.Domains[0].Ingress != "cloudflare-tunnel" {
 		t.Errorf("domain[0].Ingress = %q", app.Domains[0].Ingress)
 	}
-	if app.Domains[1].Ingress != "tailscale" {
-		t.Errorf("domain[1].Ingress = %q", app.Domains[1].Ingress)
-	}
-	if app.Domains[2].Ingress != "" {
-		t.Errorf("domain[2].Ingress = %q, want empty (direct)", app.Domains[2].Ingress)
+	if app.Domains[1].Ingress != "" {
+		t.Errorf("domain[1].Ingress = %q, want empty (direct)", app.Domains[1].Ingress)
 	}
 }
 

@@ -3,11 +3,9 @@ package proxy
 import (
 	"bytes"
 	"fmt"
-	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/hexnickk/jib/internal/config"
 )
@@ -22,32 +20,27 @@ func sudoCommand(name string, args ...string) *exec.Cmd {
 
 // Nginx implements the Proxy interface using nginx.
 type Nginx struct {
-	ConfigDir   string // e.g. /opt/jib/nginx/
-	SymlinkDir  string // e.g. /etc/nginx/conf.d/
-	WebhookPort int    // 0 means no webhook location
+	ConfigDir  string // e.g. /opt/jib/nginx/
+	SymlinkDir string // e.g. /etc/nginx/conf.d/
 }
 
 // NewNginx creates an Nginx proxy manager.
 // configDir is where jib writes conf files (e.g. /opt/jib/nginx/).
 // symlinkDir is the platform's nginx include directory (e.g. /etc/nginx/conf.d/).
-// webhookPort is the port jib's webhook listener runs on; 0 disables the location block.
-func NewNginx(configDir, symlinkDir string, webhookPort int) *Nginx {
+func NewNginx(configDir, symlinkDir string) *Nginx {
 	return &Nginx{
-		ConfigDir:   configDir,
-		SymlinkDir:  symlinkDir,
-		WebhookPort: webhookPort,
+		ConfigDir:  configDir,
+		SymlinkDir: symlinkDir,
 	}
 }
 
 // templateData holds the values interpolated into the nginx config template.
 type templateData struct {
-	Filename     string
-	Domain       string
-	Port         int
-	WebhookPort  int
-	NginxInclude string
-	HasSSL       bool
-	IsTunnel     bool // true for cloudflare-tunnel/tailscale — skips ACME challenge
+	Filename string
+	Domain   string
+	Port     int
+	HasSSL   bool
+	IsTunnel bool // true for cloudflare-tunnel — skips ACME challenge
 }
 
 // confFilename returns the config filename for a domain.
@@ -78,13 +71,11 @@ func (n *Nginx) GenerateConfig(app string, appCfg config.App) (map[string]string
 		}
 
 		data := templateData{
-			Filename:     filename,
-			Domain:       d.Host,
-			Port:         d.Port,
-			WebhookPort:  n.WebhookPort,
-			NginxInclude: appCfg.NginxInclude,
-			HasSSL:       hasSSL,
-			IsTunnel:     isTunnel,
+			Filename: filename,
+			Domain:   d.Host,
+			Port:     d.Port,
+			HasSSL:   hasSSL,
+			IsTunnel: isTunnel,
 		}
 
 		var buf bytes.Buffer
@@ -167,133 +158,4 @@ func (n *Nginx) Test() error {
 		return fmt.Errorf("nginx config test failed: %s: %w", string(out), err)
 	}
 	return nil
-}
-
-// MaintenanceOn enables maintenance mode for an app by backing up each domain's
-// nginx config and replacing it with a 503 maintenance page.
-func (n *Nginx) MaintenanceOn(app string, domains []config.Domain, message string) error {
-	if message == "" {
-		message = "Service is temporarily unavailable. We'll be back shortly."
-	}
-
-	// Write the maintenance HTML page
-	htmlDir := filepath.Join(n.ConfigDir, "maintenance")
-	if err := os.MkdirAll(htmlDir, 0o755); err != nil { //nolint:gosec // nginx html dir needs to be world-readable
-		return fmt.Errorf("creating maintenance html dir: %w", err)
-	}
-
-	htmlContent := strings.ReplaceAll(maintenanceHTMLTemplate, "{{MESSAGE}}", html.EscapeString(message))
-	htmlPath := filepath.Join(htmlDir, "maintenance.html")
-	if err := os.WriteFile(htmlPath, []byte(htmlContent), 0o644); err != nil { //nolint:gosec // nginx html must be world-readable
-		return fmt.Errorf("writing maintenance html: %w", err)
-	}
-
-	// Track which domains we've successfully switched so we can roll back on failure.
-	var switched []config.Domain
-
-	rollback := func() {
-		for _, rd := range switched {
-			fn := confFilename(rd.Host)
-			cp := filepath.Join(n.ConfigDir, fn)
-			bp := cp + ".bak"
-			_ = os.Rename(bp, cp)
-		}
-	}
-
-	for _, d := range domains {
-		filename := confFilename(d.Host)
-		confPath := filepath.Join(n.ConfigDir, filename)
-		bakPath := confPath + ".bak"
-
-		// Check if already in maintenance
-		if _, err := os.Stat(bakPath); err == nil {
-			rollback()
-			return fmt.Errorf("app %s domain %s is already in maintenance mode", app, d.Host)
-		}
-
-		// Back up the existing config
-		if err := os.Rename(confPath, bakPath); err != nil {
-			rollback()
-			return fmt.Errorf("backing up %s: %w", confPath, err)
-		}
-
-		// Check if SSL cert exists for this domain
-		certPath := fmt.Sprintf("/etc/letsencrypt/live/%s/fullchain.pem", d.Host)
-		_, certErr := os.Stat(certPath)
-		hasSSL := certErr == nil
-
-		// Generate maintenance config
-		data := maintenanceData{
-			Domain:  d.Host,
-			HTMLDir: htmlDir,
-			HasSSL:  hasSSL,
-		}
-
-		var buf bytes.Buffer
-		if err := maintenanceTmpl.Execute(&buf, data); err != nil {
-			_ = os.Rename(bakPath, confPath)
-			rollback()
-			return fmt.Errorf("generating maintenance config for %s: %w", d.Host, err)
-		}
-
-		if err := os.WriteFile(confPath, buf.Bytes(), 0o644); err != nil { //nolint:gosec // nginx config must be world-readable
-			_ = os.Rename(bakPath, confPath)
-			rollback()
-			return fmt.Errorf("writing maintenance config for %s: %w", d.Host, err)
-		}
-
-		switched = append(switched, d)
-	}
-
-	return n.Reload()
-}
-
-// MaintenanceOff disables maintenance mode by restoring backed-up configs.
-func (n *Nginx) MaintenanceOff(app string, domains []config.Domain) error {
-	for _, d := range domains {
-		filename := confFilename(d.Host)
-		confPath := filepath.Join(n.ConfigDir, filename)
-		bakPath := confPath + ".bak"
-
-		if _, err := os.Stat(bakPath); os.IsNotExist(err) {
-			return fmt.Errorf("app %s domain %s is not in maintenance mode (no .bak file)", app, d.Host)
-		}
-
-		// Restore from backup
-		if err := os.Rename(bakPath, confPath); err != nil {
-			return fmt.Errorf("restoring %s from backup: %w", confPath, err)
-		}
-	}
-
-	return n.Reload()
-}
-
-// MaintenanceStatus returns a map of app name to list of domains in maintenance mode.
-// It scans the config directory for .conf.bak files and matches them to app domains.
-func (n *Nginx) MaintenanceStatus(apps map[string]config.App) map[string][]string {
-	result := make(map[string][]string)
-
-	for appName, appCfg := range apps {
-		for _, d := range appCfg.Domains {
-			filename := confFilename(d.Host)
-			bakPath := filepath.Join(n.ConfigDir, filename+".bak")
-			if _, err := os.Stat(bakPath); err == nil {
-				result[appName] = append(result[appName], d.Host)
-			}
-		}
-	}
-
-	return result
-}
-
-// IsInMaintenance returns true if any domain for the app has a .bak file.
-func (n *Nginx) IsInMaintenance(app string, domains []config.Domain) bool {
-	for _, d := range domains {
-		filename := confFilename(d.Host)
-		bakPath := filepath.Join(n.ConfigDir, filename+".bak")
-		if _, err := os.Stat(bakPath); err == nil {
-			return true
-		}
-	}
-	return false
 }

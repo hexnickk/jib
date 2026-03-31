@@ -91,66 +91,6 @@ func (c RollbackCommand) Validate() error {
 	return nil
 }
 
-// BackupCommand requests a backup for an app.
-type BackupCommand struct {
-	Message
-	App  string `json:"app"`
-	User string `json:"user"`
-}
-
-// Subject returns the NATS subject for this command.
-func (c BackupCommand) Subject() string {
-	return TopicBackupCmd + "." + sanitizeToken(c.App)
-}
-
-// Validate checks required fields.
-func (c BackupCommand) Validate() error {
-	if c.App == "" {
-		return fmt.Errorf("app is required")
-	}
-	return nil
-}
-
-// MaintenanceCommand toggles maintenance mode for an app.
-type MaintenanceCommand struct {
-	Message
-	App     string `json:"app"`
-	Enabled bool   `json:"enabled"`
-	User    string `json:"user"`
-}
-
-// Subject returns the NATS subject for this command.
-func (c MaintenanceCommand) Subject() string {
-	return TopicMaintenanceCmd + "." + sanitizeToken(c.App)
-}
-
-// Validate checks required fields.
-func (c MaintenanceCommand) Validate() error {
-	if c.App == "" {
-		return fmt.Errorf("app is required")
-	}
-	return nil
-}
-
-// CertRenewCommand requests SSL cert renewal for a domain.
-type CertRenewCommand struct {
-	Message
-	Domain string `json:"domain"`
-}
-
-// Subject returns the NATS subject for this command.
-func (c CertRenewCommand) Subject() string {
-	return TopicCertRenewCmd + "." + sanitizeToken(c.Domain)
-}
-
-// Validate checks required fields.
-func (c CertRenewCommand) Validate() error {
-	if c.Domain == "" {
-		return fmt.Errorf("domain is required")
-	}
-	return nil
-}
-
 // ConfigReloadCommand requests the daemon to reload its config.
 type ConfigReloadCommand struct {
 	Message
@@ -208,33 +148,6 @@ type HealthEvent struct {
 // Subject returns the NATS subject for this event.
 func (e HealthEvent) Subject() string {
 	return TopicHealthEvent + "." + sanitizeToken(e.App) + "." + e.Status
-}
-
-// CertEvent reports a certificate expiry warning.
-type CertEvent struct {
-	Message
-	Domain   string `json:"domain"`
-	DaysLeft int    `json:"days_left"`
-	Error    string `json:"error,omitempty"`
-}
-
-// Subject returns the NATS subject for this event.
-func (e CertEvent) Subject() string {
-	return TopicCertEvent + "." + sanitizeToken(e.Domain) + "." + StatusExpiring
-}
-
-// BackupEvent reports the result of a backup.
-type BackupEvent struct {
-	Message
-	App        string `json:"app"`
-	Status     string `json:"status"` // "success" or "failure"
-	Error      string `json:"error,omitempty"`
-	DurationMs int64  `json:"duration_ms"`
-}
-
-// Subject returns the NATS subject for this event.
-func (e BackupEvent) Subject() string {
-	return TopicBackupEvent + "." + sanitizeToken(e.App) + "." + e.Status
 }
 
 // Heartbeat is a periodic status message from the daemon.

@@ -10,7 +10,7 @@ import (
 )
 
 func TestGenerateConfigSingleDomain(t *testing.T) {
-	n := NewNginx("/opt/jib/nginx/", "/etc/nginx/conf.d/", 0)
+	n := NewNginx("/opt/jib/nginx/", "/etc/nginx/conf.d/")
 
 	appCfg := config.App{
 		Domains: []config.Domain{
@@ -57,15 +57,10 @@ func TestGenerateConfigSingleDomain(t *testing.T) {
 			t.Errorf("config should not contain %q without SSL cert", check)
 		}
 	}
-
-	// Webhook location should NOT be present when port is 0.
-	if strings.Contains(content, "/_jib/webhook") {
-		t.Error("config should not contain webhook location when port is 0")
-	}
 }
 
 func TestGenerateConfigMultipleDomains(t *testing.T) {
-	n := NewNginx("/opt/jib/nginx/", "/etc/nginx/conf.d/", 0)
+	n := NewNginx("/opt/jib/nginx/", "/etc/nginx/conf.d/")
 
 	appCfg := config.App{
 		Domains: []config.Domain{
@@ -99,59 +94,8 @@ func TestGenerateConfigMultipleDomains(t *testing.T) {
 	}
 }
 
-func TestGenerateConfigWebhookLocation(t *testing.T) {
-	n := NewNginx("/opt/jib/nginx/", "/etc/nginx/conf.d/", 9090)
-
-	appCfg := config.App{
-		Domains: []config.Domain{
-			{Host: "example.com", Port: 3000},
-		},
-	}
-
-	configs, err := n.GenerateConfig("myapp", appCfg)
-	if err != nil {
-		t.Fatalf("GenerateConfig failed: %v", err)
-	}
-
-	content := configs["example.com.conf"]
-	// Without an SSL cert, the webhook location (inside the SSL block) is not rendered.
-	// Verify the HTTP-only proxy is present instead.
-	if !strings.Contains(content, "proxy_pass http://127.0.0.1:3000;") {
-		t.Error("config should contain proxy_pass for the app port")
-	}
-	if strings.Contains(content, "/_jib/webhook") {
-		t.Error("webhook location should not appear without SSL")
-	}
-}
-
-func TestGenerateConfigWithNginxInclude(t *testing.T) {
-	n := NewNginx("/opt/jib/nginx/", "/etc/nginx/conf.d/", 0)
-
-	appCfg := config.App{
-		NginxInclude: "/opt/jib/repos/myapp/infra/nginx/custom.conf",
-		Domains: []config.Domain{
-			{Host: "example.com", Port: 3000},
-		},
-	}
-
-	configs, err := n.GenerateConfig("myapp", appCfg)
-	if err != nil {
-		t.Fatalf("GenerateConfig failed: %v", err)
-	}
-
-	content := configs["example.com.conf"]
-	// Without an SSL cert, the include directive (inside the SSL block) is not rendered.
-	// Verify the HTTP-only proxy is generated correctly.
-	if !strings.Contains(content, "proxy_pass http://127.0.0.1:3000;") {
-		t.Errorf("config should contain proxy_pass, got:\n%s", content)
-	}
-	if strings.Contains(content, "include /opt/jib/repos/myapp/infra/nginx/custom.conf;") {
-		t.Error("include directive should not appear without SSL")
-	}
-}
-
-func TestGenerateConfigWithoutNginxInclude(t *testing.T) {
-	n := NewNginx("/opt/jib/nginx/", "/etc/nginx/conf.d/", 0)
+func TestGenerateConfigNoIncludeDirective(t *testing.T) {
+	n := NewNginx("/opt/jib/nginx/", "/etc/nginx/conf.d/")
 
 	appCfg := config.App{
 		Domains: []config.Domain{
@@ -166,7 +110,7 @@ func TestGenerateConfigWithoutNginxInclude(t *testing.T) {
 
 	content := configs["example.com.conf"]
 	if strings.Contains(content, "include ") {
-		t.Error("config should not contain include directive when NginxInclude is empty")
+		t.Error("config should not contain include directive")
 	}
 }
 
@@ -174,7 +118,7 @@ func TestWriteConfigs(t *testing.T) {
 	configDir := t.TempDir()
 	symlinkDir := t.TempDir()
 
-	n := NewNginx(configDir, symlinkDir, 0)
+	n := NewNginx(configDir, symlinkDir)
 
 	configs := map[string]string{
 		"example.com.conf": "# test config\nserver { listen 80; }",
@@ -209,7 +153,7 @@ func TestRemoveConfigs(t *testing.T) {
 	configDir := t.TempDir()
 	symlinkDir := t.TempDir()
 
-	n := NewNginx(configDir, symlinkDir, 0)
+	n := NewNginx(configDir, symlinkDir)
 
 	// Create a config file and symlink first.
 	confPath := filepath.Join(configDir, "example.com.conf")

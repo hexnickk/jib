@@ -128,10 +128,6 @@ func (h *eventHandler) parseEvent(subject string, data []byte) *notify.Event {
 		eventType = "deploy"
 	case strings.HasPrefix(subject, bus.TopicHealthEvent+"."):
 		eventType = "health_check"
-	case strings.HasPrefix(subject, bus.TopicCertEvent+"."):
-		eventType = "cert_expiry"
-	case strings.HasPrefix(subject, bus.TopicBackupEvent+"."):
-		eventType = "backup"
 	default:
 		return nil
 	}

@@ -15,8 +15,6 @@ import (
 	"github.com/hexnickk/jib/internal/docker"
 	gitPkg "github.com/hexnickk/jib/internal/git"
 	ghPkg "github.com/hexnickk/jib/internal/github"
-	"github.com/hexnickk/jib/internal/network"
-	"github.com/hexnickk/jib/internal/platform"
 	"github.com/hexnickk/jib/internal/stack"
 	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
@@ -37,13 +35,13 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	// jib add <app>
 	addCmd := &cobra.Command{
 		Use:   "add <app>",
-		Short: "Add app: config + clone + key + nginx + SSL",
+		Short: "Add app: config + clone + key + nginx",
 		Args:  exactArgs(1),
 		RunE:  runAdd,
 	}
 	addCmd.Flags().String("repo", "", "GitHub repo (org/name)")
 	addCmd.Flags().String("git-provider", "", "Git auth provider name (from 'jib github key/app setup')")
-	addCmd.Flags().String("ingress", "direct", "Default ingress for all domains: direct, cloudflare-tunnel, tailscale (override per-domain with @suffix)")
+	addCmd.Flags().String("ingress", "direct", "Default ingress for all domains: direct, cloudflare-tunnel (override per-domain with @suffix)")
 	addCmd.Flags().String("compose", "", "Compose file path (or comma-separated list)")
 	addCmd.Flags().StringSlice("domain", nil, "Domain mapping (repeatable): example.com, web=example.com, or example.com:8080. Omit to use jib.domain labels from compose.")
 	addCmd.Flags().StringSlice("health", nil, "Health check path:port (repeatable). Inferred from compose if omitted.")
@@ -84,7 +82,6 @@ WantedBy=multi-user.target
 `
 
 func runInit(cmd *cobra.Command, args []string) error {
-	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 	skipInstall, _ := cmd.Flags().GetBool("skip-install")
 
 	cfgPath := configPath()
@@ -100,79 +97,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// --- Ensure: dependencies installed ---
 	if !skipInstall {
-		fmt.Println("Checking dependencies...")
-		if err := ensureDeps(); err != nil {
-			return err
-		}
-
 		// Enable and start Docker and Nginx
 		for _, svc := range []string{"docker", "nginx"} {
 			ensureSystemdService(svc)
 		}
 	} else {
 		fmt.Println("Skipping dependency installation (--skip-install).")
-	}
-
-	// --- First-run only: interactive prompts for SSL and rclone ---
-	certbotEmail := ""
-	if firstRun {
-		sslChoice := "certbot"
-		if !nonInteractive {
-			fmt.Println()
-			choice, err := tui.PromptSelect("Domain/SSL management", []tui.SelectOption{
-				{Label: "Certbot (Let's Encrypt) — recommended for direct server access", Value: "certbot"},
-				{Label: "Cloudflare Tunnel", Value: "cloudflare"},
-				{Label: "Tailscale", Value: "tailscale"},
-				{Label: "None — I'll manage SSL myself", Value: "none"},
-			})
-			if err != nil {
-				return err
-			}
-			sslChoice = choice
-		}
-
-		switch sslChoice {
-		case "certbot":
-			if !skipInstall {
-				fmt.Println("\nInstalling certbot...")
-				installCmd := sudoCmd("apt-get", "install", "-y", "certbot", "python3-certbot-nginx")
-				installCmd.Stdout = os.Stdout
-				installCmd.Stderr = os.Stderr
-				if err := installCmd.Run(); err != nil {
-					fmt.Fprintf(os.Stderr, "warning: certbot installation failed: %v\n", err)
-				}
-			}
-			if !nonInteractive {
-				email, err := tui.PromptStringOptional("Email for Let's Encrypt notifications (optional)")
-				if err != nil {
-					return err
-				}
-				certbotEmail = email
-			}
-		case "cloudflare":
-			fmt.Println("\nRun 'jib cloudflare setup' after init to configure.")
-		case "tailscale":
-			fmt.Println("\nRun 'jib tailscale setup' after init to configure.")
-		case "none":
-			fmt.Println("\nSkipping SSL setup.")
-		}
-
-		if !nonInteractive && !skipInstall {
-			fmt.Println()
-			installRclone, err := tui.PromptConfirm("Install rclone for backups?", false)
-			if err != nil {
-				return err
-			}
-			if installRclone {
-				fmt.Println("Installing rclone...")
-				installCmd := sudoCmd("apt-get", "install", "-y", "rclone")
-				installCmd.Stdout = os.Stdout
-				installCmd.Stderr = os.Stderr
-				if err := installCmd.Run(); err != nil {
-					fmt.Fprintf(os.Stderr, "warning: rclone installation failed: %v\n", err)
-				}
-			}
-		}
 	}
 
 	// --- Ensure: jib group exists and current user is a member ---
@@ -187,11 +117,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// --- Ensure: config.yml exists ---
 	if firstRun {
 		fmt.Println("\nGenerating config.yml...")
-		cfgContent := fmt.Sprintf("config_version: %d\npoll_interval: 5m\n", config.LatestConfigVersion)
-		if certbotEmail != "" {
-			cfgContent += fmt.Sprintf("certbot_email: %s\n", certbotEmail)
-		}
-		cfgContent += "apps: {}\n"
+		cfgContent := fmt.Sprintf("config_version: %d\npoll_interval: 5m\napps: {}\n", config.LatestConfigVersion)
 
 		writeCfgCmd := sudoCmd("tee", cfgPath)
 		writeCfgCmd.Stdin = strings.NewReader(cfgContent)
@@ -231,62 +157,6 @@ func userInGroup(user, group string) bool {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
-}
-
-// ensureDeps checks core dependencies and installs any that are missing.
-func ensureDeps() error {
-	depResults := platform.CheckAllDependencies()
-
-	coreDeps := map[string]bool{
-		"Docker": false, "Docker Compose": false, "Nginx": false, "Git": false,
-	}
-	for _, r := range depResults {
-		if _, isCore := coreDeps[r.Name]; isCore {
-			coreDeps[r.Name] = r.Installed
-			if r.Installed {
-				fmt.Printf("  %s: OK (v%s)\n", r.Name, r.Version)
-			} else {
-				fmt.Printf("  %s: MISSING\n", r.Name)
-			}
-		}
-	}
-
-	var toInstall []string
-	if !coreDeps["Docker"] {
-		toInstall = append(toInstall, "docker.io")
-	}
-	if !coreDeps["Docker Compose"] {
-		toInstall = append(toInstall, "docker-compose-v2")
-	}
-	if !coreDeps["Nginx"] {
-		toInstall = append(toInstall, "nginx")
-	}
-	if !coreDeps["Git"] {
-		toInstall = append(toInstall, "git")
-	}
-
-	if len(toInstall) == 0 {
-		return nil
-	}
-
-	fmt.Printf("\nInstalling: %s\n", strings.Join(toInstall, ", "))
-
-	updateCmd := sudoCmd("apt-get", "update")
-	updateCmd.Stdout = os.Stdout
-	updateCmd.Stderr = os.Stderr
-	if err := updateCmd.Run(); err != nil {
-		return fmt.Errorf("apt-get update failed: %w", err)
-	}
-
-	installArgs := append([]string{"install", "-y"}, toInstall...)
-	installCmd := sudoCmd("apt-get", installArgs...)
-	installCmd.Stdout = os.Stdout
-	installCmd.Stderr = os.Stderr
-	if err := installCmd.Run(); err != nil {
-		return fmt.Errorf("apt-get install failed: %w", err)
-	}
-
-	return nil
 }
 
 // ensureSystemdService enables and starts a systemd service if not already active.
@@ -360,7 +230,7 @@ func ensureDirs(root string) {
 	fmt.Println("\nEnsuring directory structure...")
 	dirs := []string{
 		"state", "secrets", "repos", "overrides",
-		"nginx", "backups", "locks", "deploy-keys", "logs",
+		"nginx", "locks", "deploy-keys", "logs",
 	}
 	for _, dir := range dirs {
 		dirPath := filepath.Join(root, dir)
@@ -761,30 +631,14 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	// --- Step 3: Save to config ---
 	cfgPath := configPath()
-	var resources *config.Resources
 
 	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
-		existingApps := 0
-		if appsRaw, ok := raw["apps"]; ok {
-			if appsMap, ok := appsRaw.(map[string]interface{}); ok {
-				existingApps = len(appsMap)
-			}
-		}
-
-		if sr, err := platform.DetectResources(); err == nil {
-			appCount := existingApps + 1
-			mem, cpus := platform.SuggestAppResources(sr, appCount)
-			resources = &config.Resources{Memory: mem, CPUs: cpus}
-			fmt.Printf("  Resource limits: memory=%s, cpus=%s (%d app(s))\n", mem, cpus, appCount)
-		}
-
 		newApp := config.App{
-			Repo:      repo,
-			Provider:  providerName,
-			Compose:   composeFiles,
-			Domains:   domains,
-			Health:    healthChecks,
-			Resources: resources,
+			Repo:     repo,
+			Provider: providerName,
+			Compose:  composeFiles,
+			Domains:  domains,
+			Health:   healthChecks,
 		}
 
 		appData, err := yaml.Marshal(newApp)
@@ -845,7 +699,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\nApp %q deployed successfully (SHA: %s)\n", appName, result.DeployedSHA[:8])
 
-	// --- Step 5: Provision nginx + SSL ---
+	// --- Step 5: Provision nginx ---
 	fmt.Println("\nProvisioning nginx...")
 	appCfg := cfg.Apps[appName]
 	p := newProxy(cfg)
@@ -867,26 +721,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		fmt.Println("  nginx: reloaded")
 	}
 
-	// SSL — per-domain: skip tunnel domains (they handle TLS at the edge)
-	sslMgr := newSSLManager(cfg)
-	for _, d := range appCfg.Domains {
-		if d.IsTunnelIngress() {
-			fmt.Printf("  ssl: skipping %s (tunnel: %s)\n", d.Host, d.Ingress)
-			continue
-		}
-		check := network.CheckDomain(d.Host)
-		if check.Warning != "" {
-			fmt.Fprintf(os.Stderr, "  ssl: skipping %s — %s\n", d.Host, check.Warning)
-			continue
-		}
-		fmt.Printf("  ssl: obtaining cert for %s...\n", d.Host)
-		if err := sslMgr.Obtain(ctx, d.Host); err != nil {
-			fmt.Fprintf(os.Stderr, "  ssl: warning: %s: %v\n", d.Host, err)
-		} else {
-			fmt.Printf("  ssl: %s OK\n", d.Host)
-		}
-	}
-
 	// --- Step 6: Cloudflare tunnel routes (if applicable) ---
 	var cfDomains []string
 	for _, d := range domains {
@@ -900,12 +734,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(os.Stderr, "  warning: %v\n", err)
 			fmt.Fprintln(os.Stderr, "  You may need to add DNS records and tunnel routes manually.")
 		}
-	}
-
-	// --- Step 7: Domain checks (warnings only) ---
-	fmt.Println("\nChecking domains...")
-	for _, d := range domains {
-		checkDomainAndWarn(d.Host)
 	}
 
 	return nil
@@ -1140,25 +968,4 @@ func runRemove(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\nRemoved app %q: %s\n", appName, strings.Join(removed, ", "))
 	return nil
-}
-
-// checkDomainAndWarn runs domain checks and prints warnings.
-func checkDomainAndWarn(domain string) {
-	check := network.CheckDomain(domain)
-
-	if check.Warning != "" {
-		fmt.Fprintf(os.Stderr, "  ⚠ %s: %s\n", domain, check.Warning)
-		return
-	}
-
-	switch check.Transport {
-	case "direct":
-		fmt.Printf("  ✓ %s → this server\n", domain)
-	case "cloudflare":
-		fmt.Printf("  ✓ %s → Cloudflare (%s)\n", domain, check.IPs[0])
-	case "tailscale":
-		fmt.Printf("  ✓ %s → Tailscale (%s)\n", domain, check.IPs[0])
-	default:
-		fmt.Fprintf(os.Stderr, "  ⚠ %s → %s (not this server)\n", domain, check.IPs[0])
-	}
 }

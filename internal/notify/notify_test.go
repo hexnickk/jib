@@ -286,95 +286,6 @@ func TestParseEnvFileMissing(t *testing.T) {
 	}
 }
 
-func TestLoadFromSecretsEmpty(t *testing.T) {
-	dir := t.TempDir()
-	multi := LoadFromSecrets(dir)
-	if len(multi.channels) != 0 {
-		t.Errorf("expected 0 notifiers, got %d", len(multi.channels))
-	}
-	// Send should be a no-op
-	err := multi.Send(context.Background(), Event{Type: "deploy"})
-	if err != nil {
-		t.Errorf("expected nil error from empty Multi, got: %v", err)
-	}
-}
-
-func TestLoadFromSecretsWithTelegram(t *testing.T) {
-	dir := t.TempDir()
-	jibDir := filepath.Join(dir, "_jib")
-	if err := os.MkdirAll(jibDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-
-	content := "TELEGRAM_BOT_TOKEN=mytoken\nTELEGRAM_CHAT_ID=mychat\n"
-	if err := os.WriteFile(filepath.Join(jibDir, "telegram.env"), []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	multi := LoadFromSecrets(dir)
-	if len(multi.channels) != 1 {
-		t.Fatalf("expected 1 notifier, got %d", len(multi.channels))
-	}
-	if multi.channels[0].notifier.Name() != "telegram" {
-		t.Errorf("expected telegram notifier, got %s", multi.channels[0].notifier.Name())
-	}
-}
-
-func TestLoadFromSecretsWithAll(t *testing.T) {
-	dir := t.TempDir()
-	jibDir := filepath.Join(dir, "_jib")
-	if err := os.MkdirAll(jibDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-
-	for _, f := range []struct {
-		name    string
-		content string
-	}{
-		{"telegram.env", "TELEGRAM_BOT_TOKEN=t\nTELEGRAM_CHAT_ID=c\n"},
-		{"slack_webhook", "https://hooks.slack.com/test"},
-		{"discord_webhook", "https://discord.com/api/webhooks/test"},
-		{"webhook_url", "https://example.com/hook"},
-	} {
-		if err := os.WriteFile(filepath.Join(jibDir, f.name), []byte(f.content), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	multi := LoadFromSecrets(dir)
-	if len(multi.channels) != 4 {
-		t.Fatalf("expected 4 notifiers, got %d", len(multi.channels))
-	}
-
-	names := make(map[string]bool)
-	for _, ch := range multi.channels {
-		names[ch.notifier.Name()] = true
-	}
-	for _, want := range []string{"telegram", "slack", "discord", "webhook"} {
-		if !names[want] {
-			t.Errorf("missing notifier: %s", want)
-		}
-	}
-}
-
-func TestLoadFromSecretsTelegramPartialCreds(t *testing.T) {
-	dir := t.TempDir()
-	jibDir := filepath.Join(dir, "_jib")
-	if err := os.MkdirAll(jibDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-
-	// Only token, no chat ID — should not create notifier
-	if err := os.WriteFile(filepath.Join(jibDir, "telegram.env"), []byte("TELEGRAM_BOT_TOKEN=t\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	multi := LoadFromSecrets(dir)
-	if len(multi.channels) != 0 {
-		t.Errorf("expected 0 notifiers with partial telegram creds, got %d", len(multi.channels))
-	}
-}
-
 func TestLoadChannels(t *testing.T) {
 	dir := t.TempDir()
 	jibDir := filepath.Join(dir, "_jib")
@@ -388,21 +299,14 @@ func TestLoadChannels(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Write slack creds
-	slackCreds, _ := json.Marshal(map[string]string{"webhook_url": "https://hooks.slack.com/x"})
-	if err := os.WriteFile(filepath.Join(jibDir, "dev-slack.json"), slackCreds, 0600); err != nil {
-		t.Fatal(err)
-	}
-
 	channels := map[string]ChannelConfig{
-		"ops-tg":    {Driver: "telegram"},
-		"dev-slack": {Driver: "slack"},
-		"missing":   {Driver: "webhook"}, // no creds file
+		"ops-tg":  {Driver: "telegram"},
+		"missing": {Driver: "webhook"}, // unsupported driver, should be skipped
 	}
 
 	multi := LoadChannels(dir, channels)
-	if len(multi.channels) != 2 {
-		t.Fatalf("expected 2 channels, got %d", len(multi.channels))
+	if len(multi.channels) != 1 {
+		t.Fatalf("expected 1 channel, got %d", len(multi.channels))
 	}
 
 	names := multi.ChannelNames()
@@ -412,9 +316,6 @@ func TestLoadChannels(t *testing.T) {
 	}
 	if !nameSet["ops-tg"] {
 		t.Error("missing ops-tg channel")
-	}
-	if !nameSet["dev-slack"] {
-		t.Error("missing dev-slack channel")
 	}
 }
 

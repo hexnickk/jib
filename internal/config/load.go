@@ -65,10 +65,6 @@ func applyDefaults(cfg *Config) {
 		cfg.PollInterval = "5m"
 	}
 
-	if cfg.Webhook != nil && cfg.Webhook.Port == 0 {
-		cfg.Webhook.Port = 9090
-	}
-
 	for name, app := range cfg.Apps {
 		if app.Branch == "" {
 			app.Branch = "main"

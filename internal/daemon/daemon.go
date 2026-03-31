@@ -1,6 +1,6 @@
 // Package daemon implements the always-running jib background service.
-// It handles autodeploy polling, incoming webhooks, scheduled backups,
-// and health monitoring. Installed as a systemd service by `jib init`.
+// It handles autodeploy polling and NATS command processing.
+// Installed as a systemd service by `jib init`.
 package daemon
 
 import (
@@ -15,14 +15,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hexnickk/jib/internal/backup"
 	"github.com/hexnickk/jib/internal/bus"
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
-	"github.com/hexnickk/jib/internal/ssl"
 	"github.com/hexnickk/jib/internal/state"
 )
 
@@ -37,9 +35,7 @@ type Daemon struct {
 	stateStore *state.Store
 	secrets    *secrets.Manager
 	proxyMgr   proxy.Proxy
-	sslMgr     *ssl.CertManager
 	historyLog *history.Logger
-	backupMgr  *backup.Manager
 
 	bus       *bus.Bus        // nil if NATS is unavailable
 	ctx       context.Context // daemon lifecycle context, used by background tasks
@@ -133,14 +129,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		d.runPoller(ctx)
 	}()
 
-	// 2. Backup scheduler.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		d.runScheduler(ctx)
-	}()
-
-	// 3. Heartbeat (only if NATS connected).
+	// 2. Heartbeat (only if NATS connected).
 	if d.bus != nil {
 		wg.Add(1)
 		go func() {
@@ -174,17 +163,9 @@ func (d *Daemon) loadConfig() error {
 	d.stateStore = state.NewStore(filepath.Join(d.Root, "state"))
 	d.secrets = secrets.NewManager(filepath.Join(d.Root, "secrets"))
 	d.historyLog = history.NewLogger(filepath.Join(d.Root, "logs"))
-	d.backupMgr = backup.NewManager(cfg, filepath.Join(d.Root, "backups"))
-	d.sslMgr = ssl.NewCertManager(cfg.CertbotEmail, "/var/www/certbot")
-
-	webhookPort := 0
-	if cfg.Webhook != nil {
-		webhookPort = cfg.Webhook.Port
-	}
 	d.proxyMgr = proxy.NewNginx(
 		filepath.Join(d.Root, "nginx"),
 		"/etc/nginx/conf.d",
-		webhookPort,
 	)
 
 	return nil
@@ -206,7 +187,6 @@ func (d *Daemon) newEngine() *deploy.Engine {
 		StateStore:  d.stateStore,
 		Secrets:     d.secrets,
 		Proxy:       d.proxyMgr,
-		SSL:         d.sslMgr,
 		History:     d.historyLog,
 		LockDir:     filepath.Join(d.Root, "locks"),
 		RepoBaseDir: filepath.Join(d.Root, "repos"),

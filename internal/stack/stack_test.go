@@ -72,8 +72,6 @@ func TestGenerateCompose_FullConfig(t *testing.T) {
 	cfg := &config.Config{
 		ConfigVersion: 2,
 		PollInterval:  "5m",
-		CertbotEmail:  "test@example.com",
-		Webhook:       &config.WebhookConfig{Enabled: true, Port: 9090},
 		Notifications: map[string]config.NotificationChannel{
 			"ops-tg":    {Driver: "telegram"},
 			"dev-slack": {Driver: "slack"},
@@ -89,7 +87,7 @@ func TestGenerateCompose_FullConfig(t *testing.T) {
 	compose := GenerateCompose(cfg, tokens)
 
 	for _, want := range []string{
-		"jib-bus:", "jib-webhook:", "jib-health:", "jib-certs:",
+		"jib-bus:", "jib-health:",
 		"jib-notifications-ops-tg:", "jib-notifications-dev-slack:",
 		"cloudflared:", "cloudflare/cloudflared",
 		`CHANNEL_NAME: "ops-tg"`, `CHANNEL_NAME: "dev-slack"`,

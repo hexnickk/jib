@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hexnickk/jib/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,7 +21,6 @@ type serviceOverride struct {
 	Labels  map[string]string `yaml:"labels"`
 	Restart string            `yaml:"restart"`
 	Logging *loggingConfig    `yaml:"logging"`
-	Deploy  *deployConfig     `yaml:"deploy,omitempty"`
 }
 
 type loggingConfig struct {
@@ -30,29 +28,15 @@ type loggingConfig struct {
 	Options map[string]string `yaml:"options"`
 }
 
-type deployConfig struct {
-	Resources *resourcesConfig `yaml:"resources,omitempty"`
-}
-
-type resourcesConfig struct {
-	Limits *resourceLimits `yaml:"limits,omitempty"`
-}
-
-type resourceLimits struct {
-	Memory string `yaml:"memory,omitempty"`
-	CPUs   string `yaml:"cpus,omitempty"`
-}
-
 type overrideFile struct {
 	Services map[string]serviceOverride `yaml:"services"`
 }
 
 // GenerateOverride creates an override file at <overrideDir>/<app>.yml with
-// jib-managed labels, restart policies, log rotation, and resource limits for each service.
+// jib-managed labels, restart policies, and log rotation for each service.
 // It parses the user's compose file(s) to discover service names.
 // The override file lives outside the repo to avoid git conflicts.
-// If resources is non-nil, deploy resource limits are included for every service.
-func GenerateOverride(ctx context.Context, app string, composeFiles []string, repoDir string, overrideDir string, resources *config.Resources) (string, error) {
+func GenerateOverride(ctx context.Context, app string, composeFiles []string, repoDir string, overrideDir string) (string, error) {
 	services, err := discoverServices(ctx, composeFiles, repoDir)
 	if err != nil {
 		return "", fmt.Errorf("discovering services: %w", err)
@@ -76,17 +60,6 @@ func GenerateOverride(ctx context.Context, app string, composeFiles []string, re
 					"max-file": "3",
 				},
 			},
-		}
-
-		if resources != nil && (resources.Memory != "" || resources.CPUs != "") {
-			so.Deploy = &deployConfig{
-				Resources: &resourcesConfig{
-					Limits: &resourceLimits{
-						Memory: resources.Memory,
-						CPUs:   resources.CPUs,
-					},
-				},
-			}
 		}
 
 		override.Services[svc] = so

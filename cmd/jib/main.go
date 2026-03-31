@@ -25,7 +25,7 @@ func newRootCmd() *cobra.Command {
 		Long: `Jib — Lightweight Docker Compose Deploy Tool
 
 A single Go binary that deploys docker-compose apps on bare machines with
-zero-downtime (optional), auto-SSL, autodeploy, backups, and basic monitoring.
+autodeploy, notifications, and reverse proxy management.
 For small teams running 3-7 apps per machine.
 
 Jib lives on the server. You SSH in and run commands, or use
@@ -47,9 +47,7 @@ Jib lives on the server. You SSH in and run commands, or use
 	registerNotifyCommands(rootCmd)
 	registerGitHubCommands(rootCmd)
 	registerCloudflareCommands(rootCmd)
-	registerTailscaleCommands(rootCmd)
 	registerDaemonCommands(rootCmd)
-	registerServiceCommands(rootCmd)
 
 	return rootCmd
 }

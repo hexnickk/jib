@@ -35,12 +35,11 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	// jib notify add <name> --driver <driver>
 	addCmd := &cobra.Command{
 		Use:   "add <name>",
-		Short: "Add a notification channel (generic)",
+		Short: "Add a notification channel",
 		Args:  exactArgs(1),
 		RunE:  runNotifyAdd,
 	}
-	addCmd.Flags().String("driver", "", "Channel driver: telegram, slack, discord, webhook")
-	addCmd.Flags().String("url", "", "Webhook URL (for webhook, slack, discord drivers)")
+	addCmd.Flags().String("driver", "", "Channel driver: telegram")
 	notifyCmd.AddCommand(addCmd)
 
 	// jib notify remove <name>
@@ -78,47 +77,9 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 	})
 	notifyCmd.AddCommand(notifyTelegramCmd)
 
-	// jib notify slack add/test
-	notifySlackCmd := &cobra.Command{
-		Use:   "slack",
-		Short: "Manage Slack notification channels",
-	}
-	notifySlackCmd.AddCommand(&cobra.Command{
-		Use:   "add <name>",
-		Short: "Add a Slack notification channel",
-		Args:  exactArgs(1),
-		RunE:  runSlackAdd,
-	})
-	notifySlackCmd.AddCommand(&cobra.Command{
-		Use:   "test <name>",
-		Short: "Send a test message to a Slack channel",
-		Args:  exactArgs(1),
-		RunE:  runNotifyTest,
-	})
-	notifyCmd.AddCommand(notifySlackCmd)
-
-	// jib notify discord add/test
-	notifyDiscordCmd := &cobra.Command{
-		Use:   "discord",
-		Short: "Manage Discord notification channels",
-	}
-	notifyDiscordCmd.AddCommand(&cobra.Command{
-		Use:   "add <name>",
-		Short: "Add a Discord notification channel",
-		Args:  exactArgs(1),
-		RunE:  runDiscordAdd,
-	})
-	notifyDiscordCmd.AddCommand(&cobra.Command{
-		Use:   "test <name>",
-		Short: "Send a test message to a Discord channel",
-		Args:  exactArgs(1),
-		RunE:  runNotifyTest,
-	})
-	notifyCmd.AddCommand(notifyDiscordCmd)
-
 	rootCmd.AddCommand(notifyCmd)
 
-	// Hidden backward-compat aliases: jib telegram, jib slack, jib discord
+	// Hidden backward-compat alias: jib telegram
 	telegramAlias := &cobra.Command{
 		Use:    "telegram",
 		Short:  "Manage Telegram notification channels",
@@ -137,44 +98,6 @@ func registerNotifyCommands(rootCmd *cobra.Command) {
 		RunE:  runNotifyTest,
 	})
 	rootCmd.AddCommand(telegramAlias)
-
-	slackAlias := &cobra.Command{
-		Use:    "slack",
-		Short:  "Manage Slack notification channels",
-		Hidden: true,
-	}
-	slackAlias.AddCommand(&cobra.Command{
-		Use:   "add <name>",
-		Short: "Add a Slack notification channel",
-		Args:  exactArgs(1),
-		RunE:  runSlackAdd,
-	})
-	slackAlias.AddCommand(&cobra.Command{
-		Use:   "test <name>",
-		Short: "Send a test message to a Slack channel",
-		Args:  exactArgs(1),
-		RunE:  runNotifyTest,
-	})
-	rootCmd.AddCommand(slackAlias)
-
-	discordAlias := &cobra.Command{
-		Use:    "discord",
-		Short:  "Manage Discord notification channels",
-		Hidden: true,
-	}
-	discordAlias.AddCommand(&cobra.Command{
-		Use:   "add <name>",
-		Short: "Add a Discord notification channel",
-		Args:  exactArgs(1),
-		RunE:  runDiscordAdd,
-	})
-	discordAlias.AddCommand(&cobra.Command{
-		Use:   "test <name>",
-		Short: "Send a test message to a Discord channel",
-		Args:  exactArgs(1),
-		RunE:  runNotifyTest,
-	})
-	rootCmd.AddCommand(discordAlias)
 }
 
 // runNotifyList shows all configured notification channels and which apps use them.
@@ -194,9 +117,6 @@ func runNotifyList(cmd *cobra.Command, args []string) error {
 		fmt.Println("No notification channels configured.")
 		fmt.Println("\nAdd one with:")
 		fmt.Println("  jib notify telegram add <name>")
-		fmt.Println("  jib notify slack add <name>")
-		fmt.Println("  jib notify discord add <name>")
-		fmt.Println("  jib notify add <name> --driver webhook --url <url>")
 		return nil
 	}
 
@@ -269,65 +189,21 @@ func runNotifyList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// runNotifyAdd adds a generic notification channel.
+// runNotifyAdd adds a notification channel.
 func runNotifyAdd(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	driver, _ := cmd.Flags().GetString("driver")
-	urlFlag, _ := cmd.Flags().GetString("url")
 
 	if driver == "" {
-		return fmt.Errorf("--driver is required (telegram, slack, discord, webhook)")
+		return fmt.Errorf("--driver is required (telegram)")
 	}
 
 	if !config.ValidNotifyDrivers[driver] {
-		return fmt.Errorf("invalid driver %q; must be telegram, slack, discord, or webhook", driver)
+		return fmt.Errorf("invalid driver %q; supported drivers: telegram", driver)
 	}
 
 	secretsDir := filepath.Join(jibRoot(), "secrets")
-
-	// Telegram needs bot_token + chat_id; handle separately.
-	if driver == "telegram" {
-		return addTelegramChannel(name, secretsDir)
-	}
-
-	// Slack, discord, and webhook all need a single URL.
-	url := urlFlag
-	if url == "" {
-		if driver == "webhook" {
-			fmt.Println("Add a generic webhook notification channel.")
-			fmt.Println()
-			fmt.Println("Jib will POST JSON to your URL on deploy events.")
-			fmt.Println("The payload includes: app name, status, timestamp, and commit info.")
-			fmt.Println()
-		}
-		promptLabel := strings.ToUpper(driver[:1]) + driver[1:] + " webhook URL"
-		if driver == "webhook" {
-			promptLabel = "Webhook URL"
-		}
-		var err error
-		url, err = tui.PromptString("url", promptLabel)
-		if err != nil {
-			return err
-		}
-	}
-
-	credKey := "webhook_url" //nolint:gosec // G101 false positive: this is a map key name, not a credential
-	if driver == "webhook" {
-		credKey = "url"
-	}
-	creds := map[string]string{credKey: url}
-
-	if err := notify.WriteChannelCreds(secretsDir, name, creds); err != nil {
-		return err
-	}
-
-	if err := addChannelToConfig(name, driver); err != nil {
-		return err
-	}
-
-	fmt.Printf("Added %s channel %q.\n", driver, name)
-	syncStack()
-	return nil
+	return addTelegramChannel(name, secretsDir)
 }
 
 // runNotifyRemove removes a channel from config and deletes its credentials.
@@ -472,56 +348,6 @@ func addTelegramChannel(name string, secretsDir string) error {
 	}
 
 	fmt.Printf("Added telegram channel %q.\n", name)
-	syncStack()
-	return nil
-}
-
-// runSlackAdd prompts for Slack webhook URL and adds the channel.
-func runSlackAdd(cmd *cobra.Command, args []string) error {
-	return addWebhookChannel(args[0], "slack", "Slack webhook URL", "webhook_url")
-}
-
-// runDiscordAdd prompts for Discord webhook URL and adds the channel.
-func runDiscordAdd(cmd *cobra.Command, args []string) error {
-	return addWebhookChannel(args[0], "discord", "Discord webhook URL", "webhook_url")
-}
-
-// addWebhookChannel is a shared helper for drivers that need a single URL credential.
-func addWebhookChannel(name, driver, promptLabel, credKey string) error {
-	switch driver {
-	case "slack":
-		fmt.Println("Add a Slack notification channel.")
-		fmt.Println()
-		fmt.Println("You'll need a Slack Incoming Webhook URL:")
-		fmt.Println("  1. Go to https://api.slack.com/apps → Create New App → From scratch")
-		fmt.Println("  2. Go to Incoming Webhooks → Activate Incoming Webhooks")
-		fmt.Println("  3. Click 'Add New Webhook to Workspace' and pick a channel")
-		fmt.Println("  4. Copy the webhook URL (starts with https://hooks.slack.com/...)")
-		fmt.Println()
-	case "discord":
-		fmt.Println("Add a Discord notification channel.")
-		fmt.Println()
-		fmt.Println("You'll need a Discord Webhook URL:")
-		fmt.Println("  1. Open Server Settings → Integrations → Webhooks")
-		fmt.Println("  2. Click 'New Webhook', pick a channel, and optionally rename it")
-		fmt.Println("  3. Click 'Copy Webhook URL' (starts with https://discord.com/api/webhooks/...)")
-		fmt.Println()
-	}
-
-	url, err := tui.PromptString("url", promptLabel)
-	if err != nil {
-		return err
-	}
-
-	secretsDir := filepath.Join(jibRoot(), "secrets")
-	if err := notify.WriteChannelCreds(secretsDir, name, map[string]string{credKey: url}); err != nil {
-		return err
-	}
-	if err := addChannelToConfig(name, driver); err != nil {
-		return err
-	}
-
-	fmt.Printf("Added %s channel %q.\n", driver, name)
 	syncStack()
 	return nil
 }

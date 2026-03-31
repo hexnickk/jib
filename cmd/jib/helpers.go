@@ -13,7 +13,6 @@ import (
 
 	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
-	"github.com/hexnickk/jib/internal/ssl"
 	"github.com/hexnickk/jib/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -56,19 +55,10 @@ func newSecretsManager() *secrets.Manager {
 	return secrets.NewManager(filepath.Join(jibRoot(), "secrets"))
 }
 
-func newSSLManager(cfg *config.Config) *ssl.CertManager {
-	return ssl.NewCertManager(cfg.CertbotEmail, "/var/www/certbot")
-}
-
 func newProxy(cfg *config.Config) proxy.Proxy {
-	webhookPort := 0
-	if cfg.Webhook != nil {
-		webhookPort = cfg.Webhook.Port
-	}
 	return proxy.NewNginx(
 		filepath.Join(jibRoot(), "nginx"),
 		"/etc/nginx/conf.d",
-		webhookPort,
 	)
 }
 
@@ -83,7 +73,6 @@ func newEngine(cfg *config.Config) *deploy.Engine {
 		StateStore:  newStateStore(),
 		Secrets:     newSecretsManager(),
 		Proxy:       newProxy(cfg),
-		SSL:         newSSLManager(cfg),
 		History:     newHistoryLogger(),
 		LockDir:     filepath.Join(root, "locks"),
 		RepoBaseDir: filepath.Join(root, "repos"),

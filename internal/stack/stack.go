@@ -123,27 +123,6 @@ func GenerateCompose(cfg *config.Config, tokens *Tokens) string {
       - /opt/jib/config.yml:/opt/jib/config.yml:ro
       - /opt/jib/secrets:/opt/jib/secrets:ro`
 
-	// Webhook trigger.
-	if cfg.Webhook != nil && cfg.Webhook.Enabled {
-		port := cfg.Webhook.Port
-		if port == 0 {
-			port = 9090
-		}
-		fmt.Fprintf(&b, `
-  jib-webhook:
-    build:
-      context: %s
-      dockerfile: services/jib-webhook/Dockerfile
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:%d:%d"
-%s
-%s
-    networks:
-      - %s
-`, RepoRoot, port, 9090, sharedEnv("trigger", tokens.Trigger), sharedVolumes, NetworkName)
-	}
-
 	// Health monitor (if any app has health checks).
 	hasHealth := false
 	for _, app := range cfg.Apps {
@@ -171,21 +150,6 @@ func GenerateCompose(cfg *config.Config, tokens *Tokens) string {
 %s
 %s
 `, RepoRoot, healthEnv, sharedVolumes)
-	}
-
-	// Cert watcher (if certbot is configured and any domain needs certs).
-	if cfg.CertbotEmail != "" {
-		fmt.Fprintf(&b, `
-  jib-certs:
-    build:
-      context: %s
-      dockerfile: services/jib-certs/Dockerfile
-    restart: unless-stopped
-%s
-%s
-    networks:
-      - %s
-`, RepoRoot, sharedEnv("monitor", tokens.Monitor), sharedVolumes, NetworkName)
 	}
 
 	// Per-channel notifiers. One container per configured channel.
@@ -219,27 +183,6 @@ func GenerateCompose(cfg *config.Config, tokens *Tokens) string {
     entrypoint: ["/bin/sh", "-c", "exec cloudflared tunnel --no-autoupdate run --token $(cat /run/secrets/tunnel-token)"]
     volumes:
       - /opt/jib/secrets/_jib/cloudflare-tunnel-token:/run/secrets/tunnel-token:ro
-`)
-	}
-
-	// Tailscale.
-	if cfg.Tunnel != nil && cfg.Tunnel.Provider == "tailscale" {
-		fmt.Fprintf(&b, `
-  tailscale:
-    image: tailscale/tailscale:latest
-    restart: unless-stopped
-    network_mode: host
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    volumes:
-      - /opt/jib/tailscale:/var/lib/tailscale
-      - /opt/jib/secrets/_jib/tailscale-authkey:/run/secrets/ts-authkey:ro
-    environment:
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_AUTHKEY_FILE: /run/secrets/ts-authkey
 `)
 	}
 

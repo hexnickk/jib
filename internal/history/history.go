@@ -13,11 +13,8 @@ import (
 
 // EventType enumerates the kinds of events we log.
 const (
-	EventDeploy       = "deploy"
-	EventRollback     = "rollback"
-	EventBackup       = "backup"
-	EventRestore      = "restore"
-	EventConfigChange = "config_change"
+	EventDeploy   = "deploy"
+	EventRollback = "rollback"
 )
 
 // Event represents a single logged event.

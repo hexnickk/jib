@@ -67,13 +67,6 @@ func TestHealthEventSubject(t *testing.T) {
 	}
 }
 
-func TestCertEventSubject(t *testing.T) {
-	ev := CertEvent{Domain: "example.com"}
-	if ev.Subject() != "jib.event.cert.example.com.expiring" {
-		t.Errorf("Subject = %q", ev.Subject())
-	}
-}
-
 func TestHeartbeatSubject(t *testing.T) {
 	hb := Heartbeat{}
 	if hb.Subject() != "jib.heartbeat.daemon" {
@@ -121,9 +114,9 @@ func TestSubjectSanitization(t *testing.T) {
 		t.Errorf("Subject() = %q, want wildcards stripped", got)
 	}
 
-	// Dots are allowed (domains have them)
-	ev := CertEvent{Domain: "api.example.com"}
-	if got := ev.Subject(); got != "jib.event.cert.api.example.com.expiring" {
+	// Dots are allowed in health event subjects
+	ev := HealthEvent{App: "api.example.com", Status: StatusFailed}
+	if got := ev.Subject(); got != "jib.event.health.api.example.com.failed" {
 		t.Errorf("Subject() = %q", got)
 	}
 }

@@ -43,62 +43,11 @@ func LoadChannels(secretsDir string, channels map[string]ChannelConfig) *Multi {
 				continue
 			}
 			n = NewTelegram(token, chatID)
-		case "slack":
-			url := creds["webhook_url"]
-			if url == "" {
-				continue
-			}
-			n = NewSlack(url)
-		case "discord":
-			url := creds["webhook_url"]
-			if url == "" {
-				continue
-			}
-			n = NewDiscord(url)
-		case "webhook":
-			url := creds["url"]
-			if url == "" {
-				continue
-			}
-			n = NewWebhook(url)
 		default:
 			continue
 		}
 
 		chs = append(chs, namedNotifier{name: name, notifier: n})
-	}
-
-	return &Multi{channels: chs}
-}
-
-// LoadFromSecrets is the legacy loader for backward compatibility.
-// It checks for old-format secrets files. New code should use LoadChannels.
-func LoadFromSecrets(secretsDir string) *Multi {
-	dir := filepath.Join(secretsDir, "_jib")
-	var chs []namedNotifier
-
-	// Telegram (old format: telegram.env)
-	if env, err := parseEnvFile(filepath.Join(dir, "telegram.env")); err == nil {
-		token := env["TELEGRAM_BOT_TOKEN"]
-		chatID := env["TELEGRAM_CHAT_ID"]
-		if token != "" && chatID != "" {
-			chs = append(chs, namedNotifier{name: "telegram", notifier: NewTelegram(token, chatID)})
-		}
-	}
-
-	// Slack
-	if url, err := readFileString(filepath.Join(dir, "slack_webhook")); err == nil && url != "" {
-		chs = append(chs, namedNotifier{name: "slack", notifier: NewSlack(url)})
-	}
-
-	// Discord
-	if url, err := readFileString(filepath.Join(dir, "discord_webhook")); err == nil && url != "" {
-		chs = append(chs, namedNotifier{name: "discord", notifier: NewDiscord(url)})
-	}
-
-	// Generic webhook
-	if url, err := readFileString(filepath.Join(dir, "webhook_url")); err == nil && url != "" {
-		chs = append(chs, namedNotifier{name: "webhook", notifier: NewWebhook(url)})
 	}
 
 	return &Multi{channels: chs}
@@ -174,13 +123,4 @@ func parseEnvReader(r io.Reader) (map[string]string, error) {
 		return nil, err
 	}
 	return env, nil
-}
-
-// readFileString reads a file and returns its trimmed content.
-func readFileString(path string) (string, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // path constructed from trusted secrets directory
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(data)), nil
 }

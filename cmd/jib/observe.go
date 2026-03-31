@@ -42,7 +42,7 @@ func registerObserveCommands(rootCmd *cobra.Command) {
 	// jib history <app>
 	historyCmd := &cobra.Command{
 		Use:   "history <app>",
-		Short: "Deploy/rollback/backup timeline",
+		Short: "Deploy/rollback timeline",
 		Args:  exactArgs(1),
 		RunE:  runHistory,
 	}
@@ -122,11 +122,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		LastDeploy          string `json:"last_deploy"`
 		ConsecutiveFailures int    `json:"consecutive_failures"`
 		Pinned              bool   `json:"pinned"`
-		Maintenance         bool   `json:"maintenance"`
 	}
-
-	p := newProxy(cfg)
-	maintenanceApps := p.MaintenanceStatus(cfg.Apps)
 
 	var statuses []appStatus
 	names := sortedAppNames(cfg.Apps)
@@ -145,7 +141,6 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		if !appState.LastDeploy.IsZero() {
 			lastDeploy = appState.LastDeploy.Format("2006-01-02 15:04:05")
 		}
-		_, inMaintenance := maintenanceApps[name]
 		statuses = append(statuses, appStatus{
 			Name:                name,
 			DeployedSHA:         sha,
@@ -153,7 +148,6 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			LastDeploy:          lastDeploy,
 			ConsecutiveFailures: appState.ConsecutiveFailures,
 			Pinned:              appState.Pinned,
-			Maintenance:         inMaintenance,
 		})
 	}
 
@@ -173,9 +167,6 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintln(w, "  NAME\tSHA\tSTATUS\tLAST DEPLOY\tFAILURES")
 		for _, s := range statuses {
 			status := s.LastDeployStatus
-			if s.Maintenance {
-				status = "maintenance"
-			}
 			if s.Pinned {
 				status += " (pinned)"
 			}
@@ -566,11 +557,6 @@ func printInfraStatus(cfg *config.Config) {
 		fmt.Printf("  tunnel:          %s\n", label)
 	}
 
-	// SSL
-	if cfg.CertbotEmail != "" {
-		fmt.Printf("  ssl:             certbot (%s)\n", cfg.CertbotEmail)
-	}
-
 	// Notifications
 	if len(cfg.Notifications) > 0 {
 		var chans []string
@@ -581,14 +567,8 @@ func printInfraStatus(cfg *config.Config) {
 		fmt.Printf("  notifications:   %s\n", strings.Join(chans, ", "))
 	}
 
-	// Webhook
-	if cfg.Webhook != nil && cfg.Webhook.Enabled {
-		fmt.Printf("  webhook:         port %d\n", cfg.Webhook.Port)
-	}
-
 	// If nothing is configured, give a hint
-	hasWebhook := cfg.Webhook != nil && cfg.Webhook.Enabled
-	if cfg.Tunnel == nil && cfg.CertbotEmail == "" && len(cfg.Notifications) == 0 && !hasWebhook {
+	if cfg.Tunnel == nil && len(cfg.Notifications) == 0 {
 		fmt.Println("  (not configured) — run 'jib init' to set up")
 	}
 }

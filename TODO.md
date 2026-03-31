@@ -1,39 +1,58 @@
-# Jib — Roadmap
+# Jib — Dropped Features (re-add as modules later)
 
-## Completed
+Features removed from initial modular release to keep scope minimal.
+Core workflow: GitHub polling + deploy + Telegram notifications + Cloudflare tunnels.
 
-All items below have been implemented, reviewed, and tested.
+## Notifications
+- [ ] Slack notifications
+- [ ] Discord notifications
+- [ ] Generic webhook notifications
 
-- [x] Fix exit codes — non-zero on failure for all commands
-- [x] Fix `jib config set` type handling — booleans, numbers parsed correctly
-- [x] `jib remove <app>` — full cleanup (containers, nginx, state, secrets, repo, config)
-- [x] `jib env set/del` — per-variable secrets management
-- [x] `jib history` — append-only event log wired into deploy/rollback
-- [x] Maintenance mode — `jib maintenance on/off/status` with nginx 503 swap
-- [x] Resource limits — auto-suggested CPU/memory per app, written to overrides
-- [x] `jib upgrade` — self-update from GitHub Releases
-- [x] `jib init` — interactive onboarding (deps, SSL/tunnel choice, dirs, config, systemd)
-- [x] Notifications — named instances, per-app routing, `jib telegram/slack/discord` commands
-- [x] `jib github setup/status/remove` — deploy keys + webhook secrets
-- [x] `jib cloudflare setup/add/status` — Cloudflare Tunnel management
-- [x] `jib tailscale setup/status` — Tailscale management
-- [x] Shared services — `jib service add/list/status/remove` (Postgres/MySQL/MariaDB/Redis/MongoDB)
-- [x] Backup/restore — multiple destinations (R2/S3/SSH/local), retention, volume backup
-- [x] Daemon — autodeploy polling, webhook server, backup scheduler, health monitor, cert watcher
+## Triggers
+- [ ] GitHub webhook trigger (listen for push events, deploy immediately)
+- [ ] Telegram bot trigger (listen for /deploy commands via bot)
+- [ ] Slack bot trigger
 
-## Up Next
+## Ingress
+- [ ] Tailscale integration (VPN mesh networking)
+- [ ] Caddy support (alternative reverse proxy to nginx)
 
-### GitHub App authentication
-Deploy keys work but are per-repo. GitHub Apps allow one installation to access multiple repos with fine-grained permissions. Implementation: store App ID, Installation ID, and private key PEM; generate short-lived installation access tokens (JWT → GitHub API) before each `git fetch`; clone via HTTPS (`x-access-token`). No new dependencies — Go stdlib handles JWT/RSA.
+## Backup & Restore
+- [ ] Backup scheduler (cron-based automatic backups)
+- [ ] Backup destinations: S3, R2, SSH, local
+- [ ] Backup encryption (GPG)
+- [ ] Restore command
+- [ ] Retention policies
 
-### Blue-green deploy strategy (zero-downtime)
-The `restart` strategy has brief downtime during container swap. Blue-green deploys to an inactive slot, health checks it, then swaps nginx — zero downtime. The config schema already supports `strategy: blue-green` but the engine only implements `restart`.
+## SSL / Certificates
+- [ ] Certbot integration (Let's Encrypt auto-provisioning)
+- [ ] Cert expiry watcher (monitor and auto-renew)
 
-### Preview/branch deploys
-Deploy a PR branch to a temporary subdomain (`pr-42.myapp.com`), auto-destroy when merged. Requires: parallel container sets, temporary nginx configs, wildcard cert or per-preview cert, cleanup via webhook or polling.
+## Shared Services
+- [ ] Managed databases: PostgreSQL, MySQL, MariaDB, MongoDB
+- [ ] Managed caches: Redis
+- [ ] Auto-generated credentials and connection strings
 
-### GitLab integration
-Same as `jib github setup` but for GitLab — deploy tokens, webhook registration, push event parsing. The daemon webhook server already parses GitLab payloads, just needs the setup CLI.
+## Operations
+- [ ] Maintenance mode (503 pages via nginx)
+- [ ] Metrics command (live container resource usage)
+- [ ] Cleanup command (prune Docker images/volumes)
+- [ ] Self-update / upgrade command
+- [ ] `jib env` commands (get/set/remove env vars via CLI)
+- [ ] Cron tasks (scheduled commands in app containers)
 
-### Wildcard SSL certificates
-Per-domain certbot works but doesn't scale. Wildcard certs (`*.myapp.com`) via DNS challenge would simplify multi-domain and preview deploy setups.
+## Deploy Engine
+- [ ] Auto-generate compose from Dockerfile (if no compose file exists)
+- [ ] Resource auto-detection and per-app CPU/memory limits
+- [ ] Dry-run mode
+- [ ] Blue-green deploy strategy (zero-downtime)
+- [ ] Preview/branch deploys (PR to temporary subdomain)
+
+## Platform
+- [ ] Dependency installer (auto-install Docker, Nginx, etc.)
+- [ ] Domain reachability checks (DNS classification in status)
+- [ ] Custom nginx includes
+
+## Future Integrations
+- [ ] GitLab provider
+- [ ] Wildcard SSL certificates (DNS challenge)

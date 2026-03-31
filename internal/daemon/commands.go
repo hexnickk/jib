@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -26,9 +25,6 @@ func (d *Daemon) subscribeCommands() error {
 	}{
 		{bus.TopicDeployCmd + ".>", d.handleDeployCmd},
 		{bus.TopicRollbackCmd + ".>", d.handleRollbackCmd},
-		{bus.TopicBackupCmd + ".>", d.handleBackupCmd},
-		{bus.TopicMaintenanceCmd + ".>", d.handleMaintenanceCmd},
-		{bus.TopicCertRenewCmd + ".>", d.handleCertRenewCmd},
 		{bus.TopicConfigReload, d.handleConfigReloadCmd},
 	}
 
@@ -133,101 +129,6 @@ func (d *Daemon) handleRollbackCmd(subject string, data []byte) (interface{}, er
 			return
 		}
 		d.publishDeployEvent(result, "rollback", cmd.User, cmd.ID, duration)
-	}()
-
-	return bus.CommandAck{Accepted: true, CorrelationID: cmd.ID}, nil
-}
-
-func (d *Daemon) handleBackupCmd(subject string, data []byte) (interface{}, error) {
-	var cmd bus.BackupCommand
-	if err := json.Unmarshal(data, &cmd); err != nil {
-		return bus.CommandAck{Accepted: false, Error: "invalid payload"}, nil
-	}
-	if cmd.App == "" {
-		cmd.App = extractAppFromSubject(subject)
-	}
-	if err := cmd.Validate(); err != nil {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
-	}
-
-	cfg := d.getConfig()
-	appCfg, ok := cfg.Apps[cmd.App]
-	if !ok {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: fmt.Sprintf("app %q not found", cmd.App)}, nil
-	}
-
-	go func() {
-		start := time.Now()
-		_, err := d.backupMgr.Backup(cmd.App, appCfg)
-		duration := time.Since(start)
-		if err != nil {
-			d.logger.Printf("bus: backup %s failed: %v", cmd.App, err)
-			d.publishBackupEvent(cmd.App, bus.StatusFailure, err.Error(), duration)
-		} else {
-			d.logger.Printf("bus: backup %s complete", cmd.App)
-			d.publishBackupEvent(cmd.App, bus.StatusSuccess, "", duration)
-		}
-	}()
-
-	return bus.CommandAck{Accepted: true, CorrelationID: cmd.ID}, nil
-}
-
-func (d *Daemon) handleMaintenanceCmd(subject string, data []byte) (interface{}, error) {
-	var cmd bus.MaintenanceCommand
-	if err := json.Unmarshal(data, &cmd); err != nil {
-		return bus.CommandAck{Accepted: false, Error: "invalid payload"}, nil
-	}
-	if cmd.App == "" {
-		cmd.App = extractAppFromSubject(subject)
-	}
-	if err := cmd.Validate(); err != nil {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
-	}
-
-	cfg := d.getConfig()
-	appCfg, ok := cfg.Apps[cmd.App]
-	if !ok {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: fmt.Sprintf("app %q not found", cmd.App)}, nil
-	}
-
-	d.mu.RLock()
-	p := d.proxyMgr
-	d.mu.RUnlock()
-
-	var err error
-	if cmd.Enabled {
-		err = p.MaintenanceOn(cmd.App, appCfg.Domains, "")
-	} else {
-		err = p.MaintenanceOff(cmd.App, appCfg.Domains)
-	}
-	if err != nil {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
-	}
-
-	return bus.CommandAck{Accepted: true, CorrelationID: cmd.ID}, nil
-}
-
-func (d *Daemon) handleCertRenewCmd(subject string, data []byte) (interface{}, error) {
-	var cmd bus.CertRenewCommand
-	if err := json.Unmarshal(data, &cmd); err != nil {
-		return bus.CommandAck{Accepted: false, Error: "invalid payload"}, nil
-	}
-	if cmd.Domain == "" {
-		// Extract domain from subject: jib.command.cert.renew.<domain parts>
-		cmd.Domain = strings.TrimPrefix(subject, bus.TopicCertRenewCmd+".")
-	}
-	if err := cmd.Validate(); err != nil {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
-	}
-
-	go func() {
-		out, err := exec.CommandContext(d.ctx, "certbot", "renew", "--cert-name", cmd.Domain, "--non-interactive").CombinedOutput() //nolint:gosec // domain from validated command
-		if err != nil {
-			d.logger.Printf("bus: cert renew %s failed: %v: %s", cmd.Domain, err, out)
-			d.publishCertEvent(cmd.Domain, 0, err.Error())
-		} else {
-			d.logger.Printf("bus: cert renewed %s", cmd.Domain)
-		}
 	}()
 
 	return bus.CommandAck{Accepted: true, CorrelationID: cmd.ID}, nil
