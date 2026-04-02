@@ -15,6 +15,7 @@ import (
 	"github.com/hexnickk/jib/internal/docker"
 	gitPkg "github.com/hexnickk/jib/internal/git"
 	ghPkg "github.com/hexnickk/jib/internal/github"
+	"github.com/hexnickk/jib/internal/module"
 	"github.com/hexnickk/jib/internal/stack"
 	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
@@ -314,7 +315,16 @@ func syncStack() {
 		}
 	}
 
-	if err := stack.EnsureStack(cfg, tokens); err != nil {
+	// Collect module-contributed compose services.
+	tokenMap := tokens.TokenMap()
+	var moduleServices []string
+	for _, cp := range module.ComposeProviders() {
+		if svc := cp.ComposeServices(cfg, tokenMap); svc != "" {
+			moduleServices = append(moduleServices, svc)
+		}
+	}
+
+	if err := stack.EnsureStack(cfg, tokens, moduleServices); err != nil {
 		fmt.Fprintf(os.Stderr, "  stack: warning: writing stack files: %v\n", err)
 		return
 	}
@@ -699,40 +709,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\nApp %q deployed successfully (SHA: %s)\n", appName, result.DeployedSHA[:8])
 
-	// --- Step 5: Provision nginx ---
-	fmt.Println("\nProvisioning nginx...")
+	// --- Step 5: Run module setup hooks (nginx, cloudflare, etc.) ---
 	appCfg := cfg.Apps[appName]
-	p := newProxy(cfg)
-	configs, err := p.GenerateConfig(appName, appCfg)
-	if err != nil {
-		return fmt.Errorf("generating nginx config: %w", err)
-	}
-	if err := p.WriteConfigs(configs); err != nil {
-		return fmt.Errorf("writing nginx configs: %w", err)
-	}
-	for filename := range configs {
-		fmt.Printf("  nginx: %s\n", filename)
-	}
-	if err := p.Test(); err != nil {
-		fmt.Fprintf(os.Stderr, "  warning: nginx config test failed: %v\n", err)
-	} else if err := p.Reload(); err != nil {
-		fmt.Fprintf(os.Stderr, "  warning: nginx reload failed: %v\n", err)
-	} else {
-		fmt.Println("  nginx: reloaded")
-	}
-
-	// --- Step 6: Cloudflare tunnel routes (if applicable) ---
-	var cfDomains []string
-	for _, d := range domains {
-		if d.Ingress == "cloudflare-tunnel" {
-			cfDomains = append(cfDomains, d.Host)
-		}
-	}
-	if len(cfDomains) > 0 {
-		fmt.Println("\nSetting up Cloudflare tunnel routes...")
-		if err := addCloudflareRoutes(ctx, cfDomains); err != nil {
-			fmt.Fprintf(os.Stderr, "  warning: %v\n", err)
-			fmt.Fprintln(os.Stderr, "  You may need to add DNS records and tunnel routes manually.")
+	for _, hook := range module.SetupHooks() {
+		if err := hook.OnAppAdd(ctx, appName, appCfg, cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: %s: %v\n", hook.Name(), err)
 		}
 	}
 
@@ -872,37 +853,12 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// 2. Remove Cloudflare tunnel routes (if applicable)
-	var cfDomains []string
-	for _, d := range appCfg.Domains {
-		if d.Ingress == "cloudflare-tunnel" {
-			cfDomains = append(cfDomains, d.Host)
-		}
-	}
-	if len(cfDomains) > 0 {
-		if err := removeCloudflareRoutes(ctx, cfDomains); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: removing cloudflare routes: %v\n", err)
+	// 2. Run module teardown hooks (cloudflare routes, nginx configs, etc.)
+	for _, hook := range module.SetupHooks() {
+		if err := hook.OnAppRemove(ctx, appName, appCfg, cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: %s teardown: %v\n", hook.Name(), err)
 		} else {
-			removed = append(removed, "cloudflare routes")
-		}
-	}
-
-	// 3. Remove nginx configs
-	if len(appCfg.Domains) > 0 {
-		p := newProxy(cfg)
-		if err := p.RemoveConfigs(appName, appCfg.Domains); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: removing nginx configs: %v\n", err)
-		} else {
-			removed = append(removed, "nginx configs")
-		}
-
-		// Reload nginx (test first)
-		if err := p.Test(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: nginx config test failed: %v\n", err)
-		} else if err := p.Reload(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: nginx reload: %v\n", err)
-		} else {
-			removed = append(removed, "nginx reloaded")
+			removed = append(removed, hook.Name())
 		}
 	}
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/git"
-	ghPkg "github.com/hexnickk/jib/internal/github"
+	"github.com/hexnickk/jib/internal/module"
 	"github.com/hexnickk/jib/internal/state"
 )
 
@@ -84,19 +84,21 @@ func (d *Daemon) pollOnce(ctx context.Context) {
 			continue
 		}
 
-		// Refresh auth for GitHub App providers before fetch.
-		if appCfg.Provider != "" {
-			if provider, ok := cfg.LookupProvider(appCfg.Provider); ok && provider.Type == ghPkg.ProviderTypeApp {
-				token, err := ghPkg.GenerateInstallationToken(ctx, d.Root, appCfg.Provider, provider.AppID, appCfg.Repo)
-				if err != nil {
-					d.logger.Printf("poller: %s: token refresh error: %v", appName, err)
-					continue
-				}
-				if err := ghPkg.SetRemoteToken(ctx, repoDir, appCfg.Repo, token); err != nil {
-					d.logger.Printf("poller: %s: set remote URL error: %v", appName, err)
-					continue
-				}
+		// Refresh auth via registered GitAuthProviders before fetch.
+		authFailed := false
+		for _, gap := range module.GitAuthProviders() {
+			handled, err := gap.RefreshAuth(ctx, d.Root, repoDir, appCfg, cfg)
+			if err != nil {
+				d.logger.Printf("poller: %s: %s auth refresh error: %v", appName, gap.Name(), err)
+				authFailed = true
+				break
 			}
+			if handled {
+				break
+			}
+		}
+		if authFailed {
+			continue
 		}
 
 		// Fetch from origin.

@@ -4,6 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/hexnickk/jib/internal/module"
+	"github.com/hexnickk/jib/internal/module/cfmod"
+	"github.com/hexnickk/jib/internal/module/ghmod"
+	"github.com/hexnickk/jib/internal/module/health"
+	"github.com/hexnickk/jib/internal/module/nginxmod"
+	"github.com/hexnickk/jib/internal/module/telegram"
+	"github.com/hexnickk/jib/internal/stack"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +26,16 @@ func main() {
 }
 
 func newRootCmd() *cobra.Command {
+	root := jibRoot()
+
+	// Register modules. Order matters for SetupHooks:
+	// cloudflare routes before nginx (add), nginx before cloudflare (remove handled by iteration order).
+	module.Register(&cfmod.Module{Root: root})
+	module.Register(&nginxmod.Module{Root: root})
+	module.Register(&ghmod.Module{})
+	module.Register(&health.Module{RepoRoot: stack.RepoRoot})
+	module.Register(&telegram.Module{RepoRoot: stack.RepoRoot})
+
 	rootCmd := &cobra.Command{
 		Use:   "jib",
 		Short: "Lightweight Docker Compose deploy tool",
@@ -38,16 +55,18 @@ Jib lives on the server. You SSH in and run commands, or use
 	rootCmd.Version = version
 	rootCmd.SetVersionTemplate("jib version {{.Version}}\n")
 
-	// Register all command groups
+	// Core commands
 	registerSetupCommands(rootCmd)
 	registerDeployCommands(rootCmd)
 	registerObserveCommands(rootCmd)
 	registerOperateCommands(rootCmd)
 	registerConfigCommands(rootCmd)
+	registerDaemonCommands(rootCmd)
+
+	// Module CLI commands
 	registerNotifyCommands(rootCmd)
 	registerGitHubCommands(rootCmd)
 	registerCloudflareCommands(rootCmd)
-	registerDaemonCommands(rootCmd)
 
 	return rootCmd
 }

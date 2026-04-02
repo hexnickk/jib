@@ -216,57 +216,6 @@ func cloudflareAPITokenPath() string {
 	return filepath.Join(jibRoot(), "secrets", "_jib", "cloudflare-api-token")
 }
 
-// loadCloudflareAPIToken reads the stored API token.
-func loadCloudflareAPIToken() (string, error) {
-	data, err := os.ReadFile(cloudflareAPITokenPath()) //nolint:gosec // trusted path
-	if err != nil {
-		return "", fmt.Errorf("cloudflare API token not found — run 'jib cloudflare setup' with API mode first")
-	}
-	return strings.TrimSpace(string(data)), nil
-}
-
-// loadTunnelConfig reads tunnel_id and account_id from the jib config.
-func loadTunnelConfig() (tunnelID, accountID string, err error) {
-	cfg, err := loadConfig()
-	if err != nil {
-		return "", "", fmt.Errorf("loading config: %w", err)
-	}
-	if cfg.Tunnel == nil || cfg.Tunnel.TunnelID == "" {
-		return "", "", fmt.Errorf("no tunnel configured — run 'jib cloudflare setup' first")
-	}
-	return cfg.Tunnel.TunnelID, cfg.Tunnel.AccountID, nil
-}
-
-// addCloudflareRoutes creates DNS records and tunnel ingress rules for the given domains.
-func addCloudflareRoutes(ctx context.Context, domains []string) error {
-	token, err := loadCloudflareAPIToken()
-	if err != nil {
-		return err
-	}
-	tunnelID, accountID, err := loadTunnelConfig()
-	if err != nil {
-		return err
-	}
-
-	client := cloudflare.NewClient(token)
-	return client.AddTunnelRoutes(ctx, accountID, tunnelID, domains)
-}
-
-// removeCloudflareRoutes removes DNS records and tunnel ingress rules for the given domains.
-func removeCloudflareRoutes(ctx context.Context, domains []string) error {
-	token, err := loadCloudflareAPIToken()
-	if err != nil {
-		return err
-	}
-	tunnelID, accountID, err := loadTunnelConfig()
-	if err != nil {
-		return err
-	}
-
-	client := cloudflare.NewClient(token)
-	return client.RemoveTunnelRoutes(ctx, accountID, tunnelID, domains)
-}
-
 func runCloudflareStatus(cmd *cobra.Command, args []string) error {
 	cfg, err := loadConfig()
 	if err != nil {

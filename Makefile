@@ -3,7 +3,10 @@ LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 BINARY := jib
 BUILD_DIR := bin
 
-.PHONY: build install clean version test lint fmt check setup-hooks
+.PHONY: bootstrap build install clean version test lint fmt check setup-hooks
+
+bootstrap:
+	go install golang.org/x/tools/gopls@latest
 
 build:
 	@mkdir -p $(BUILD_DIR)

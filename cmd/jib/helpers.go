@@ -55,7 +55,7 @@ func newSecretsManager() *secrets.Manager {
 	return secrets.NewManager(filepath.Join(jibRoot(), "secrets"))
 }
 
-func newProxy(cfg *config.Config) proxy.Proxy {
+func newProxy(_ *config.Config) proxy.Proxy {
 	return proxy.NewNginx(
 		filepath.Join(jibRoot(), "nginx"),
 		"/etc/nginx/conf.d",

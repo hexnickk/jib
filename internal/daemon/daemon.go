@@ -191,6 +191,7 @@ func (d *Daemon) newEngine() *deploy.Engine {
 		LockDir:     filepath.Join(d.Root, "locks"),
 		RepoBaseDir: filepath.Join(d.Root, "repos"),
 		OverrideDir: filepath.Join(d.Root, "overrides"),
+		JibRoot:     d.Root,
 	}
 }
 
