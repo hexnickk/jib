@@ -43,7 +43,7 @@ func TestGenerateCompose_MinimalConfig(t *testing.T) {
 		ConfigVersion: 2,
 		PollInterval:  "5m",
 		Apps: map[string]config.App{
-			"myapp": {Repo: "org/repo", Strategy: "restart", Branch: "main",
+			"myapp": {Repo: "org/repo", Branch: "main",
 				Domains: []config.Domain{{Host: "example.com", Port: 80}}},
 		},
 	}
@@ -70,7 +70,7 @@ func TestGenerateCompose_WithModuleServices(t *testing.T) {
 		ConfigVersion: 2,
 		PollInterval:  "5m",
 		Apps: map[string]config.App{
-			"myapp": {Repo: "org/repo", Strategy: "restart", Branch: "main",
+			"myapp": {Repo: "org/repo", Branch: "main",
 				Domains: []config.Domain{{Host: "example.com", Port: 80}}},
 		},
 	}

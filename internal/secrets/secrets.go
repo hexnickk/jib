@@ -94,14 +94,11 @@ func (m *Manager) Check(app string, envFileName string) (exists bool, path strin
 	return err == nil, path
 }
 
-// CheckAll checks all apps that have SecretsEnv set to true.
-// Returns a status entry for each such app, sorted by app name.
+// CheckAll checks all apps for secrets files.
+// Returns a status entry for each app, sorted by app name.
 func (m *Manager) CheckAll(apps map[string]config.App) []AppSecretStatus {
 	var results []AppSecretStatus
 	for name, app := range apps {
-		if !app.SecretsEnv {
-			continue
-		}
 		exists, path := m.Check(name, app.EnvFile)
 		results = append(results, AppSecretStatus{
 			App:    name,

@@ -50,6 +50,15 @@ func LoadConfig(path string) (*Config, error) {
 		cfg.ConfigVersion = 2
 	}
 
+	// Migrate v2 → v3: strategy, secrets_env removed; ingress cleared.
+	if cfg.ConfigVersion < 3 {
+		for name, app := range cfg.Apps {
+			app.Ingress = "" // clear deprecated field
+			cfg.Apps[name] = app
+		}
+		cfg.ConfigVersion = 3
+	}
+
 	applyDefaults(&cfg)
 
 	if err := Validate(&cfg); err != nil {
@@ -68,9 +77,6 @@ func applyDefaults(cfg *Config) {
 	for name, app := range cfg.Apps {
 		if app.Branch == "" {
 			app.Branch = "main"
-		}
-		if app.Strategy == "" {
-			app.Strategy = "restart"
 		}
 		if app.EnvFile == "" {
 			app.EnvFile = ".env"

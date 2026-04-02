@@ -218,7 +218,6 @@ func runStatusDetail(cfg *config.Config, name string, jsonOutput bool) error {
 		fmt.Printf("App: %s\n\n", name)
 		fmt.Printf("  Repo:               %s\n", appCfg.Repo)
 		fmt.Printf("  Branch:             %s\n", appCfg.Branch)
-		fmt.Printf("  Strategy:           %s\n", appCfg.Strategy)
 		for _, d := range appCfg.Domains {
 			ingress := "direct"
 			if d.Ingress != "" {
@@ -420,10 +419,6 @@ func runEnvSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("setting env vars: %w", err)
 	}
 
-	if !appCfg.SecretsEnv {
-		fmt.Println("Note: enable secrets_env in config for this app to use these vars")
-	}
-
 	for key := range vars {
 		fmt.Printf("Set %s\n", key)
 	}
@@ -448,10 +443,6 @@ func runEnvDel(cmd *cobra.Command, args []string) error {
 	mgr := newSecretsManager()
 	if err := mgr.DelVar(appName, appCfg.EnvFile, keys); err != nil {
 		return fmt.Errorf("deleting env vars: %w", err)
-	}
-
-	if !appCfg.SecretsEnv {
-		fmt.Println("Note: enable secrets_env in config for this app to use these vars")
 	}
 
 	for _, key := range keys {

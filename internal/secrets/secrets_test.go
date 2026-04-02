@@ -151,17 +151,17 @@ func TestCheckAllMixedApps(t *testing.T) {
 	}
 
 	apps := map[string]config.App{
-		"appA": {SecretsEnv: true},
-		"appB": {SecretsEnv: true},
-		"appC": {SecretsEnv: false}, // should be skipped
-		"appD": {SecretsEnv: true, EnvFile: ".env.local"},
+		"appA": {},
+		"appB": {},
+		"appC": {},
+		"appD": {EnvFile: ".env.local"},
 	}
 
 	results := m.CheckAll(apps)
 
-	// Should have 3 results (appA, appB, appD — appC is skipped).
-	if len(results) != 3 {
-		t.Fatalf("got %d results, want 3", len(results))
+	// Should have 4 results (all apps checked).
+	if len(results) != 4 {
+		t.Fatalf("got %d results, want 4", len(results))
 	}
 
 	// Sort for deterministic checks.
@@ -175,11 +175,14 @@ func TestCheckAllMixedApps(t *testing.T) {
 	if results[1].Exists || results[1].App != "appB" {
 		t.Errorf("appB: exists=%v, want false", results[1].Exists)
 	}
-	if results[2].App != "appD" {
-		t.Errorf("expected appD, got %s", results[2].App)
+	if results[2].App != "appC" {
+		t.Errorf("expected appC, got %s", results[2].App)
 	}
-	if !strings.HasSuffix(results[2].Path, ".env.local") {
-		t.Errorf("appD path = %q, want suffix .env.local", results[2].Path)
+	if results[3].App != "appD" {
+		t.Errorf("expected appD, got %s", results[3].App)
+	}
+	if !strings.HasSuffix(results[3].Path, ".env.local") {
+		t.Errorf("appD path = %q, want suffix .env.local", results[3].Path)
 	}
 }
 

@@ -79,10 +79,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 		return nil, fmt.Errorf("app %q not found in config", opts.App)
 	}
 
-	strategy := appCfg.Strategy
-	if strategy == "" {
-		strategy = "restart"
-	}
+	const strategy = "restart"
 
 	repoDir := RepoPath(e.RepoBaseDir, opts.App, appCfg.Repo)
 	branch := appCfg.Branch
@@ -104,13 +101,6 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	}
 
 	// 4. Validate secrets if secrets_env is true.
-	if appCfg.SecretsEnv {
-		exists, secretPath := e.Secrets.Check(opts.App, appCfg.EnvFile)
-		if !exists {
-			return nil, fmt.Errorf("secrets file missing for app %q (expected at %s)", opts.App, secretPath)
-		}
-	}
-
 	// Load current state for previous SHA tracking.
 	appState, err := e.StateStore.Load(opts.App)
 	if err != nil {
@@ -194,8 +184,8 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 		return nil, fmt.Errorf("git checkout: %w", err)
 	}
 
-	// 6. Symlink secrets .env into repo.
-	if appCfg.SecretsEnv {
+	// 6. Symlink secrets .env into repo (if secrets file exists).
+	if hasSecrets, _ := e.Secrets.Check(opts.App, appCfg.EnvFile); hasSecrets {
 		if err := e.Secrets.Symlink(opts.App, repoDir, appCfg.EnvFile); err != nil {
 			return nil, fmt.Errorf("symlinking secrets: %w", err)
 		}
@@ -345,7 +335,7 @@ func (e *Engine) newCompose(app string, appCfg config.App, repoDir string) *dock
 	}
 
 	envFile := ""
-	if appCfg.SecretsEnv {
+	if exists, _ := e.Secrets.Check(app, appCfg.EnvFile); exists {
 		envFile = e.Secrets.SymlinkPath(app, appCfg.EnvFile)
 	}
 

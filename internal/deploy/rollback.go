@@ -31,10 +31,7 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 		return nil, fmt.Errorf("app %q not found in config", opts.App)
 	}
 
-	strategy := appCfg.Strategy
-	if strategy == "" {
-		strategy = "restart"
-	}
+	const strategy = "restart"
 
 	repoDir := RepoPath(e.RepoBaseDir, opts.App, appCfg.Repo)
 
@@ -64,8 +61,8 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 		return nil, fmt.Errorf("git checkout %s: %w", previousSHA, err)
 	}
 
-	// 5. Symlink secrets.
-	if appCfg.SecretsEnv {
+	// 5. Symlink secrets (if file exists).
+	if exists, _ := e.Secrets.Check(opts.App, appCfg.EnvFile); exists {
 		if err := e.Secrets.Symlink(opts.App, repoDir, appCfg.EnvFile); err != nil {
 			return nil, fmt.Errorf("symlinking secrets: %w", err)
 		}

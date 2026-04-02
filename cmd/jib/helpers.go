@@ -94,8 +94,8 @@ func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {
 	}
 
 	envFile := ""
-	if appCfg.SecretsEnv {
-		mgr := newSecretsManager()
+	mgr := newSecretsManager()
+	if exists, _ := mgr.Check(appName, appCfg.EnvFile); exists {
 		envFile = mgr.SymlinkPath(appName, appCfg.EnvFile)
 	}
 

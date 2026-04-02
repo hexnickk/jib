@@ -321,10 +321,6 @@ func runSecretsCheck(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		if !appCfg.SecretsEnv {
-			fmt.Printf("App %q does not use secrets_env.\n", appName)
-			return nil
-		}
 		exists, path := mgr.Check(appName, appCfg.EnvFile)
 		if exists {
 			fmt.Printf("OK  %s  %s\n", appName, path)

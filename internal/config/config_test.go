@@ -122,9 +122,6 @@ apps:
 	if app.Branch != "main" {
 		t.Errorf("default branch = %q, want 'main'", app.Branch)
 	}
-	if app.Strategy != "restart" {
-		t.Errorf("default strategy = %q, want 'restart'", app.Strategy)
-	}
 	if app.EnvFile != ".env" {
 		t.Errorf("default env_file = %q, want '.env'", app.EnvFile)
 	}
@@ -225,25 +222,6 @@ apps:
 		t.Fatal("expected error for bad port")
 	}
 	if !strings.Contains(err.Error(), "invalid port 99999") {
-		t.Errorf("error = %v", err)
-	}
-}
-
-func TestValidation_BadStrategy(t *testing.T) {
-	yml := `
-apps:
-  myapp:
-    repo: org/repo
-    strategy: canary
-    domains:
-      - host: example.com
-        port: 80
-`
-	_, err := LoadConfig(writeTemp(t, yml))
-	if err == nil {
-		t.Fatal("expected error for bad strategy")
-	}
-	if !strings.Contains(err.Error(), "strategy must be") {
 		t.Errorf("error = %v", err)
 	}
 }
@@ -471,14 +449,14 @@ apps:
 	if app.Ingress != "" {
 		t.Errorf("app.Ingress = %q, want empty (migrated to domains)", app.Ingress)
 	}
-	// Both domains should have the ingress
+	// Domains should have the ingress from the v1 app-level field
 	for i, d := range app.Domains {
 		if d.Ingress != "cloudflare-tunnel" {
 			t.Errorf("domain[%d].Ingress = %q, want cloudflare-tunnel", i, d.Ingress)
 		}
 	}
-	if cfg.ConfigVersion != 2 {
-		t.Errorf("config_version = %d, want 2", cfg.ConfigVersion)
+	if cfg.ConfigVersion != LatestConfigVersion {
+		t.Errorf("config_version = %d, want %d", cfg.ConfigVersion, LatestConfigVersion)
 	}
 }
 

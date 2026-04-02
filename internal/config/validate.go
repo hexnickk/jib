@@ -107,19 +107,9 @@ func validateApp(ve *ValidationError, name string, app *App, github *GitHubConfi
 		}
 	}
 
-	// App-level ingress (deprecated, kept for backward compat).
-	if app.Ingress != "" && !ValidIngressValues[app.Ingress] {
-		ve.addf("%s: ingress must be 'direct' or 'cloudflare-tunnel', got %q", prefix, app.Ingress)
-	}
-
 	// Required: at least one domain.
 	if len(app.Domains) == 0 {
 		ve.addf("%s: at least one domain is required", prefix)
-	}
-
-	// Strategy.
-	if app.Strategy != "" && app.Strategy != "restart" {
-		ve.addf("%s: strategy must be 'restart', got %q", prefix, app.Strategy)
 	}
 
 	// Domains.

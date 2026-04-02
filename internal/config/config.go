@@ -27,7 +27,7 @@ func (s *StringOrSlice) UnmarshalYAML(value *yaml.Node) error {
 }
 
 // LatestConfigVersion is the current config schema version.
-const LatestConfigVersion = 2
+const LatestConfigVersion = 3
 
 // Config is the top-level Jib configuration.
 type Config struct {
@@ -70,21 +70,19 @@ func (d *Domain) IsTunnelIngress() bool {
 
 // App describes a single deployable application.
 type App struct {
-	Repo       string            `yaml:"repo"`
-	Provider   string            `yaml:"provider,omitempty"`
-	Ingress    string            `yaml:"ingress,omitempty"`
-	Branch     string            `yaml:"branch,omitempty"`
-	Compose    StringOrSlice     `yaml:"compose,omitempty"`
-	Strategy   string            `yaml:"strategy,omitempty"`
-	Health     []HealthCheck     `yaml:"health,omitempty"`
-	Warmup     string            `yaml:"warmup,omitempty"`
-	PreDeploy  []PreDeployHook   `yaml:"pre_deploy,omitempty"`
-	BuildArgs  map[string]string `yaml:"build_args,omitempty"`
-	Domains    []Domain          `yaml:"domains"`
-	SecretsEnv bool              `yaml:"secrets_env,omitempty"`
-	EnvFile    string            `yaml:"env_file,omitempty"`
-	Services   []string          `yaml:"services,omitempty"`
-	Notify     []string          `yaml:"notify,omitempty"`
+	Repo      string            `yaml:"repo"`
+	Provider  string            `yaml:"provider,omitempty"`
+	Ingress   string            `yaml:"ingress,omitempty"` // deprecated v1 field; migrated to per-domain, then cleared
+	Branch    string            `yaml:"branch,omitempty"`
+	Compose   StringOrSlice     `yaml:"compose,omitempty"`
+	Health    []HealthCheck     `yaml:"health,omitempty"`
+	Warmup    string            `yaml:"warmup,omitempty"`
+	PreDeploy []PreDeployHook   `yaml:"pre_deploy,omitempty"`
+	BuildArgs map[string]string `yaml:"build_args,omitempty"`
+	Domains   []Domain          `yaml:"domains"`
+	EnvFile   string            `yaml:"env_file,omitempty"` // defaults to ".env"; secrets loaded if file exists
+	Services  []string          `yaml:"services,omitempty"`
+	Notify    []string          `yaml:"notify,omitempty"`
 }
 
 // Domain maps a hostname to a container port with optional ingress method.
