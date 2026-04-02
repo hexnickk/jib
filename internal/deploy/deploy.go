@@ -303,6 +303,11 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	appState.LastDeployTrigger = opts.Trigger
 	appState.LastDeployUser = opts.User
 
+	// Auto-pin when deploying a specific ref so the poller doesn't overwrite it.
+	if opts.Ref != "" {
+		appState.Pinned = true
+	}
+
 	if err := e.StateStore.Save(opts.App, appState); err != nil {
 		return nil, fmt.Errorf("saving state: %w", err)
 	}

@@ -86,6 +86,9 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		fmt.Println("[dry-run] No changes were made.")
 	}
 	printDeployResult(result)
+	if ref != "" && result.Success {
+		fmt.Println("  Pinned: true (autodeploy paused — run 'jib resume' to unpin)")
+	}
 	if !result.Success {
 		return fmt.Errorf("deploy completed with errors: %s", result.Error)
 	}
@@ -143,9 +146,9 @@ func runResume(cmd *cobra.Command, args []string) error {
 
 func printDeployResult(r *deploy.DeployResult) {
 	if r.Success {
-		fmt.Printf("OK  %s deployed (%s strategy)\n", r.App, r.Strategy)
+		fmt.Printf("OK  %s deployed\n", r.App)
 	} else {
-		fmt.Printf("FAIL  %s deploy failed (%s strategy)\n", r.App, r.Strategy)
+		fmt.Printf("FAIL  %s deploy failed\n", r.App)
 	}
 	if r.PreviousSHA != "" {
 		prev := r.PreviousSHA
