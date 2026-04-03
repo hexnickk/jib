@@ -20,14 +20,15 @@ Stack: GitHub App auth → git polling → docker-compose deploy → Cloudflare 
 
 Micro-service design — each service is a separate binary with one responsibility. Services communicate via NATS. This is NOT for scalability — it's so Claude agents can hold each service entirely in context.
 
-Services live under `services/` in the monorepo. Shared code lives under `internal/`.
+All binaries live under `cmd/` in the monorepo. Shared code lives under `internal/`.
 
 Services:
-- `services/jib-deployer/` — handles deploys, rollbacks, resume via NATS
-- `services/jib-watcher/` — polls git repos, triggers deploys via NATS
-- `services/jib-heartbeat/` — publishes periodic heartbeat to NATS
-- `services/jib-health/` — HTTP health checks (Docker container)
-- `services/jib-notifications-telegram/` — Telegram notifications (Docker container)
+- `cmd/jib/` — CLI (deploy, rollback, resume, setup, config management)
+- `cmd/jib-deployer/` — handles deploys, rollbacks, resume via NATS
+- `cmd/jib-watcher/` — polls git repos, triggers deploys via NATS
+- `cmd/jib-heartbeat/` — publishes periodic heartbeat to NATS
+- `cmd/jib-health/` — HTTP health checks (Docker container)
+- `cmd/jib-notifications-telegram/` — Telegram notifications (Docker container)
 
 ## Build & Test
 

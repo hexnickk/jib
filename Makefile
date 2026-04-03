@@ -14,15 +14,15 @@ build:
 
 build-deployer:
 	@mkdir -p $(BUILD_DIR)
-	go build $(LDFLAGS) -o $(BUILD_DIR)/jib-deployer ./services/jib-deployer
+	go build $(LDFLAGS) -o $(BUILD_DIR)/jib-deployer ./cmd/jib-deployer
 
 build-watcher:
 	@mkdir -p $(BUILD_DIR)
-	go build $(LDFLAGS) -o $(BUILD_DIR)/jib-watcher ./services/jib-watcher
+	go build $(LDFLAGS) -o $(BUILD_DIR)/jib-watcher ./cmd/jib-watcher
 
 build-heartbeat:
 	@mkdir -p $(BUILD_DIR)
-	go build $(LDFLAGS) -o $(BUILD_DIR)/jib-heartbeat ./services/jib-heartbeat
+	go build $(LDFLAGS) -o $(BUILD_DIR)/jib-heartbeat ./cmd/jib-heartbeat
 
 build-all: build build-deployer build-watcher build-heartbeat
 

@@ -33,7 +33,7 @@ func (m *Module) ComposeServices(cfg *config.Config, tokens map[string]string) s
   %s:
     build:
       context: %s
-      dockerfile: services/%s/Dockerfile
+      dockerfile: cmd/%s/Dockerfile
     restart: unless-stopped
     environment:
       JIB_CONFIG: /opt/jib/config.yml

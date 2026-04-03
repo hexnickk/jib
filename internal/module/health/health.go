@@ -35,7 +35,7 @@ func (m *Module) ComposeServices(cfg *config.Config, tokens map[string]string) s
   jib-health:
     build:
       context: %s
-      dockerfile: services/jib-health/Dockerfile
+      dockerfile: cmd/jib-health/Dockerfile
     restart: unless-stopped
     network_mode: host
     environment:
