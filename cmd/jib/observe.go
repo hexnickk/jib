@@ -264,7 +264,7 @@ func runStatusDetail(cfg *config.Config, name string, jsonOutput bool) error {
 		case "app":
 			fmt.Printf("Provider: %s (github app)\n\n", name)
 			fmt.Printf("  App ID:             %d\n", p.AppID)
-			pemPath := ghPkg.AppPEMPath(root, name)
+			pemPath := ghPkg.AppPEMPath(name)
 			if _, err := os.Stat(pemPath); err == nil {
 				fmt.Printf("  Private Key:        %s\n", pemPath)
 			} else {

@@ -8,21 +8,22 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/hexnickk/jib/internal/config"
 )
 
-// ChannelConfig mirrors config.NotificationChannel but avoids circular imports.
+// ChannelConfig mirrors config.NotificationChannel to avoid config importing notify.
 type ChannelConfig struct {
 	Driver string
 }
 
 // LoadChannels builds a Multi notifier from named channel configs and their
-// credential files in secretsDir (e.g. /opt/jib/secrets/_jib/<name>.json).
-func LoadChannels(secretsDir string, channels map[string]ChannelConfig) *Multi {
-	dir := filepath.Join(secretsDir, "_jib")
+// credential files in /opt/jib/secrets/_jib/notify/<name>.json.
+func LoadChannels(channels map[string]ChannelConfig) *Multi {
 	var chs []namedNotifier
 
 	for name, ch := range channels {
-		credPath := filepath.Join(dir, name+".json")
+		credPath := config.CredsPath("notify", name+".json")
 		data, err := os.ReadFile(credPath) //nolint:gosec // path is constructed from trusted secrets directory
 		if err != nil {
 			// No credentials file — skip silently.
@@ -54,8 +55,8 @@ func LoadChannels(secretsDir string, channels map[string]ChannelConfig) *Multi {
 }
 
 // ReadChannelCreds reads the credential JSON for a named channel.
-func ReadChannelCreds(secretsDir, name string) (map[string]string, error) {
-	path := filepath.Join(secretsDir, "_jib", name+".json")
+func ReadChannelCreds(name string) (map[string]string, error) {
+	path := config.CredsPath("notify", name+".json")
 	data, err := os.ReadFile(path) //nolint:gosec // path is constructed from trusted secrets directory
 	if err != nil {
 		return nil, fmt.Errorf("reading credentials for %q: %w", name, err)
@@ -68,16 +69,15 @@ func ReadChannelCreds(secretsDir, name string) (map[string]string, error) {
 }
 
 // WriteChannelCreds writes the credential JSON for a named channel.
-func WriteChannelCreds(secretsDir, name string, creds map[string]string) error {
-	dir := filepath.Join(secretsDir, "_jib")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+func WriteChannelCreds(name string, creds map[string]string) error {
+	path := config.CredsPath("notify", name+".json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("creating secrets dir: %w", err)
 	}
 	data, err := json.MarshalIndent(creds, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling credentials: %w", err)
 	}
-	path := filepath.Join(dir, name+".json")
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("writing credentials for %q: %w", name, err)
 	}
@@ -85,8 +85,8 @@ func WriteChannelCreds(secretsDir, name string, creds map[string]string) error {
 }
 
 // DeleteChannelCreds removes the credential file for a named channel.
-func DeleteChannelCreds(secretsDir, name string) error {
-	path := filepath.Join(secretsDir, "_jib", name+".json")
+func DeleteChannelCreds(name string) error {
+	path := config.CredsPath("notify", name+".json")
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("removing credentials for %q: %w", name, err)
 	}

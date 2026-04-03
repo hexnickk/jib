@@ -288,14 +288,16 @@ func TestParseEnvFileMissing(t *testing.T) {
 
 func TestLoadChannels(t *testing.T) {
 	dir := t.TempDir()
-	jibDir := filepath.Join(dir, "_jib")
-	if err := os.MkdirAll(jibDir, 0o750); err != nil {
+	t.Setenv("JIB_ROOT", dir)
+
+	notifyDir := filepath.Join(dir, "secrets", "_jib", "notify")
+	if err := os.MkdirAll(notifyDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
 	// Write telegram creds
 	tgCreds, _ := json.Marshal(map[string]string{"bot_token": "t123", "chat_id": "-100"})
-	if err := os.WriteFile(filepath.Join(jibDir, "ops-tg.json"), tgCreds, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(notifyDir, "ops-tg.json"), tgCreds, 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -304,7 +306,7 @@ func TestLoadChannels(t *testing.T) {
 		"missing": {Driver: "webhook"}, // unsupported driver, should be skipped
 	}
 
-	multi := LoadChannels(dir, channels)
+	multi := LoadChannels(channels)
 	if len(multi.channels) != 1 {
 		t.Fatalf("expected 1 channel, got %d", len(multi.channels))
 	}
@@ -321,13 +323,15 @@ func TestLoadChannels(t *testing.T) {
 
 func TestWriteAndReadChannelCreds(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("JIB_ROOT", dir)
+
 	creds := map[string]string{"bot_token": "abc", "chat_id": "-123"}
 
-	if err := WriteChannelCreds(dir, "test-tg", creds); err != nil {
+	if err := WriteChannelCreds("test-tg", creds); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
-	got, err := ReadChannelCreds(dir, "test-tg")
+	got, err := ReadChannelCreds("test-tg")
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -338,16 +342,18 @@ func TestWriteAndReadChannelCreds(t *testing.T) {
 
 func TestDeleteChannelCreds(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("JIB_ROOT", dir)
+
 	creds := map[string]string{"url": "https://example.com"}
-	if err := WriteChannelCreds(dir, "test-hook", creds); err != nil {
+	if err := WriteChannelCreds("test-hook", creds); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := DeleteChannelCreds(dir, "test-hook"); err != nil {
+	if err := DeleteChannelCreds("test-hook"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 
-	_, err := ReadChannelCreds(dir, "test-hook")
+	_, err := ReadChannelCreds("test-hook")
 	if err == nil {
 		t.Error("expected error after deletion")
 	}
@@ -355,8 +361,10 @@ func TestDeleteChannelCreds(t *testing.T) {
 
 func TestDeleteChannelCredsNonExistent(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("JIB_ROOT", dir)
+
 	// Should not error for non-existent file.
-	if err := DeleteChannelCreds(dir, "nope"); err != nil {
+	if err := DeleteChannelCreds("nope"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

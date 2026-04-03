@@ -36,8 +36,8 @@ func KeyPath(root, providerName string) string {
 }
 
 // AppPEMPath returns the PEM file path for a GitHub App provider.
-func AppPEMPath(root, providerName string) string {
-	return filepath.Join(root, "secrets", "_jib", "github-app-"+providerName+".pem")
+func AppPEMPath(providerName string) string {
+	return config.CredsPath("github-app", providerName+".pem")
 }
 
 // GenerateDeployKey generates an ed25519 SSH keypair and returns the public key.
@@ -84,8 +84,8 @@ func ProviderNameAvailable(cfg *config.Config, name string) error {
 }
 
 // GenerateInstallationToken generates a short-lived GitHub App installation access token.
-func GenerateInstallationToken(ctx context.Context, root, providerName string, appID int64, repo string) (string, error) {
-	pemPath := AppPEMPath(root, providerName)
+func GenerateInstallationToken(ctx context.Context, providerName string, appID int64, repo string) (string, error) {
+	pemPath := AppPEMPath(providerName)
 	pemData, err := os.ReadFile(pemPath) //nolint:gosec // path constructed from trusted config
 	if err != nil {
 		return "", fmt.Errorf("reading GitHub App PEM: %w", err)

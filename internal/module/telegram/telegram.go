@@ -40,7 +40,7 @@ func (m *Module) ComposeServices(cfg *config.Config, tokens map[string]string) s
       NATS_USER: %s
       NATS_PASS: %s
       CHANNEL_NAME: "%s"
-      CREDS_FILE: "%s/%s.json"
+      CREDS_FILE: "%s"
     volumes:
       - %s:%s:ro
       - %s:%s:ro
@@ -49,7 +49,7 @@ func (m *Module) ComposeServices(cfg *config.Config, tokens map[string]string) s
 `, svcName, config.RepoRoot(), imageName,
 			config.ConfigFile(), config.SecretsDir(),
 			"notifier", tokens["notifier"],
-			name, config.JibSecretsDir(), name,
+			name, config.CredsPath("notify", name+".json"),
 			config.ConfigFile(), config.ConfigFile(),
 			config.SecretsDir(), config.SecretsDir(),
 			stack.NetworkName)

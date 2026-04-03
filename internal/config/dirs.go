@@ -48,3 +48,8 @@ func NginxDir() string { return filepath.Join(Root(), "nginx") }
 
 // JibSecretsDir returns the path for jib's own secrets (tunnel tokens, API tokens, etc.).
 func JibSecretsDir() string { return filepath.Join(Root(), "secrets", "_jib") }
+
+// CredsPath returns the path for a jib credential file under _jib/<kind>/<name>.
+// Kind groups related credentials (e.g. "cloudflare", "github-app", "notify")
+// and name identifies the specific credential within that group.
+func CredsPath(kind, name string) string { return filepath.Join(JibSecretsDir(), kind, name) }

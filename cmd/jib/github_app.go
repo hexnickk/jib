@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hexnickk/jib/internal/config"
 	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
@@ -49,7 +48,6 @@ func registerGitHubAppCommands(githubCmd *cobra.Command) {
 
 func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	root := config.Root()
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -74,7 +72,7 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		}
 
 		if method == "manifest" {
-			return runGitHubAppManifest(name, root)
+			return runGitHubAppManifest(name)
 		}
 
 		// Manual flow — show guide
@@ -118,11 +116,11 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		src = strings.NewReader(pemData)
 	}
 
-	return saveGitHubAppProvider(name, root, appID, "", src)
+	return saveGitHubAppProvider(name, appID, "", src)
 }
 
 // runGitHubAppManifest handles the automatic GitHub App creation via manifest flow.
-func runGitHubAppManifest(name, root string) error {
+func runGitHubAppManifest(name string) error {
 	ctx := context.Background()
 	result, err := ghPkg.RunManifestFlow(ctx, name)
 	if err != nil {
@@ -131,13 +129,13 @@ func runGitHubAppManifest(name, root string) error {
 
 	fmt.Printf("\nGitHub App %q created (ID: %d).\n", result.Slug, result.AppID)
 
-	return saveGitHubAppProvider(name, root, result.AppID, result.Slug, strings.NewReader(result.PEM))
+	return saveGitHubAppProvider(name, result.AppID, result.Slug, strings.NewReader(result.PEM))
 }
 
 // saveGitHubAppProvider saves the app ID to config and the PEM key to disk.
 // slug is the GitHub App slug (used for the installation URL); empty for manual flow.
-func saveGitHubAppProvider(name, root string, appID int64, slug string, pemSrc io.Reader) error {
-	pemPath := ghPkg.AppPEMPath(root, name)
+func saveGitHubAppProvider(name string, appID int64, slug string, pemSrc io.Reader) error {
+	pemPath := ghPkg.AppPEMPath(name)
 	if err := os.MkdirAll(filepath.Dir(pemPath), 0o700); err != nil {
 		return fmt.Errorf("creating secrets directory: %w", err)
 	}
@@ -176,7 +174,6 @@ func saveGitHubAppProvider(name, root string, appID int64, slug string, pemSrc i
 
 func runGitHubAppStatus(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	root := config.Root()
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -194,7 +191,7 @@ func runGitHubAppStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Provider %q (GitHub App):\n\n", name)
 	fmt.Printf("  App ID: %d\n", provider.AppID)
 
-	pemPath := ghPkg.AppPEMPath(root, name)
+	pemPath := ghPkg.AppPEMPath(name)
 	if _, err := os.Stat(pemPath); err == nil {
 		fmt.Printf("  Private key: %s\n", pemPath)
 	} else {
@@ -213,7 +210,6 @@ func runGitHubAppStatus(cmd *cobra.Command, args []string) error {
 
 func runGitHubAppRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	root := config.Root()
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -236,7 +232,7 @@ func runGitHubAppRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Remove PEM file
-	pemPath := ghPkg.AppPEMPath(root, name)
+	pemPath := ghPkg.AppPEMPath(name)
 	_ = os.Remove(pemPath)
 
 	// Remove from config

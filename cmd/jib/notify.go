@@ -134,9 +134,6 @@ func runNotifyList(cmd *cobra.Command, args []string) error {
 	}
 	sort.Strings(names)
 
-	// Check for credentials.
-	secretsDir := config.SecretsDir()
-
 	if jsonOutput {
 		type channelInfo struct {
 			Name   string   `json:"name"`
@@ -148,7 +145,7 @@ func runNotifyList(cmd *cobra.Command, args []string) error {
 		for _, name := range names {
 			ch := cfg.Notifications[name]
 			credsStatus := "missing"
-			if _, err := notify.ReadChannelCreds(secretsDir, name); err == nil {
+			if _, err := notify.ReadChannelCreds(name); err == nil {
 				credsStatus = "ok"
 			}
 			apps := channelApps[name]
@@ -173,7 +170,7 @@ func runNotifyList(cmd *cobra.Command, args []string) error {
 	for _, name := range names {
 		ch := cfg.Notifications[name]
 		credsStatus := "missing"
-		if _, err := notify.ReadChannelCreds(secretsDir, name); err == nil {
+		if _, err := notify.ReadChannelCreds(name); err == nil {
 			credsStatus = "ok"
 		}
 		apps := channelApps[name]
@@ -201,8 +198,7 @@ func runNotifyAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid driver %q; supported drivers: telegram", driver)
 	}
 
-	secretsDir := config.SecretsDir()
-	return addTelegramChannel(name, secretsDir)
+	return addTelegramChannel(name)
 }
 
 // runNotifyRemove removes a channel from config and deletes its credentials.
@@ -259,8 +255,7 @@ func runNotifyRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Delete credentials file.
-	secretsDir := config.SecretsDir()
-	if err := notify.DeleteChannelCreds(secretsDir, name); err != nil {
+	if err := notify.DeleteChannelCreds(name); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
 	}
 
@@ -283,14 +278,13 @@ func runNotifyTest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("channel %q not found in config", name)
 	}
 
-	secretsDir := config.SecretsDir()
 	channels := map[string]notify.ChannelConfig{
 		name: {Driver: ch.Driver},
 	}
-	multi := notify.LoadChannels(secretsDir, channels)
+	multi := notify.LoadChannels(channels)
 
 	if len(multi.ChannelNames()) == 0 {
-		return fmt.Errorf("channel %q has no credentials (check %s/_jib/%s.json)", name, secretsDir, name)
+		return fmt.Errorf("channel %q has no credentials (check %s)", name, config.CredsPath("notify", name+".json"))
 	}
 
 	event := notify.Event{
@@ -312,11 +306,10 @@ func runNotifyTest(cmd *cobra.Command, args []string) error {
 // runTelegramAdd prompts for Telegram credentials and adds the channel.
 func runTelegramAdd(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	secretsDir := config.SecretsDir()
-	return addTelegramChannel(name, secretsDir)
+	return addTelegramChannel(name)
 }
 
-func addTelegramChannel(name string, secretsDir string) error {
+func addTelegramChannel(name string) error {
 	fmt.Println("Add a Telegram notification channel.")
 	fmt.Println()
 	fmt.Println("You'll need:")
@@ -338,7 +331,7 @@ func addTelegramChannel(name string, secretsDir string) error {
 	}
 
 	creds := map[string]string{"bot_token": token, "chat_id": chatID}
-	if err := notify.WriteChannelCreds(secretsDir, name, creds); err != nil {
+	if err := notify.WriteChannelCreds(name, creds); err != nil {
 		return err
 	}
 

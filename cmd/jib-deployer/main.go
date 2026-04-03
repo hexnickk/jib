@@ -116,7 +116,6 @@ func (s *service) newEngine() *deploy.Engine {
 		LockDir:     config.LockDir(),
 		RepoBaseDir: config.ReposDir(),
 		OverrideDir: config.OverrideDir(),
-		JibRoot:     config.Root(),
 	}
 }
 

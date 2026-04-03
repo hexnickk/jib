@@ -37,7 +37,6 @@ type Engine struct {
 	LockDir     string
 	RepoBaseDir string // e.g. /opt/jib/repos
 	OverrideDir string // e.g. /opt/jib/overrides
-	JibRoot     string // e.g. /opt/jib (needed for provider key paths)
 }
 
 // DeployOptions configures a single deploy invocation.
@@ -421,7 +420,7 @@ func (e *Engine) refreshFetchAuth(ctx context.Context, appCfg config.App, repoDi
 		return nil // key providers use core.sshCommand, no refresh needed
 	}
 
-	token, err := ghPkg.GenerateInstallationToken(ctx, e.JibRoot, appCfg.Provider, provider.AppID, appCfg.Repo)
+	token, err := ghPkg.GenerateInstallationToken(ctx, appCfg.Provider, provider.AppID, appCfg.Repo)
 	if err != nil {
 		return fmt.Errorf("generating installation token: %w", err)
 	}

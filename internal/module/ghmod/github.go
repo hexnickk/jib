@@ -28,7 +28,7 @@ func (m *Module) RefreshAuth(ctx context.Context, root, repoDir string, appCfg c
 		return false, nil
 	}
 
-	token, err := ghPkg.GenerateInstallationToken(ctx, root, appCfg.Provider, provider.AppID, appCfg.Repo)
+	token, err := ghPkg.GenerateInstallationToken(ctx, appCfg.Provider, provider.AppID, appCfg.Repo)
 	if err != nil {
 		return true, err
 	}

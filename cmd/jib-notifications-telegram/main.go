@@ -13,7 +13,7 @@ import (
 
 func main() {
 	channelName := notifysvc.EnvOr("CHANNEL_NAME", "telegram")
-	credsPath := notifysvc.EnvOr("CREDS_FILE", config.JibSecretsDir()+"/"+channelName+".json")
+	credsPath := notifysvc.EnvOr("CREDS_FILE", config.CredsPath("notify", channelName+".json"))
 
 	data, err := os.ReadFile(credsPath) //nolint:gosec // trusted creds path
 	if err != nil {

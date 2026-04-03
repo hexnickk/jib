@@ -875,7 +875,7 @@ func cloneWithProvider(ctx context.Context, root, repo, repoDir, branch string, 
 
 	case ghPkg.ProviderTypeApp:
 		fmt.Println("Generating installation token...")
-		token, err := ghPkg.GenerateInstallationToken(ctx, root, providerName, provider.AppID, repo)
+		token, err := ghPkg.GenerateInstallationToken(ctx, providerName, provider.AppID, repo)
 		if err != nil {
 			return fmt.Errorf("generating installation token: %w", err)
 		}

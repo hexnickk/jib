@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/hexnickk/jib/internal/cloudflare"
@@ -37,8 +36,8 @@ func (m *Module) ComposeServices(cfg *config.Config, tokens map[string]string) s
     network_mode: host
     entrypoint: ["/bin/sh", "-c", "exec cloudflared tunnel --no-autoupdate run --token $(cat /run/secrets/tunnel-token)"]
     volumes:
-      - %s/cloudflare-tunnel-token:/run/secrets/tunnel-token:ro
-`, config.JibSecretsDir())
+      - %s:/run/secrets/tunnel-token:ro
+`, config.CredsPath("cloudflare", "tunnel-token"))
 }
 
 func (m *Module) OnAppAdd(ctx context.Context, app string, appCfg config.App, cfg *config.Config) error {
@@ -94,7 +93,7 @@ func (m *Module) removeRoutes(ctx context.Context, cfg *config.Config, domains [
 }
 
 func loadAPIToken() (string, error) {
-	path := filepath.Join(config.JibSecretsDir(), "cloudflare-api-token")
+	path := config.CredsPath("cloudflare", "api-token")
 	data, err := os.ReadFile(path) //nolint:gosec // path from trusted root
 	if err != nil {
 		return "", fmt.Errorf("cloudflare API token not found — run 'jib cloudflare setup' with API mode first")
