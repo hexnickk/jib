@@ -33,3 +33,7 @@ Thumbs.db
 # Environment
 .env
 .env.*
+
+# Claude Code
+.claude/memories/
+.claude/plans/

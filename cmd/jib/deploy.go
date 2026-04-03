@@ -1,12 +1,17 @@
 package main
 
 import (
-	"context"
 	"fmt"
+	"log"
+	"os"
+	"time"
 
-	"github.com/hexnickk/jib/internal/deploy"
+	"github.com/google/uuid"
+	"github.com/hexnickk/jib/internal/bus"
 	"github.com/spf13/cobra"
 )
+
+const defaultDeployTimeout = 5 * time.Minute
 
 func registerDeployCommands(rootCmd *cobra.Command) {
 	// jib deploy <app>
@@ -19,15 +24,18 @@ func registerDeployCommands(rootCmd *cobra.Command) {
 	deployCmd.Flags().String("ref", "", "Git ref (SHA, branch, tag) to deploy")
 	deployCmd.Flags().Bool("dry-run", false, "Show what would happen without making changes")
 	deployCmd.Flags().Bool("force", false, "Deploy even if already at target SHA")
+	deployCmd.Flags().Duration("timeout", defaultDeployTimeout, "Max time to wait for deploy result")
 	rootCmd.AddCommand(deployCmd)
 
 	// jib rollback <app>
-	rootCmd.AddCommand(&cobra.Command{
+	rollbackCmd := &cobra.Command{
 		Use:   "rollback <app>",
 		Short: "Swap to previous version",
 		Args:  exactArgs(1),
 		RunE:  runRollback,
-	})
+	}
+	rollbackCmd.Flags().Duration("timeout", defaultDeployTimeout, "Max time to wait for rollback result")
+	rootCmd.AddCommand(rollbackCmd)
 
 	// jib resume <app>
 	rootCmd.AddCommand(&cobra.Command{
@@ -54,70 +62,85 @@ func registerDeployCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(webhookCmd)
 }
 
+// connectNATS connects to NATS with a short timeout for CLI use.
+func connectNATS() (*bus.Bus, error) {
+	logger := log.New(os.Stderr, "", 0)
+	b, err := bus.Connect(bus.Options{URL: bus.DefaultURL}, logger)
+	if err != nil {
+		return nil, fmt.Errorf("cannot connect to NATS — run 'jib init' or check 'systemctl status jib-stack'\n  %w", err)
+	}
+	return b, nil
+}
+
 func runDeploy(cmd *cobra.Command, args []string) error {
 	appName := args[0]
-
-	cfg, err := loadConfig()
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
-	}
-
 	ref, _ := cmd.Flags().GetString("ref")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	force, _ := cmd.Flags().GetBool("force")
+	timeout, _ := cmd.Flags().GetDuration("timeout")
 
-	engine := newEngine(cfg)
+	b, err := connectNATS()
+	if err != nil {
+		return err
+	}
+	defer b.Close()
 
-	opts := deploy.DeployOptions{
+	correlationID := uuid.NewString()
+	deployCmd := bus.DeployCommand{
+		Message: bus.NewMessage("cli"),
 		App:     appName,
 		Ref:     ref,
-		DryRun:  dryRun,
-		Force:   force,
 		Trigger: "manual",
 		User:    currentUser(),
+		Force:   force,
+		DryRun:  dryRun,
 	}
+	deployCmd.CorrelationID = correlationID
 
-	result, err := engine.Deploy(context.Background(), opts)
+	ev, err := b.DeployAndWait(deployCmd.Subject(), deployCmd, correlationID, appName, timeout)
 	if err != nil {
-		return fmt.Errorf("deploy failed: %w", err)
+		return err
 	}
 
 	if dryRun {
 		fmt.Println("[dry-run] No changes were made.")
 	}
-	printDeployResult(result)
-	if ref != "" && result.Success {
+	printEventResult(ev)
+	if ref != "" && ev.Status == bus.StatusSuccess {
 		fmt.Println("  Pinned: true (autodeploy paused — run 'jib resume' to unpin)")
 	}
-	if !result.Success {
-		return fmt.Errorf("deploy completed with errors: %s", result.Error)
+	if ev.Status != bus.StatusSuccess {
+		return fmt.Errorf("deploy completed with errors: %s", ev.Error)
 	}
 	return nil
 }
 
 func runRollback(cmd *cobra.Command, args []string) error {
 	appName := args[0]
+	timeout, _ := cmd.Flags().GetDuration("timeout")
 
-	cfg, err := loadConfig()
+	b, err := connectNATS()
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
+		return err
 	}
+	defer b.Close()
 
-	engine := newEngine(cfg)
-
-	opts := deploy.RollbackOptions{
-		App:  appName,
-		User: currentUser(),
+	correlationID := uuid.NewString()
+	rollbackCmd := bus.RollbackCommand{
+		Message: bus.NewMessage("cli"),
+		App:     appName,
+		User:    currentUser(),
 	}
+	rollbackCmd.CorrelationID = correlationID
 
-	result, err := engine.Rollback(context.Background(), opts)
+	ev, err := b.DeployAndWait(rollbackCmd.Subject(), rollbackCmd, correlationID, appName, timeout)
 	if err != nil {
-		return fmt.Errorf("rollback failed: %w", err)
+		return err
 	}
 
-	printDeployResult(result)
-	if !result.Success {
-		return fmt.Errorf("rollback completed with errors: %s", result.Error)
+	printEventResult(ev)
+	if ev.Status != bus.StatusSuccess {
+		return fmt.Errorf("rollback completed with errors: %s", ev.Error)
 	}
 	return nil
 }
@@ -125,18 +148,24 @@ func runRollback(cmd *cobra.Command, args []string) error {
 func runResume(cmd *cobra.Command, args []string) error {
 	appName := args[0]
 
-	store := newStateStore()
-
-	appState, err := store.Load(appName)
+	b, err := connectNATS()
 	if err != nil {
-		return fmt.Errorf("loading state: %w", err)
+		return err
+	}
+	defer b.Close()
+
+	resumeCmd := bus.ResumeCommand{
+		Message: bus.NewMessage("cli"),
+		App:     appName,
+		User:    currentUser(),
 	}
 
-	appState.Pinned = false
-	appState.ConsecutiveFailures = 0
-
-	if err := store.Save(appName, appState); err != nil {
-		return fmt.Errorf("saving state: %w", err)
+	ack, err := b.RequestAck(resumeCmd.Subject(), resumeCmd)
+	if err != nil {
+		return err
+	}
+	if !ack.Accepted {
+		return fmt.Errorf("resume rejected: %s", ack.Error)
 	}
 
 	fmt.Printf("Resumed app %q: pinned=false, consecutive_failures=0\n", appName)
@@ -144,27 +173,28 @@ func runResume(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printDeployResult(r *deploy.DeployResult) {
-	if r.Success {
-		fmt.Printf("OK  %s deployed\n", r.App)
+// printEventResult prints a deploy event result.
+func printEventResult(ev *bus.DeployEvent) {
+	if ev.Status == bus.StatusSuccess {
+		fmt.Printf("OK  %s deployed\n", ev.App)
 	} else {
-		fmt.Printf("FAIL  %s deploy failed\n", r.App)
+		fmt.Printf("FAIL  %s deploy failed\n", ev.App)
 	}
-	if r.PreviousSHA != "" {
-		prev := r.PreviousSHA
+	if ev.PreviousSHA != "" {
+		prev := ev.PreviousSHA
 		if len(prev) > 7 {
 			prev = prev[:7]
 		}
 		fmt.Printf("  Previous: %s\n", prev)
 	}
-	if r.DeployedSHA != "" {
-		deployed := r.DeployedSHA
-		if len(deployed) > 7 {
-			deployed = deployed[:7]
+	if ev.SHA != "" {
+		sha := ev.SHA
+		if len(sha) > 7 {
+			sha = sha[:7]
 		}
-		fmt.Printf("  Deployed: %s\n", deployed)
+		fmt.Printf("  Deployed: %s\n", sha)
 	}
-	if r.Error != "" {
-		fmt.Printf("  Error:    %s\n", r.Error)
+	if ev.Error != "" {
+		fmt.Printf("  Error:    %s\n", ev.Error)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/hexnickk/jib/internal/docker"
 	"github.com/hexnickk/jib/internal/git"
 	"github.com/hexnickk/jib/internal/history"
+	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/state"
 )
 
@@ -33,7 +34,7 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 
 	const strategy = "restart"
 
-	repoDir := RepoPath(e.RepoBaseDir, opts.App, appCfg.Repo)
+	repoDir := paths.RepoPath(e.RepoBaseDir, opts.App, appCfg.Repo)
 
 	// 1. Load state, get previous_sha.
 	appState, err := e.StateStore.Load(opts.App)

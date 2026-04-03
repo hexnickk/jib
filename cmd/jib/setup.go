@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/hexnickk/jib/internal/bus"
 	"github.com/hexnickk/jib/internal/config"
-	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/docker"
 	gitPkg "github.com/hexnickk/jib/internal/git"
 	ghPkg "github.com/hexnickk/jib/internal/github"
@@ -68,19 +70,50 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	})
 }
 
-// systemd unit file for the jib daemon.
-const jibServiceUnit = `[Unit]
-Description=Jib Deploy Daemon
-After=docker.service nginx.service
+// systemd unit templates for jib services.
+var serviceUnits = map[string]string{
+	"jib-deployer": `[Unit]
+Description=Jib Deployer
+After=docker.service
+Wants=docker.service
 
 [Service]
-ExecStart=/usr/local/bin/jib _daemon
+ExecStartPre=/bin/sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
+ExecStart=/usr/local/bin/jib-deployer
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-`
+`,
+	"jib-watcher": `[Unit]
+Description=Jib Git Watcher
+After=jib-deployer.service
+Wants=jib-deployer.service
+
+[Service]
+ExecStartPre=/bin/sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
+ExecStart=/usr/local/bin/jib-watcher
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+`,
+	"jib-heartbeat": `[Unit]
+Description=Jib Heartbeat
+After=docker.service
+
+[Service]
+ExecStartPre=/bin/sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
+ExecStart=/usr/local/bin/jib-heartbeat
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+`,
+}
 
 func runInit(cmd *cobra.Command, args []string) error {
 	skipInstall, _ := cmd.Flags().GetBool("skip-install")
@@ -131,8 +164,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Println("\nConfig exists, skipping generation.")
 	}
 
-	// --- Ensure: systemd unit installed and running ---
-	ensureJibDaemon()
+	// --- Ensure: systemd units installed and running ---
+	ensureServices()
 
 	// --- Ensure: service stack (NATS + configured services) ---
 	fmt.Println("\nEnsuring service stack...")
@@ -252,33 +285,47 @@ func ensureDirs(root string) {
 	fmt.Printf("  %s: OK (root:jib)\n", root)
 }
 
-// ensureJibDaemon ensures the jib systemd unit is installed, loaded, and running.
-func ensureJibDaemon() {
-	fmt.Println("\nEnsuring jib daemon...")
-	unitPath := "/etc/systemd/system/jib.service"
+// ensureServices installs, enables, and starts the jib systemd service units.
+// Migrates from the old monolithic jib.service if it exists.
+func ensureServices() {
+	fmt.Println("\nEnsuring jib services...")
 
-	// Always write the unit file to pick up any changes.
-	writeCmd := sudoCmd("tee", unitPath)
-	writeCmd.Stdin = strings.NewReader(jibServiceUnit)
-	writeCmd.Stdout = nil
-	if err := writeCmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "  warning: could not write %s: %v\n", unitPath, err)
-		return
+	// Migrate from old monolithic daemon if present.
+	oldUnit := "/etc/systemd/system/jib.service"
+	if _, err := os.Stat(oldUnit); err == nil {
+		fmt.Println("  Migrating from old jib.service...")
+		_ = sudoCmd("systemctl", "stop", "jib").Run()
+		_ = sudoCmd("systemctl", "disable", "jib").Run()
+		_ = sudoCmd("rm", "-f", oldUnit).Run()
+		fmt.Println("  Old jib.service removed.")
+	}
+
+	// Install and start each service unit.
+	for name, unit := range serviceUnits {
+		unitPath := fmt.Sprintf("/etc/systemd/system/%s.service", name)
+		writeCmd := sudoCmd("tee", unitPath)
+		writeCmd.Stdin = strings.NewReader(unit)
+		writeCmd.Stdout = nil
+		if err := writeCmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: could not write %s: %v\n", unitPath, err)
+			continue
+		}
 	}
 
 	if err := sudoCmd("systemctl", "daemon-reload").Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "  warning: systemctl daemon-reload: %v\n", err)
 	}
 
-	// Enable and start if not already running.
-	if err := exec.Command("systemctl", "is-active", "--quiet", "jib").Run(); err == nil { //nolint:gosec // trusted CLI subprocess
-		fmt.Println("  jib daemon: running")
-		return
-	}
-	if err := sudoCmd("systemctl", "enable", "--now", "jib").Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "  warning: systemctl enable --now jib: %v\n", err)
-	} else {
-		fmt.Println("  jib daemon: started")
+	for name := range serviceUnits {
+		if err := exec.Command("systemctl", "is-active", "--quiet", name).Run(); err == nil { //nolint:gosec // trusted CLI subprocess
+			fmt.Printf("  %s: running\n", name)
+			continue
+		}
+		if err := sudoCmd("systemctl", "enable", "--now", name).Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: systemctl enable --now %s: %v\n", name, err)
+		} else {
+			fmt.Printf("  %s: started\n", name)
+		}
 	}
 }
 
@@ -688,26 +735,36 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	// --- Step 4: Deploy ---
 	fmt.Println("\nDeploying...")
-	cfg, err = loadConfig()
-	if err != nil {
-		return fmt.Errorf("reloading config: %w", err)
-	}
 
-	engine := newEngine(cfg)
-	result, err := engine.Deploy(ctx, deploy.DeployOptions{
+	b, err := connectNATS()
+	if err != nil {
+		return fmt.Errorf("connecting to NATS for deploy: %w", err)
+	}
+	defer b.Close()
+
+	correlationID := uuid.NewString()
+	deployCmd := bus.DeployCommand{
+		Message: bus.NewMessage("cli"),
 		App:     appName,
 		Force:   true,
 		Trigger: "add",
 		User:    currentUser(),
-	})
+	}
+	deployCmd.CorrelationID = correlationID
+
+	ev, err := b.DeployAndWait(deployCmd.Subject(), deployCmd, correlationID, appName, 5*time.Minute)
 	if err != nil {
 		return fmt.Errorf("deploy failed: %w", err)
 	}
-	if !result.Success {
-		return fmt.Errorf("deploy failed: %s", result.Error)
+	if ev.Status != bus.StatusSuccess {
+		return fmt.Errorf("deploy failed: %s", ev.Error)
 	}
 
-	fmt.Printf("\nApp %q deployed successfully (SHA: %s)\n", appName, result.DeployedSHA[:8])
+	sha := ev.SHA
+	if len(sha) > 8 {
+		sha = sha[:8]
+	}
+	fmt.Printf("\nApp %q deployed successfully (SHA: %s)\n", appName, sha)
 
 	// --- Step 5: Run module setup hooks (nginx, cloudflare, etc.) ---
 	appCfg := cfg.Apps[appName]

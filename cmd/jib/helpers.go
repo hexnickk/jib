@@ -7,11 +7,9 @@ import (
 	"path/filepath"
 
 	"github.com/hexnickk/jib/internal/config"
-	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/docker"
 	"github.com/hexnickk/jib/internal/history"
-
-	"github.com/hexnickk/jib/internal/proxy"
+	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
 	"github.com/spf13/cobra"
@@ -36,7 +34,7 @@ func sudoCmd(name string, args ...string) *exec.Cmd {
 
 // repoDir returns the on-disk path for an app's git checkout.
 func repoDir(appName string, repo string) string {
-	return deploy.RepoPath(filepath.Join(jibRoot(), "repos"), appName, repo)
+	return paths.RepoPath(filepath.Join(jibRoot(), "repos"), appName, repo)
 }
 
 func configPath() string {
@@ -55,30 +53,8 @@ func newSecretsManager() *secrets.Manager {
 	return secrets.NewManager(filepath.Join(jibRoot(), "secrets"))
 }
 
-func newProxy(_ *config.Config) proxy.Proxy {
-	return proxy.NewNginx(
-		filepath.Join(jibRoot(), "nginx"),
-		"/etc/nginx/conf.d",
-	)
-}
-
 func newHistoryLogger() *history.Logger {
 	return history.NewLogger(filepath.Join(jibRoot(), "logs"))
-}
-
-func newEngine(cfg *config.Config) *deploy.Engine {
-	root := jibRoot()
-	return &deploy.Engine{
-		Config:      cfg,
-		StateStore:  newStateStore(),
-		Secrets:     newSecretsManager(),
-		Proxy:       newProxy(cfg),
-		History:     newHistoryLogger(),
-		LockDir:     filepath.Join(root, "locks"),
-		RepoBaseDir: filepath.Join(root, "repos"),
-		OverrideDir: filepath.Join(root, "overrides"),
-		JibRoot:     root,
-	}
 }
 
 func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {

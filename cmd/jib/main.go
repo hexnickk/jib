@@ -61,7 +61,6 @@ Jib lives on the server. You SSH in and run commands, or use
 	registerObserveCommands(rootCmd)
 	registerOperateCommands(rootCmd)
 	registerConfigCommands(rootCmd)
-	registerDaemonCommands(rootCmd)
 
 	// Module CLI commands
 	registerNotifyCommands(rootCmd)

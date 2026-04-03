@@ -4,9 +4,10 @@ package bus
 // Command topics (trigger → daemon).
 // Subjects include the app/domain name as the last token, e.g. "jib.command.deploy.myapp".
 const (
-	TopicDeployCmd    = "jib.command.deploy"        // + .<app>
-	TopicRollbackCmd  = "jib.command.rollback"      // + .<app>
-	TopicConfigReload = "jib.command.config.reload" // no suffix
+	TopicDeployCmd    = "jib.command.deploy"   // + .<app>
+	TopicRollbackCmd  = "jib.command.rollback" // + .<app>
+	TopicResumeCmd    = "jib.command.resume"   // + .<app>
+	TopicConfigReload = "jib.config.reload"    // fan-out, no suffix
 )
 
 // Event topics (daemon/monitors → notifiers).
@@ -26,7 +27,7 @@ const (
 )
 
 // Heartbeat topic.
-const TopicHeartbeat = "jib.heartbeat.daemon"
+const TopicHeartbeat = "jib.heartbeat"
 
 // Wildcard subscriptions.
 const (

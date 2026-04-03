@@ -58,6 +58,19 @@ func Connect(opts Options, logger *log.Logger) (*Bus, error) {
 	return &Bus{conn: nc, logger: logger}, nil
 }
 
+// ConnectWithRetry connects to NATS, retrying every 2s until successful.
+// Intended for long-running services (deployer, watcher, heartbeat).
+func ConnectWithRetry(opts Options, logger *log.Logger) *Bus {
+	for {
+		b, err := Connect(opts, logger)
+		if err == nil {
+			return b
+		}
+		logger.Printf("bus: connect failed, retrying in 2s: %v", err)
+		time.Sleep(2 * time.Second)
+	}
+}
+
 // Close drains the connection and closes it.
 func (b *Bus) Close() {
 	if b.conn != nil {
@@ -101,6 +114,36 @@ type ReplyHandler func(subject string, data []byte) (interface{}, error)
 // SubscribeReply registers a handler for request-reply patterns.
 func (b *Bus) SubscribeReply(subject string, handler ReplyHandler) (*nats.Subscription, error) {
 	return b.conn.Subscribe(subject, func(msg *nats.Msg) {
+		reply, err := handler(msg.Subject, msg.Data)
+		if err != nil {
+			b.logger.Printf("bus: reply handler error on %s: %v", msg.Subject, err)
+			reply = CommandAck{Accepted: false, Error: err.Error()}
+		}
+		if msg.Reply != "" {
+			replyData, marshalErr := json.Marshal(reply)
+			if marshalErr != nil {
+				b.logger.Printf("bus: marshal reply error: %v", marshalErr)
+				return
+			}
+			if pubErr := msg.Respond(replyData); pubErr != nil {
+				b.logger.Printf("bus: respond error: %v", pubErr)
+			}
+		}
+	})
+}
+
+// QueueSubscribe registers a handler with a queue group for load-balanced delivery.
+func (b *Bus) QueueSubscribe(subject, queue string, handler Handler) (*nats.Subscription, error) {
+	return b.conn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
+		if err := handler(msg.Subject, msg.Data); err != nil {
+			b.logger.Printf("bus: handler error on %s: %v", msg.Subject, err)
+		}
+	})
+}
+
+// QueueSubscribeReply registers a reply handler with a queue group.
+func (b *Bus) QueueSubscribeReply(subject, queue string, handler ReplyHandler) (*nats.Subscription, error) {
+	return b.conn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
 		reply, err := handler(msg.Subject, msg.Data)
 		if err != nil {
 			b.logger.Printf("bus: reply handler error on %s: %v", msg.Subject, err)

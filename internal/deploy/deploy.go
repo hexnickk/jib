@@ -15,6 +15,7 @@ import (
 	"github.com/hexnickk/jib/internal/git"
 	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/history"
+	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
@@ -25,16 +26,6 @@ const minDiskBytes uint64 = 2 * 1024 * 1024 * 1024
 
 // lockTimeout is the maximum time to wait for a deploy lock in blocking mode.
 const lockTimeout = 5 * time.Minute
-
-// RepoPath returns the on-disk path for an app's git checkout.
-// GitHub repos (org/name) go under repos/github/org/name.
-// Local repos go under repos/local/<appName>.
-func RepoPath(repoBaseDir, appName, repo string) string {
-	if repo == "local" || repo == "" {
-		return filepath.Join(repoBaseDir, "local", appName)
-	}
-	return filepath.Join(repoBaseDir, "github", repo)
-}
 
 // Engine orchestrates deploys and rollbacks.
 type Engine struct {
@@ -81,7 +72,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 
 	const strategy = "restart"
 
-	repoDir := RepoPath(e.RepoBaseDir, opts.App, appCfg.Repo)
+	repoDir := paths.RepoPath(e.RepoBaseDir, opts.App, appCfg.Repo)
 	branch := appCfg.Branch
 	if branch == "" {
 		branch = "main"

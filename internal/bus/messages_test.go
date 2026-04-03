@@ -69,7 +69,7 @@ func TestHealthEventSubject(t *testing.T) {
 
 func TestHeartbeatSubject(t *testing.T) {
 	hb := Heartbeat{}
-	if hb.Subject() != "jib.heartbeat.daemon" {
+	if hb.Subject() != "jib.heartbeat" {
 		t.Errorf("Subject = %q", hb.Subject())
 	}
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/git"
-
+	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
 )
@@ -218,7 +218,7 @@ func TestDeployDryRunDoesNotModifyState(t *testing.T) {
 	appName := "testapp"
 
 	// Create a real git repo for the app.
-	appRepoDir := RepoPath(repoBaseDir, appName, "local")
+	appRepoDir := paths.RepoPath(repoBaseDir, appName, "local")
 	initTestRepo2(t, tmpDir, appRepoDir)
 
 	eng := &Engine{

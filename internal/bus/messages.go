@@ -91,6 +91,26 @@ func (c RollbackCommand) Validate() error {
 	return nil
 }
 
+// ResumeCommand requests unpinning and resetting failures for an app.
+type ResumeCommand struct {
+	Message
+	App  string `json:"app"`
+	User string `json:"user"`
+}
+
+// Subject returns the NATS subject for this command.
+func (c ResumeCommand) Subject() string {
+	return TopicResumeCmd + "." + sanitizeToken(c.App)
+}
+
+// Validate checks required fields.
+func (c ResumeCommand) Validate() error {
+	if c.App == "" {
+		return fmt.Errorf("app is required")
+	}
+	return nil
+}
+
 // ConfigReloadCommand requests the daemon to reload its config.
 type ConfigReloadCommand struct {
 	Message
