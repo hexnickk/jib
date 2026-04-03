@@ -160,7 +160,7 @@ func EnsureStack(cfg *config.Config, tokens *Tokens, moduleServices []string) er
 
 // Up starts the stack services.
 func Up(ctx context.Context) error {
-	return composeCmd(ctx, "up", "-d", "--remove-orphans").Run()
+	return composeCmd(ctx, "up", "-d", "--build", "--remove-orphans").Run()
 }
 
 // Down stops the stack services.

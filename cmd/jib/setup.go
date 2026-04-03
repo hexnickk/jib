@@ -148,6 +148,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// --- Ensure: directory structure with correct ownership/permissions ---
 	ensureDirs(root)
 
+	// --- Ensure: jib source repo for Docker service builds ---
+	ensureSourceRepo()
+
 	// --- Ensure: config.yml exists ---
 	if firstRun {
 		fmt.Println("\nGenerating config.yml...")
@@ -264,7 +267,7 @@ func ensureDirs(root string) {
 	fmt.Println("\nEnsuring directory structure...")
 	dirs := []string{
 		"state", "secrets", "repos", "overrides",
-		"nginx", "locks", "deploy-keys", "logs",
+		"nginx", "locks", "deploy-keys", "logs", "src",
 	}
 	for _, dir := range dirs {
 		dirPath := filepath.Join(root, dir)
@@ -285,8 +288,49 @@ func ensureDirs(root string) {
 	fmt.Printf("  %s: OK (root:jib)\n", root)
 }
 
+// ensureSourceRepo clones or updates the jib source at /opt/jib/src for Docker service builds.
+func ensureSourceRepo() {
+	srcDir := stack.RepoRoot // "/opt/jib/src"
+
+	if version == "dev" {
+		fmt.Println("\nSkipping source repo (dev build).")
+		return
+	}
+
+	fmt.Println("\nEnsuring jib source...")
+
+	gitDir := filepath.Join(srcDir, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		// Fresh clone at the specific tag (shallow).
+		fmt.Printf("  Cloning jib source (%s)...\n", version)
+		cmd := sudoCmd("git", "clone", "--depth", "1", "--branch", version,
+			"https://github.com/hexnickk/jib.git", srcDir)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: clone failed: %v\n", err)
+			return
+		}
+	} else {
+		// Already cloned — update to current version if needed.
+		out, err := exec.Command("git", "-C", srcDir, "describe", "--tags", "--exact-match", "HEAD").Output() //nolint:gosec // trusted path
+		currentTag := strings.TrimSpace(string(out))
+		if err != nil || currentTag != version {
+			fmt.Printf("  Updating source to %s...\n", version)
+			_ = sudoCmd("git", "-C", srcDir, "fetch", "--depth", "1", "origin", "tag", version).Run()
+			_ = sudoCmd("git", "-C", srcDir, "checkout", version).Run()
+		} else {
+			fmt.Printf("  Source at %s: OK\n", version)
+		}
+	}
+
+	// Fix ownership.
+	_ = sudoCmd("chown", "-R", "root:jib", srcDir).Run()
+}
+
 // ensureServices installs, enables, and starts the jib systemd service units.
 // Migrates from the old monolithic jib.service if it exists.
+// Restarts already-running services to pick up new binaries.
 func ensureServices() {
 	fmt.Println("\nEnsuring jib services...")
 
@@ -300,8 +344,14 @@ func ensureServices() {
 		fmt.Println("  Old jib.service removed.")
 	}
 
-	// Install and start each service unit.
+	// Write unit files for services whose binaries exist.
 	for name, unit := range serviceUnits {
+		binaryPath := filepath.Join("/usr/local/bin", name)
+		if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "  warning: %s not found, skipping\n", binaryPath)
+			continue
+		}
+
 		unitPath := fmt.Sprintf("/etc/systemd/system/%s.service", name)
 		writeCmd := sudoCmd("tee", unitPath)
 		writeCmd.Stdin = strings.NewReader(unit)
@@ -317,14 +367,26 @@ func ensureServices() {
 	}
 
 	for name := range serviceUnits {
-		if err := exec.Command("systemctl", "is-active", "--quiet", name).Run(); err == nil { //nolint:gosec // trusted CLI subprocess
-			fmt.Printf("  %s: running\n", name)
+		binaryPath := filepath.Join("/usr/local/bin", name)
+		if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
 			continue
 		}
-		if err := sudoCmd("systemctl", "enable", "--now", name).Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "  warning: systemctl enable --now %s: %v\n", name, err)
+
+		wasRunning := exec.Command("systemctl", "is-active", "--quiet", name).Run() == nil //nolint:gosec // trusted CLI subprocess
+
+		if wasRunning {
+			// Restart to pick up new binary.
+			if err := sudoCmd("systemctl", "restart", name).Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "  warning: restart %s: %v\n", name, err)
+			} else {
+				fmt.Printf("  %s: restarted\n", name)
+			}
 		} else {
-			fmt.Printf("  %s: started\n", name)
+			if err := sudoCmd("systemctl", "enable", "--now", name).Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "  warning: enable --now %s: %v\n", name, err)
+			} else {
+				fmt.Printf("  %s: started\n", name)
+			}
 		}
 	}
 }

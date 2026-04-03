@@ -19,8 +19,11 @@ import (
 	"github.com/hexnickk/jib/internal/state"
 )
 
+var version = "dev"
+
 func main() {
 	logger := log.New(os.Stderr, "[watcher] ", log.LstdFlags)
+	logger.Printf("starting jib-watcher %s", version)
 
 	root := os.Getenv("JIB_ROOT")
 	if root == "" {

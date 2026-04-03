@@ -1,12 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-# Jib installer — downloads the latest release binary to /usr/local/bin/jib
+# Jib installer — downloads the latest release and installs all binaries
 # Usage: curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/refs/heads/main/install.sh | bash
 
 REPO="hexnickk/jib"
 INSTALL_DIR="/usr/local/bin"
-BINARY="jib"
 
 # Detect OS and arch
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -42,38 +41,46 @@ fi
 
 echo "Latest version: $TAG"
 
-# Download binary
-URL="https://github.com/${REPO}/releases/download/${TAG}/jib-${OS}-${ARCH}"
+# Download tarball
+URL="https://github.com/${REPO}/releases/download/${TAG}/jib-${TAG}-${OS}-${ARCH}.tar.gz"
 echo "Downloading ${URL}..."
 
-TMP=$(mktemp)
-trap 'rm -f "$TMP"' EXIT
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
 
-if ! curl -fsSL -o "$TMP" "$URL"; then
+if ! curl -fsSL -o "$TMPDIR/jib.tar.gz" "$URL"; then
   echo "Error: download failed. Check that a release exists for ${OS}/${ARCH} at:"
   echo "  https://github.com/${REPO}/releases/tag/${TAG}"
   exit 1
 fi
 
-chmod +x "$TMP"
+# Extract
+tar -xzf "$TMPDIR/jib.tar.gz" -C "$TMPDIR"
+rm "$TMPDIR/jib.tar.gz"
 
-# Install
-if [ -w "$INSTALL_DIR" ]; then
-  mv "$TMP" "${INSTALL_DIR}/${BINARY}"
-else
-  echo "Installing to ${INSTALL_DIR} (requires sudo)..."
-  sudo mv "$TMP" "${INSTALL_DIR}/${BINARY}"
-fi
+# Install all binaries
+echo "Installing to ${INSTALL_DIR}..."
+for bin in "$TMPDIR"/*; do
+  name=$(basename "$bin")
+  chmod +x "$bin"
+  if [ -w "$INSTALL_DIR" ]; then
+    mv "$bin" "${INSTALL_DIR}/${name}"
+  else
+    sudo mv "$bin" "${INSTALL_DIR}/${name}"
+  fi
+  echo "  Installed ${name}"
+done
 
-echo "Installed jib ${TAG} to ${INSTALL_DIR}/${BINARY}"
+echo ""
+echo "Installed jib ${TAG} to ${INSTALL_DIR}"
 echo ""
 
 # Run init with sudo so it can create dirs, groups, and systemd units.
 # SUDO_USER is preserved so init knows which user to add to the jib group.
 if [ "$(id -u)" -eq 0 ]; then
-  "${INSTALL_DIR}/${BINARY}" init
+  "${INSTALL_DIR}/jib" init
 else
-  sudo "${INSTALL_DIR}/${BINARY}" init
+  sudo "${INSTALL_DIR}/jib" init
   # Activate jib group so jib commands work immediately.
   # Skip if already active (e.g., re-install).
   if ! id -nG 2>/dev/null | grep -qw jib; then

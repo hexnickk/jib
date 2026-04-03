@@ -23,8 +23,11 @@ import (
 	"github.com/hexnickk/jib/internal/state"
 )
 
+var version = "dev"
+
 func main() {
 	logger := log.New(os.Stderr, "[deployer] ", log.LstdFlags)
+	logger.Printf("starting jib-deployer %s", version)
 
 	root := os.Getenv("JIB_ROOT")
 	if root == "" {

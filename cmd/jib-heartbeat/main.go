@@ -15,8 +15,11 @@ import (
 
 const heartbeatInterval = 30 * time.Second
 
+var version = "dev"
+
 func main() {
 	logger := log.New(os.Stderr, "[heartbeat] ", log.LstdFlags)
+	logger.Printf("starting jib-heartbeat %s", version)
 
 	root := os.Getenv("JIB_ROOT")
 	if root == "" {
