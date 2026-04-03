@@ -249,7 +249,7 @@ func runStatusDetail(cfg *config.Config, name string, jsonOutput bool) error {
 	}
 
 	// Try provider
-	root := jibRoot()
+	root := config.Root()
 	if p, ok := cfg.LookupProvider(name); ok {
 		if jsonOutput {
 			data, err := json.MarshalIndent(p, "", "  ")

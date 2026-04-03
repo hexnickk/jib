@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -21,11 +20,7 @@ func main() {
 	logger := log.New(os.Stderr, "[heartbeat] ", log.LstdFlags)
 	logger.Printf("starting jib-heartbeat %s", version)
 
-	root := os.Getenv("JIB_ROOT")
-	if root == "" {
-		root = "/opt/jib"
-	}
-	cfgPath := filepath.Join(root, "config.yml")
+	cfgPath := config.ConfigFile()
 
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {

@@ -39,7 +39,7 @@ func registerConfigCommands(rootCmd *cobra.Command) {
 func runConfigGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
-	data, err := os.ReadFile(configPath())
+	data, err := os.ReadFile(config.ConfigFile())
 	if err != nil {
 		return fmt.Errorf("reading config: %w", err)
 	}
@@ -94,7 +94,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("complex values (maps/lists) cannot be set via 'config set'; use 'jib edit' instead")
 	}
 
-	path := configPath()
+	path := config.ConfigFile()
 
 	if err := config.ModifyRawConfig(path, func(raw map[string]interface{}) error {
 		return setNestedValue(raw, key, parsed)
@@ -112,7 +112,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 }
 
 func runConfigList(cmd *cobra.Command, args []string) error {
-	data, err := os.ReadFile(configPath())
+	data, err := os.ReadFile(config.ConfigFile())
 	if err != nil {
 		return fmt.Errorf("reading config: %w", err)
 	}

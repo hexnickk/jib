@@ -22,7 +22,7 @@ const checkInterval = 60 * time.Second
 func main() {
 	logger := log.New(os.Stderr, "[health] ", log.LstdFlags)
 
-	configPath := envOr("JIB_CONFIG", "/opt/jib/config.yml")
+	configPath := envOr("JIB_CONFIG", config.ConfigFile())
 	natsURL := envOr("NATS_URL", bus.DefaultURL)
 	natsUser := os.Getenv("NATS_USER")
 	natsPass := os.Getenv("NATS_PASS")

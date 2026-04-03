@@ -13,11 +13,6 @@ import (
 // the lock is already held by another process.
 var ErrLockBusy = errors.New("lock is held by another process")
 
-// DefaultLockDir returns the default directory for lock files.
-func DefaultLockDir() string {
-	return "/opt/jib/locks"
-}
-
 // Lock represents a held file lock.
 type Lock struct {
 	file *os.File

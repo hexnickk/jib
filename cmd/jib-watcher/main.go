@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -25,12 +24,7 @@ func main() {
 	logger := log.New(os.Stderr, "[watcher] ", log.LstdFlags)
 	logger.Printf("starting jib-watcher %s", version)
 
-	root := os.Getenv("JIB_ROOT")
-	if root == "" {
-		root = "/opt/jib"
-	}
-
-	cfgPath := filepath.Join(root, "config.yml")
+	cfgPath := config.ConfigFile()
 
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
@@ -44,11 +38,10 @@ func main() {
 	defer b.Close()
 
 	svc := &service{
-		root:    root,
 		cfgPath: cfgPath,
 		cfg:     cfg,
 		bus:     b,
-		state:   state.NewStore(filepath.Join(root, "state")),
+		state:   state.NewStore(config.StateDir()),
 		logger:  logger,
 	}
 
@@ -75,7 +68,6 @@ func main() {
 }
 
 type service struct {
-	root    string
 	cfgPath string
 	logger  *log.Logger
 	bus     *bus.Bus
@@ -164,7 +156,7 @@ func (s *service) pollOnce(ctx context.Context) {
 			branch = "main"
 		}
 
-		repoDir := paths.RepoPath(filepath.Join(s.root, "repos"), appName, appCfg.Repo)
+		repoDir := paths.RepoPath(config.ReposDir(), appName, appCfg.Repo)
 		if _, err := os.Stat(repoDir); os.IsNotExist(err) {
 			continue
 		}
@@ -175,7 +167,7 @@ func (s *service) pollOnce(ctx context.Context) {
 		// Refresh auth via registered GitAuthProviders before fetch.
 		authFailed := false
 		for _, gap := range module.GitAuthProviders() {
-			handled, err := gap.RefreshAuth(ctx, s.root, repoDir, appCfg, cfg)
+			handled, err := gap.RefreshAuth(ctx, config.Root(), repoDir, appCfg, cfg)
 			if err != nil {
 				s.logger.Printf("%s: %s auth refresh error: %v", appName, gap.Name(), err)
 				authFailed = true

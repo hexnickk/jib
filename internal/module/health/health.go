@@ -11,9 +11,7 @@ import (
 )
 
 // Module implements module.ComposeProvider for health monitoring.
-type Module struct {
-	RepoRoot string // path to jib source repo for building images
-}
+type Module struct{}
 
 var _ module.ComposeProvider = (*Module)(nil)
 
@@ -39,13 +37,16 @@ func (m *Module) ComposeServices(cfg *config.Config, tokens map[string]string) s
     restart: unless-stopped
     network_mode: host
     environment:
-      JIB_CONFIG: /opt/jib/config.yml
-      JIB_SECRETS: /opt/jib/secrets
+      JIB_CONFIG: %s
+      JIB_SECRETS: %s
       NATS_URL: nats://localhost:4222
       NATS_USER: %s
       NATS_PASS: %s
     volumes:
-      - /opt/jib/config.yml:/opt/jib/config.yml:ro
-      - /opt/jib/secrets:/opt/jib/secrets:ro
-`, m.RepoRoot, "monitor", tokens["monitor"])
+      - %s:%s:ro
+      - %s:%s:ro
+`, config.RepoRoot(), config.ConfigFile(), config.SecretsDir(),
+		"monitor", tokens["monitor"],
+		config.ConfigFile(), config.ConfigFile(),
+		config.SecretsDir(), config.SecretsDir())
 }

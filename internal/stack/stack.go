@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	// StackDir is the directory for the service stack compose file.
-	StackDir = "/opt/jib/stack"
 	// ComposeFile is the compose file name within StackDir.
 	ComposeFile = "docker-compose.yml"
 	// NATSConfFile is the NATS config file name within StackDir.
@@ -29,12 +27,12 @@ const (
 
 // composePath returns the full path to the stack compose file.
 func composePath() string {
-	return filepath.Join(StackDir, ComposeFile)
+	return filepath.Join(config.StackDir(), ComposeFile)
 }
 
 // natsConfPath returns the full path to the NATS config file.
 func natsConfPath() string {
-	return filepath.Join(StackDir, NATSConfFile)
+	return filepath.Join(config.StackDir(), NATSConfFile)
 }
 
 // Tokens holds the NATS auth tokens for different service roles.
@@ -86,10 +84,6 @@ authorization {
 `, tokens.Daemon, tokens.Trigger, tokens.Monitor, tokens.Notifier)
 }
 
-// RepoRoot is the path to the jib source repo, used for building service images.
-// Set by the CLI before calling EnsureStack.
-var RepoRoot = "/opt/jib/src"
-
 // TokenMap converts Tokens to a map for use by module ComposeProviders.
 func (t *Tokens) TokenMap() map[string]string {
 	return map[string]string{
@@ -139,7 +133,7 @@ networks:
 
 // EnsureStack writes the compose and NATS config files, creates directories.
 func EnsureStack(cfg *config.Config, tokens *Tokens, moduleServices []string) error {
-	if err := os.MkdirAll(StackDir, 0o750); err != nil { //nolint:gosec // stack dir needs group read for docker
+	if err := os.MkdirAll(config.StackDir(), 0o750); err != nil { //nolint:gosec // stack dir needs group read for docker
 		return fmt.Errorf("creating stack dir: %w", err)
 	}
 

@@ -185,7 +185,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	// 6b. Generate compose file for Dockerfile-only repos.
 	overrideDir := e.OverrideDir
 	if overrideDir == "" {
-		overrideDir = docker.DefaultOverrideDir
+		overrideDir = config.OverrideDir()
 	}
 	if docker.NeedsGeneratedCompose(repoDir, []string(appCfg.Compose)) {
 		fmt.Printf("[deploy] No docker-compose.yml found, generating from Dockerfile...\n")
@@ -337,7 +337,7 @@ func (e *Engine) newCompose(app string, appCfg config.App, repoDir string) *dock
 
 	overrideDir := e.OverrideDir
 	if overrideDir == "" {
-		overrideDir = docker.DefaultOverrideDir
+		overrideDir = config.OverrideDir()
 	}
 
 	return &docker.Compose{

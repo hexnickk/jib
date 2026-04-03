@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/module"
@@ -14,9 +13,7 @@ import (
 )
 
 // Module implements module.SetupHook for nginx proxy management.
-type Module struct {
-	Root string // jib root directory (e.g. /opt/jib)
-}
+type Module struct{}
 
 var _ module.SetupHook = (*Module)(nil)
 
@@ -24,7 +21,7 @@ func (m *Module) Name() string { return "nginx" }
 
 func (m *Module) newProxy() *proxy.Nginx {
 	return proxy.NewNginx(
-		filepath.Join(m.Root, "nginx"),
+		config.NginxDir(),
 		"/etc/nginx/conf.d",
 	)
 }

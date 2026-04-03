@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hexnickk/jib/internal/config"
 	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
@@ -48,7 +49,7 @@ func registerGitHubAppCommands(githubCmd *cobra.Command) {
 
 func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	root := jibRoot()
+	root := config.Root()
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -175,7 +176,7 @@ func saveGitHubAppProvider(name, root string, appID int64, slug string, pemSrc i
 
 func runGitHubAppStatus(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	root := jibRoot()
+	root := config.Root()
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -212,7 +213,7 @@ func runGitHubAppStatus(cmd *cobra.Command, args []string) error {
 
 func runGitHubAppRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	root := jibRoot()
+	root := config.Root()
 
 	cfg, err := loadConfig()
 	if err != nil {

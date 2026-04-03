@@ -118,8 +118,8 @@ WantedBy=multi-user.target
 func runInit(cmd *cobra.Command, args []string) error {
 	skipInstall, _ := cmd.Flags().GetBool("skip-install")
 
-	cfgPath := configPath()
-	root := jibRoot()
+	cfgPath := config.ConfigFile()
+	root := config.Root()
 	firstRun := !fileExists(cfgPath)
 
 	if firstRun {
@@ -290,7 +290,7 @@ func ensureDirs(root string) {
 
 // ensureSourceRepo clones or updates the jib source at /opt/jib/src for Docker service builds.
 func ensureSourceRepo() {
-	srcDir := stack.RepoRoot // "/opt/jib/src"
+	srcDir := config.RepoRoot()
 
 	if version == "dev" {
 		fmt.Println("\nSkipping source repo (dev build).")
@@ -402,7 +402,7 @@ func syncStack() {
 		return
 	}
 
-	tokensPath := filepath.Join(stack.StackDir, "tokens.json")
+	tokensPath := filepath.Join(config.StackDir(), "tokens.json")
 	var tokens *stack.Tokens
 	if data, readErr := os.ReadFile(tokensPath); readErr == nil { //nolint:gosec // trusted path
 		var t stack.Tokens
@@ -453,7 +453,7 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		editor = "vi"
 	}
 
-	cfgPath := configPath()
+	cfgPath := config.ConfigFile()
 
 	// Check the file exists before editing
 	if _, err := os.Stat(cfgPath); err != nil {
@@ -558,7 +558,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := context.Background()
-	root := jibRoot()
+	root := config.Root()
 	repoDirPath := repoDir(appName, repo)
 
 	// Parse compose files
@@ -667,7 +667,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		if docker.NeedsGeneratedCompose(repoDirPath, files) {
 			// Dockerfile-only repo — generate compose and assign port
 			fmt.Println("\nNo docker-compose.yml found, will generate from Dockerfile.")
-			overrideDir := filepath.Join(root, "overrides")
+			overrideDir := config.OverrideDir()
 			composePath, hostPort, err := docker.GenerateComposeForDockerfile(appName, repoDirPath, overrideDir, 0)
 			if err != nil {
 				return fmt.Errorf("generating compose from Dockerfile: %w", err)
@@ -749,7 +749,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// --- Step 3: Save to config ---
-	cfgPath := configPath()
+	cfgPath := config.ConfigFile()
 
 	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
 		newApp := config.App{
@@ -911,15 +911,13 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	root := jibRoot()
-
 	// Paths that will be removed
-	stateFile := filepath.Join(root, "state", appName+".json")
-	domainStateFile := filepath.Join(root, "state", appName+".domains.json")
-	secretsDir := filepath.Join(root, "secrets", appName)
+	stateFile := filepath.Join(config.StateDir(), appName+".json")
+	domainStateFile := filepath.Join(config.StateDir(), appName+".domains.json")
+	secretsDir := filepath.Join(config.SecretsDir(), appName)
 	repoDirPath := repoDir(appName, appCfg.Repo)
-	overrideFile := docker.OverridePath(filepath.Join(root, "overrides"), appName)
-	historyFile := filepath.Join(root, "logs", appName+".jsonl")
+	overrideFile := docker.OverridePath(config.OverrideDir(), appName)
+	historyFile := filepath.Join(config.LogDir(), appName+".jsonl")
 
 	// If not --force, show what will be removed and ask for confirmation
 	if !force {
@@ -1028,7 +1026,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// 8. Remove app from config.yml
-	cfgPath := configPath()
+	cfgPath := config.ConfigFile()
 	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
 		if appsRaw, ok := raw["apps"]; ok {
 			if appsMap, ok := appsRaw.(map[string]interface{}); ok {

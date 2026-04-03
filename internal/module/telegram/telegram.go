@@ -12,9 +12,7 @@ import (
 )
 
 // Module implements module.ComposeProvider for Telegram notifications.
-type Module struct {
-	RepoRoot string
-}
+type Module struct{}
 
 var _ module.ComposeProvider = (*Module)(nil)
 
@@ -36,19 +34,25 @@ func (m *Module) ComposeServices(cfg *config.Config, tokens map[string]string) s
       dockerfile: cmd/%s/Dockerfile
     restart: unless-stopped
     environment:
-      JIB_CONFIG: /opt/jib/config.yml
-      JIB_SECRETS: /opt/jib/secrets
+      JIB_CONFIG: %s
+      JIB_SECRETS: %s
       NATS_URL: nats://jib-bus:4222
       NATS_USER: %s
       NATS_PASS: %s
       CHANNEL_NAME: "%s"
-      CREDS_FILE: "/opt/jib/secrets/_jib/%s.json"
+      CREDS_FILE: "%s/%s.json"
     volumes:
-      - /opt/jib/config.yml:/opt/jib/config.yml:ro
-      - /opt/jib/secrets:/opt/jib/secrets:ro
+      - %s:%s:ro
+      - %s:%s:ro
     networks:
       - %s
-`, svcName, m.RepoRoot, imageName, "notifier", tokens["notifier"], name, name, stack.NetworkName)
+`, svcName, config.RepoRoot(), imageName,
+			config.ConfigFile(), config.SecretsDir(),
+			"notifier", tokens["notifier"],
+			name, config.JibSecretsDir(), name,
+			config.ConfigFile(), config.ConfigFile(),
+			config.SecretsDir(), config.SecretsDir(),
+			stack.NetworkName)
 	}
 	return b.String()
 }

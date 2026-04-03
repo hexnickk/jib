@@ -44,7 +44,7 @@ func registerGitHubKeyCommands(githubCmd *cobra.Command) {
 
 func runGitHubKeySetup(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	root := jibRoot()
+	root := config.Root()
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -96,7 +96,7 @@ func runGitHubKeySetup(cmd *cobra.Command, args []string) error {
 
 func runGitHubKeyStatus(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	root := jibRoot()
+	root := config.Root()
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -139,7 +139,7 @@ func runGitHubKeyStatus(cmd *cobra.Command, args []string) error {
 
 func runGitHubKeyRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	root := jibRoot()
+	root := config.Root()
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -189,7 +189,7 @@ func appsUsingProvider(cfg *config.Config, providerName string) []string {
 
 // saveProvider adds a provider entry to the config YAML.
 func saveProvider(name string, data map[string]interface{}) error {
-	return config.ModifyRawConfig(configPath(), func(raw map[string]interface{}) error {
+	return config.ModifyRawConfig(config.ConfigFile(), func(raw map[string]interface{}) error {
 		gh, ok := raw["github"].(map[string]interface{})
 		if !ok {
 			gh = make(map[string]interface{})
@@ -207,7 +207,7 @@ func saveProvider(name string, data map[string]interface{}) error {
 
 // removeProvider removes a provider entry from the config YAML.
 func removeProvider(name string) error {
-	return config.ModifyRawConfig(configPath(), func(raw map[string]interface{}) error {
+	return config.ModifyRawConfig(config.ConfigFile(), func(raw map[string]interface{}) error {
 		gh, ok := raw["github"].(map[string]interface{})
 		if !ok {
 			return nil

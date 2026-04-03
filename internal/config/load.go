@@ -7,11 +7,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DefaultConfigPath returns the standard location for the Jib config file.
-func DefaultConfigPath() string {
-	return "/opt/jib/config.yml"
-}
-
 // LoadConfig reads a YAML config file, applies defaults, and validates it.
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // CLI tool reads user-specified config

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -136,7 +135,7 @@ func runNotifyList(cmd *cobra.Command, args []string) error {
 	sort.Strings(names)
 
 	// Check for credentials.
-	secretsDir := filepath.Join(jibRoot(), "secrets")
+	secretsDir := config.SecretsDir()
 
 	if jsonOutput {
 		type channelInfo struct {
@@ -202,7 +201,7 @@ func runNotifyAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid driver %q; supported drivers: telegram", driver)
 	}
 
-	secretsDir := filepath.Join(jibRoot(), "secrets")
+	secretsDir := config.SecretsDir()
 	return addTelegramChannel(name, secretsDir)
 }
 
@@ -210,7 +209,7 @@ func runNotifyAdd(cmd *cobra.Command, args []string) error {
 func runNotifyRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
-	cfgPath := configPath()
+	cfgPath := config.ConfigFile()
 	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
 		removed := false
 		if notifRaw, ok := raw["notifications"]; ok {
@@ -260,7 +259,7 @@ func runNotifyRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Delete credentials file.
-	secretsDir := filepath.Join(jibRoot(), "secrets")
+	secretsDir := config.SecretsDir()
 	if err := notify.DeleteChannelCreds(secretsDir, name); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
 	}
@@ -284,7 +283,7 @@ func runNotifyTest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("channel %q not found in config", name)
 	}
 
-	secretsDir := filepath.Join(jibRoot(), "secrets")
+	secretsDir := config.SecretsDir()
 	channels := map[string]notify.ChannelConfig{
 		name: {Driver: ch.Driver},
 	}
@@ -313,7 +312,7 @@ func runNotifyTest(cmd *cobra.Command, args []string) error {
 // runTelegramAdd prompts for Telegram credentials and adds the channel.
 func runTelegramAdd(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	secretsDir := filepath.Join(jibRoot(), "secrets")
+	secretsDir := config.SecretsDir()
 	return addTelegramChannel(name, secretsDir)
 }
 
@@ -354,7 +353,7 @@ func addTelegramChannel(name string, secretsDir string) error {
 
 // addChannelToConfig writes a notification channel entry to config.yml.
 func addChannelToConfig(name, driver string) error {
-	cfgPath := configPath()
+	cfgPath := config.ConfigFile()
 	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
 		notifRaw, ok := raw["notifications"]
 		if !ok {

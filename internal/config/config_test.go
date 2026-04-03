@@ -403,9 +403,9 @@ apps:
 	}
 }
 
-func TestDefaultConfigPath(t *testing.T) {
-	if DefaultConfigPath() != "/opt/jib/config.yml" {
-		t.Errorf("DefaultConfigPath() = %q", DefaultConfigPath())
+func TestConfigFile(t *testing.T) {
+	if ConfigFile() != "/opt/jib/config.yml" {
+		t.Errorf("ConfigFile() = %q", ConfigFile())
 	}
 }
 

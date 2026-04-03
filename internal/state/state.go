@@ -5,11 +5,6 @@ import "time"
 // CurrentSchemaVersion is the state file schema version this binary understands.
 const CurrentSchemaVersion = 1
 
-// DefaultStateDir returns the default directory for state files.
-func DefaultStateDir() string {
-	return "/opt/jib/state"
-}
-
 // AppState represents the persisted deploy state for a single application.
 type AppState struct {
 	SchemaVersion       int       `json:"schema_version"`

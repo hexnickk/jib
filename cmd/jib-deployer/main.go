@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -29,12 +28,7 @@ func main() {
 	logger := log.New(os.Stderr, "[deployer] ", log.LstdFlags)
 	logger.Printf("starting jib-deployer %s", version)
 
-	root := os.Getenv("JIB_ROOT")
-	if root == "" {
-		root = "/opt/jib"
-	}
-
-	cfgPath := filepath.Join(root, "config.yml")
+	cfgPath := config.ConfigFile()
 
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
@@ -42,7 +36,6 @@ func main() {
 	}
 
 	svc := &service{
-		root:    root,
 		cfgPath: cfgPath,
 		logger:  logger,
 	}
@@ -84,7 +77,6 @@ func main() {
 }
 
 type service struct {
-	root    string
 	cfgPath string
 	logger  *log.Logger
 	bus     *bus.Bus
@@ -103,11 +95,11 @@ func (s *service) rebuild(cfg *config.Config) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cfg = cfg
-	s.stateStore = state.NewStore(filepath.Join(s.root, "state"))
-	s.secrets = secrets.NewManager(filepath.Join(s.root, "secrets"))
-	s.historyLog = history.NewLogger(filepath.Join(s.root, "logs"))
+	s.stateStore = state.NewStore(config.StateDir())
+	s.secrets = secrets.NewManager(config.SecretsDir())
+	s.historyLog = history.NewLogger(config.LogDir())
 	s.proxyMgr = proxy.NewNginx(
-		filepath.Join(s.root, "nginx"),
+		config.NginxDir(),
 		"/etc/nginx/conf.d",
 	)
 }
@@ -121,10 +113,10 @@ func (s *service) newEngine() *deploy.Engine {
 		Secrets:     s.secrets,
 		Proxy:       s.proxyMgr,
 		History:     s.historyLog,
-		LockDir:     filepath.Join(s.root, "locks"),
-		RepoBaseDir: filepath.Join(s.root, "repos"),
-		OverrideDir: filepath.Join(s.root, "overrides"),
-		JibRoot:     s.root,
+		LockDir:     config.LockDir(),
+		RepoBaseDir: config.ReposDir(),
+		OverrideDir: config.OverrideDir(),
+		JibRoot:     config.Root(),
 	}
 }
 
@@ -141,7 +133,7 @@ func (s *service) handleDeploy(subject string, data []byte) (any, error) {
 	}
 
 	// Non-blocking lock probe for dedup.
-	lock, err := state.Acquire(cmd.App, filepath.Join(s.root, "locks"), false, 0)
+	lock, err := state.Acquire(cmd.App, config.LockDir(), false, 0)
 	if err != nil {
 		if errors.Is(err, state.ErrLockBusy) {
 			return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: "deploy already in progress"}, nil

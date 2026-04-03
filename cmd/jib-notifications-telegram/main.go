@@ -6,13 +6,14 @@ import (
 	"log"
 	"os"
 
+	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/notify"
 	"github.com/hexnickk/jib/internal/notifysvc"
 )
 
 func main() {
 	channelName := notifysvc.EnvOr("CHANNEL_NAME", "telegram")
-	credsPath := notifysvc.EnvOr("CREDS_FILE", "/opt/jib/secrets/_jib/"+channelName+".json")
+	credsPath := notifysvc.EnvOr("CREDS_FILE", config.JibSecretsDir()+"/"+channelName+".json")
 
 	data, err := os.ReadFile(credsPath) //nolint:gosec // trusted creds path
 	if err != nil {

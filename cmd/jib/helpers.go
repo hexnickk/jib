@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
@@ -14,15 +13,6 @@ import (
 	"github.com/hexnickk/jib/internal/state"
 	"github.com/spf13/cobra"
 )
-
-// jibRoot returns the base directory for all jib data.
-// Defaults to /opt/jib, overridable with JIB_ROOT env var.
-func jibRoot() string {
-	if root := os.Getenv("JIB_ROOT"); root != "" {
-		return root
-	}
-	return "/opt/jib"
-}
 
 // sudoCmd creates an exec.Cmd that prepends "sudo" when not running as root.
 func sudoCmd(name string, args ...string) *exec.Cmd {
@@ -34,27 +24,23 @@ func sudoCmd(name string, args ...string) *exec.Cmd {
 
 // repoDir returns the on-disk path for an app's git checkout.
 func repoDir(appName string, repo string) string {
-	return paths.RepoPath(filepath.Join(jibRoot(), "repos"), appName, repo)
-}
-
-func configPath() string {
-	return filepath.Join(jibRoot(), "config.yml")
+	return paths.RepoPath(config.ReposDir(), appName, repo)
 }
 
 func loadConfig() (*config.Config, error) {
-	return config.LoadConfig(configPath())
+	return config.LoadConfig(config.ConfigFile())
 }
 
 func newStateStore() *state.Store {
-	return state.NewStore(filepath.Join(jibRoot(), "state"))
+	return state.NewStore(config.StateDir())
 }
 
 func newSecretsManager() *secrets.Manager {
-	return secrets.NewManager(filepath.Join(jibRoot(), "secrets"))
+	return secrets.NewManager(config.SecretsDir())
 }
 
 func newHistoryLogger() *history.Logger {
-	return history.NewLogger(filepath.Join(jibRoot(), "logs"))
+	return history.NewLogger(config.LogDir())
 }
 
 func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {
@@ -63,7 +49,6 @@ func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {
 		return nil, err
 	}
 
-	root := jibRoot()
 	files := []string(appCfg.Compose)
 	if len(files) == 0 {
 		files = []string{"docker-compose.yml"}
@@ -82,7 +67,7 @@ func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {
 		Dir:      dir,
 		Files:    files,
 		EnvFile:  envFile,
-		Override: docker.OverridePath(filepath.Join(root, "overrides"), appName),
+		Override: docker.OverridePath(config.OverrideDir(), appName),
 	}, nil
 }
 

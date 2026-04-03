@@ -24,7 +24,7 @@ import (
 func Run(channelName string, notifier notify.Notifier) {
 	logger := log.New(os.Stderr, "[notify-"+channelName+"] ", log.LstdFlags)
 
-	configPath := EnvOr("JIB_CONFIG", "/opt/jib/config.yml")
+	configPath := EnvOr("JIB_CONFIG", config.ConfigFile())
 	natsURL := EnvOr("NATS_URL", bus.DefaultURL)
 	natsUser := os.Getenv("NATS_USER")
 	natsPass := os.Getenv("NATS_PASS")

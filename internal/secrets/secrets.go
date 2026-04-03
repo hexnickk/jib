@@ -12,9 +12,6 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 )
 
-// DefaultSecretsDir is the default base directory for secrets on the server.
-const DefaultSecretsDir = "/opt/jib/secrets" //nolint:gosec // G101 false positive: this is a directory path, not a credential
-
 // Manager handles secrets file operations.
 type Manager struct {
 	Dir string // base secrets directory

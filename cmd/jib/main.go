@@ -10,7 +10,6 @@ import (
 	"github.com/hexnickk/jib/internal/module/health"
 	"github.com/hexnickk/jib/internal/module/nginxmod"
 	"github.com/hexnickk/jib/internal/module/telegram"
-	"github.com/hexnickk/jib/internal/stack"
 	"github.com/spf13/cobra"
 )
 
@@ -26,15 +25,13 @@ func main() {
 }
 
 func newRootCmd() *cobra.Command {
-	root := jibRoot()
-
 	// Register modules. Order matters for SetupHooks:
 	// cloudflare routes before nginx (add), nginx before cloudflare (remove handled by iteration order).
-	module.Register(&cfmod.Module{Root: root})
-	module.Register(&nginxmod.Module{Root: root})
+	module.Register(&cfmod.Module{})
+	module.Register(&nginxmod.Module{})
 	module.Register(&ghmod.Module{})
-	module.Register(&health.Module{RepoRoot: stack.RepoRoot})
-	module.Register(&telegram.Module{RepoRoot: stack.RepoRoot})
+	module.Register(&health.Module{})
+	module.Register(&telegram.Module{})
 
 	rootCmd := &cobra.Command{
 		Use:   "jib",

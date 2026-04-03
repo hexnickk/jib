@@ -16,9 +16,7 @@ import (
 )
 
 // Module implements ComposeProvider and SetupHook for Cloudflare tunnels.
-type Module struct {
-	Root string // jib root directory (e.g. /opt/jib)
-}
+type Module struct{}
 
 var (
 	_ module.ComposeProvider = (*Module)(nil)
@@ -32,15 +30,15 @@ func (m *Module) ComposeServices(cfg *config.Config, tokens map[string]string) s
 		return ""
 	}
 
-	return `
+	return fmt.Sprintf(`
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     network_mode: host
     entrypoint: ["/bin/sh", "-c", "exec cloudflared tunnel --no-autoupdate run --token $(cat /run/secrets/tunnel-token)"]
     volumes:
-      - /opt/jib/secrets/_jib/cloudflare-tunnel-token:/run/secrets/tunnel-token:ro
-`
+      - %s/cloudflare-tunnel-token:/run/secrets/tunnel-token:ro
+`, config.JibSecretsDir())
 }
 
 func (m *Module) OnAppAdd(ctx context.Context, app string, appCfg config.App, cfg *config.Config) error {
@@ -68,7 +66,7 @@ func (m *Module) OnAppRemove(ctx context.Context, app string, appCfg config.App,
 }
 
 func (m *Module) addRoutes(ctx context.Context, cfg *config.Config, domains []string) error {
-	token, err := m.loadAPIToken()
+	token, err := loadAPIToken()
 	if err != nil {
 		return err
 	}
@@ -82,7 +80,7 @@ func (m *Module) addRoutes(ctx context.Context, cfg *config.Config, domains []st
 }
 
 func (m *Module) removeRoutes(ctx context.Context, cfg *config.Config, domains []string) error {
-	token, err := m.loadAPIToken()
+	token, err := loadAPIToken()
 	if err != nil {
 		return err
 	}
@@ -95,8 +93,8 @@ func (m *Module) removeRoutes(ctx context.Context, cfg *config.Config, domains [
 	return client.RemoveTunnelRoutes(ctx, accountID, tunnelID, domains)
 }
 
-func (m *Module) loadAPIToken() (string, error) {
-	path := filepath.Join(m.Root, "secrets", "_jib", "cloudflare-api-token")
+func loadAPIToken() (string, error) {
+	path := filepath.Join(config.JibSecretsDir(), "cloudflare-api-token")
 	data, err := os.ReadFile(path) //nolint:gosec // path from trusted root
 	if err != nil {
 		return "", fmt.Errorf("cloudflare API token not found — run 'jib cloudflare setup' with API mode first")

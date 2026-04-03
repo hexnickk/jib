@@ -135,7 +135,7 @@ func runCloudflareAPISetup(apiToken, tunnelName string) error {
 	}
 
 	// Save tunnel token for the stack container.
-	tunnelTokenPath := filepath.Join(jibRoot(), "secrets", "_jib", "cloudflare-tunnel-token")
+	tunnelTokenPath := filepath.Join(config.JibSecretsDir(), "cloudflare-tunnel-token")
 	if err := os.WriteFile(tunnelTokenPath, []byte(token), 0o600); err != nil {
 		return fmt.Errorf("saving tunnel token: %w", err)
 	}
@@ -146,7 +146,7 @@ func runCloudflareAPISetup(apiToken, tunnelName string) error {
 	})
 
 	// Save tunnel config
-	cfgPath := configPath()
+	cfgPath := config.ConfigFile()
 	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
 		tunnelCfg := map[string]interface{}{
 			"provider":   "cloudflare",
@@ -183,7 +183,7 @@ func runCloudflareManualSetup() error {
 	}
 
 	// Save tunnel token and start via stack.
-	tunnelTokenPath := filepath.Join(jibRoot(), "secrets", "_jib", "cloudflare-tunnel-token")
+	tunnelTokenPath := filepath.Join(config.JibSecretsDir(), "cloudflare-tunnel-token")
 	if err := os.MkdirAll(filepath.Dir(tunnelTokenPath), 0o700); err != nil {
 		return fmt.Errorf("creating secrets dir: %w", err)
 	}
@@ -192,7 +192,7 @@ func runCloudflareManualSetup() error {
 	}
 
 	// Save tunnel config (manual mode — no tunnel_id/account_id).
-	cfgPath := configPath()
+	cfgPath := config.ConfigFile()
 	if err := config.ModifyRawConfig(cfgPath, func(raw map[string]interface{}) error {
 		raw["tunnel"] = map[string]interface{}{"provider": "cloudflare"}
 		return nil
@@ -213,7 +213,7 @@ func runCloudflareManualSetup() error {
 
 // cloudflareAPITokenPath returns the path where the Cloudflare API token is stored.
 func cloudflareAPITokenPath() string {
-	return filepath.Join(jibRoot(), "secrets", "_jib", "cloudflare-api-token")
+	return filepath.Join(config.JibSecretsDir(), "cloudflare-api-token")
 }
 
 func runCloudflareStatus(cmd *cobra.Command, args []string) error {

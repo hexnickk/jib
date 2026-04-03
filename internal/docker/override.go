@@ -11,11 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const (
-	// DefaultOverrideDir is the default directory for generated override files.
-	DefaultOverrideDir = "/opt/jib/overrides"
-)
-
 // serviceOverride defines the jib-managed settings applied per service.
 type serviceOverride struct {
 	Labels  map[string]string `yaml:"labels"`
