@@ -23,6 +23,12 @@ import (
 //go:embed jib-bus.service
 var systemdUnit []byte
 
+//go:embed docker-compose.yml
+var composeFile []byte
+
+//go:embed nats.conf
+var natsConf []byte
+
 var version = "dev"
 
 const (

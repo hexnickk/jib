@@ -1,0 +1,13 @@
+# Managed by jib-bus — do not edit.
+# Written to /opt/jib/bus/docker-compose.yml by `jib-bus install`.
+name: jib-bus
+
+services:
+  nats:
+    image: nats:alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4222:4222"
+    volumes:
+      - ./nats.conf:/etc/nats/nats.conf:ro
+    command: ["-c", "/etc/nats/nats.conf"]
