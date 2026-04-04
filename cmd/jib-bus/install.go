@@ -67,19 +67,29 @@ func installService() error {
 	return systemctl("enable", serviceName)
 }
 
-// uninstallService disables and stops the service, removes its unit file, and
-// reloads systemd. Missing pieces (already stopped, already removed) are not
-// treated as errors. Must be run as root.
+// uninstallService disables and stops the service, removes every file that
+// installService wrote (unit, compose, nats.conf), and reloads systemd.
+// Missing pieces (already stopped, already removed) are not treated as
+// errors. Must be run as root.
 func uninstallService() error {
 	if os.Geteuid() != 0 {
 		return errors.New("must be run as root")
 	}
 	// disable/stop may fail if the unit is already gone — intentionally ignored.
+	// Stopping the unit triggers its ExecStop (docker compose down), tearing
+	// down the containers before we remove the compose file out from under it.
 	_ = systemctl("disable", serviceName)
 	_ = systemctl("stop", serviceName)
-	if err := os.Remove(unitPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("removing unit file: %w", err)
+
+	for _, p := range []string{unitPath, composePath, confPath} {
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("removing %s: %w", p, err)
+		}
 	}
+	// Best-effort: remove busDir if empty. Fails silently if the operator
+	// left other files there, which we do not own.
+	_ = os.Remove(busDir)
+
 	return systemctl("daemon-reload")
 }
 
