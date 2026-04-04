@@ -1,5 +1,5 @@
 # Managed by jib-bus — do not edit.
-# Written to /opt/jib/bus/docker-compose.yml by `jib-bus install`.
+# Written under $JIB_ROOT/bus/docker-compose.yml by `jib-bus install`.
 name: jib-bus
 
 services:

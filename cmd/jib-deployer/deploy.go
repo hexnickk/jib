@@ -12,7 +12,6 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/git"
 	ghPkg "github.com/hexnickk/jib/internal/github"
-	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/state"
 )
 
@@ -40,7 +39,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 
 	const strategy = "restart"
 
-	repoDir := paths.RepoPath(e.RepoBaseDir, opts.App, appCfg.Repo)
+	repoDir := config.RepoPathIn(e.RepoBaseDir, opts.App, appCfg.Repo)
 	branch := appCfg.Branch
 	if branch == "" {
 		branch = "main"

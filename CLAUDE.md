@@ -57,6 +57,15 @@ Pre-commit hooks run `gofmt` and `golangci-lint`. Fix issues before committing.
 - State: `/opt/jib/state/<app>.json`
 - NATS for inter-service messaging
 - Modules in `internal/module/` register at startup via `module.Register()`
+- **Secrets in compose files**: pass secrets to containers as environment
+  variables only, via `env_file:` or `environment:`. Never mount secret
+  files as volumes (no `volumes: - /path/to/secret:/run/secrets/...`). This
+  applies to every compose file jib generates or owns, including infra
+  containers under `cmd/jib-*/`. Config files that aren't secrets (e.g.
+  `nats.conf`) may still be volume-mounted.
+- All jib-managed paths honor `$JIB_ROOT`. When an installer embeds a
+  systemd unit or compose file that references a path, template it via
+  `text/template` at install time — do not hardcode `/opt/jib`.
 
 # Important
 

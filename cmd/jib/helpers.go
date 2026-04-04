@@ -7,7 +7,6 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
-	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
 	"github.com/spf13/cobra"
@@ -23,7 +22,7 @@ func sudoCmd(name string, args ...string) *exec.Cmd {
 
 // repoDir returns the on-disk path for an app's git checkout.
 func repoDir(appName string, repo string) string {
-	return paths.RepoPath(config.ReposDir(), appName, repo)
+	return config.RepoPath(appName, repo)
 }
 
 func loadConfig() (*config.Config, error) {

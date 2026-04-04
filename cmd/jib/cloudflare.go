@@ -19,8 +19,8 @@ import (
 // (re)starts it. Safe to call multiple times — `install` overwrites the
 // compose/unit files, and `restart` picks up fresh tokens or config on
 // re-setup (unlike `enable --now`, which is a no-op when the unit is
-// already running). Call after writing the tunnel token to
-// config.CredsPath("cloudflare", "tunnel-token").
+// already running). Call after saveTunnelTokenEnv has written the token
+// env file.
 func ensureCloudflaredRunning() error {
 	binaryPath := "/usr/local/bin/jib-cloudflared"
 	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
@@ -156,10 +156,9 @@ func runCloudflareAPISetup(apiToken, tunnelName string) error {
 		return err
 	}
 
-	// Save tunnel token for the jib-cloudflared container to read.
-	tunnelTokenPath := config.CredsPath("cloudflare", "tunnel-token")
-	if err := os.WriteFile(tunnelTokenPath, []byte(token), 0o600); err != nil {
-		return fmt.Errorf("saving tunnel token: %w", err)
+	// Save tunnel token as an env file for the jib-cloudflared container.
+	if err := saveTunnelTokenEnv(token); err != nil {
+		return err
 	}
 
 	// Initialize tunnel with catch-all 404
@@ -207,13 +206,9 @@ func runCloudflareManualSetup() error {
 		return err
 	}
 
-	// Save tunnel token for the jib-cloudflared container to read.
-	tunnelTokenPath := config.CredsPath("cloudflare", "tunnel-token")
-	if err := os.MkdirAll(filepath.Dir(tunnelTokenPath), 0o700); err != nil {
-		return fmt.Errorf("creating secrets dir: %w", err)
-	}
-	if err := os.WriteFile(tunnelTokenPath, []byte(token), 0o600); err != nil {
-		return fmt.Errorf("saving tunnel token: %w", err)
+	// Save tunnel token as an env file for the jib-cloudflared container.
+	if err := saveTunnelTokenEnv(token); err != nil {
+		return err
 	}
 
 	// Save tunnel config (manual mode — no tunnel_id/account_id).
@@ -241,6 +236,28 @@ func runCloudflareManualSetup() error {
 // cloudflareAPITokenPath returns the path where the Cloudflare API token is stored.
 func cloudflareAPITokenPath() string {
 	return config.CredsPath("cloudflare", "api-token")
+}
+
+// tunnelTokenEnvPath returns the path of the env file that feeds the
+// TUNNEL_TOKEN variable into the jib-cloudflared container via compose's
+// env_file directive. jib-cloudflared's install.go reads the same path via
+// config.CredsPath to template its docker-compose.yml, keeping them in sync.
+func tunnelTokenEnvPath() string {
+	return config.CredsPath("cloudflare", "tunnel.env")
+}
+
+// saveTunnelTokenEnv writes the cloudflared tunnel token in KEY=VALUE env
+// format so docker compose can load it via env_file, avoiding a volume
+// mount of the raw secret into the container.
+func saveTunnelTokenEnv(token string) error {
+	path := tunnelTokenEnvPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return fmt.Errorf("creating secrets dir: %w", err)
+	}
+	if err := os.WriteFile(path, []byte("TUNNEL_TOKEN="+token+"\n"), 0o600); err != nil {
+		return fmt.Errorf("saving tunnel token: %w", err)
+	}
+	return nil
 }
 
 func runCloudflareStatus(cmd *cobra.Command, args []string) error {

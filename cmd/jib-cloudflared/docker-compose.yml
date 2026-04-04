@@ -1,9 +1,10 @@
 # Managed by jib-cloudflared — do not edit.
-# Written to /opt/jib/cloudflared/docker-compose.yml by `jib-cloudflared install`.
+# Written under $JIB_ROOT/cloudflared/docker-compose.yml by `jib-cloudflared install`.
 #
-# The tunnel token is NOT managed by jib-cloudflared. It is written by
-# `jib cloudflare setup` to /opt/jib/secrets/_jib/cloudflare/tunnel-token
-# (via config.CredsPath) before this service is started.
+# The tunnel token is NOT managed by jib-cloudflared. `jib cloudflare setup`
+# writes it as an env file (TUNNEL_TOKEN=...) under config.CredsPath, and
+# docker compose loads it via env_file so the secret is passed to the
+# container as an environment variable — never mounted as a host file.
 name: jib-cloudflared
 
 services:
@@ -11,6 +12,6 @@ services:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     network_mode: host
-    entrypoint: ["/bin/sh", "-c", "exec cloudflared tunnel --no-autoupdate run --token $(cat /run/secrets/tunnel-token)"]
-    volumes:
-      - /opt/jib/secrets/_jib/cloudflare/tunnel-token:/run/secrets/tunnel-token:ro
+    command: tunnel --no-autoupdate run
+    env_file:
+      - {{.TunnelEnvPath}}

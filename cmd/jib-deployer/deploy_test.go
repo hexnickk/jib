@@ -9,7 +9,6 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/git"
-	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
 )
@@ -218,7 +217,7 @@ func TestDeployDryRunDoesNotModifyState(t *testing.T) {
 	appName := "testapp"
 
 	// Create a real git repo for the app.
-	appRepoDir := paths.RepoPath(repoBaseDir, appName, "local")
+	appRepoDir := config.RepoPathIn(repoBaseDir, appName, "local")
 	initTestRepo2(t, tmpDir, appRepoDir)
 
 	eng := &Engine{
@@ -421,7 +420,7 @@ func seedState(t *testing.T, eng *Engine, appName, deployedSHA, previousSHA stri
 func TestRollbackHappyPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	appName := "testapp"
-	repoDir := paths.RepoPath(filepath.Join(tmpDir, "repos"), appName, "local")
+	repoDir := config.RepoPathIn(filepath.Join(tmpDir, "repos"), appName, "local")
 	shaA, shaB := initTwoCommitRepo(t, tmpDir, repoDir)
 
 	fake := newFakeDocker() // rollback image present, all healthy
@@ -478,7 +477,7 @@ func TestRollbackHappyPath(t *testing.T) {
 func TestRollbackRebuildWhenImageMissing(t *testing.T) {
 	tmpDir := t.TempDir()
 	appName := "testapp"
-	repoDir := paths.RepoPath(filepath.Join(tmpDir, "repos"), appName, "local")
+	repoDir := config.RepoPathIn(filepath.Join(tmpDir, "repos"), appName, "local")
 	shaA, shaB := initTwoCommitRepo(t, tmpDir, repoDir)
 
 	fake := newFakeDocker()
@@ -506,7 +505,7 @@ func TestRollbackRebuildWhenImageMissing(t *testing.T) {
 func TestRollbackHealthCheckFailure(t *testing.T) {
 	tmpDir := t.TempDir()
 	appName := "testapp"
-	repoDir := paths.RepoPath(filepath.Join(tmpDir, "repos"), appName, "local")
+	repoDir := config.RepoPathIn(filepath.Join(tmpDir, "repos"), appName, "local")
 	shaA, shaB := initTwoCommitRepo(t, tmpDir, repoDir)
 
 	fake := newFakeDocker()
@@ -546,7 +545,7 @@ func TestRollbackHealthCheckFailure(t *testing.T) {
 func TestDeployHappyPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	appName := "testapp"
-	repoDir := paths.RepoPath(filepath.Join(tmpDir, "repos"), appName, "local")
+	repoDir := config.RepoPathIn(filepath.Join(tmpDir, "repos"), appName, "local")
 	initTestRepo2(t, tmpDir, repoDir)
 
 	sha, err := git.CurrentSHA(context.Background(), repoDir)

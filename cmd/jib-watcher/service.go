@@ -14,7 +14,6 @@ import (
 	"github.com/hexnickk/jib/internal/git"
 	"github.com/hexnickk/jib/internal/module"
 	"github.com/hexnickk/jib/internal/module/ghmod"
-	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/state"
 )
 
@@ -156,7 +155,7 @@ func (s *service) pollOnce(ctx context.Context) {
 			branch = "main"
 		}
 
-		repoDir := paths.RepoPath(config.ReposDir(), appName, appCfg.Repo)
+		repoDir := config.RepoPath(appName, appCfg.Repo)
 		if _, err := os.Stat(repoDir); os.IsNotExist(err) {
 			continue
 		}

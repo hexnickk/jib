@@ -6,8 +6,8 @@ Requires=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'docker compose -f /opt/jib/bus/docker-compose.yml up -d'
-ExecStop=/bin/sh -c 'docker compose -f /opt/jib/bus/docker-compose.yml down'
+ExecStart=/bin/sh -c 'docker compose -f {{.BusDir}}/docker-compose.yml up -d'
+ExecStop=/bin/sh -c 'docker compose -f {{.BusDir}}/docker-compose.yml down'
 
 [Install]
 WantedBy=multi-user.target

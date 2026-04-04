@@ -40,6 +40,28 @@ func ReposDir() string { return filepath.Join(Root(), "repos") }
 // NginxDir returns the directory for jib-managed nginx configs.
 func NginxDir() string { return filepath.Join(Root(), "nginx") }
 
+// BusDir returns the directory for jib-bus compose/conf files.
+func BusDir() string { return filepath.Join(Root(), "bus") }
+
+// CloudflaredDir returns the directory for jib-cloudflared compose files.
+func CloudflaredDir() string { return filepath.Join(Root(), "cloudflared") }
+
+// RepoPath returns the on-disk path for an app's git checkout under ReposDir.
+// GitHub repos (org/name) go under repos/github/org/name.
+// Local repos go under repos/local/<appName>.
+func RepoPath(appName, repo string) string {
+	return RepoPathIn(ReposDir(), appName, repo)
+}
+
+// RepoPathIn is like RepoPath but takes an explicit base directory, for tests
+// and for the deployer which injects its RepoBaseDir for testability.
+func RepoPathIn(base, appName, repo string) string {
+	if repo == "local" || repo == "" {
+		return filepath.Join(base, "local", appName)
+	}
+	return filepath.Join(base, "github", repo)
+}
+
 // CredsPath returns the path for a jib credential file under secrets/_jib/<kind>/<name>.
 // Kind groups related credentials (e.g. "cloudflare", "github-app")
 // and name identifies the specific credential within that group.
