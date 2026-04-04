@@ -1,4 +1,4 @@
-package cloudflare
+package cfapi
 
 import "testing"
 

@@ -1,5 +1,8 @@
-// Package cloudflare provides an API client for managing Cloudflare Tunnels and DNS records.
-package cloudflare
+// Package cfapi is an HTTP client for the Cloudflare REST API (tunnels,
+// DNS records, ingress routes). Named cfapi, not cloudflare, to avoid
+// confusion with cmd/jib-cloudflared — which installs the cloudflared
+// daemon container and has nothing to do with the REST API.
+package cfapi
 
 import (
 	"bytes"

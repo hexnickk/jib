@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/hexnickk/jib/internal/cloudflare"
+	"github.com/hexnickk/jib/internal/cfapi"
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
@@ -108,7 +108,7 @@ func runCloudflareAPISetup(apiToken, tunnelName string) error {
 		}
 	}
 
-	client := cloudflare.NewClient(apiToken)
+	client := cfapi.NewClient(apiToken)
 
 	// Verify token and get account ID
 	fmt.Println("\nVerifying API token...")
@@ -162,7 +162,7 @@ func runCloudflareAPISetup(apiToken, tunnelName string) error {
 	}
 
 	// Initialize tunnel with catch-all 404
-	_ = client.PutTunnelIngress(ctx, accountID, tunnel.ID, []cloudflare.IngressRule{
+	_ = client.PutTunnelIngress(ctx, accountID, tunnel.ID, []cfapi.IngressRule{
 		{Service: "http_status:404"},
 	})
 

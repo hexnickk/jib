@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hexnickk/jib/internal/cloudflare"
+	"github.com/hexnickk/jib/internal/cfapi"
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/module"
 )
@@ -56,7 +56,7 @@ func (m *Module) addRoutes(ctx context.Context, cfg *config.Config, domains []st
 		return err
 	}
 
-	client := cloudflare.NewClient(token)
+	client := cfapi.NewClient(token)
 	return client.AddTunnelRoutes(ctx, accountID, tunnelID, domains)
 }
 
@@ -70,7 +70,7 @@ func (m *Module) removeRoutes(ctx context.Context, cfg *config.Config, domains [
 		return err
 	}
 
-	client := cloudflare.NewClient(token)
+	client := cfapi.NewClient(token)
 	return client.RemoveTunnelRoutes(ctx, accountID, tunnelID, domains)
 }
 
