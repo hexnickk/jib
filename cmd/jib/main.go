@@ -51,7 +51,9 @@ Jib lives on the server. You SSH in and run commands, or use
 	// Core commands
 	registerSetupCommands(rootCmd)
 	registerDeployCommands(rootCmd)
-	registerOperateCommands(rootCmd)
+	registerContainerCommands(rootCmd)
+	registerShellCommands(rootCmd)
+	registerSecretsCommands(rootCmd)
 	registerConfigCommands(rootCmd)
 
 	// Module CLI commands
