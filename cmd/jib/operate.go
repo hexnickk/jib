@@ -55,7 +55,6 @@ func registerOperateCommands(rootCmd *cobra.Command) {
 	secretsCmd := &cobra.Command{
 		Use:              "secrets",
 		Short:            "Manage app secrets (bulk file import)",
-		Long:             "Manage app secrets (bulk file import).\n\nFor individual variable management, use 'jib env set <app> KEY=VALUE'",
 		TraverseChildren: true,
 	}
 	secretsSetCmd := &cobra.Command{

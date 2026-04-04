@@ -68,7 +68,7 @@ func connectNATS() (*bus.Bus, error) {
 	logger := log.New(os.Stderr, "", 0)
 	b, err := bus.Connect(bus.Options{URL: bus.DefaultURL}, logger)
 	if err != nil {
-		return nil, fmt.Errorf("cannot connect to NATS — run 'jib init' or check 'systemctl status jib-stack'\n  %w", err)
+		return nil, fmt.Errorf("cannot connect to NATS — run 'jib init' or check 'systemctl status jib-bus'\n  %w", err)
 	}
 	return b, nil
 }

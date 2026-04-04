@@ -454,7 +454,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	ctx := context.Background()
 	root := config.Root()
-	repoDirPath := repoDir(appName, repo)
+	repoDirPath := config.RepoPath(appName, repo)
 
 	// Parse compose files
 	var composeFiles config.StringOrSlice
@@ -811,7 +811,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	stateFile := filepath.Join(config.StateDir(), appName+".json")
 	domainStateFile := filepath.Join(config.StateDir(), appName+".domains.json")
 	secretsDir := filepath.Join(config.SecretsDir(), appName)
-	repoDirPath := repoDir(appName, appCfg.Repo)
+	repoDirPath := config.RepoPath(appName, appCfg.Repo)
 	overrideFile := docker.OverridePath(config.OverrideDir(), appName)
 
 	// If not --force, show what will be removed and ask for confirmation
