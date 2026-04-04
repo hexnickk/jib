@@ -1,4 +1,4 @@
-package github
+package main
 
 import (
 	"context"
@@ -15,15 +15,21 @@ import (
 	"time"
 )
 
-// ManifestResult holds the credentials returned by GitHub after manifest flow.
-type ManifestResult struct {
+// GitHub App manifest flow lives here (not in internal/github) because it's
+// an interactive CLI-only workflow: it spawns a local HTTP server, opens a
+// browser, and waits for a callback. Only `jib github app setup` uses it,
+// so keeping it out of internal/github means ghmod and other library
+// consumers don't transitively pull in net/http, os/exec, and runtime.
+
+// manifestResult holds the credentials returned by GitHub after the manifest flow.
+type manifestResult struct {
 	AppID int64
 	Slug  string
 	PEM   string
 }
 
-// manifest is the JSON body POSTed to GitHub.
-type manifest struct {
+// manifestPayload is the JSON body POSTed to GitHub.
+type manifestPayload struct {
 	Name               string            `json:"name"`
 	URL                string            `json:"url"`
 	HookAttributes     hookAttributes    `json:"hook_attributes"`
@@ -37,9 +43,9 @@ type hookAttributes struct {
 	Active bool `json:"active"`
 }
 
-// RunManifestFlow automates GitHub App creation via the manifest flow.
+// runManifestFlow automates GitHub App creation via the manifest flow.
 // It starts a temporary local server, opens the browser, and waits for the callback.
-func RunManifestFlow(ctx context.Context, providerName string) (*ManifestResult, error) {
+func runManifestFlow(ctx context.Context, providerName string) (*manifestResult, error) {
 	// Pick a port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -57,7 +63,7 @@ func RunManifestFlow(ctx context.Context, providerName string) (*ManifestResult,
 
 	callbackURL := fmt.Sprintf("http://localhost:%d/callback", port)
 
-	m := manifest{
+	m := manifestPayload{
 		Name:           "jib-deploy-" + providerName,
 		URL:            "https://github.com/hexnickk/jib",
 		HookAttributes: hookAttributes{Active: false},
@@ -154,7 +160,7 @@ func serveManifestForm(w http.ResponseWriter, state, manifestJSON string) {
 </html>`, state, html.EscapeString(manifestJSON))
 }
 
-func exchangeManifestCode(ctx context.Context, code string) (*ManifestResult, error) {
+func exchangeManifestCode(ctx context.Context, code string) (*manifestResult, error) {
 	url := fmt.Sprintf("https://api.github.com/app-manifests/%s/conversions", code)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
@@ -186,7 +192,7 @@ func exchangeManifestCode(ctx context.Context, code string) (*ManifestResult, er
 		return nil, fmt.Errorf("GitHub did not return a private key")
 	}
 
-	return &ManifestResult{
+	return &manifestResult{
 		AppID: result.ID,
 		Slug:  result.Slug,
 		PEM:   result.PEM,
