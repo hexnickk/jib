@@ -50,8 +50,8 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 	previousSHA := appState.PreviousSHA
 	currentSHA := appState.DeployedSHA
 
-	// 3. Acquire flock.
-	lock, err := acquireLockForRollback(opts.App, e.LockDir)
+	// 3. Acquire flock (always blocking for rollback).
+	lock, err := state.Acquire(opts.App, e.LockDir, true, lockTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("acquiring lock: %w", err)
 	}
@@ -141,16 +141,11 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 	}, nil
 }
 
-// firstService returns the first service name from the config, or an empty string.
+// firstService returns the first configured service name, or "app" as a default.
 // Used to construct the rollback image tag to check.
 func firstService(appCfg config.App) string {
 	if len(appCfg.Services) > 0 {
 		return appCfg.Services[0]
 	}
 	return "app"
-}
-
-// acquireLockForRollback acquires a blocking lock for rollback (always blocking).
-func acquireLockForRollback(app, lockDir string) (*state.Lock, error) {
-	return state.Acquire(app, lockDir, true, lockTimeout)
 }

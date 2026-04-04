@@ -8,7 +8,6 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
 	"github.com/hexnickk/jib/internal/history"
-	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
 )
@@ -21,7 +20,6 @@ type Engine struct {
 	Config      *config.Config
 	StateStore  *state.Store
 	Secrets     *secrets.Manager
-	Proxy       proxy.Proxy
 	History     *history.Logger
 	LockDir     string
 	RepoBaseDir string // e.g. /opt/jib/repos
