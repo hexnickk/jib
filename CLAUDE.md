@@ -32,6 +32,8 @@ Services:
 - `cmd/jib/` — CLI (deploy, rollback, resume, setup, config management)
 - `cmd/jib-deployer/` — handles deploys, rollbacks, resume via NATS
 - `cmd/jib-watcher/` — polls git repos, triggers deploys via NATS
+- `cmd/jib-bus/` — systemd unit installer for the NATS message bus (docker compose oneshot)
+- `cmd/jib-cloudflared/` — systemd unit installer for the cloudflared tunnel (docker compose oneshot, opt-in)
 
 ## Build & Test
 
@@ -55,4 +57,8 @@ Pre-commit hooks run `gofmt` and `golangci-lint`. Fix issues before committing.
 - State: `/opt/jib/state/<app>.json`
 - NATS for inter-service messaging
 - Modules in `internal/module/` register at startup via `module.Register()`
+
+# Important
+
 - Files should target 100 LoC, anything above 200 LoC needs an explicit approval
+- Do not add Claude as a co-author to commits

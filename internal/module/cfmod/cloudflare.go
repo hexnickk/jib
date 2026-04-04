@@ -1,6 +1,7 @@
-// Package cfmod provides the Cloudflare tunnel module for jib.
-// It contributes the cloudflared container to the stack, and manages
-// tunnel route creation/removal during app add/remove.
+// Package cfmod provides the Cloudflare tunnel SetupHook for jib.
+// It manages tunnel route creation/removal during app add/remove.
+// The cloudflared container itself is managed by the separate jib-cloudflared
+// binary and its systemd unit, installed by `jib cloudflare setup`.
 package cfmod
 
 import (
@@ -14,31 +15,12 @@ import (
 	"github.com/hexnickk/jib/internal/module"
 )
 
-// Module implements ComposeProvider and SetupHook for Cloudflare tunnels.
+// Module implements SetupHook for Cloudflare tunnel route management.
 type Module struct{}
 
-var (
-	_ module.ComposeProvider = (*Module)(nil)
-	_ module.SetupHook       = (*Module)(nil)
-)
+var _ module.SetupHook = (*Module)(nil)
 
 func (m *Module) Name() string { return "cloudflare" }
-
-func (m *Module) ComposeServices(cfg *config.Config, tokens map[string]string) string {
-	if cfg.Tunnel == nil || cfg.Tunnel.Provider != "cloudflare" {
-		return ""
-	}
-
-	return fmt.Sprintf(`
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    restart: unless-stopped
-    network_mode: host
-    entrypoint: ["/bin/sh", "-c", "exec cloudflared tunnel --no-autoupdate run --token $(cat /run/secrets/tunnel-token)"]
-    volumes:
-      - %s:/run/secrets/tunnel-token:ro
-`, config.CredsPath("cloudflare", "tunnel-token"))
-}
 
 func (m *Module) OnAppAdd(ctx context.Context, app string, appCfg config.App, cfg *config.Config) error {
 	domains := tunnelDomains(appCfg)

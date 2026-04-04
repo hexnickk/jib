@@ -1,10 +1,9 @@
 [Unit]
 Description=Jib Deployer
-After=docker.service
-Wants=docker.service
+After=jib-bus.service
+Requires=jib-bus.service
 
 [Service]
-ExecStartPre=/bin/sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
 ExecStart=/usr/local/bin/jib-deployer run
 Restart=always
 RestartSec=5

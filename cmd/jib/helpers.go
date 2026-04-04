@@ -7,7 +7,6 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/docker"
-	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
@@ -37,10 +36,6 @@ func newStateStore() *state.Store {
 
 func newSecretsManager() *secrets.Manager {
 	return secrets.NewManager(config.SecretsDir())
-}
-
-func newHistoryLogger() *history.Logger {
-	return history.NewLogger(config.LogDir())
 }
 
 func newCompose(cfg *config.Config, appName string) (*docker.Compose, error) {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/git"
-	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/state"
 )
@@ -23,8 +22,6 @@ type RollbackOptions struct {
 // It checks out the previous SHA, reuses the rollback-tagged image if available,
 // otherwise rebuilds, brings containers up, and runs health checks.
 func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployResult, error) {
-	rollbackStart := time.Now()
-
 	// Validate app exists in config.
 	appCfg, ok := e.Config.Apps[opts.App]
 	if !ok {
@@ -126,9 +123,6 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 	if err := e.StateStore.Save(opts.App, appState); err != nil {
 		return nil, fmt.Errorf("saving state: %w", err)
 	}
-
-	// 10. Log event to history.
-	e.logHistory(opts.App, history.EventRollback, previousSHA, currentSHA, "manual", opts.User, rollbackStatus, rollbackError, rollbackStart)
 
 	return &DeployResult{
 		App:         opts.App,

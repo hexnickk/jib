@@ -3,7 +3,7 @@ LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 BINARY := jib
 BUILD_DIR := bin
 
-.PHONY: bootstrap build build-deployer build-watcher build-bus build-all install install-all clean version test lint fmt check setup-hooks
+.PHONY: bootstrap build build-deployer build-watcher build-bus build-cloudflared build-all install install-all clean version test lint fmt check setup-hooks
 
 bootstrap:
 	go install golang.org/x/tools/gopls@latest
@@ -24,7 +24,11 @@ build-bus:
 	@mkdir -p $(BUILD_DIR)
 	go build $(LDFLAGS) -o $(BUILD_DIR)/jib-bus ./cmd/jib-bus
 
-build-all: build build-deployer build-watcher build-bus
+build-cloudflared:
+	@mkdir -p $(BUILD_DIR)
+	go build $(LDFLAGS) -o $(BUILD_DIR)/jib-cloudflared ./cmd/jib-cloudflared
+
+build-all: build build-deployer build-watcher build-bus build-cloudflared
 
 install:
 	go install $(LDFLAGS) ./cmd/jib
@@ -34,6 +38,7 @@ install-all: build-all
 	cp $(BUILD_DIR)/jib-deployer /usr/local/bin/
 	cp $(BUILD_DIR)/jib-watcher /usr/local/bin/
 	cp $(BUILD_DIR)/jib-bus /usr/local/bin/
+	cp $(BUILD_DIR)/jib-cloudflared /usr/local/bin/
 
 clean:
 	rm -rf $(BUILD_DIR)

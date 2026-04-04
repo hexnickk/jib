@@ -2,6 +2,8 @@
 /jib
 /jib-deployer
 /jib-watcher
+/jib-bus
+/jib-cloudflared
 *.exe
 *.exe~
 *.dll

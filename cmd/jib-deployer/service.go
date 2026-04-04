@@ -15,7 +15,6 @@ import (
 
 	"github.com/hexnickk/jib/internal/bus"
 	"github.com/hexnickk/jib/internal/config"
-	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
 )
@@ -88,7 +87,6 @@ type service struct {
 	cfg        *config.Config
 	stateStore *state.Store
 	secrets    *secrets.Manager
-	historyLog *history.Logger
 }
 
 func (s *service) rebuild(cfg *config.Config) {
@@ -97,7 +95,6 @@ func (s *service) rebuild(cfg *config.Config) {
 	s.cfg = cfg
 	s.stateStore = state.NewStore(config.StateDir())
 	s.secrets = secrets.NewManager(config.SecretsDir())
-	s.historyLog = history.NewLogger(config.LogDir())
 }
 
 func (s *service) newEngine() *Engine {
@@ -107,7 +104,6 @@ func (s *service) newEngine() *Engine {
 		Config:      s.cfg,
 		StateStore:  s.stateStore,
 		Secrets:     s.secrets,
-		History:     s.historyLog,
 		Docker:      realDocker{},
 		LockDir:     config.LockDir(),
 		RepoBaseDir: config.ReposDir(),

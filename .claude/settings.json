@@ -1,5 +1,6 @@
 {
   "enabledPlugins": {
     "gopls-lsp@claude-plugins-official": true
-  }
+  },
+  "includeCoAuthoredBy": false
 }

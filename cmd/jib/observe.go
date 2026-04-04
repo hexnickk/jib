@@ -9,11 +9,9 @@ import (
 	"sort"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/hexnickk/jib/internal/config"
 	ghPkg "github.com/hexnickk/jib/internal/github"
-	"github.com/hexnickk/jib/internal/stack"
 	"github.com/spf13/cobra"
 )
 
@@ -38,17 +36,6 @@ func registerObserveCommands(rootCmd *cobra.Command) {
 	logsCmd.Flags().BoolP("follow", "f", false, "Follow log output")
 	logsCmd.Flags().Int("tail", 100, "Number of lines to show from the end")
 	rootCmd.AddCommand(logsCmd)
-
-	// jib history <app>
-	historyCmd := &cobra.Command{
-		Use:   "history <app>",
-		Short: "Deploy/rollback timeline",
-		Args:  exactArgs(1),
-		RunE:  runHistory,
-	}
-	historyCmd.Flags().Int("limit", 20, "Maximum number of entries to show")
-	historyCmd.Flags().Bool("json", false, "Output raw JSON lines")
-	rootCmd.AddCommand(historyCmd)
 
 	// jib env <app>
 	envCmd := &cobra.Command{
@@ -182,15 +169,21 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	printInfraStatus(cfg)
 
-	// Service stack status.
+	// Systemd-managed jib services. jib-cloudflared is only listed if a
+	// Cloudflare tunnel is configured — otherwise it was never installed
+	// and showing it as "inactive" is misleading.
 	fmt.Println()
-	stackStatus, err := stack.Status(context.Background())
-	if err == nil && stackStatus != "" {
-		fmt.Println("Services:")
-		// Indent each line.
-		for _, line := range strings.Split(stackStatus, "\n") {
-			fmt.Printf("  %s\n", line)
+	fmt.Println("Services:")
+	services := []string{"jib-bus", "jib-deployer", "jib-watcher"}
+	if cfg.Tunnel != nil && cfg.Tunnel.Provider == "cloudflare" {
+		services = append(services, "jib-cloudflared")
+	}
+	for _, name := range services {
+		state := "inactive"
+		if exec.Command("systemctl", "is-active", "--quiet", name).Run() == nil { //nolint:gosec // trusted CLI subprocess
+			state = "active"
 		}
+		fmt.Printf("  %-16s  %s\n", name, state)
 	}
 
 	return nil
@@ -449,56 +442,6 @@ func runEnvDel(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Deleted %s\n", key)
 	}
 	fmt.Println("Restart or redeploy to apply changes.")
-	return nil
-}
-
-func runHistory(cmd *cobra.Command, args []string) error {
-	appName := args[0]
-	limit, _ := cmd.Flags().GetInt("limit")
-	jsonOutput, _ := cmd.Flags().GetBool("json")
-
-	logger := newHistoryLogger()
-	events, err := logger.Read(appName, limit)
-	if err != nil {
-		return fmt.Errorf("reading history for %s: %w", appName, err)
-	}
-
-	if len(events) == 0 {
-		fmt.Printf("No history for %s.\n", appName)
-		return nil
-	}
-
-	if jsonOutput {
-		for _, ev := range events {
-			data, err := json.Marshal(ev)
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(data))
-		}
-		return nil
-	}
-
-	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "TIME\tTYPE\tSHA\tSTATUS\tUSER\tDURATION")
-	for _, ev := range events {
-		sha := ev.SHA
-		if len(sha) > 7 {
-			sha = sha[:7]
-		}
-		ts := ev.Timestamp.Local().Format(time.DateTime)
-		dur := fmt.Sprintf("%dms", ev.DurationMs)
-		if ev.DurationMs >= 1000 {
-			dur = fmt.Sprintf("%.1fs", float64(ev.DurationMs)/1000)
-		}
-		status := ev.Status
-		if ev.Error != "" {
-			status = status + " (" + ev.Error + ")"
-		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			ts, ev.Type, sha, status, ev.User, dur)
-	}
-	_ = w.Flush()
 	return nil
 }
 

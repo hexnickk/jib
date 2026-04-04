@@ -58,7 +58,6 @@ ssh user@server jib <command> [args] [flags]
 | `jib logs <app> [service] [--tail N] [-f]` | Container logs (default tail 100) |
 | `jib metrics [app] [--watch]` | Live CPU/memory/network stats (`--watch` requires TTY) |
 | `jib env <app>` | Show env vars (secrets redacted) |
-| `jib history <app> [--json] [--limit N]` | Deploy timeline (not yet implemented) |
 
 ### Running Commands in Containers
 
@@ -292,7 +291,7 @@ The app started but the health endpoint isn't responding. Check:
 The deploy is recorded as a failure. If the app crashes on startup, the container will be in a restart loop (not running). If the app starts but returns unhealthy responses, containers stay running with bad code. Either way: fix the issue and redeploy, or `jib rollback`.
 
 ### "No previous deploy found" on rollback
-There's only one deploy in history. Rollback requires at least two deploys.
+Rollback requires at least two deploys — the state file records the previous SHA.
 
 ### SSL certificate missing
 ```bash
@@ -339,7 +338,6 @@ jib exec <app> <service> -- sh
 
 - **`jib remove`** is a stub — it prints what it would do but doesn't execute. To remove an app manually: `jib down <app>`, delete from config, remove `/opt/jib/repos/<app>/`, `/opt/jib/state/<app>.json`, `/opt/jib/secrets/<app>/`.
 - **`jib init`** is a stub — prints the onboarding steps but doesn't execute them.
-- **`jib history`** is not yet implemented.
 - **Blue-green strategy** is defined in config but not implemented in the deploy engine.
 - **`jib config set`** corrupts booleans and can't set nested maps/lists. Edit the YAML directly.
 - **Exit codes** — some commands return exit code 0 even on failure. Don't rely on exit codes for scripting; parse the output instead.

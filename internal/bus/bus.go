@@ -17,9 +17,7 @@ type Bus struct {
 
 // Options configures the NATS connection.
 type Options struct {
-	URL      string // e.g. "nats://localhost:4222"
-	User     string // NATS user, empty = no auth
-	Password string // NATS password
+	URL string // e.g. "nats://localhost:4222"
 }
 
 // DefaultURL is the default NATS server address.
@@ -31,9 +29,9 @@ func Connect(opts Options, logger *log.Logger) (*Bus, error) {
 		opts.URL = DefaultURL
 	}
 
-	natsOpts := []nats.Option{
+	nc, err := nats.Connect(opts.URL,
 		nats.Name("jib"),
-		nats.ReconnectWait(2 * time.Second),
+		nats.ReconnectWait(2*time.Second),
 		nats.MaxReconnects(-1), // reconnect forever
 		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
 			if err != nil {
@@ -43,13 +41,7 @@ func Connect(opts Options, logger *log.Logger) (*Bus, error) {
 		nats.ReconnectHandler(func(_ *nats.Conn) {
 			logger.Println("bus: reconnected")
 		}),
-	}
-
-	if opts.User != "" {
-		natsOpts = append(natsOpts, nats.UserInfo(opts.User, opts.Password))
-	}
-
-	nc, err := nats.Connect(opts.URL, natsOpts...)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to NATS at %s: %w", opts.URL, err)
 	}
@@ -111,36 +103,6 @@ func (b *Bus) Subscribe(subject string, handler Handler) (*nats.Subscription, er
 // ReplyHandler is a function that processes a message and returns a reply.
 type ReplyHandler func(subject string, data []byte) (interface{}, error)
 
-// SubscribeReply registers a handler for request-reply patterns.
-func (b *Bus) SubscribeReply(subject string, handler ReplyHandler) (*nats.Subscription, error) {
-	return b.conn.Subscribe(subject, func(msg *nats.Msg) {
-		reply, err := handler(msg.Subject, msg.Data)
-		if err != nil {
-			b.logger.Printf("bus: reply handler error on %s: %v", msg.Subject, err)
-			reply = CommandAck{Accepted: false, Error: err.Error()}
-		}
-		if msg.Reply != "" {
-			replyData, marshalErr := json.Marshal(reply)
-			if marshalErr != nil {
-				b.logger.Printf("bus: marshal reply error: %v", marshalErr)
-				return
-			}
-			if pubErr := msg.Respond(replyData); pubErr != nil {
-				b.logger.Printf("bus: respond error: %v", pubErr)
-			}
-		}
-	})
-}
-
-// QueueSubscribe registers a handler with a queue group for load-balanced delivery.
-func (b *Bus) QueueSubscribe(subject, queue string, handler Handler) (*nats.Subscription, error) {
-	return b.conn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
-		if err := handler(msg.Subject, msg.Data); err != nil {
-			b.logger.Printf("bus: handler error on %s: %v", msg.Subject, err)
-		}
-	})
-}
-
 // QueueSubscribeReply registers a reply handler with a queue group.
 func (b *Bus) QueueSubscribeReply(subject, queue string, handler ReplyHandler) (*nats.Subscription, error) {
 	return b.conn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
@@ -160,11 +122,4 @@ func (b *Bus) QueueSubscribeReply(subject, queue string, handler ReplyHandler) (
 			}
 		}
 	})
-}
-
-// Decode unmarshals a NATS message payload into the given type.
-func Decode[T any](data []byte) (T, error) {
-	var msg T
-	err := json.Unmarshal(data, &msg)
-	return msg, err
 }

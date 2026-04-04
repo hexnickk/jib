@@ -111,21 +111,6 @@ func (c ResumeCommand) Validate() error {
 	return nil
 }
 
-// ConfigReloadCommand requests the daemon to reload its config.
-type ConfigReloadCommand struct {
-	Message
-}
-
-// Subject returns the NATS subject for this command.
-func (c ConfigReloadCommand) Subject() string {
-	return TopicConfigReload
-}
-
-// Validate checks required fields.
-func (c ConfigReloadCommand) Validate() error {
-	return nil
-}
-
 // --- Command ACK ---
 
 // CommandAck is the immediate reply to a command (accepted or rejected).

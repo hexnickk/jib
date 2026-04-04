@@ -6,15 +6,37 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/hexnickk/jib/internal/cloudflare"
 	"github.com/hexnickk/jib/internal/config"
-	"github.com/hexnickk/jib/internal/stack"
 	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
 )
+
+// ensureCloudflaredRunning installs the jib-cloudflared systemd unit and
+// (re)starts it. Safe to call multiple times — `install` overwrites the
+// compose/unit files, and `restart` picks up fresh tokens or config on
+// re-setup (unlike `enable --now`, which is a no-op when the unit is
+// already running). Call after writing the tunnel token to
+// config.CredsPath("cloudflare", "tunnel-token").
+func ensureCloudflaredRunning() error {
+	binaryPath := "/usr/local/bin/jib-cloudflared"
+	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+		return fmt.Errorf("jib-cloudflared binary not found at %s — run 'make install-all' or reinstall jib", binaryPath)
+	}
+	// install writes the unit + compose, daemon-reloads, and enables the unit.
+	if err := sudoCmd(binaryPath, "install").Run(); err != nil {
+		return fmt.Errorf("jib-cloudflared install: %w", err)
+	}
+	// restart applies any config changes (new token, updated compose) and
+	// starts the unit if it was previously stopped.
+	if err := sudoCmd("systemctl", "restart", "jib-cloudflared").Run(); err != nil {
+		return fmt.Errorf("restarting jib-cloudflared: %w", err)
+	}
+	return nil
+}
 
 func registerCloudflareCommands(rootCmd *cobra.Command) {
 	cfCmd := &cobra.Command{
@@ -134,7 +156,7 @@ func runCloudflareAPISetup(apiToken, tunnelName string) error {
 		return err
 	}
 
-	// Save tunnel token for the stack container.
+	// Save tunnel token for the jib-cloudflared container to read.
 	tunnelTokenPath := config.CredsPath("cloudflare", "tunnel-token")
 	if err := os.WriteFile(tunnelTokenPath, []byte(token), 0o600); err != nil {
 		return fmt.Errorf("saving tunnel token: %w", err)
@@ -160,8 +182,11 @@ func runCloudflareAPISetup(apiToken, tunnelName string) error {
 	}
 
 	fmt.Println()
+	fmt.Println("Cloudflare Tunnel configured. Starting cloudflared...")
+	if err := ensureCloudflaredRunning(); err != nil {
+		return err
+	}
 	fmt.Println("Cloudflare Tunnel setup complete.")
-	syncStack()
 	fmt.Println("When you add apps with cloudflare-tunnel ingress, jib will automatically")
 	fmt.Println("create DNS records and tunnel routes.")
 	return nil
@@ -182,7 +207,7 @@ func runCloudflareManualSetup() error {
 		return err
 	}
 
-	// Save tunnel token and start via stack.
+	// Save tunnel token for the jib-cloudflared container to read.
 	tunnelTokenPath := config.CredsPath("cloudflare", "tunnel-token")
 	if err := os.MkdirAll(filepath.Dir(tunnelTokenPath), 0o700); err != nil {
 		return fmt.Errorf("creating secrets dir: %w", err)
@@ -200,8 +225,10 @@ func runCloudflareManualSetup() error {
 		return fmt.Errorf("saving tunnel config: %w", err)
 	}
 
-	fmt.Println("\nCloudflare Tunnel configured.")
-	syncStack()
+	fmt.Println("\nCloudflare Tunnel configured. Starting cloudflared...")
+	if err := ensureCloudflaredRunning(); err != nil {
+		return err
+	}
 	fmt.Println()
 	fmt.Println("Next, go back to the Cloudflare dashboard and:")
 	fmt.Println("  1. Click 'Next'")
@@ -236,12 +263,11 @@ func runCloudflareStatus(cmd *cobra.Command, args []string) error {
 		fmt.Println("  Mode:       manual (dashboard)")
 	}
 
-	// Check container status.
-	out, err := stack.Status(context.Background())
-	if err == nil && strings.Contains(out, "cloudflared") {
-		fmt.Println("  Container:  running")
+	// Check jib-cloudflared service status.
+	if exec.Command("systemctl", "is-active", "--quiet", "jib-cloudflared").Run() == nil { //nolint:gosec // trusted CLI subprocess
+		fmt.Println("  Service:    active (jib-cloudflared.service)")
 	} else {
-		fmt.Println("  Container:  not running")
+		fmt.Println("  Service:    inactive (run 'jib cloudflare setup' or 'sudo systemctl start jib-cloudflared')")
 	}
 
 	return nil

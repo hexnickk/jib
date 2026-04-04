@@ -1,12 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"os"
 	"time"
 
 	"github.com/hexnickk/jib/internal/config"
-	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
 )
@@ -19,7 +16,6 @@ type Engine struct {
 	Config      *config.Config
 	StateStore  *state.Store
 	Secrets     *secrets.Manager
-	History     *history.Logger
 	Docker      DockerClient
 	LockDir     string
 	RepoBaseDir string // e.g. /opt/jib/repos
@@ -56,26 +52,6 @@ func (e *Engine) newCompose(app string, appCfg config.App, repoDir string) Compo
 	}
 
 	return e.Docker.NewCompose(app, repoDir, files, envFile, e.Docker.OverridePath(overrideDir, app))
-}
-
-// logHistory appends an event to the history log, logging errors to stderr.
-func (e *Engine) logHistory(app, eventType, sha, previousSHA, trigger, user, status, errMsg string, start time.Time) {
-	if e.History == nil {
-		return
-	}
-	if err := e.History.Append(app, history.Event{
-		Timestamp:   time.Now(),
-		Type:        eventType,
-		SHA:         sha,
-		PreviousSHA: previousSHA,
-		Trigger:     trigger,
-		User:        user,
-		Status:      status,
-		Error:       errMsg,
-		DurationMs:  time.Since(start).Milliseconds(),
-	}); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: history: %v\n", err)
-	}
 }
 
 // parseWarmup parses a duration string (e.g. "10s"), returning 0 on error.

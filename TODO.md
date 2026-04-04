@@ -1,6 +1,7 @@
 # TODOs
 
 - [ ] Introduce jib-stack.service as a systemd oneshot unit that manages the Docker Compose stack (jib-bus + module containers). Wire the native services (jib-deployer, jib-watcher) to depend on it explicitly, replacing the implicit nc -z 4222 busy-wait.
+- [ ] Bring back history
 
 ## Statuses
 

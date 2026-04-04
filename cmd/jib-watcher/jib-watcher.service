@@ -1,10 +1,10 @@
 [Unit]
 Description=Jib Git Watcher
-After=jib-deployer.service
+After=jib-bus.service jib-deployer.service
+Requires=jib-bus.service
 Wants=jib-deployer.service
 
 [Service]
-ExecStartPre=/bin/sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
 ExecStart=/usr/local/bin/jib-watcher run
 Restart=always
 RestartSec=5

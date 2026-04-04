@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,7 +17,6 @@ import (
 	gitPkg "github.com/hexnickk/jib/internal/git"
 	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/module"
-	"github.com/hexnickk/jib/internal/stack"
 	"github.com/hexnickk/jib/internal/tui"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -125,10 +123,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// --- Ensure: systemd units installed and running ---
 	ensureServices()
 
-	// --- Ensure: service stack (NATS + configured services) ---
-	fmt.Println("\nEnsuring service stack...")
-	syncStack()
-
 	fmt.Println()
 	fmt.Println("Jib initialized! Next:")
 	fmt.Println("  jib add <app> --repo org/repo --domain example.com")
@@ -222,7 +216,7 @@ func ensureDirs(root string) {
 	fmt.Println("\nEnsuring directory structure...")
 	dirs := []string{
 		"state", "secrets", "repos", "overrides",
-		"nginx", "locks", "deploy-keys", "logs", "src",
+		"nginx", "locks", "deploy-keys", "src",
 	}
 	for _, dir := range dirs {
 		dirPath := filepath.Join(root, dir)
@@ -303,8 +297,9 @@ func ensureServices() {
 	// Systemd-managed services. Each binary owns its full install lifecycle
 	// via its `install` subcommand (write unit, daemon-reload, enable). This
 	// list is the only place that knows which services exist — drop a name
-	// to eject a service.
-	serviceNames := []string{"jib-deployer", "jib-watcher"}
+	// to eject a service. jib-cloudflared is intentionally NOT in this list:
+	// it is opt-in and installed by `jib cloudflare setup`.
+	serviceNames := []string{"jib-bus", "jib-deployer", "jib-watcher"}
 
 	for _, name := range serviceNames {
 		binaryPath := filepath.Join("/usr/local/bin", name)
@@ -340,59 +335,6 @@ func ensureServices() {
 				fmt.Printf("  %s: started\n", name)
 			}
 		}
-	}
-}
-
-// syncStack regenerates the service stack compose file from the current config
-// and converges running containers. Creates tokens on first run.
-// Call after any config change that affects services (cloudflare setup,
-// jib init, etc.).
-func syncStack() {
-	cfg, err := loadConfig()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "  stack: warning: loading config: %v\n", err)
-		return
-	}
-
-	tokensPath := filepath.Join(config.StackDir(), "tokens.json")
-	var tokens *stack.Tokens
-	if data, readErr := os.ReadFile(tokensPath); readErr == nil { //nolint:gosec // trusted path
-		var t stack.Tokens
-		if json.Unmarshal(data, &t) == nil && t.Daemon != "" {
-			tokens = &t
-		}
-	}
-
-	// Generate new tokens if needed (first run).
-	if tokens == nil {
-		t, genErr := stack.GenerateTokens()
-		if genErr != nil {
-			fmt.Fprintf(os.Stderr, "  stack: warning: generating NATS tokens: %v\n", genErr)
-			return
-		}
-		tokens = t
-		if tokenData, marshalErr := json.Marshal(tokens); marshalErr == nil {
-			_ = os.WriteFile(tokensPath, tokenData, 0o600)
-		}
-	}
-
-	// Collect module-contributed compose services.
-	tokenMap := tokens.TokenMap()
-	var moduleServices []string
-	for _, cp := range module.ComposeProviders() {
-		if svc := cp.ComposeServices(cfg, tokenMap); svc != "" {
-			moduleServices = append(moduleServices, svc)
-		}
-	}
-
-	if err := stack.EnsureStack(cfg, tokens, moduleServices); err != nil {
-		fmt.Fprintf(os.Stderr, "  stack: warning: writing stack files: %v\n", err)
-		return
-	}
-
-	ctx := context.Background()
-	if err := stack.Up(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "  stack: warning: converging: %v\n", err)
 	}
 }
 
@@ -869,7 +811,6 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	secretsDir := filepath.Join(config.SecretsDir(), appName)
 	repoDirPath := repoDir(appName, appCfg.Repo)
 	overrideFile := docker.OverridePath(config.OverrideDir(), appName)
-	historyFile := filepath.Join(config.LogDir(), appName+".jsonl")
 
 	// If not --force, show what will be removed and ask for confirmation
 	if !force {
@@ -886,7 +827,6 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  - Remove secrets: %s\n", secretsDir)
 		fmt.Printf("  - Remove repo: %s\n", repoDirPath)
 		fmt.Printf("  - Remove override: %s\n", overrideFile)
-		fmt.Printf("  - Remove history: %s\n", historyFile)
 		fmt.Println("  - Remove app from config.yml")
 		fmt.Println()
 		ok, err := tui.PromptConfirm("Continue?", false)
@@ -968,13 +908,6 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "warning: removing override file: %v\n", err)
 	} else if err == nil {
 		removed = append(removed, "override")
-	}
-
-	// 7b. Remove history log
-	if err := os.Remove(historyFile); err != nil && !os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "warning: removing history file: %v\n", err)
-	} else if err == nil {
-		removed = append(removed, "history")
 	}
 
 	// 8. Remove app from config.yml

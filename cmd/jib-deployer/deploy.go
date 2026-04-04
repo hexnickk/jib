@@ -12,7 +12,6 @@ import (
 	"github.com/hexnickk/jib/internal/config"
 	"github.com/hexnickk/jib/internal/git"
 	ghPkg "github.com/hexnickk/jib/internal/github"
-	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/paths"
 	"github.com/hexnickk/jib/internal/state"
 )
@@ -32,7 +31,6 @@ type DeployOptions struct {
 
 // Deploy implements the full restart strategy deploy flow (steps 1-17 from the plan).
 func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult, error) {
-	deployStart := time.Now()
 
 	// 1. Validate app exists in config.
 	appCfg, ok := e.Config.Apps[opts.App]
@@ -201,8 +199,6 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 				_ = git.Checkout(ctx, repoDir, previousSHA)
 			}
 			hookErr := fmt.Sprintf("pre_deploy hook %q failed: %v", hook.Service, err)
-
-			e.logHistory(opts.App, history.EventDeploy, targetRef, previousSHA, opts.Trigger, opts.User, "failure", hookErr, deployStart)
 			return &DeployResult{
 				App:         opts.App,
 				PreviousSHA: previousSHA,
@@ -279,9 +275,6 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	if err := e.Docker.PruneImages(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: pruning images: %v\n", err)
 	}
-
-	// 18. Log event to history.
-	e.logHistory(opts.App, history.EventDeploy, deployedSHA, previousSHA, opts.Trigger, opts.User, deployStatus, deployError, deployStart)
 
 	return &DeployResult{
 		App:         opts.App,
