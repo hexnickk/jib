@@ -70,51 +70,6 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	})
 }
 
-// systemd unit templates for jib services.
-var serviceUnits = map[string]string{
-	"jib-deployer": `[Unit]
-Description=Jib Deployer
-After=docker.service
-Wants=docker.service
-
-[Service]
-ExecStartPre=/bin/sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
-ExecStart=/usr/local/bin/jib-deployer
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-`,
-	"jib-watcher": `[Unit]
-Description=Jib Git Watcher
-After=jib-deployer.service
-Wants=jib-deployer.service
-
-[Service]
-ExecStartPre=/bin/sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
-ExecStart=/usr/local/bin/jib-watcher
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-`,
-	"jib-heartbeat": `[Unit]
-Description=Jib Heartbeat
-After=docker.service
-
-[Service]
-ExecStartPre=/bin/sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
-ExecStart=/usr/local/bin/jib-heartbeat
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-`,
-}
-
 func runInit(cmd *cobra.Command, args []string) error {
 	skipInstall, _ := cmd.Flags().GetBool("skip-install")
 
@@ -344,17 +299,45 @@ func ensureServices() {
 		fmt.Println("  Old jib.service removed.")
 	}
 
-	// Write unit files for services whose binaries exist.
-	for name, unit := range serviceUnits {
+	// Systemd-managed services. Services that implement the install subcommand
+	// protocol own their full install lifecycle (write unit, daemon-reload,
+	// enable); legacy services still emit their unit via --print-unit and we
+	// write it ourselves. This list is the only place that knows which is
+	// which — drop a service from the relevant slice to eject it.
+	selfInstallServices := []string{"jib-deployer"}
+	legacyServices := []string{"jib-watcher", "jib-heartbeat"}
+	serviceNames := append(append([]string{}, selfInstallServices...), legacyServices...)
+
+	// Self-installing services: delegate entirely to the binary.
+	for _, name := range selfInstallServices {
+		binaryPath := filepath.Join("/usr/local/bin", name)
+		if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "  warning: %s not found, skipping\n", binaryPath)
+			continue
+		}
+		if err := sudoCmd(binaryPath, "install").Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: %s install: %v\n", name, err)
+			continue
+		}
+	}
+
+	// Legacy services: harvest unit file via --print-unit and write it.
+	for _, name := range legacyServices {
 		binaryPath := filepath.Join("/usr/local/bin", name)
 		if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "  warning: %s not found, skipping\n", binaryPath)
 			continue
 		}
 
+		unit, err := exec.Command(binaryPath, "--print-unit").Output() //nolint:gosec // trusted binary path
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  warning: %s --print-unit: %v\n", name, err)
+			continue
+		}
+
 		unitPath := fmt.Sprintf("/etc/systemd/system/%s.service", name)
 		writeCmd := sudoCmd("tee", unitPath)
-		writeCmd.Stdin = strings.NewReader(unit)
+		writeCmd.Stdin = strings.NewReader(string(unit))
 		writeCmd.Stdout = nil
 		if err := writeCmd.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "  warning: could not write %s: %v\n", unitPath, err)
@@ -366,7 +349,7 @@ func ensureServices() {
 		fmt.Fprintf(os.Stderr, "  warning: systemctl daemon-reload: %v\n", err)
 	}
 
-	for name := range serviceUnits {
+	for _, name := range serviceNames {
 		binaryPath := filepath.Join("/usr/local/bin", name)
 		if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
 			continue
