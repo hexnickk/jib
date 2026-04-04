@@ -296,6 +296,7 @@ func ensureServices() {
 		_ = sudoCmd("systemctl", "stop", "jib").Run()
 		_ = sudoCmd("systemctl", "disable", "jib").Run()
 		_ = sudoCmd("rm", "-f", oldUnit).Run()
+		_ = sudoCmd("systemctl", "daemon-reload").Run()
 		fmt.Println("  Old jib.service removed.")
 	}
 
@@ -315,10 +316,6 @@ func ensureServices() {
 			fmt.Fprintf(os.Stderr, "  warning: %s install: %v\n", name, err)
 			continue
 		}
-	}
-
-	if err := sudoCmd("systemctl", "daemon-reload").Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "  warning: systemctl daemon-reload: %v\n", err)
 	}
 
 	for _, name := range serviceNames {
