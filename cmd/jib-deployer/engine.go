@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/hexnickk/jib/internal/config"
-	"github.com/hexnickk/jib/internal/docker"
 	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
@@ -21,6 +20,7 @@ type Engine struct {
 	StateStore  *state.Store
 	Secrets     *secrets.Manager
 	History     *history.Logger
+	Docker      DockerClient
 	LockDir     string
 	RepoBaseDir string // e.g. /opt/jib/repos
 	OverrideDir string // e.g. /opt/jib/overrides
@@ -36,8 +36,10 @@ type DeployResult struct {
 	Error       string
 }
 
-// newCompose creates a docker.Compose configured for the given app.
-func (e *Engine) newCompose(app string, appCfg config.App, repoDir string) *docker.Compose {
+// newCompose creates a Compose configured for the given app. Resolves
+// defaults (compose files, env file, override dir) and delegates the actual
+// construction to the DockerClient so tests can substitute a fake.
+func (e *Engine) newCompose(app string, appCfg config.App, repoDir string) Compose {
 	files := []string(appCfg.Compose)
 	if len(files) == 0 {
 		files = []string{"docker-compose.yml"}
@@ -53,13 +55,7 @@ func (e *Engine) newCompose(app string, appCfg config.App, repoDir string) *dock
 		overrideDir = config.OverrideDir()
 	}
 
-	return &docker.Compose{
-		App:      app,
-		Dir:      repoDir,
-		Files:    files,
-		EnvFile:  envFile,
-		Override: docker.OverridePath(overrideDir, app),
-	}
+	return e.Docker.NewCompose(app, repoDir, files, envFile, e.Docker.OverridePath(overrideDir, app))
 }
 
 // logHistory appends an event to the history log, logging errors to stderr.

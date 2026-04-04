@@ -353,3 +353,256 @@ func TestRollbackNoPreviousDeploy(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err.Error())
 	}
 }
+
+// initTwoCommitRepo creates a repo with two commits at the given path and
+// returns (shaA, shaB) where shaA is the first commit and shaB the second.
+func initTwoCommitRepo(t *testing.T, tmpDir, repoDir string) (string, string) {
+	t.Helper()
+	initTestRepo2(t, tmpDir, repoDir)
+
+	shaA, err := git.CurrentSHA(context.Background(), repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Second commit.
+	if err := os.WriteFile(filepath.Join(repoDir, "hello.txt"), []byte("v2"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run(t, repoDir, "git", "add", ".")
+	run(t, repoDir, "git", "commit", "-m", "v2")
+	run(t, repoDir, "git", "push", "origin", "HEAD:main")
+
+	shaB, err := git.CurrentSHA(context.Background(), repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return shaA, shaB
+}
+
+// newTestEngine returns an Engine wired with real StateStore/Secrets and the
+// given fake docker, rooted under tmpDir. The app map contains one entry
+// (appName) with a single "web" service — sufficient for Deploy/Rollback
+// pipeline tests.
+func newTestEngine(tmpDir, appName string, fake *fakeDocker) *Engine {
+	return &Engine{
+		Config: &config.Config{
+			Apps: map[string]config.App{
+				appName: {
+					Repo:     "local",
+					Branch:   "main",
+					Services: []string{"web"},
+				},
+			},
+		},
+		StateStore:  state.NewStore(filepath.Join(tmpDir, "state")),
+		Secrets:     secrets.NewManager(filepath.Join(tmpDir, "secrets")),
+		Docker:      fake,
+		LockDir:     filepath.Join(tmpDir, "locks"),
+		RepoBaseDir: filepath.Join(tmpDir, "repos"),
+		OverrideDir: filepath.Join(tmpDir, "overrides"),
+	}
+}
+
+// seedState writes an initial AppState to the store with the given SHAs.
+func seedState(t *testing.T, eng *Engine, appName, deployedSHA, previousSHA string) {
+	t.Helper()
+	s, err := eng.StateStore.Load(appName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.DeployedSHA = deployedSHA
+	s.PreviousSHA = previousSHA
+	if err := eng.StateStore.Save(appName, s); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRollbackHappyPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	appName := "testapp"
+	repoDir := paths.RepoPath(filepath.Join(tmpDir, "repos"), appName, "local")
+	shaA, shaB := initTwoCommitRepo(t, tmpDir, repoDir)
+
+	fake := newFakeDocker() // rollback image present, all healthy
+	eng := newTestEngine(tmpDir, appName, fake)
+	seedState(t, eng, appName, shaB, shaA)
+
+	result, err := eng.Rollback(context.Background(), RollbackOptions{App: appName, User: "test"})
+	if err != nil {
+		t.Fatalf("rollback failed: %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
+
+	// State must be swapped: deployed <- previous, previous <- old deployed.
+	after, err := eng.StateStore.Load(appName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.DeployedSHA != shaA {
+		t.Errorf("DeployedSHA: want %s, got %s", shaA, after.DeployedSHA)
+	}
+	if after.PreviousSHA != shaB {
+		t.Errorf("PreviousSHA: want %s, got %s", shaB, after.PreviousSHA)
+	}
+	if after.LastDeployStatus != "success" {
+		t.Errorf("LastDeployStatus: want success, got %s", after.LastDeployStatus)
+	}
+	if after.ConsecutiveFailures != 0 {
+		t.Errorf("ConsecutiveFailures: want 0, got %d", after.ConsecutiveFailures)
+	}
+
+	// Repo HEAD must be at previous SHA.
+	head, err := git.CurrentSHA(context.Background(), repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if head != shaA {
+		t.Errorf("repo HEAD: want %s, got %s", shaA, head)
+	}
+
+	// Rollback image present → Build must NOT have been called.
+	if fake.compose == nil {
+		t.Fatal("expected newCompose to be called")
+	}
+	if fake.compose.buildCalls != 0 {
+		t.Errorf("expected 0 build calls (rollback image present), got %d", fake.compose.buildCalls)
+	}
+	if fake.compose.upCalls != 1 {
+		t.Errorf("expected 1 up call, got %d", fake.compose.upCalls)
+	}
+}
+
+func TestRollbackRebuildWhenImageMissing(t *testing.T) {
+	tmpDir := t.TempDir()
+	appName := "testapp"
+	repoDir := paths.RepoPath(filepath.Join(tmpDir, "repos"), appName, "local")
+	shaA, shaB := initTwoCommitRepo(t, tmpDir, repoDir)
+
+	fake := newFakeDocker()
+	fake.imageExistsResult = false // no rollback image → rebuild required
+
+	eng := newTestEngine(tmpDir, appName, fake)
+	seedState(t, eng, appName, shaB, shaA)
+
+	result, err := eng.Rollback(context.Background(), RollbackOptions{App: appName, User: "test"})
+	if err != nil {
+		t.Fatalf("rollback failed: %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
+
+	if fake.compose == nil || fake.compose.buildCalls != 1 {
+		t.Errorf("expected 1 build call (rollback image missing), got %+v", fake.compose)
+	}
+	if fake.compose.upCalls != 1 {
+		t.Errorf("expected 1 up call, got %d", fake.compose.upCalls)
+	}
+}
+
+func TestRollbackHealthCheckFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+	appName := "testapp"
+	repoDir := paths.RepoPath(filepath.Join(tmpDir, "repos"), appName, "local")
+	shaA, shaB := initTwoCommitRepo(t, tmpDir, repoDir)
+
+	fake := newFakeDocker()
+	fake.allHealthyResult = false // health check fails
+
+	eng := newTestEngine(tmpDir, appName, fake)
+	// Configure the app to have a health check so CheckHealth is called.
+	app := eng.Config.Apps[appName]
+	app.Health = []config.HealthCheck{{Path: "/health", Port: 8080}}
+	eng.Config.Apps[appName] = app
+	seedState(t, eng, appName, shaB, shaA)
+
+	result, err := eng.Rollback(context.Background(), RollbackOptions{App: appName, User: "test"})
+	if err != nil {
+		t.Fatalf("rollback returned error (expected failure result, not error): %v", err)
+	}
+	if result.Success {
+		t.Fatal("expected rollback to report failure on bad health check")
+	}
+
+	after, err := eng.StateStore.Load(appName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.LastDeployStatus != "failure" {
+		t.Errorf("LastDeployStatus: want failure, got %s", after.LastDeployStatus)
+	}
+	if after.ConsecutiveFailures != 1 {
+		t.Errorf("ConsecutiveFailures: want 1, got %d", after.ConsecutiveFailures)
+	}
+	// State still swaps (rollback completed the action, just reports unhealthy).
+	if after.DeployedSHA != shaA {
+		t.Errorf("DeployedSHA should still swap on health failure; want %s, got %s", shaA, after.DeployedSHA)
+	}
+}
+
+func TestDeployHappyPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	appName := "testapp"
+	repoDir := paths.RepoPath(filepath.Join(tmpDir, "repos"), appName, "local")
+	initTestRepo2(t, tmpDir, repoDir)
+
+	sha, err := git.CurrentSHA(context.Background(), repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fake := newFakeDocker()
+	eng := newTestEngine(tmpDir, appName, fake)
+	// No seeded state → previousSHA is "", differs from current, so the
+	// "already at target" skip condition on deploy.go:105 does not fire.
+
+	result, err := eng.Deploy(context.Background(), DeployOptions{
+		App:     appName,
+		Trigger: "manual",
+		User:    "test",
+	})
+	if err != nil {
+		t.Fatalf("deploy failed: %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
+	if result.DeployedSHA != sha {
+		t.Errorf("DeployedSHA: want %s, got %s", sha, result.DeployedSHA)
+	}
+
+	// Verify the full pipeline ran: build, up, tagRollback, prune.
+	if fake.compose == nil {
+		t.Fatal("expected newCompose to be called")
+	}
+	if fake.compose.buildCalls != 1 {
+		t.Errorf("build calls: want 1, got %d", fake.compose.buildCalls)
+	}
+	if fake.compose.upCalls != 1 {
+		t.Errorf("up calls: want 1, got %d", fake.compose.upCalls)
+	}
+	if fake.compose.tagCalls != 1 {
+		t.Errorf("tag calls: want 1, got %d", fake.compose.tagCalls)
+	}
+	if fake.pruneCalls != 1 {
+		t.Errorf("prune calls: want 1, got %d", fake.pruneCalls)
+	}
+	if fake.generateOverrideCalls != 1 {
+		t.Errorf("generateOverride calls: want 1, got %d", fake.generateOverrideCalls)
+	}
+
+	// State updated with the deployed SHA.
+	after, err := eng.StateStore.Load(appName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.DeployedSHA != sha {
+		t.Errorf("state DeployedSHA: want %s, got %s", sha, after.DeployedSHA)
+	}
+	if after.LastDeployStatus != "success" {
+		t.Errorf("LastDeployStatus: want success, got %s", after.LastDeployStatus)
+	}
+}

@@ -108,6 +108,7 @@ func (s *service) newEngine() *Engine {
 		StateStore:  s.stateStore,
 		Secrets:     s.secrets,
 		History:     s.historyLog,
+		Docker:      realDocker{},
 		LockDir:     config.LockDir(),
 		RepoBaseDir: config.ReposDir(),
 		OverrideDir: config.OverrideDir(),

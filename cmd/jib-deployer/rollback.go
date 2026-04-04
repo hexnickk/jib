@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/hexnickk/jib/internal/config"
-	"github.com/hexnickk/jib/internal/docker"
 	"github.com/hexnickk/jib/internal/git"
 	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/paths"
@@ -73,7 +72,7 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 
 	// 6. Check if rollback image exists; if not, rebuild.
 	rollbackTag := fmt.Sprintf("%s-%s:rollback", compose.ProjectName(), firstService(appCfg))
-	if !docker.ImageExists(ctx, rollbackTag) {
+	if !e.Docker.ImageExists(ctx, rollbackTag) {
 		// No rollback image, must rebuild.
 		if err := compose.Build(ctx, appCfg.BuildArgs); err != nil {
 			return nil, fmt.Errorf("rebuilding for rollback: %w", err)
@@ -90,8 +89,8 @@ func (e *Engine) Rollback(ctx context.Context, opts RollbackOptions) (*DeployRes
 	var healthErr string
 	if len(appCfg.Health) > 0 {
 		warmup := parseWarmup(appCfg.Warmup)
-		results := docker.CheckHealth(ctx, appCfg.Health, warmup)
-		if !docker.AllHealthy(results) {
+		results := e.Docker.CheckHealth(ctx, appCfg.Health, warmup)
+		if !e.Docker.AllHealthy(results) {
 			healthOK = false
 			var msgs []string
 			for _, r := range results {

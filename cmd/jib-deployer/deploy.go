@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/hexnickk/jib/internal/config"
-	"github.com/hexnickk/jib/internal/docker"
 	"github.com/hexnickk/jib/internal/git"
 	ghPkg "github.com/hexnickk/jib/internal/github"
 	"github.com/hexnickk/jib/internal/history"
@@ -158,9 +157,9 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	if overrideDir == "" {
 		overrideDir = config.OverrideDir()
 	}
-	if docker.NeedsGeneratedCompose(repoDir, []string(appCfg.Compose)) {
+	if e.Docker.NeedsGeneratedCompose(repoDir, []string(appCfg.Compose)) {
 		fmt.Printf("[deploy] No docker-compose.yml found, generating from Dockerfile...\n")
-		composePath, hostPort, err := docker.GenerateComposeForDockerfile(opts.App, repoDir, overrideDir, 0)
+		composePath, hostPort, err := e.Docker.GenerateComposeForDockerfile(opts.App, repoDir, overrideDir, 0)
 		if err != nil {
 			return nil, fmt.Errorf("generating compose from Dockerfile: %w", err)
 		}
@@ -185,7 +184,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	compose := e.newCompose(opts.App, appCfg, repoDir)
 
 	// 6c. Generate jib override file (labels, restart policy, log rotation).
-	if _, err := docker.GenerateOverride(ctx, opts.App, []string(appCfg.Compose), repoDir, overrideDir); err != nil {
+	if _, err := e.Docker.GenerateOverride(ctx, opts.App, []string(appCfg.Compose), repoDir, overrideDir); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not generate override file: %v\n", err)
 	}
 
@@ -225,8 +224,8 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	var healthErr string
 	if len(appCfg.Health) > 0 {
 		warmup := parseWarmup(appCfg.Warmup)
-		results := docker.CheckHealth(ctx, appCfg.Health, warmup)
-		if !docker.AllHealthy(results) {
+		results := e.Docker.CheckHealth(ctx, appCfg.Health, warmup)
+		if !e.Docker.AllHealthy(results) {
 			healthOK = false
 			var msgs []string
 			for _, r := range results {
@@ -277,7 +276,7 @@ func (e *Engine) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	// 15. Lock released by defer.
 
 	// 16. Prune old images.
-	if err := docker.PruneImages(ctx); err != nil {
+	if err := e.Docker.PruneImages(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: pruning images: %v\n", err)
 	}
 
