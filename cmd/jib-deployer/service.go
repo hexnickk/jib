@@ -15,7 +15,6 @@ import (
 
 	"github.com/hexnickk/jib/internal/bus"
 	"github.com/hexnickk/jib/internal/config"
-	"github.com/hexnickk/jib/internal/deploy"
 	"github.com/hexnickk/jib/internal/history"
 	"github.com/hexnickk/jib/internal/proxy"
 	"github.com/hexnickk/jib/internal/secrets"
@@ -107,10 +106,10 @@ func (s *service) rebuild(cfg *config.Config) {
 	)
 }
 
-func (s *service) newEngine() *deploy.Engine {
+func (s *service) newEngine() *Engine {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return &deploy.Engine{
+	return &Engine{
 		Config:      s.cfg,
 		StateStore:  s.stateStore,
 		Secrets:     s.secrets,
@@ -150,7 +149,7 @@ func (s *service) handleDeploy(subject string, data []byte) (any, error) {
 		defer s.wg.Done()
 		engine := s.newEngine()
 		start := time.Now()
-		result, deployErr := engine.Deploy(s.ctx, deploy.DeployOptions{
+		result, deployErr := engine.Deploy(s.ctx, DeployOptions{
 			App:     cmd.App,
 			Ref:     cmd.Ref,
 			Trigger: cmd.Trigger,
@@ -161,7 +160,7 @@ func (s *service) handleDeploy(subject string, data []byte) (any, error) {
 		duration := time.Since(start)
 		if deployErr != nil {
 			s.logger.Printf("deploy %s error: %v", cmd.App, deployErr)
-			s.publishDeployEvent(&deploy.DeployResult{
+			s.publishDeployEvent(&DeployResult{
 				App: cmd.App, Success: false, Error: deployErr.Error(),
 			}, cmd.Trigger, cmd.User, cmd.ID, duration)
 			return
@@ -194,14 +193,14 @@ func (s *service) handleRollback(subject string, data []byte) (any, error) {
 		defer s.wg.Done()
 		engine := s.newEngine()
 		start := time.Now()
-		result, err := engine.Rollback(s.ctx, deploy.RollbackOptions{
+		result, err := engine.Rollback(s.ctx, RollbackOptions{
 			App:  cmd.App,
 			User: cmd.User,
 		})
 		duration := time.Since(start)
 		if err != nil {
 			s.logger.Printf("rollback %s error: %v", cmd.App, err)
-			s.publishDeployEvent(&deploy.DeployResult{
+			s.publishDeployEvent(&DeployResult{
 				App: cmd.App, Success: false, Error: err.Error(),
 			}, "rollback", cmd.User, cmd.ID, duration)
 			return
@@ -253,7 +252,7 @@ func (s *service) handleConfigReload(_ string, _ []byte) error {
 	return nil
 }
 
-func (s *service) publishDeployEvent(result *deploy.DeployResult, trigger, user, correlationID string, duration time.Duration) {
+func (s *service) publishDeployEvent(result *DeployResult, trigger, user, correlationID string, duration time.Duration) {
 	status := bus.StatusSuccess
 	if !result.Success {
 		status = bus.StatusFailure
