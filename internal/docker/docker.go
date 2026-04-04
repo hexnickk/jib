@@ -141,10 +141,3 @@ func (c *Compose) Logs(ctx context.Context, service string, follow bool, tail in
 	}
 	return c.runInteractive(ctx, args, nil)
 }
-
-// PS runs docker compose ps and returns the output.
-func (c *Compose) PS(ctx context.Context) (string, error) {
-	args := c.baseArgs()
-	args = append(args, "ps")
-	return c.runCapture(ctx, args)
-}

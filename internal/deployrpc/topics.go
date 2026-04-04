@@ -3,8 +3,8 @@
 //
 // It layers on top of internal/bus, which provides generic NATS primitives.
 // Keeping the deploy-specific types, topics, and client/server helpers out
-// of internal/bus lets a hypothetical future service (e.g. jib-notifier)
-// reuse the bus without pulling in deployer wire types.
+// of internal/bus means the bus stays a pure NATS wrapper — nothing in it
+// has to know about deploys, commands, or ACKs.
 package deployrpc
 
 // Command topics (CLI → deployer).
