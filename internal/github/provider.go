@@ -75,14 +75,6 @@ func HTTPSCloneURL(repo, token string) string {
 	return fmt.Sprintf("https://x-access-token:%s@github.com/%s.git", token, repo)
 }
 
-// ProviderNameAvailable checks that a provider name is valid and not already taken.
-func ProviderNameAvailable(cfg *config.Config, name string) error {
-	if _, ok := cfg.LookupProvider(name); ok {
-		return fmt.Errorf("provider %q already exists", name)
-	}
-	return nil
-}
-
 // GenerateInstallationToken generates a short-lived GitHub App installation access token.
 func GenerateInstallationToken(ctx context.Context, providerName string, appID int64, repo string) (string, error) {
 	pemPath := AppPEMPath(providerName)

@@ -51,7 +51,7 @@ func runGitHubKeySetup(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	if err := ghPkg.ProviderNameAvailable(cfg, name); err != nil {
+	if err := providerNameAvailable(cfg, name); err != nil {
 		return err
 	}
 
@@ -174,55 +174,4 @@ func runGitHubKeyRemove(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Removed provider %q.\n", name)
 	fmt.Println("Remember to also remove the deploy key from your GitHub repository settings.")
 	return nil
-}
-
-// appsUsingProvider returns the names of apps referencing a given provider.
-func appsUsingProvider(cfg *config.Config, providerName string) []string {
-	var apps []string
-	for name, app := range cfg.Apps {
-		if app.Provider == providerName {
-			apps = append(apps, name)
-		}
-	}
-	return apps
-}
-
-// saveProvider adds a provider entry to the config YAML.
-func saveProvider(name string, data map[string]interface{}) error {
-	return config.ModifyRawConfig(config.ConfigFile(), func(raw map[string]interface{}) error {
-		gh, ok := raw["github"].(map[string]interface{})
-		if !ok {
-			gh = make(map[string]interface{})
-			raw["github"] = gh
-		}
-		providers, ok := gh["providers"].(map[string]interface{})
-		if !ok {
-			providers = make(map[string]interface{})
-			gh["providers"] = providers
-		}
-		providers[name] = data
-		return nil
-	})
-}
-
-// removeProvider removes a provider entry from the config YAML.
-func removeProvider(name string) error {
-	return config.ModifyRawConfig(config.ConfigFile(), func(raw map[string]interface{}) error {
-		gh, ok := raw["github"].(map[string]interface{})
-		if !ok {
-			return nil
-		}
-		providers, ok := gh["providers"].(map[string]interface{})
-		if !ok {
-			return nil
-		}
-		delete(providers, name)
-		if len(providers) == 0 {
-			delete(gh, "providers")
-		}
-		if len(gh) == 0 {
-			delete(raw, "github")
-		}
-		return nil
-	})
 }

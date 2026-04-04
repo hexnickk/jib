@@ -54,7 +54,7 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	if err := ghPkg.ProviderNameAvailable(cfg, name); err != nil {
+	if err := providerNameAvailable(cfg, name); err != nil {
 		return err
 	}
 
@@ -122,7 +122,7 @@ func runGitHubAppSetup(cmd *cobra.Command, args []string) error {
 // runGitHubAppManifest handles the automatic GitHub App creation via manifest flow.
 func runGitHubAppManifest(name string) error {
 	ctx := context.Background()
-	result, err := ghPkg.RunManifestFlow(ctx, name)
+	result, err := runManifestFlow(ctx, name)
 	if err != nil {
 		return fmt.Errorf("manifest flow: %w", err)
 	}
