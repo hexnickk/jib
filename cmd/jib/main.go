@@ -9,7 +9,7 @@ import (
 	"github.com/hexnickk/jib/internal/module/ghmod"
 	"github.com/hexnickk/jib/internal/module/health"
 	"github.com/hexnickk/jib/internal/module/nginxmod"
-	"github.com/hexnickk/jib/internal/module/telegram"
+	"github.com/hexnickk/jib/internal/module/notifier"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +31,7 @@ func newRootCmd() *cobra.Command {
 	module.Register(&nginxmod.Module{})
 	module.Register(&ghmod.Module{})
 	module.Register(&health.Module{})
-	module.Register(&telegram.Module{})
+	module.Register(&notifier.Module{})
 
 	rootCmd := &cobra.Command{
 		Use:   "jib",

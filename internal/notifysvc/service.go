@@ -1,6 +1,6 @@
-// Package notifysvc provides the shared runtime for jib notification services.
-// Each per-driver service (jib-notify-telegram, jib-notify-slack, etc.)
-// creates a notify.Notifier and calls Run() to start the event loop.
+// Package notifysvc provides the shared runtime for the jib-notifier service.
+// It subscribes to NATS events and routes them to the correct notification
+// channels based on each app's notify list in the config.
 package notifysvc
 
 import (
@@ -19,20 +19,14 @@ import (
 )
 
 // Run starts the notification service event loop. It subscribes to all NATS
-// events and routes them through the given notifier. channelName is the
-// notification channel name used for per-app routing (matches app.notify config).
-func Run(channelName string, notifier notify.Notifier) {
-	logger := log.New(os.Stderr, "[notify-"+channelName+"] ", log.LstdFlags)
+// events and routes them to the appropriate channels based on each app's
+// notify list in the config.
+func Run(multi *notify.Multi, cfg *config.Config) {
+	logger := log.New(os.Stderr, "[notifier] ", log.LstdFlags)
 
-	configPath := EnvOr("JIB_CONFIG", config.ConfigFile())
 	natsURL := EnvOr("NATS_URL", bus.DefaultURL)
 	natsUser := os.Getenv("NATS_USER")
 	natsPass := os.Getenv("NATS_PASS")
-
-	cfg, err := config.LoadConfig(configPath)
-	if err != nil {
-		logger.Fatalf("loading config: %v", err)
-	}
 
 	b, err := bus.Connect(bus.Options{
 		URL:      natsURL,
@@ -44,26 +38,24 @@ func Run(channelName string, notifier notify.Notifier) {
 	}
 	defer b.Close()
 
-	// Build per-app routing: which apps include this channel in their notify list.
-	appSet := make(map[string]bool)
+	// Build per-app notify routing from config.
+	appNotify := make(map[string][]string)
 	for name, app := range cfg.Apps {
-		for _, ch := range app.Notify {
-			if ch == channelName {
-				appSet[name] = true
-			}
+		if len(app.Notify) > 0 {
+			appNotify[name] = app.Notify
 		}
 	}
 
 	handler := &eventHandler{
-		notifier: notifier,
-		appSet:   appSet,
-		logger:   logger,
+		multi:     multi,
+		appNotify: appNotify,
+		logger:    logger,
 	}
 
 	if _, err := b.Subscribe(bus.SubAllEvents, handler.handle); err != nil {
 		logger.Fatalf("subscribing: %v", err)
 	}
-	logger.Printf("subscribed to %s (channel: %s)", bus.SubAllEvents, channelName)
+	logger.Printf("subscribed to %s (channels: %s)", bus.SubAllEvents, strings.Join(multi.ChannelNames(), ", "))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
@@ -81,9 +73,9 @@ func EnvOr(key, fallback string) string {
 }
 
 type eventHandler struct {
-	notifier notify.Notifier
-	appSet   map[string]bool // apps that route to this channel
-	logger   *log.Logger
+	multi     *notify.Multi
+	appNotify map[string][]string // app name → channel names
+	logger    *log.Logger
 }
 
 func (h *eventHandler) handle(subject string, data []byte) error {
@@ -92,16 +84,15 @@ func (h *eventHandler) handle(subject string, data []byte) error {
 		return nil
 	}
 
-	// Skip events for apps that don't route to this channel.
-	// If appSet is empty (no per-app routing), notify for all events.
-	if len(h.appSet) > 0 && !h.appSet[event.App] {
+	notifyList := h.appNotify[event.App]
+	if len(notifyList) == 0 {
 		return nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := h.notifier.Send(ctx, *event); err != nil {
+	if err := h.multi.SendForApp(ctx, notifyList, *event); err != nil {
 		h.logger.Printf("send error: %v", err)
 	}
 	return nil

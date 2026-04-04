@@ -28,7 +28,7 @@ Services:
 - `cmd/jib-watcher/` — polls git repos, triggers deploys via NATS
 - `cmd/jib-heartbeat/` — publishes periodic heartbeat to NATS
 - `cmd/jib-health/` — HTTP health checks (Docker container)
-- `cmd/jib-notifications-telegram/` — Telegram notifications (Docker container)
+- `cmd/jib-notifier/` — notifications for all channels (Docker container)
 
 ## Build & Test
 

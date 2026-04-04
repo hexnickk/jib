@@ -60,8 +60,8 @@ func TestGenerateCompose_MinimalConfig(t *testing.T) {
 	if strings.Contains(compose, "jib-health") {
 		t.Error("health should not be included without module services")
 	}
-	if strings.Contains(compose, "jib-notifications-") {
-		t.Error("notifiers should not be included without module services")
+	if strings.Contains(compose, "jib-notifier") {
+		t.Error("notifier should not be included without module services")
 	}
 }
 
