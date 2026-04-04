@@ -115,7 +115,6 @@ internal/
 ├── deploy/                 Deploy + rollback orchestration
 ├── docker/                 Compose wrappers, health checks, override generation
 ├── secrets/                Secrets management + symlinks
-├── notify/                 Multi-channel notifications
 ├── proxy/                  Nginx config generation
 ├── ssl/                    Certbot wrapper + cert expiry
 └── platform/               OS abstraction + dependency checks
@@ -132,7 +131,7 @@ internal/
 7. Run pre-deploy hooks
 8. `docker compose up -d --force-recreate`
 9. Warmup → health check (5 retries with backoff)
-10. Update state, notify, prune old images
+10. Update state, prune old images
 
 ### Docker Isolation
 

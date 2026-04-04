@@ -1,5 +1,5 @@
 // Package module defines the interface for jib's modular integration system.
-// Each integration (GitHub, Cloudflare, nginx, Telegram, health) implements
+// Each integration (GitHub, Cloudflare, nginx) implements
 // one or more interfaces and registers itself with the global registry.
 // Core code queries the registry for capabilities instead of importing
 // specific integration packages.

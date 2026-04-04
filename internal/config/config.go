@@ -31,12 +31,11 @@ const LatestConfigVersion = 3
 
 // Config is the top-level Jib configuration.
 type Config struct {
-	ConfigVersion int                            `yaml:"config_version,omitempty"`
-	PollInterval  string                         `yaml:"poll_interval"`
-	GitHub        *GitHubConfig                  `yaml:"github,omitempty"`
-	Apps          map[string]App                 `yaml:"apps"`
-	Notifications map[string]NotificationChannel `yaml:"notifications,omitempty"`
-	Tunnel        *TunnelConfig                  `yaml:"tunnel,omitempty"`
+	ConfigVersion int            `yaml:"config_version,omitempty"`
+	PollInterval  string         `yaml:"poll_interval"`
+	GitHub        *GitHubConfig  `yaml:"github,omitempty"`
+	Apps          map[string]App `yaml:"apps"`
+	Tunnel        *TunnelConfig  `yaml:"tunnel,omitempty"`
 }
 
 // GitHubProvider represents a named authentication provider (deploy key or GitHub App).
@@ -82,7 +81,6 @@ type App struct {
 	Domains   []Domain          `yaml:"domains"`
 	EnvFile   string            `yaml:"env_file,omitempty"` // defaults to ".env"; secrets loaded if file exists
 	Services  []string          `yaml:"services,omitempty"`
-	Notify    []string          `yaml:"notify,omitempty"`
 }
 
 // Domain maps a hostname to a container port with optional ingress method.
@@ -101,17 +99,6 @@ type HealthCheck struct {
 // PreDeployHook names a service to run before the main deploy.
 type PreDeployHook struct {
 	Service string `yaml:"service"`
-}
-
-// NotificationChannel defines a named notification channel.
-// Credentials (tokens, webhook URLs) are stored in /opt/jib/secrets/_jib/<name>.json.
-type NotificationChannel struct {
-	Driver string `yaml:"driver"` // telegram
-}
-
-// ValidNotifyDrivers is the set of supported notification drivers.
-var ValidNotifyDrivers = map[string]bool{
-	"telegram": true,
 }
 
 // TunnelConfig controls tunnel integration.

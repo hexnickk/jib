@@ -1,5 +1,3 @@
-# Jib — Claude Code Guide
-
 ## Memories & Plans
 
 Project memories live in `.claude/memories/` (gitignored, persists across devcontainer rebuilds).
@@ -9,6 +7,14 @@ Architecture plans and implementation notes live in `.claude/plans/` (also gitig
 
 When saving memories, write to `/workspaces/jib/.claude/memories/` and update `.claude/memories/MEMORY.md`.
 When creating plans, write to `/workspaces/jib/.claude/plans/`.
+
+## Philosophy
+
+This codebase will outlive you. Every shortcut becomes someone else's burden. Every hack compounds into technical debt that slows the whole team down.
+
+You are not just writing code. You are shaping the future of this project. The patterns you establish will be copied. The corners you cut will be cut again.
+
+Fight entropy. Leave the codebase better than you found it.
 
 ## Project
 
@@ -26,9 +32,6 @@ Services:
 - `cmd/jib/` — CLI (deploy, rollback, resume, setup, config management)
 - `cmd/jib-deployer/` — handles deploys, rollbacks, resume via NATS
 - `cmd/jib-watcher/` — polls git repos, triggers deploys via NATS
-- `cmd/jib-heartbeat/` — publishes periodic heartbeat to NATS
-- `cmd/jib-health/` — HTTP health checks (Docker container)
-- `cmd/jib-notifier/` — notifications for all channels (Docker container)
 
 ## Build & Test
 
@@ -52,3 +55,4 @@ Pre-commit hooks run `gofmt` and `golangci-lint`. Fix issues before committing.
 - State: `/opt/jib/state/<app>.json`
 - NATS for inter-service messaging
 - Modules in `internal/module/` register at startup via `module.Register()`
+- Files should target 100 LoC, anything above 200 LoC needs an explicit approval

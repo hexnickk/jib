@@ -10,28 +10,14 @@ const (
 	TopicConfigReload = "jib.config.reload"    // fan-out, no suffix
 )
 
-// Event topics (daemon/monitors → notifiers).
+// Event topics (daemon → subscribers).
 // Subjects include the app/domain and status, e.g. "jib.event.deploy.myapp.success".
 const (
 	TopicDeployEvent = "jib.event.deploy" // + .<app>.<status>
-	TopicHealthEvent = "jib.event.health" // + .<app>.<status>
 )
 
 // Status suffixes for event topics.
 const (
-	StatusSuccess   = "success"
-	StatusFailure   = "failure"
-	StatusFailed    = "failed"
-	StatusRecovered = "recovered"
-	StatusExpiring  = "expiring"
-)
-
-// Heartbeat topic.
-const TopicHeartbeat = "jib.heartbeat"
-
-// Wildcard subscriptions.
-const (
-	SubAllCommands = "jib.command.>"
-	SubAllEvents   = "jib.event.>"
-	SubAll         = "jib.>"
+	StatusSuccess = "success"
+	StatusFailure = "failure"
 )

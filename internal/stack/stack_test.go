@@ -12,7 +12,7 @@ func TestGenerateTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tokens.Daemon == "" || tokens.Trigger == "" || tokens.Monitor == "" || tokens.Notifier == "" {
+	if tokens.Daemon == "" || tokens.Trigger == "" {
 		t.Error("all tokens should be non-empty")
 	}
 	if tokens.Daemon == tokens.Trigger {
@@ -24,7 +24,7 @@ func TestGenerateTokens(t *testing.T) {
 }
 
 func TestGenerateNATSConf(t *testing.T) {
-	tokens := &Tokens{Daemon: "d", Trigger: "t", Monitor: "m", Notifier: "n"}
+	tokens := &Tokens{Daemon: "d", Trigger: "t"}
 	conf := GenerateNATSConf(tokens)
 
 	if !strings.Contains(conf, `password: "d"`) {
@@ -47,7 +47,7 @@ func TestGenerateCompose_MinimalConfig(t *testing.T) {
 				Domains: []config.Domain{{Host: "example.com", Port: 80}}},
 		},
 	}
-	tokens := &Tokens{Daemon: "d", Trigger: "t", Monitor: "m", Notifier: "n"}
+	tokens := &Tokens{Daemon: "d", Trigger: "t"}
 	compose := GenerateCompose(cfg, tokens, nil)
 
 	if !strings.Contains(compose, "jib-bus:") {
@@ -57,11 +57,8 @@ func TestGenerateCompose_MinimalConfig(t *testing.T) {
 		t.Error("NATS image missing")
 	}
 	// No module services provided
-	if strings.Contains(compose, "jib-health") {
-		t.Error("health should not be included without module services")
-	}
-	if strings.Contains(compose, "jib-notifier") {
-		t.Error("notifier should not be included without module services")
+	if strings.Contains(compose, "cloudflared") {
+		t.Error("cloudflared should not be included without module services")
 	}
 }
 
@@ -74,15 +71,14 @@ func TestGenerateCompose_WithModuleServices(t *testing.T) {
 				Domains: []config.Domain{{Host: "example.com", Port: 80}}},
 		},
 	}
-	tokens := &Tokens{Daemon: "d", Trigger: "t", Monitor: "m", Notifier: "n"}
+	tokens := &Tokens{Daemon: "d", Trigger: "t"}
 
 	moduleServices := []string{
-		"\n  jib-health:\n    image: test-health\n",
 		"\n  cloudflared:\n    image: cloudflare/cloudflared\n",
 	}
 	compose := GenerateCompose(cfg, tokens, moduleServices)
 
-	for _, want := range []string{"jib-bus:", "jib-health:", "cloudflared:"} {
+	for _, want := range []string{"jib-bus:", "cloudflared:"} {
 		if !strings.Contains(compose, want) {
 			t.Errorf("missing %q in compose", want)
 		}
@@ -90,10 +86,10 @@ func TestGenerateCompose_WithModuleServices(t *testing.T) {
 }
 
 func TestTokenMap(t *testing.T) {
-	tokens := &Tokens{Daemon: "d", Trigger: "t", Monitor: "m", Notifier: "n"}
+	tokens := &Tokens{Daemon: "d", Trigger: "t"}
 	m := tokens.TokenMap()
 
-	if m["daemon"] != "d" || m["trigger"] != "t" || m["monitor"] != "m" || m["notifier"] != "n" {
+	if m["daemon"] != "d" || m["trigger"] != "t" {
 		t.Errorf("unexpected token map: %v", m)
 	}
 }

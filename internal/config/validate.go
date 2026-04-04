@@ -47,13 +47,6 @@ func Validate(cfg *Config) error {
 		}
 	}
 
-	// Notification channels.
-	for name, ch := range cfg.Notifications {
-		if !ValidNotifyDrivers[ch.Driver] {
-			ve.addf("notification '%s': driver must be telegram, got %q", name, ch.Driver)
-		}
-	}
-
 	// GitHub providers.
 	if cfg.GitHub != nil {
 		for name, p := range cfg.GitHub.Providers {
@@ -72,7 +65,7 @@ func Validate(cfg *Config) error {
 
 	// Apps.
 	for name, app := range cfg.Apps {
-		validateApp(ve, name, &app, cfg.GitHub, cfg.Notifications)
+		validateApp(ve, name, &app, cfg.GitHub)
 	}
 
 	if ve.hasErrors() {
@@ -81,7 +74,7 @@ func Validate(cfg *Config) error {
 	return nil
 }
 
-func validateApp(ve *ValidationError, name string, app *App, github *GitHubConfig, notifications map[string]NotificationChannel) {
+func validateApp(ve *ValidationError, name string, app *App, github *GitHubConfig) {
 	prefix := fmt.Sprintf("app '%s'", name)
 
 	// App name format.
@@ -142,13 +135,6 @@ func validateApp(ve *ValidationError, name string, app *App, github *GitHubConfi
 	if app.Warmup != "" {
 		if _, err := time.ParseDuration(app.Warmup); err != nil {
 			ve.addf("%s: warmup: invalid duration %q", prefix, app.Warmup)
-		}
-	}
-
-	// Notify: each referenced channel must exist in notifications.
-	for _, ch := range app.Notify {
-		if _, ok := notifications[ch]; !ok {
-			ve.addf("%s: notify references undefined channel %q", prefix, ch)
 		}
 	}
 }

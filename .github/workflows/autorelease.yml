@@ -40,7 +40,7 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           LDFLAGS="-X main.version=${VERSION}"
-          BINS="jib jib-deployer jib-watcher jib-heartbeat"
+          BINS="jib jib-deployer jib-watcher"
 
           for PAIR in linux/amd64 linux/arm64; do
             OS="${PAIR%/*}"

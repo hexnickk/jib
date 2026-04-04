@@ -548,18 +548,8 @@ func printInfraStatus(cfg *config.Config) {
 		fmt.Printf("  tunnel:          %s\n", label)
 	}
 
-	// Notifications
-	if len(cfg.Notifications) > 0 {
-		var chans []string
-		for name, ch := range cfg.Notifications {
-			chans = append(chans, name+" ("+ch.Driver+")")
-		}
-		sort.Strings(chans)
-		fmt.Printf("  notifications:   %s\n", strings.Join(chans, ", "))
-	}
-
 	// If nothing is configured, give a hint
-	if cfg.Tunnel == nil && len(cfg.Notifications) == 0 {
+	if cfg.Tunnel == nil {
 		fmt.Println("  (not configured) — run 'jib init' to set up")
 	}
 }

@@ -59,7 +59,7 @@ func Connect(opts Options, logger *log.Logger) (*Bus, error) {
 }
 
 // ConnectWithRetry connects to NATS, retrying every 2s until successful.
-// Intended for long-running services (deployer, watcher, heartbeat).
+// Intended for long-running services (deployer, watcher).
 func ConnectWithRetry(opts Options, logger *log.Logger) *Bus {
 	for {
 		b, err := Connect(opts, logger)

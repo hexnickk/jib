@@ -1,5 +1,7 @@
 # Binaries
 /jib
+/jib-deployer
+/jib-watcher
 *.exe
 *.exe~
 *.dll

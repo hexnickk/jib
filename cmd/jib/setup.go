@@ -305,7 +305,7 @@ func ensureServices() {
 	// write it ourselves. This list is the only place that knows which is
 	// which — drop a service from the relevant slice to eject it.
 	selfInstallServices := []string{"jib-deployer"}
-	legacyServices := []string{"jib-watcher", "jib-heartbeat"}
+	legacyServices := []string{"jib-watcher"}
 	serviceNames := append(append([]string{}, selfInstallServices...), legacyServices...)
 
 	// Self-installing services: delegate entirely to the binary.
@@ -376,8 +376,8 @@ func ensureServices() {
 
 // syncStack regenerates the service stack compose file from the current config
 // and converges running containers. Creates tokens on first run.
-// Call after any config change that affects services (notify add/remove,
-// cloudflare setup, jib init, etc.).
+// Call after any config change that affects services (cloudflare setup,
+// jib init, etc.).
 func syncStack() {
 	cfg, err := loadConfig()
 	if err != nil {

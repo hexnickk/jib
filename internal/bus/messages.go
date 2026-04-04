@@ -155,29 +155,3 @@ type DeployEvent struct {
 func (e DeployEvent) Subject() string {
 	return TopicDeployEvent + "." + sanitizeToken(e.App) + "." + e.Status
 }
-
-// HealthEvent reports a health check state change.
-type HealthEvent struct {
-	Message
-	App      string `json:"app"`
-	Endpoint string `json:"endpoint"`
-	Status   string `json:"status"` // "failed" or "recovered"
-	Error    string `json:"error,omitempty"`
-}
-
-// Subject returns the NATS subject for this event.
-func (e HealthEvent) Subject() string {
-	return TopicHealthEvent + "." + sanitizeToken(e.App) + "." + e.Status
-}
-
-// Heartbeat is a periodic status message from the daemon.
-type Heartbeat struct {
-	Message
-	Apps   []string `json:"apps"`
-	Uptime int64    `json:"uptime_s"`
-}
-
-// Subject returns the NATS subject for this heartbeat.
-func (e Heartbeat) Subject() string {
-	return TopicHeartbeat
-}

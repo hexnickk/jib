@@ -1,17 +1,13 @@
-# Jib — Dropped Features (re-add as modules later)
+# TODOs
 
-Features removed from initial modular release to keep scope minimal.
-Core workflow: GitHub polling + deploy + Telegram notifications + Cloudflare tunnels.
+- [ ] Introduce jib-stack.service as a systemd oneshot unit that manages the Docker Compose stack (jib-bus + module containers). Wire the native services (jib-deployer, jib-watcher) to depend on it explicitly, replacing the implicit nc -z 4222 busy-wait.
 
-## Notifications
-- [ ] Slack notifications
-- [ ] Discord notifications
-- [ ] Generic webhook notifications
+## Statuses
+
+- [ ] Bring back health checker
 
 ## Triggers
 - [ ] GitHub webhook trigger (listen for push events, deploy immediately)
-- [ ] Telegram bot trigger (listen for /deploy commands via bot)
-- [ ] Slack bot trigger
 
 ## Ingress
 - [ ] Tailscale integration (VPN mesh networking)

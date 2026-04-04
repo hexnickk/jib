@@ -7,9 +7,7 @@ import (
 	"github.com/hexnickk/jib/internal/module"
 	"github.com/hexnickk/jib/internal/module/cfmod"
 	"github.com/hexnickk/jib/internal/module/ghmod"
-	"github.com/hexnickk/jib/internal/module/health"
 	"github.com/hexnickk/jib/internal/module/nginxmod"
-	"github.com/hexnickk/jib/internal/module/notifier"
 	"github.com/spf13/cobra"
 )
 
@@ -30,8 +28,6 @@ func newRootCmd() *cobra.Command {
 	module.Register(&cfmod.Module{})
 	module.Register(&nginxmod.Module{})
 	module.Register(&ghmod.Module{})
-	module.Register(&health.Module{})
-	module.Register(&notifier.Module{})
 
 	rootCmd := &cobra.Command{
 		Use:   "jib",
@@ -60,7 +56,6 @@ Jib lives on the server. You SSH in and run commands, or use
 	registerConfigCommands(rootCmd)
 
 	// Module CLI commands
-	registerNotifyCommands(rootCmd)
 	registerGitHubCommands(rootCmd)
 	registerCloudflareCommands(rootCmd)
 

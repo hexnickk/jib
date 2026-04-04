@@ -1,6 +1,6 @@
 // Command jib-deployer handles deploys, rollbacks, and resumes via NATS.
 //
-// Subcommand protocol (see also jib-watcher, jib-heartbeat):
+// Subcommand protocol (see also jib-watcher):
 //
 //	jib-deployer run        run the service (systemd ExecStart)
 //	jib-deployer install    write unit file, daemon-reload, enable (requires root)

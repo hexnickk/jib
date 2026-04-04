@@ -4,7 +4,7 @@ You are operating `jib`, a lightweight Docker Compose deployment tool. Jib is a 
 
 ## What Jib Does
 
-Jib deploys docker-compose apps on bare Linux machines. It handles: git pull, docker build, docker compose up, health checks, rollback, nginx reverse proxy, SSL certs, secrets injection, and notifications. Designed for small teams running 3–7 apps per server.
+Jib deploys docker-compose apps on bare Linux machines. It handles: git pull, docker build, docker compose up, health checks, rollback, nginx reverse proxy, SSL certs, and secrets injection. Designed for small teams running 3–7 apps per server.
 
 ## How to Run Commands
 
@@ -31,7 +31,7 @@ ssh user@server jib <command> [args] [flags]
 | `jib rollback <app>` | Swap to previous version (one level) |
 | `jib resume <app>` | Reset failure counter, unpin, re-enable autodeploy |
 
-**Deploy flow:** acquire lock → check disk space → validate secrets → git fetch/checkout → symlink secrets → generate override → docker compose build → run pre_deploy hooks → docker compose up → warmup → health check → update state → notify → prune images.
+**Deploy flow:** acquire lock → check disk space → validate secrets → git fetch/checkout → symlink secrets → generate override → docker compose build → run pre_deploy hooks → docker compose up → warmup → health check → update state → prune images.
 
 ### Managing Apps
 
@@ -108,14 +108,10 @@ Config lives at `/opt/jib/config.yml`.
 | `jib upgrade` | Self-update jib binary |
 | `jib nuke [--force]` | Remove ALL jib data from the machine |
 
-### Notifications & Webhooks
+### Webhooks
 
 | Command | What it does |
 |---------|-------------|
-| `jib notify setup <channel>` | Set up telegram/slack/discord/webhook |
-| `jib notify test [channel]` | Send test notification |
-| `jib notify list` | Show configured channels |
-| `jib notify remove <channel>` | Remove a channel |
 | `jib webhook setup` | Generate webhook secret + URL for GitHub |
 
 ### Backups

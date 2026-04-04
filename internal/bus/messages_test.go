@@ -60,20 +60,6 @@ func TestDeployEventSubject(t *testing.T) {
 	}
 }
 
-func TestHealthEventSubject(t *testing.T) {
-	ev := HealthEvent{App: "api", Status: StatusFailed}
-	if ev.Subject() != "jib.event.health.api.failed" {
-		t.Errorf("Subject = %q", ev.Subject())
-	}
-}
-
-func TestHeartbeatSubject(t *testing.T) {
-	hb := Heartbeat{}
-	if hb.Subject() != "jib.heartbeat" {
-		t.Errorf("Subject = %q", hb.Subject())
-	}
-}
-
 func TestMessageRoundTrip(t *testing.T) {
 	cmd := DeployCommand{
 		Message: NewMessage("webhook"),
@@ -114,9 +100,9 @@ func TestSubjectSanitization(t *testing.T) {
 		t.Errorf("Subject() = %q, want wildcards stripped", got)
 	}
 
-	// Dots are allowed in health event subjects
-	ev := HealthEvent{App: "api.example.com", Status: StatusFailed}
-	if got := ev.Subject(); got != "jib.event.health.api.example.com.failed" {
+	// Dots are allowed in deploy event subjects
+	ev := DeployEvent{App: "api.example.com", Status: StatusSuccess}
+	if got := ev.Subject(); got != "jib.event.deploy.api.example.com.success" {
 		t.Errorf("Subject() = %q", got)
 	}
 }
