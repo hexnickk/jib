@@ -15,6 +15,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/bus"
 	"github.com/hexnickk/jib/internal/config"
+	"github.com/hexnickk/jib/internal/deployrpc"
 	"github.com/hexnickk/jib/internal/secrets"
 	"github.com/hexnickk/jib/internal/state"
 )
@@ -33,7 +34,7 @@ func runService() {
 	}
 
 	// Context must be assigned before any subscription is created — NATS
-	// callbacks become live the moment QueueSubscribeReply returns, and
+	// callbacks become live the moment HandleCommand returns, and
 	// handlers read svc.ctx to pass into engine.Deploy/Rollback.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -50,13 +51,13 @@ func runService() {
 	svc.bus = b
 
 	// Queue group "deployer" for load-balanced command handling.
-	if _, err := b.QueueSubscribeReply(bus.TopicDeployCmd+".>", "deployer", svc.handleDeploy); err != nil {
+	if _, err := deployrpc.HandleCommand(b, deployrpc.TopicDeployCmd+".>", "deployer", svc.handleDeploy); err != nil {
 		logger.Fatalf("subscribing to deploy commands: %v", err)
 	}
-	if _, err := b.QueueSubscribeReply(bus.TopicRollbackCmd+".>", "deployer", svc.handleRollback); err != nil {
+	if _, err := deployrpc.HandleCommand(b, deployrpc.TopicRollbackCmd+".>", "deployer", svc.handleRollback); err != nil {
 		logger.Fatalf("subscribing to rollback commands: %v", err)
 	}
-	if _, err := b.QueueSubscribeReply(bus.TopicResumeCmd+".>", "deployer", svc.handleResume); err != nil {
+	if _, err := deployrpc.HandleCommand(b, deployrpc.TopicResumeCmd+".>", "deployer", svc.handleResume); err != nil {
 		logger.Fatalf("subscribing to resume commands: %v", err)
 	}
 
@@ -111,25 +112,25 @@ func (s *service) newEngine() *Engine {
 	}
 }
 
-func (s *service) handleDeploy(subject string, data []byte) (any, error) {
-	var cmd bus.DeployCommand
+func (s *service) handleDeploy(subject string, data []byte) (deployrpc.CommandAck, error) {
+	var cmd deployrpc.DeployCommand
 	if err := json.Unmarshal(data, &cmd); err != nil {
-		return bus.CommandAck{Accepted: false, Error: "invalid payload"}, nil
+		return deployrpc.CommandAck{Accepted: false, Error: "invalid payload"}, nil
 	}
 	if cmd.App == "" {
 		cmd.App = extractApp(subject)
 	}
 	if err := cmd.Validate(); err != nil {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
+		return deployrpc.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
 	}
 
 	// Non-blocking lock probe for dedup.
 	lock, err := state.Acquire(cmd.App, config.LockDir(), false, 0)
 	if err != nil {
 		if errors.Is(err, state.ErrLockBusy) {
-			return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: "deploy already in progress"}, nil
+			return deployrpc.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: "deploy already in progress"}, nil
 		}
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
+		return deployrpc.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
 	}
 	_ = lock.Release()
 
@@ -163,19 +164,19 @@ func (s *service) handleDeploy(subject string, data []byte) (any, error) {
 		}
 	}()
 
-	return bus.CommandAck{Accepted: true, CorrelationID: cmd.ID}, nil
+	return deployrpc.CommandAck{Accepted: true, CorrelationID: cmd.ID}, nil
 }
 
-func (s *service) handleRollback(subject string, data []byte) (any, error) {
-	var cmd bus.RollbackCommand
+func (s *service) handleRollback(subject string, data []byte) (deployrpc.CommandAck, error) {
+	var cmd deployrpc.RollbackCommand
 	if err := json.Unmarshal(data, &cmd); err != nil {
-		return bus.CommandAck{Accepted: false, Error: "invalid payload"}, nil
+		return deployrpc.CommandAck{Accepted: false, Error: "invalid payload"}, nil
 	}
 	if cmd.App == "" {
 		cmd.App = extractApp(subject)
 	}
 	if err := cmd.Validate(); err != nil {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
+		return deployrpc.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
 	}
 
 	s.wg.Add(1)
@@ -198,19 +199,19 @@ func (s *service) handleRollback(subject string, data []byte) (any, error) {
 		s.publishDeployEvent(result, "rollback", cmd.User, cmd.ID, duration)
 	}()
 
-	return bus.CommandAck{Accepted: true, CorrelationID: cmd.ID}, nil
+	return deployrpc.CommandAck{Accepted: true, CorrelationID: cmd.ID}, nil
 }
 
-func (s *service) handleResume(subject string, data []byte) (any, error) {
-	var cmd bus.ResumeCommand
+func (s *service) handleResume(subject string, data []byte) (deployrpc.CommandAck, error) {
+	var cmd deployrpc.ResumeCommand
 	if err := json.Unmarshal(data, &cmd); err != nil {
-		return bus.CommandAck{Accepted: false, Error: "invalid payload"}, nil
+		return deployrpc.CommandAck{Accepted: false, Error: "invalid payload"}, nil
 	}
 	if cmd.App == "" {
 		cmd.App = extractApp(subject)
 	}
 	if err := cmd.Validate(); err != nil {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
+		return deployrpc.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: err.Error()}, nil
 	}
 
 	s.mu.RLock()
@@ -219,16 +220,16 @@ func (s *service) handleResume(subject string, data []byte) (any, error) {
 
 	appState, err := store.Load(cmd.App)
 	if err != nil {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: fmt.Sprintf("loading state: %v", err)}, nil
+		return deployrpc.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: fmt.Sprintf("loading state: %v", err)}, nil
 	}
 	appState.Pinned = false
 	appState.ConsecutiveFailures = 0
 	if err := store.Save(cmd.App, appState); err != nil {
-		return bus.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: fmt.Sprintf("saving state: %v", err)}, nil
+		return deployrpc.CommandAck{Accepted: false, CorrelationID: cmd.ID, Error: fmt.Sprintf("saving state: %v", err)}, nil
 	}
 
 	s.logger.Printf("resumed %s: pinned=false, failures=0", cmd.App)
-	return bus.CommandAck{Accepted: true, CorrelationID: cmd.ID}, nil
+	return deployrpc.CommandAck{Accepted: true, CorrelationID: cmd.ID}, nil
 }
 
 func (s *service) handleConfigReload(_ string, _ []byte) error {
@@ -243,11 +244,11 @@ func (s *service) handleConfigReload(_ string, _ []byte) error {
 }
 
 func (s *service) publishDeployEvent(result *DeployResult, trigger, user, correlationID string, duration time.Duration) {
-	status := bus.StatusSuccess
+	status := deployrpc.StatusSuccess
 	if !result.Success {
-		status = bus.StatusFailure
+		status = deployrpc.StatusFailure
 	}
-	ev := bus.DeployEvent{
+	ev := deployrpc.DeployEvent{
 		Message:     bus.NewCorrelated("deployer", correlationID),
 		App:         result.App,
 		SHA:         result.DeployedSHA,

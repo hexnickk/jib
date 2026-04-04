@@ -100,26 +100,34 @@ func (b *Bus) Subscribe(subject string, handler Handler) (*nats.Subscription, er
 	})
 }
 
-// ReplyHandler is a function that processes a message and returns a reply.
+// ReplyHandler processes a message and returns a reply value to be
+// JSON-marshaled and sent back on the NATS reply subject. Handlers own
+// their error shape: any expected failure must be expressed as a valid
+// reply value (nil error). Returning a non-nil error is reserved for
+// truly unexpected failures — the bus logs the error and does NOT send a
+// reply, which callers experience as a request timeout.
 type ReplyHandler func(subject string, data []byte) (interface{}, error)
 
 // QueueSubscribeReply registers a reply handler with a queue group.
+// The bus is agnostic to reply types — protocol-specific wrappers (see
+// internal/deployrpc.HandleCommand) compose on top to encode typed ACKs.
 func (b *Bus) QueueSubscribeReply(subject, queue string, handler ReplyHandler) (*nats.Subscription, error) {
 	return b.conn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
 		reply, err := handler(msg.Subject, msg.Data)
 		if err != nil {
 			b.logger.Printf("bus: reply handler error on %s: %v", msg.Subject, err)
-			reply = CommandAck{Accepted: false, Error: err.Error()}
+			return
 		}
-		if msg.Reply != "" {
-			replyData, marshalErr := json.Marshal(reply)
-			if marshalErr != nil {
-				b.logger.Printf("bus: marshal reply error: %v", marshalErr)
-				return
-			}
-			if pubErr := msg.Respond(replyData); pubErr != nil {
-				b.logger.Printf("bus: respond error: %v", pubErr)
-			}
+		if msg.Reply == "" || reply == nil {
+			return
+		}
+		replyData, marshalErr := json.Marshal(reply)
+		if marshalErr != nil {
+			b.logger.Printf("bus: marshal reply error: %v", marshalErr)
+			return
+		}
+		if pubErr := msg.Respond(replyData); pubErr != nil {
+			b.logger.Printf("bus: respond error: %v", pubErr)
 		}
 	})
 }

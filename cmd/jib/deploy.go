@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hexnickk/jib/internal/bus"
+	"github.com/hexnickk/jib/internal/deployrpc"
 	"github.com/spf13/cobra"
 )
 
@@ -86,7 +87,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	defer b.Close()
 
 	correlationID := uuid.NewString()
-	deployCmd := bus.DeployCommand{
+	deployCmd := deployrpc.DeployCommand{
 		Message: bus.NewMessage("cli"),
 		App:     appName,
 		Ref:     ref,
@@ -97,7 +98,8 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	}
 	deployCmd.CorrelationID = correlationID
 
-	ev, err := b.DeployAndWait(deployCmd.Subject(), deployCmd, correlationID, appName, timeout)
+	rpc := deployrpc.NewClient(b)
+	ev, err := rpc.DeployAndWait(deployCmd.Subject(), deployCmd, correlationID, appName, timeout)
 	if err != nil {
 		return err
 	}
@@ -106,10 +108,10 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		fmt.Println("[dry-run] No changes were made.")
 	}
 	printEventResult(ev)
-	if ref != "" && ev.Status == bus.StatusSuccess {
+	if ref != "" && ev.Status == deployrpc.StatusSuccess {
 		fmt.Println("  Pinned: true (autodeploy paused — run 'jib resume' to unpin)")
 	}
-	if ev.Status != bus.StatusSuccess {
+	if ev.Status != deployrpc.StatusSuccess {
 		return fmt.Errorf("deploy completed with errors: %s", ev.Error)
 	}
 	return nil
@@ -126,20 +128,21 @@ func runRollback(cmd *cobra.Command, args []string) error {
 	defer b.Close()
 
 	correlationID := uuid.NewString()
-	rollbackCmd := bus.RollbackCommand{
+	rollbackCmd := deployrpc.RollbackCommand{
 		Message: bus.NewMessage("cli"),
 		App:     appName,
 		User:    currentUser(),
 	}
 	rollbackCmd.CorrelationID = correlationID
 
-	ev, err := b.DeployAndWait(rollbackCmd.Subject(), rollbackCmd, correlationID, appName, timeout)
+	rpc := deployrpc.NewClient(b)
+	ev, err := rpc.DeployAndWait(rollbackCmd.Subject(), rollbackCmd, correlationID, appName, timeout)
 	if err != nil {
 		return err
 	}
 
 	printEventResult(ev)
-	if ev.Status != bus.StatusSuccess {
+	if ev.Status != deployrpc.StatusSuccess {
 		return fmt.Errorf("rollback completed with errors: %s", ev.Error)
 	}
 	return nil
@@ -154,13 +157,14 @@ func runResume(cmd *cobra.Command, args []string) error {
 	}
 	defer b.Close()
 
-	resumeCmd := bus.ResumeCommand{
+	resumeCmd := deployrpc.ResumeCommand{
 		Message: bus.NewMessage("cli"),
 		App:     appName,
 		User:    currentUser(),
 	}
 
-	ack, err := b.RequestAck(resumeCmd.Subject(), resumeCmd)
+	rpc := deployrpc.NewClient(b)
+	ack, err := rpc.RequestAck(resumeCmd.Subject(), resumeCmd)
 	if err != nil {
 		return err
 	}
@@ -174,8 +178,8 @@ func runResume(cmd *cobra.Command, args []string) error {
 }
 
 // printEventResult prints a deploy event result.
-func printEventResult(ev *bus.DeployEvent) {
-	if ev.Status == bus.StatusSuccess {
+func printEventResult(ev *deployrpc.DeployEvent) {
+	if ev.Status == deployrpc.StatusSuccess {
 		fmt.Printf("OK  %s deployed\n", ev.App)
 	} else {
 		fmt.Printf("FAIL  %s deploy failed\n", ev.App)

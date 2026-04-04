@@ -1,24 +1,34 @@
-package bus
+package deployrpc
 
 import (
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/nats-io/nats.go"
+	"github.com/hexnickk/jib/internal/bus"
 )
+
+// Client is the CLI-side helper for sending commands to jib-deployer.
+// It wraps a generic *bus.Bus and handles the request/ACK/event dance so
+// callers don't need to know the wire protocol.
+type Client struct {
+	bus *bus.Bus
+}
+
+// NewClient returns a deployrpc Client bound to the given bus.
+func NewClient(b *bus.Bus) *Client { return &Client{bus: b} }
 
 // DeployAndWait sends a command via NATS Request (for ACK), then waits for
 // a DeployEvent with the matching correlationID on the app's event topic.
 // The caller must set CorrelationID on the command before calling.
-func (b *Bus) DeployAndWait(subject string, cmd any, correlationID string, app string, timeout time.Duration) (*DeployEvent, error) {
-	// Subscribe to deploy events BEFORE sending
+func (c *Client) DeployAndWait(subject string, cmd any, correlationID string, app string, timeout time.Duration) (*DeployEvent, error) {
+	// Subscribe to deploy events BEFORE sending.
 	eventSubject := TopicDeployEvent + "." + sanitizeToken(app) + ".>"
 	eventCh := make(chan *DeployEvent, 1)
-	sub, err := b.conn.Subscribe(eventSubject, func(msg *nats.Msg) {
+	sub, err := c.bus.Subscribe(eventSubject, func(_ string, data []byte) error {
 		var ev DeployEvent
-		if jsonErr := json.Unmarshal(msg.Data, &ev); jsonErr != nil {
-			return
+		if jsonErr := json.Unmarshal(data, &ev); jsonErr != nil {
+			return nil
 		}
 		if ev.CorrelationID == correlationID {
 			select {
@@ -26,14 +36,15 @@ func (b *Bus) DeployAndWait(subject string, cmd any, correlationID string, app s
 			default:
 			}
 		}
+		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("subscribing to deploy events: %w", err)
 	}
 	defer func() { _ = sub.Unsubscribe() }()
 
-	// Send command and wait for ACK
-	ackReply, err := b.Request(subject, cmd, 5*time.Second)
+	// Send command and wait for ACK.
+	ackReply, err := c.bus.Request(subject, cmd, 5*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("sending command (is jib-deployer running? check 'systemctl status jib-deployer'): %w", err)
 	}
@@ -46,7 +57,7 @@ func (b *Bus) DeployAndWait(subject string, cmd any, correlationID string, app s
 		return nil, fmt.Errorf("command rejected: %s", ack.Error)
 	}
 
-	// Wait for deploy result event
+	// Wait for deploy result event.
 	select {
 	case ev := <-eventCh:
 		return ev, nil
@@ -57,8 +68,8 @@ func (b *Bus) DeployAndWait(subject string, cmd any, correlationID string, app s
 
 // RequestAck sends a command via NATS Request and returns the ACK.
 // Used for commands that don't produce deploy events (like resume).
-func (b *Bus) RequestAck(subject string, cmd any) (*CommandAck, error) {
-	reply, err := b.Request(subject, cmd, 5*time.Second)
+func (c *Client) RequestAck(subject string, cmd any) (*CommandAck, error) {
+	reply, err := c.bus.Request(subject, cmd, 5*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("sending command (is jib-deployer running?): %w", err)
 	}

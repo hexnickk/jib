@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hexnickk/jib/internal/bus"
 	"github.com/hexnickk/jib/internal/config"
+	"github.com/hexnickk/jib/internal/deployrpc"
 	"github.com/hexnickk/jib/internal/docker"
 	gitPkg "github.com/hexnickk/jib/internal/git"
 	ghPkg "github.com/hexnickk/jib/internal/github"
@@ -699,7 +700,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	defer b.Close()
 
 	correlationID := uuid.NewString()
-	deployCmd := bus.DeployCommand{
+	deployCmd := deployrpc.DeployCommand{
 		Message: bus.NewMessage("cli"),
 		App:     appName,
 		Force:   true,
@@ -708,11 +709,12 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 	deployCmd.CorrelationID = correlationID
 
-	ev, err := b.DeployAndWait(deployCmd.Subject(), deployCmd, correlationID, appName, 5*time.Minute)
+	rpc := deployrpc.NewClient(b)
+	ev, err := rpc.DeployAndWait(deployCmd.Subject(), deployCmd, correlationID, appName, 5*time.Minute)
 	if err != nil {
 		return fmt.Errorf("deploy failed: %w", err)
 	}
-	if ev.Status != bus.StatusSuccess {
+	if ev.Status != deployrpc.StatusSuccess {
 		return fmt.Errorf("deploy failed: %s", ev.Error)
 	}
 

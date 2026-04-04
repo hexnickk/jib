@@ -11,6 +11,7 @@ import (
 
 	"github.com/hexnickk/jib/internal/bus"
 	"github.com/hexnickk/jib/internal/config"
+	"github.com/hexnickk/jib/internal/deployrpc"
 	"github.com/hexnickk/jib/internal/git"
 	"github.com/hexnickk/jib/internal/module"
 	"github.com/hexnickk/jib/internal/module/ghmod"
@@ -198,7 +199,7 @@ func (s *service) pollOnce(ctx context.Context) {
 		s.logger.Printf("%s: new commit detected %s (was %s)", appName, shortSHA(remoteSHA), shortSHA(appState.DeployedSHA))
 
 		// Publish deploy command via NATS instead of deploying directly.
-		cmd := bus.DeployCommand{
+		cmd := deployrpc.DeployCommand{
 			Message: bus.NewMessage("watcher"),
 			App:     appName,
 			Trigger: "autodeploy",
