@@ -16,6 +16,7 @@ import {
   secretsCmd,
   serviceCmd,
   upCmd,
+  webhookCmd,
 } from './src/commands/index.ts'
 
 /**
@@ -46,6 +47,7 @@ const main = defineCommand({
     run: runCmd,
     secrets: secretsCmd,
     service: serviceCmd,
+    webhook: webhookCmd,
   },
 })
 
