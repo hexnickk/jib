@@ -7,15 +7,6 @@ import { type ExecFn, getExec } from './shell.ts'
 import { appConfDir, confFilename, renderSite } from './templates.ts'
 
 /**
- * Injection seam for the nginx operator. Tests pass a recording fake; the
- * production default is `getExec()` from `shell.ts`, which shells out via
- * `Bun.$`. Mirrors the pattern used by `modules/nginx/install.ts`.
- */
-export interface NginxExec {
-  exec: ExecFn
-}
-
-/**
  * Returns `true` when a Let's Encrypt cert exists for `host`. The operator
  * uses this to decide whether to emit a 443 server block. Injectable so
  * tests can fake it without touching `/etc/letsencrypt`.

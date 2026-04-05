@@ -64,9 +64,15 @@ describe('schemas', () => {
       ts: '2024-01-01T00:00:00Z',
       source: 'cli',
       app: 'web',
-      domains: [{ host: 'example.com', port: 20000 }],
+      domains: [
+        { host: 'example.com', port: 20000 },
+        { host: 'tun.example.com', port: 20001, isTunnel: true },
+      ],
     })
     expect(v.domains[0]?.port).toBe(20000)
+    // `isTunnel` defaults to false when omitted, honors true when set.
+    expect(v.domains[0]?.isTunnel).toBe(false)
+    expect(v.domains[1]?.isTunnel).toBe(true)
   })
 
   test('CmdNginxClaim rejects empty domains list', () => {

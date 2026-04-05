@@ -22,10 +22,22 @@ export interface OverrideFile {
  * TODO(future): also publish `<hostPort>:<containerPort>` per domain so
  * nginx can reach `127.0.0.1:<hostPort>`. Today the compose file itself is
  * expected to publish the port; jib's port allocator hands out a host port
- * to the nginx operator but doesn't thread it into the generated override.
- * Landing this requires `buildOverride` to accept the `App.domains` entries
- * and emit a `ports:` entry on the primary service. Scoped to a dedicated
- * deployer pass, not Stage 5 of the nginx-operator refactor.
+ * to the nginx operator but nothing threads it through the generated
+ * override. This is a design tension, not a mechanical fix:
+ *
+ *   - If the user's compose file pins a host port (e.g. `ports: ["8080:80"]`)
+ *     then jib's allocator picks, say, 20000, tells nginx to proxy
+ *     `127.0.0.1:20000`, and nginx hits nothing because the container is on
+ *     8080. Broken v0 for any compose file that publishes ports.
+ *   - Forcing `buildOverride` to emit a `ports:` entry would *silently*
+ *     shadow whatever the user wrote, which is a different footgun.
+ *   - The clean resolution is probably: stop publishing in user compose
+ *     files, let jib own the host port end-to-end, and infer
+ *     `containerPort` (today hardcoded to 80 in `src/commands/add.ts`)
+ *     from the service's `EXPOSE` or the compose `expose:` key.
+ *
+ * Scoped to a dedicated deployer pass; needs a product decision before
+ * code. Tracked alongside the add-command TODO in `src/commands/add.ts`.
  */
 export function buildOverride(app: string, services: string[]): OverrideFile {
   const svcOverride: ServiceOverride = {
