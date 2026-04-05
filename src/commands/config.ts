@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { loadConfig } from '@jib/config'
 import { getPaths } from '@jib/core'
 import { defineCommand } from 'citty'
@@ -69,11 +69,11 @@ export function setNested(root: Record<string, unknown>, key: string, value: unk
   cur[last] = value
 }
 
-async function readRaw(): Promise<{ path: string; raw: string; doc: Record<string, unknown> }> {
+async function readRaw(): Promise<{ path: string; doc: Record<string, unknown> }> {
   const path = getPaths().configFile
   const raw = await readFile(path, 'utf8')
   const doc = (parse(raw) ?? {}) as Record<string, unknown>
-  return { path, raw, doc }
+  return { path, doc }
 }
 
 const get = defineCommand({
@@ -116,7 +116,6 @@ const set = defineCommand({
 
     const { path, doc } = await readRaw()
     setNested(doc, args.key, parsed)
-    const { writeFile } = await import('node:fs/promises')
     await writeFile(path, stringify(doc), { mode: 0o600 })
 
     try {

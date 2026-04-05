@@ -1,6 +1,6 @@
 import * as cloudflareMod from '@jib-module/cloudflare'
 import * as nginxMod from '@jib-module/nginx'
-import type { App, Config } from '@jib/config'
+import type { Config } from '@jib/config'
 import type { ModuleContext, ModuleManifest, SetupHook } from '@jib/core'
 
 /**
@@ -39,21 +39,16 @@ function order(registry: HookEntry[], phase: Phase): HookEntry[] {
  * finish teardown even when a single integration is broken.
  *
  * `registry` is injected (defaulting to {@link DEFAULT_REGISTRY}) so tests
- * can supply fake hooks without touching module mocks.
+ * can supply fake hooks without touching module mocks. Hooks look the app
+ * up from `ctx.config.apps[app]`, so callers must pass a `ctx` whose config
+ * already reflects the intended post-add/post-remove state.
  */
 export async function runSetupHooks(
   ctx: Ctx,
   app: string,
-  appCfg: App,
   phase: Phase,
   registry: HookEntry[] = DEFAULT_REGISTRY,
 ): Promise<void> {
-  // `appCfg` is only passed for symmetry with the Go implementation — the
-  // hooks currently look the app up from `ctx.config.apps[app]`. Kept on
-  // the signature so future hooks that want the freshly-added App object
-  // without a re-read have it available.
-  void appCfg
-
   const entries = order(registry, phase)
   const completed: HookEntry[] = []
 

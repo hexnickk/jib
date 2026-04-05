@@ -27,11 +27,8 @@ export default defineCommand({
   },
   async run({ args }) {
     const { cfg, paths } = await loadAppOrExit(args.app)
-    const appCfg = cfg.apps[args.app]
-    if (!appCfg) {
-      consola.error(`app "${args.app}" not found in config`)
-      process.exit(1)
-    }
+    // loadAppOrExit guarantees cfg.apps[args.app] exists.
+    const appCfg = cfg.apps[args.app] as NonNullable<(typeof cfg.apps)[string]>
 
     if (!args.force) {
       const ok = await promptConfirm({
@@ -49,7 +46,7 @@ export default defineCommand({
       logger: createLogger('remove'),
       paths,
     }
-    await runSetupHooks(ctx, args.app, appCfg, 'remove')
+    await runSetupHooks(ctx, args.app, 'remove')
 
     try {
       const compose = composeFor(cfg, paths, args.app)

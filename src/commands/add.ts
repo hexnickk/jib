@@ -166,7 +166,7 @@ export default defineCommand({
         logger: createLogger('add'),
         paths,
       }
-      await runSetupHooks(ctx, args.app, newApp, 'add')
+      await runSetupHooks(ctx, args.app, 'add')
     } catch (err) {
       consola.error(err instanceof Error ? err.message : String(err))
       process.exit(1)
