@@ -56,19 +56,53 @@ async function ensureConfig(): Promise<Config> {
   return loadConfig(p.configFile)
 }
 
-interface ModLike {
+export interface ModLike {
   manifest: { name: string }
   install?: (ctx: ModuleContext<Config>) => Promise<void>
+  uninstall?: (ctx: ModuleContext<Config>) => Promise<void>
 }
 
-async function installMod(mod: ModLike, ctx: ModuleContext<Config>): Promise<void> {
-  if (!mod.install) {
-    consola.warn(`${mod.manifest.name}: no install() — skipping`)
-    return
+/**
+ * Install every module in `mods` in order. On the first failure, walk the
+ * already-installed set in reverse and call each module's `uninstall()` as
+ * best-effort rollback, so the host is either fully initialized or fully
+ * unchanged. Each rollback step is independently try/catch'd — a failing
+ * uninstall doesn't abort the rest; we just log and continue. Re-throws
+ * the original install error once rollback finishes so callers can surface
+ * it and exit.
+ */
+export async function runInstallsTx(mods: ModLike[], ctx: ModuleContext<Config>): Promise<void> {
+  const installed: ModLike[] = []
+  try {
+    for (const m of mods) {
+      if (!m.install) {
+        consola.warn(`${m.manifest.name}: no install() — skipping`)
+        continue
+      }
+      consola.info(`installing ${m.manifest.name}`)
+      await m.install(ctx)
+      consola.success(`${m.manifest.name} installed`)
+      installed.push(m)
+    }
+  } catch (err) {
+    if (installed.length > 0) {
+      consola.warn(`install failed; rolling back ${installed.length} module(s)…`)
+      for (const m of [...installed].reverse()) {
+        if (!m.uninstall) {
+          consola.warn(`${m.manifest.name}: no uninstall() — leaving in place`)
+          continue
+        }
+        try {
+          await m.uninstall(ctx)
+          consola.info(`rolled back ${m.manifest.name}`)
+        } catch (e) {
+          const em = e instanceof Error ? e.message : String(e)
+          consola.warn(`${m.manifest.name} uninstall failed: ${em}`)
+        }
+      }
+    }
+    throw err
   }
-  consola.info(`installing ${mod.manifest.name}`)
-  await mod.install(ctx)
-  consola.success(`${mod.manifest.name} installed`)
 }
 
 export default defineCommand({
@@ -99,19 +133,16 @@ export default defineCommand({
       paths: getPaths(),
     }
 
-    // Required modules — order matters: nats must be up before the
-    // services that depend on it.
-    await installMod(natsMod, ctx)
-    await installMod(deployerMod, ctx)
-    await installMod(gitsitterMod, ctx)
+    // Collect the full module list BEFORE any install runs. This lets us
+    // prompt once (interactive mode) and install as a single transaction —
+    // on any failure mid-install we roll back the installed set cleanly.
+    // Order matters: nats must be up before the services that depend on it.
+    const mods: ModLike[] = [natsMod, deployerMod, gitsitterMod]
 
-    // Optional modules: nginx (strongly recommended — sole routing layer
-    // for apps with domains), cloudflared (tunnel daemon), and the
-    // cloudflare operator (DNS + ingress via the Cloudflare API).
     const wantNginx = nonInteractive
       ? true
       : await promptConfirm({ message: 'Install nginx reverse-proxy module?', initialValue: true })
-    if (wantNginx) await installMod(nginxMod, ctx)
+    if (wantNginx) mods.push(nginxMod)
 
     const wantCFD = nonInteractive
       ? false
@@ -124,7 +155,7 @@ export default defineCommand({
         'cloudflared without nginx: the tunnel will hit localhost:80 with no default handler',
       )
     }
-    if (wantCFD) await installMod(cloudflaredMod, ctx)
+    if (wantCFD) mods.push(cloudflaredMod)
 
     const wantCFOp = nonInteractive
       ? false
@@ -132,7 +163,14 @@ export default defineCommand({
           message: 'Install cloudflare operator (DNS/ingress API)?',
           initialValue: false,
         })
-    if (wantCFOp) await installMod(cloudflareMod, ctx)
+    if (wantCFOp) mods.push(cloudflareMod)
+
+    try {
+      await runInstallsTx(mods, ctx)
+    } catch (err) {
+      consola.error(`jib init failed: ${err instanceof Error ? err.message : String(err)}`)
+      process.exit(1)
+    }
 
     consola.box(
       'jib initialized. Next:\n  jib add <app> --repo org/repo --domain example.com\n  jib deploy <app>',
