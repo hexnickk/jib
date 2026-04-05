@@ -1,0 +1,162 @@
+import type { App, Config } from '@jib/config'
+import { JibError, type Logger, type Paths } from '@jib/core'
+import {
+  type CheckHealthOptions,
+  Compose,
+  type DockerExec,
+  allHealthy,
+  checkHealth,
+  overridePath,
+  parseComposeServices,
+  writeOverride,
+} from '@jib/docker'
+import type { CmdDeploy } from '@jib/rpc'
+import { type AppState, type Store, acquire } from '@jib/state'
+import { $ } from 'bun'
+
+/** Minimum free bytes required before a deploy proceeds (2 GiB, matches Go). */
+const MIN_DISK_BYTES = 2 * 1024 * 1024 * 1024
+
+export interface EngineDeps {
+  config: Config
+  paths: Paths
+  store: Store
+  log: Logger
+  /** Injected for tests — defaults to real `Bun.$ df`. */
+  diskFree?: (path: string) => Promise<number>
+  /** Injected for tests — passed to `@jib/docker` Compose. */
+  dockerExec?: DockerExec
+  /** Injected for tests — health probe override. */
+  healthOpts?: CheckHealthOptions
+}
+
+export interface ProgressCtx {
+  emit: (step: string, message: string) => void
+}
+
+export type DeployCmd = Pick<CmdDeploy, 'app' | 'workdir' | 'sha' | 'trigger'> & { user?: string }
+
+export interface DeployResult {
+  app: string
+  previousSHA: string
+  deployedSHA: string
+  success: boolean
+  durationMs: number
+  error?: string
+}
+
+/**
+ * Deploy engine. Owns the restart-strategy flow: lock, disk check, build,
+ * pre-deploy hooks, compose up, health, state update. `rollback.ts` and
+ * `resume.ts` share the engine's constructor + state store.
+ */
+export class Engine {
+  constructor(readonly deps: EngineDeps) {}
+
+  private newCompose(app: string, appCfg: App, workdir: string): Compose {
+    const files =
+      appCfg.compose && appCfg.compose.length > 0 ? appCfg.compose : ['docker-compose.yml']
+    const override = overridePath(this.deps.paths.overridesDir, app)
+    const cfg = {
+      app,
+      dir: workdir,
+      files: [...files],
+      override,
+      ...(this.deps.dockerExec ? { exec: this.deps.dockerExec } : {}),
+    }
+    return new Compose(cfg)
+  }
+
+  /** Free bytes on the filesystem containing `path`. Uses `df -B1 --output=avail`. */
+  private async diskFree(path: string): Promise<number> {
+    if (this.deps.diskFree) return this.deps.diskFree(path)
+    const res = await $`df -B1 --output=avail ${path}`.quiet().nothrow()
+    if (res.exitCode !== 0) return Number.POSITIVE_INFINITY
+    const line = res.stdout.toString().trim().split('\n')[1] ?? '0'
+    return Number(line.trim())
+  }
+
+  async deploy(cmd: DeployCmd, progress: ProgressCtx): Promise<DeployResult> {
+    const start = Date.now()
+    const appCfg = this.deps.config.apps[cmd.app]
+    if (!appCfg) throw new JibError('deploy', `app "${cmd.app}" not found in config`)
+
+    progress.emit('lock', `acquiring lock for ${cmd.app}`)
+    const release = await acquire(this.deps.paths.locksDir, cmd.app, { blocking: false })
+    try {
+      progress.emit('disk', 'checking disk space')
+      const free = await this.diskFree(cmd.workdir)
+      if (free < MIN_DISK_BYTES) {
+        throw new JibError('deploy', `insufficient disk space: ${free} bytes free`)
+      }
+
+      const prevState = await this.deps.store.load(cmd.app)
+      const previousSHA = prevState.deployed_sha
+
+      const services = parseComposeServices(cmd.workdir, appCfg.compose ?? []).map((s) => s.name)
+      await writeOverride(this.deps.paths.overridesDir, cmd.app, services)
+      const compose = this.newCompose(cmd.app, appCfg, cmd.workdir)
+
+      progress.emit('build', `building ${cmd.app}`)
+      await compose.build(appCfg.build_args ?? {})
+
+      for (const hook of appCfg.pre_deploy ?? []) {
+        progress.emit('pre_deploy', `running ${hook.service}`)
+        await compose.run(hook.service, [])
+      }
+
+      progress.emit('up', 'starting containers')
+      await compose.up({ services: appCfg.services ?? [] })
+
+      if (appCfg.health && appCfg.health.length > 0) {
+        progress.emit('health', 'running health checks')
+        const results = await checkHealth(appCfg.health, this.deps.healthOpts ?? {})
+        if (!allHealthy(results)) {
+          throw new JibError('deploy', `health check failed: ${JSON.stringify(results)}`)
+        }
+      }
+
+      const next: AppState = {
+        ...prevState,
+        app: cmd.app,
+        strategy: 'restart',
+        deployed_sha: cmd.sha,
+        deployed_workdir: cmd.workdir,
+        previous_sha: previousSHA,
+        previous_workdir: prevState.deployed_workdir,
+        last_deploy: new Date().toISOString(),
+        last_deploy_status: 'success',
+        last_deploy_error: '',
+        last_deploy_trigger: cmd.trigger,
+        last_deploy_user: cmd.user ?? '',
+        consecutive_failures: 0,
+      }
+      await this.deps.store.save(cmd.app, next)
+
+      return {
+        app: cmd.app,
+        previousSHA,
+        deployedSHA: cmd.sha,
+        success: true,
+        durationMs: Date.now() - start,
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      this.deps.log.error(`deploy ${cmd.app} failed: ${message}`)
+      await this.deps.store.updateFailure(cmd.app, message)
+      throw err
+    } finally {
+      await release()
+    }
+  }
+
+  /** Build a Compose helper against an arbitrary workdir (used by rollback). */
+  composeFor(app: string, appCfg: App, workdir: string): Compose {
+    return this.newCompose(app, appCfg, workdir)
+  }
+}
+
+/** Build an `Engine` from a `ModuleContext`-shaped deps bag. Convenience for `start.ts`. */
+export function newEngine(deps: EngineDeps): Engine {
+  return new Engine(deps)
+}
