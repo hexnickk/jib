@@ -64,7 +64,7 @@ re-runs the deploy end to end.
 | `jib rollback <app>` | Roll back to the previous successful deploy. |
 | `jib resume <app>` | Resume a paused/failed deploy loop. |
 | `jib config` | Inspect or edit the jib config. |
-| `jib edit <app>` | Edit a single app's config entry. |
+| `jib edit` | Open `config.yml` in `$EDITOR` with validation on save. |
 | `jib up \| down \| restart <app>` | Control an app's compose project. |
 | `jib exec <app> <service>` | Exec into a running container. |
 | `jib run <app> <service>` | Run a one-off container in the app project. |
@@ -105,9 +105,9 @@ make lint             # biome check
 make fmt              # biome format --write
 ```
 
-Pre-commit hooks run biome and the type checker. Fix issues before
-committing. See `CLAUDE.md` for project conventions (file size caps,
-secrets handling, module layout).
+Pre-commit hooks run `biome check`. Fix issues before committing. See
+`CLAUDE.md` for project conventions (file size caps, secrets handling,
+module layout).
 
 ## License
 
