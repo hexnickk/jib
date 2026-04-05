@@ -1,23 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-# Legacy Go checks (only while _legacy/go.mod is present)
-if [ -f _legacy/go.mod ]; then
-    pushd _legacy >/dev/null
-    unformatted=$(gofmt -l $(find . -name '*.go' -not -path './vendor/*') 2>/dev/null || true)
-    if [ -n "$unformatted" ]; then
-        echo "ERROR: The following files in _legacy/ are not formatted with gofmt:"
-        echo "$unformatted"
-        exit 1
-    fi
-    if ! go vet ./... 2>&1; then
-        echo "ERROR: go vet found issues in _legacy/."
-        exit 1
-    fi
-    popd >/dev/null
-fi
+# _legacy/ is frozen Go reference material, scheduled for removal in
+# Stage 7 of the TS rewrite. It is intentionally not linted here.
 
-# TypeScript checks via biome (only once biome is configured)
 if [ -f biome.json ] && command -v bun &>/dev/null; then
     if ! bun x biome check . 2>&1; then
         echo "ERROR: biome check failed. Run 'make fmt' or fix before committing."
