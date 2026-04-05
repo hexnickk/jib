@@ -15,7 +15,6 @@
     "@jib/bus": "workspace:*",
     "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",
-    "@jib/rpc": "workspace:*",
-    "@jib/state": "workspace:*"
+    "@jib/rpc": "workspace:*"
   }
 }

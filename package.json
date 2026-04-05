@@ -33,7 +33,6 @@
     "@jib/docker": "workspace:*",
     "@jib/rpc": "workspace:*",
     "@jib/secrets": "workspace:*",
-    "@jib/state": "workspace:*",
     "@jib/tui": "workspace:*",
     "@clack/prompts": "^0.8.2",
     "citty": "^0.1.6",
