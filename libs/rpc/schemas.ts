@@ -15,7 +15,10 @@ export type Envelope = z.infer<typeof EnvelopeSchema>
 
 const app = z.string().min(1)
 
-export const CmdRepoPrepareSchema = EnvelopeSchema.extend({ app, ref: z.string().min(1) })
+export const CmdRepoPrepareSchema = EnvelopeSchema.extend({
+  app,
+  ref: z.string().min(1).optional(),
+})
 export const CmdRepoRemoveSchema = EnvelopeSchema.extend({ app })
 export const CmdDeploySchema = EnvelopeSchema.extend({
   app,

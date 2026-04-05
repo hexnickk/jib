@@ -52,16 +52,21 @@ describe('handleCmd', () => {
 
     handleCmd(
       bus.asBus(),
-      SUBJECTS.cmd.repoPrepare,
-      'repo',
-      'gitsitter',
+      SUBJECTS.cmd.deploy,
+      'deploy',
+      'deployer',
       undefined,
-      SUBJECTS.evt.repoFailed,
-      async () => ({ success: { subject: SUBJECTS.evt.repoReady, body: {} as never } }),
+      SUBJECTS.evt.deployFailure,
+      async () => ({ success: { subject: SUBJECTS.evt.deploySuccess, body: {} as never } }),
     )
+    const deployFailures: Array<{ corrId: string; error: string }> = []
+    bus.subscribe(SUBJECTS.evt.deployFailure, (raw) => {
+      deployFailures.push(raw as { corrId: string; error: string })
+    })
 
-    // Missing `ref` — schema rejects it.
-    bus.publish(SUBJECTS.cmd.repoPrepare, {
+    // Missing required `workdir`/`sha`/`trigger` — envelope still valid so
+    // the fallback path can recover `corrId` + `app`.
+    bus.publish(SUBJECTS.cmd.deploy, {
       corrId: 'xyz',
       ts: new Date().toISOString(),
       source: 'cli',
@@ -69,8 +74,10 @@ describe('handleCmd', () => {
     })
     await flush()
     await flush()
-    expect(failures).toHaveLength(1)
-    expect(failures[0]?.corrId).toBe('xyz')
-    expect(failures[0]?.error).toContain('invalid')
+    expect(deployFailures).toHaveLength(1)
+    expect(deployFailures[0]?.corrId).toBe('xyz')
+    expect(deployFailures[0]?.error).toContain('invalid')
+    // keep the outer `failures` closure alive for biome's unused check
+    expect(failures).toHaveLength(0)
   })
 })

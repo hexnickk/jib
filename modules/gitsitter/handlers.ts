@@ -34,10 +34,12 @@ export async function prepareRepo(
   cfg: Config,
   paths: Paths,
   appName: string,
+  ref?: string,
 ): Promise<{ workdir: string; sha: string }> {
   const app = cfg.apps[appName]
   if (!app) throw new Error(`app "${appName}" not found in config`)
   const workdir = repoPath(paths, appName, app.repo)
+  const target = ref ?? app.branch
 
   const auth = app.provider ? await refreshAuth(app.provider, cfg, app, paths) : {}
   const env = auth.sshKeyPath ? git.configureSSHKey(auth.sshKeyPath) : {}
@@ -47,8 +49,8 @@ export async function prepareRepo(
     await git.clone(cloneURL(app, providerType), workdir, { branch: app.branch, env })
   }
   await applyAuth(auth, workdir, app.repo)
-  await git.fetch(workdir, app.branch, env)
-  const sha = await git.remoteSHA(workdir, app.branch)
+  await git.fetch(workdir, target, env)
+  const sha = await git.remoteSHA(workdir, target)
   await git.checkout(workdir, sha)
   return { workdir, sha }
 }
@@ -67,7 +69,7 @@ export function registerHandlers(bus: Bus, paths: Paths, getConfig: () => Config
     SUBJECTS.evt.repoProgress,
     SUBJECTS.evt.repoFailed,
     async (cmd) => {
-      const { workdir, sha } = await prepareRepo(getConfig(), paths, cmd.app)
+      const { workdir, sha } = await prepareRepo(getConfig(), paths, cmd.app, cmd.ref)
       return { success: { subject: SUBJECTS.evt.repoReady, body: { app: cmd.app, workdir, sha } } }
     },
   )
