@@ -172,11 +172,11 @@ const commands: CommandDef[] = [
     meta: { name: 'github', description: 'Manage GitHub providers' },
     subCommands: {
       key: defineCommand({
-        meta: { name: 'key' },
+        meta: { name: 'key', description: 'Manage SSH deploy key providers' },
         subCommands: { setup: keySetup, status: keyStatus, remove: keyRemove },
       }),
       app: defineCommand({
-        meta: { name: 'app' },
+        meta: { name: 'app', description: 'Manage GitHub App providers' },
         subCommands: { setup: appSetup, status: appStatus, remove: appRemove },
       }),
     },
