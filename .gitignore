@@ -12,6 +12,10 @@
 /bin/
 /dist/
 
+# Bun / Node
+node_modules/
+.bun/
+
 # Test binary
 *.test
 
