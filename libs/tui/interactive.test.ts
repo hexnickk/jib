@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { ValidationError } from '@jib/core'
 import { assertInteractive, isInteractive } from './interactive.ts'
 
-// biome-ignore lint/suspicious/noExplicitAny: test-only overrides of TTY flags
-const stdin = process.stdin as any
-// biome-ignore lint/suspicious/noExplicitAny: test-only overrides of TTY flags
-const stdout = process.stdout as any
+// `isTTY` is a writable boolean on the real streams; the Node types mark it
+// optional-readonly so we narrow to a mutable shape for test-only overrides.
+const stdin = process.stdin as { isTTY: boolean | undefined }
+const stdout = process.stdout as { isTTY: boolean | undefined }
 
 describe('isInteractive', () => {
   const envPrev = process.env.JIB_NON_INTERACTIVE

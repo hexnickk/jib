@@ -13,101 +13,96 @@ type SelectOpts<T extends string> = {
 }
 type ConfirmOpts = { message: string; initialValue?: boolean }
 
-function unwrap<T>(value: T | symbol): T {
+/**
+ * Runs `fn` (a thin clack call) under interactive-mode guard and unwraps
+ * clack's cancel symbol into a `ValidationError`. Every wrapper in this file
+ * delegates here so the interactive/cancel/return shape lives in one place.
+ */
+async function ask<T>(fn: () => Promise<T | symbol>): Promise<T> {
+  assertInteractive()
+  const value = await fn()
   if (clack.isCancel(value)) throw new ValidationError('cancelled')
   return value as T
 }
 
 /**
- * Strip keys whose value is `undefined`. Needed because clack is compiled
- * under `exactOptionalPropertyTypes`, so explicit `undefined` fails type
- * checks even though the underlying field is optional.
+ * Drop `hint: undefined` so clack (compiled under `exactOptionalPropertyTypes`)
+ * accepts the literal. Centralized so every select/multiselect call stays typed.
  */
-// biome-ignore lint/suspicious/noExplicitAny: intentionally opaque to callers
-function clean<T extends Record<string, any>>(obj: T): any {
-  const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(obj)) if (v !== undefined) out[k] = v
-  return out
-}
-
-export async function promptString(opts: StrOpts): Promise<string> {
-  assertInteractive()
-  return unwrap(
-    await clack.text(
-      clean({
-        message: opts.message,
-        placeholder: opts.placeholder,
-        initialValue: opts.initialValue,
-        validate: (v: string) => (v.length === 0 ? 'value required' : undefined),
-      }),
-    ),
+function mapOptions<T extends string>(
+  options: SelectOpts<T>['options'],
+): { value: T; label: string }[] {
+  return options.map((o) =>
+    o.hint !== undefined
+      ? ({ value: o.value, label: o.label, hint: o.hint } as { value: T; label: string })
+      : { value: o.value, label: o.label },
   )
 }
 
-export async function promptStringOptional(opts: StrOpts): Promise<string> {
-  assertInteractive()
-  return unwrap(
-    await clack.text(
-      clean({
-        message: opts.message,
-        placeholder: opts.placeholder,
-        initialValue: opts.initialValue,
-      }),
-    ),
+export function promptString(opts: StrOpts): Promise<string> {
+  return ask(() =>
+    clack.text({
+      message: opts.message,
+      ...(opts.placeholder !== undefined && { placeholder: opts.placeholder }),
+      ...(opts.initialValue !== undefined && { initialValue: opts.initialValue }),
+      validate: (v: string) => (v.length === 0 ? 'value required' : undefined),
+    }),
+  )
+}
+
+export function promptStringOptional(opts: StrOpts): Promise<string> {
+  return ask(() =>
+    clack.text({
+      message: opts.message,
+      ...(opts.placeholder !== undefined && { placeholder: opts.placeholder }),
+      ...(opts.initialValue !== undefined && { initialValue: opts.initialValue }),
+    }),
   )
 }
 
 export async function promptInt(opts: IntOpts): Promise<number> {
-  assertInteractive()
-  const res = await clack.text(
-    clean({
+  const v = await ask(() =>
+    clack.text({
       message: opts.message,
-      initialValue: opts.initialValue?.toString(),
-      validate: (v: string) => {
-        const n = Number(v)
+      ...(opts.initialValue !== undefined && { initialValue: String(opts.initialValue) }),
+      validate: (s: string) => {
+        const n = Number(s)
         if (!Number.isInteger(n)) return 'must be an integer'
-        if (opts.min !== undefined && n < opts.min) return `must be ≥ ${opts.min}`
-        if (opts.max !== undefined && n > opts.max) return `must be ≤ ${opts.max}`
+        if (opts.min !== undefined && n < opts.min) return `must be >= ${opts.min}`
+        if (opts.max !== undefined && n > opts.max) return `must be <= ${opts.max}`
         return undefined
       },
     }),
   )
-  return Number(unwrap(res))
+  return Number(v)
 }
 
-export async function promptPassword(opts: { message: string }): Promise<string> {
-  assertInteractive()
-  return unwrap(await clack.password({ message: opts.message }))
+export function promptPassword(opts: { message: string }): Promise<string> {
+  return ask(() => clack.password({ message: opts.message }))
 }
 
-export async function promptSelect<T extends string>(opts: SelectOpts<T>): Promise<T> {
-  assertInteractive()
-  return unwrap(
-    await clack.select<T>(
-      clean({
-        message: opts.message,
-        options: opts.options.map((o) => clean(o)),
-        initialValue: opts.initialValue,
-      }),
-    ),
-  )
-}
-
-export async function promptMultiSelect<T extends string>(opts: SelectOpts<T>): Promise<T[]> {
-  assertInteractive()
-  return unwrap(
-    await clack.multiselect<T>({
+export function promptSelect<T extends string>(opts: SelectOpts<T>): Promise<T> {
+  const options = mapOptions(opts.options) as Parameters<typeof clack.select<T>>[0]['options']
+  return ask<T>(() =>
+    clack.select<T>({
       message: opts.message,
-      options: opts.options.map((o) => clean(o)),
-      required: false,
+      options,
+      ...(opts.initialValue !== undefined && { initialValue: opts.initialValue }),
     }),
   )
 }
 
-export async function promptConfirm(opts: ConfirmOpts): Promise<boolean> {
-  assertInteractive()
-  return unwrap(
-    await clack.confirm(clean({ message: opts.message, initialValue: opts.initialValue })),
+export function promptMultiSelect<T extends string>(opts: SelectOpts<T>): Promise<T[]> {
+  const options = mapOptions(opts.options) as Parameters<typeof clack.multiselect<T>>[0]['options']
+  return ask<T[]>(() => clack.multiselect<T>({ message: opts.message, options, required: false }))
+}
+
+export function promptConfirm(opts: ConfirmOpts): Promise<boolean> {
+  return ask(() =>
+    clack.confirm({
+      message: opts.message,
+      ...(opts.initialValue !== undefined && { initialValue: opts.initialValue }),
+    }),
   )
 }
 
@@ -120,7 +115,7 @@ export async function promptPEM(opts: { message: string }): Promise<string> {
   clack.log.info(`${opts.message} (end with blank line)`)
   const lines: string[] = []
   while (true) {
-    const line = unwrap(await clack.text({ message: '' }))
+    const line = await ask<string>(() => clack.text({ message: '' }))
     if (line === '') break
     lines.push(line)
   }
