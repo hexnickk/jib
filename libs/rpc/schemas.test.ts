@@ -7,6 +7,7 @@ import {
   EnvelopeSchema,
   EvtCloudflareDomainReadySchema,
   EvtDeploySuccessSchema,
+  EvtNginxProgressSchema,
   EvtNginxReadySchema,
   SCHEMAS,
 } from './schemas.ts'
@@ -89,6 +90,17 @@ describe('schemas', () => {
       app: 'web',
     })
     expect(v.app).toBe('web')
+  })
+
+  test('EvtNginxProgress round-trips', () => {
+    const v = EvtNginxProgressSchema.parse({
+      corrId: 'c',
+      ts: '2024-01-01T00:00:00Z',
+      source: 'nginx',
+      app: 'web',
+      message: 'reloading nginx',
+    })
+    expect(v.message).toBe('reloading nginx')
   })
 
   test('CmdCloudflareDomainAdd round-trips', () => {
