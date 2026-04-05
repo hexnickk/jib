@@ -1,3 +1,5 @@
+import { stat, symlink, unlink } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { App, Config } from '@jib/config'
 import { JibError, type Logger, type Paths } from '@jib/core'
 import {
@@ -68,6 +70,26 @@ export class Engine {
     return new Compose(cfg)
   }
 
+  /**
+   * Link `<secretsDir>/<app>/<env_file>` → `<workdir>/<env_file>` so the
+   * user's compose `env_file:` directive (relative to the compose file)
+   * resolves against jib's managed secrets. Silently skips if no secrets
+   * file exists — apps without secrets just run without injected env.
+   * Replaces any existing file/symlink at the target path.
+   */
+  private async linkSecrets(app: string, appCfg: App, workdir: string): Promise<void> {
+    const envName = appCfg.env_file ?? '.env'
+    const src = join(this.deps.paths.secretsDir, app, envName)
+    try {
+      await stat(src)
+    } catch {
+      return // no secrets file, nothing to link
+    }
+    const dest = join(workdir, envName)
+    await unlink(dest).catch(() => undefined)
+    await symlink(src, dest)
+  }
+
   /** Free bytes on the filesystem containing `path`. Uses `df -B1 --output=avail`. */
   private async diskFree(path: string): Promise<number> {
     if (this.deps.diskFree) return this.deps.diskFree(path)
@@ -97,6 +119,11 @@ export class Engine {
       const parsed = parseComposeServices(cmd.workdir, appCfg.compose ?? [])
       const services = buildOverrideServices(parsed, appCfg.domains)
       await writeOverride(this.deps.paths.overridesDir, cmd.app, services)
+
+      // Link the jib-managed secrets file into the workdir so the user's
+      // compose `env_file: .env` (service-level) resolves against it.
+      await this.linkSecrets(cmd.app, appCfg, cmd.workdir)
+
       const compose = this.newCompose(cmd.app, appCfg, cmd.workdir)
 
       progress.emit('build', `building ${cmd.app}`)
