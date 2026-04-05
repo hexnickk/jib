@@ -14,7 +14,11 @@ import { provisionApp, rollbackRepo } from './_provision.ts'
  * Domain syntax: `host[:containerPort][@ingress]`. `containerPort` is the
  * port *inside* the container (default `80`). Jib always auto-allocates the
  * *host* port from the managed range — operators never think about host
- * ports. Compose-file inference for `containerPort` lands in Stage 5.
+ * ports. TODO(future): infer `containerPort` from the compose file's
+ * `ports:`/`expose:` section instead of requiring the operator to spell it
+ * out. Blocked on the deployer also honouring the declared container port
+ * when it writes the generated compose override (see
+ * `libs/docker/override.ts`).
  */
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/

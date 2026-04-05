@@ -1,7 +1,7 @@
 /**
  * Pure nginx config generators. Each function takes a typed input and
  * returns a string — no file I/O, no nginx calls. That keeps templates
- * trivial to unit-test and lets hooks.ts own all side effects.
+ * trivial to unit-test and lets `handlers.ts` own all side effects.
  */
 
 export interface SiteInput {

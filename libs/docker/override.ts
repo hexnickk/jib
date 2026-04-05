@@ -18,6 +18,14 @@ export interface OverrideFile {
 /**
  * Build the jib-managed override structure for a set of discovered services.
  * Pure function — no disk access — so it's trivial to unit test.
+ *
+ * TODO(future): also publish `<hostPort>:<containerPort>` per domain so
+ * nginx can reach `127.0.0.1:<hostPort>`. Today the compose file itself is
+ * expected to publish the port; jib's port allocator hands out a host port
+ * to the nginx operator but doesn't thread it into the generated override.
+ * Landing this requires `buildOverride` to accept the `App.domains` entries
+ * and emit a `ports:` entry on the primary service. Scoped to a dedicated
+ * deployer pass, not Stage 5 of the nginx-operator refactor.
  */
 export function buildOverride(app: string, services: string[]): OverrideFile {
   const svcOverride: ServiceOverride = {

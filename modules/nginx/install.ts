@@ -13,10 +13,9 @@ import { NGINX_SERVICE_NAME, NGINX_UNIT_PATH, renderSystemdUnit } from './templa
 const JIB_INCLUDE_PATH = '/etc/nginx/conf.d/jib.conf'
 
 function includeSnippet(nginxDir: string): string {
-  // Two globs: the flat form for legacy `hooks.ts` output (single-level
-  // `<host>.conf` files, deleted in stage 4) and the per-app subdir form
-  // used by the operator (`<app>/<host>.conf`). Both coexist during the
-  // stage-2→stage-4 overlap; the flat glob drops out with hooks.ts.
+  // The operator writes per-app subdirs (`<app>/<host>.conf`). The flat
+  // `*.conf` glob is retained so operators can drop hand-written site
+  // files directly under `$JIB_ROOT/nginx/` without a wrapper dir.
   return `# Managed by jib (modules/nginx) — do not edit.
 include ${nginxDir}/*.conf;
 include ${nginxDir}/*/*.conf;

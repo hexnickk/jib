@@ -1,7 +1,7 @@
 /**
- * Small exec indirection so hooks.ts can be unit-tested without touching
- * the host's nginx. Tests import this module and swap the implementation
- * via `setExec`. Production code leaves the default in place.
+ * Small exec indirection so the nginx operator can be unit-tested without
+ * touching the host's nginx. Tests import this module and swap the
+ * implementation via `setExec`. Production code leaves the default in place.
  */
 
 export type ExecResult = { ok: boolean; stderr: string; stdout: string }
