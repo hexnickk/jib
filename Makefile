@@ -3,6 +3,9 @@
 BIN := dist/jib
 PREFIX ?= /usr/local/bin
 
+# `bun build --compile` rewrites the output file in place, which fails on
+# virtiofs-backed workspaces (devcontainer bind mount). Compile into a tmpfs
+# scratch dir first, then `install` the finished binary onto the mount.
 build:
 	@mkdir -p dist
 	@tmp="$$(mktemp -d)" && \
