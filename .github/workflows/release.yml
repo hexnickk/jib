@@ -31,11 +31,16 @@ jobs:
         run: bun test
 
       - name: Sync package.json version with tag
+        env:
+          VERSION: ${{ github.ref_name }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          tmp="$(mktemp)"
-          node -e "const p=require('./package.json');p.version=process.argv[1];require('fs').writeFileSync('./package.json',JSON.stringify(p,null,2)+'\n');" "$version"
-          echo "package.json version: $(node -e 'console.log(require(\"./package.json\").version)')"
+          bun -e '
+            const fs = require("fs");
+            const p = require("./package.json");
+            p.version = process.env.VERSION.replace(/^v/, "");
+            fs.writeFileSync("./package.json", JSON.stringify(p, null, 2) + "\n");
+            console.log("package.json version:", p.version);
+          '
 
       - name: Build binary
         run: |
@@ -52,10 +57,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - uses: actions/download-artifact@v4
         with:
           path: dist
