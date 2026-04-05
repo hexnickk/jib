@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { InstallFn } from '@jib/core'
-import { Bun$ } from './shell.ts'
 import { SERVICE_NAME, UNIT_PATH, composeYaml, natsConf, systemdUnit } from './templates.ts'
 
 /**
@@ -29,7 +28,7 @@ export const install: InstallFn = async (ctx) => {
   await writeFile(UNIT_PATH, systemdUnit(vars), { mode: 0o644 })
 
   log.info('systemctl daemon-reload')
-  await Bun$`systemctl daemon-reload`
+  await Bun.$`systemctl daemon-reload`
   log.info(`systemctl enable --now ${SERVICE_NAME}`)
-  await Bun$`systemctl enable --now ${SERVICE_NAME}`
+  await Bun.$`systemctl enable --now ${SERVICE_NAME}`
 }
