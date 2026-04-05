@@ -79,6 +79,7 @@ async function probe(
   return out
 }
 
+/** Matches Go: returns true on an empty list (no checks configured = healthy). */
 export function allHealthy(results: HealthResult[]): boolean {
-  return results.length > 0 && results.every((r) => r.ok)
+  return results.every((r) => r.ok)
 }

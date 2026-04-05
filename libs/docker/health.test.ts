@@ -75,6 +75,7 @@ describe('checkHealth', () => {
         { endpoint: 'y', ok: false },
       ]),
     ).toBe(false)
-    expect(allHealthy([])).toBe(false)
+    // Matches Go: empty list = vacuously healthy (no checks configured).
+    expect(allHealthy([])).toBe(true)
   })
 })
