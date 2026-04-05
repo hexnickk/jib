@@ -173,7 +173,13 @@ export default defineCommand({
     }
 
     consola.box(
-      'jib initialized. Next:\n  jib add <app> --repo org/repo --domain example.com\n  jib deploy <app>',
+      [
+        'jib initialized. Next:',
+        '  # (private repos) register a git auth provider:',
+        '  jib github app setup <name>   # or: jib github key setup <name>',
+        '  jib add <app> --repo org/repo --domain example.com',
+        '  jib deploy <app>',
+      ].join('\n'),
     )
   },
 })
