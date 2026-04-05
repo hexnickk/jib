@@ -1,5 +1,4 @@
-import { Bus, DEFAULT_URL } from '@jib/bus'
-import { JibError } from '@jib/core'
+import { withBus } from '@jib/bus'
 import { type EvtCloudflareDomainProgress, SUBJECTS, emitAndWait } from '@jib/rpc'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
@@ -13,28 +12,6 @@ import { consola } from 'consola'
  */
 
 const DOMAIN_TIMEOUT_MS = 60_000
-
-/**
- * Local copy of `src/bus-client.ts`'s `withBus` — modules must not reach into
- * `src/`, so the five-line lifecycle wrapper is duplicated here.
- */
-async function withBus<T>(fn: (bus: Bus) => Promise<T>): Promise<T> {
-  let bus: Bus
-  try {
-    bus = await Bus.connect(DEFAULT_URL, { name: 'jib-cli', maxAttempts: 3 })
-  } catch (err) {
-    const cause = err instanceof Error ? err.message : String(err)
-    throw new JibError(
-      'bus.connect',
-      `cannot connect to NATS — run 'jib init' or check 'systemctl status jib-bus' (${cause})`,
-    )
-  }
-  try {
-    return await fn(bus)
-  } finally {
-    await bus.close().catch(() => undefined)
-  }
-}
 
 export async function emitDomainAdd(rootDomain: string): Promise<void> {
   const s = spinner()
