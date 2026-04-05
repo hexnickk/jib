@@ -9,9 +9,11 @@
         "@jib-module/cloudflare": "workspace:*",
         "@jib-module/cloudflared": "workspace:*",
         "@jib-module/deployer": "workspace:*",
+        "@jib-module/github": "workspace:*",
         "@jib-module/gitsitter": "workspace:*",
         "@jib-module/nats": "workspace:*",
         "@jib-module/nginx": "workspace:*",
+        "@jib-module/webhook": "workspace:*",
         "@jib/bus": "workspace:*",
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
@@ -158,6 +160,16 @@
         "@jib/core": "workspace:*",
       },
     },
+    "modules/webhook": {
+      "name": "@jib-module/webhook",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/bus": "workspace:*",
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+        "@jib/rpc": "workspace:*",
+      },
+    },
   },
   "packages": {
     "@biomejs/biome": ["@biomejs/biome@1.9.4", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "1.9.4", "@biomejs/cli-darwin-x64": "1.9.4", "@biomejs/cli-linux-arm64": "1.9.4", "@biomejs/cli-linux-arm64-musl": "1.9.4", "@biomejs/cli-linux-x64": "1.9.4", "@biomejs/cli-linux-x64-musl": "1.9.4", "@biomejs/cli-win32-arm64": "1.9.4", "@biomejs/cli-win32-x64": "1.9.4" }, "bin": { "biome": "bin/biome" } }, "sha512-1rkd7G70+o9KkTn5KLmDYXihGoTaIGO9PIIN2ZB7UJxFrWw04CZHPYiMRjYsaDvVV7hP1dYNRLxSANLaBFGpog=="],
@@ -195,6 +207,8 @@
     "@jib-module/nats": ["@jib-module/nats@workspace:modules/nats"],
 
     "@jib-module/nginx": ["@jib-module/nginx@workspace:modules/nginx"],
+
+    "@jib-module/webhook": ["@jib-module/webhook@workspace:modules/webhook"],
 
     "@jib/bus": ["@jib/bus@workspace:libs/bus"],
 

@@ -5,6 +5,7 @@ import * as deployerMod from '@jib-module/deployer'
 import * as gitsitterMod from '@jib-module/gitsitter'
 import * as natsMod from '@jib-module/nats'
 import * as nginxMod from '@jib-module/nginx'
+import * as webhookMod from '@jib-module/webhook'
 import { type Config, loadConfig } from '@jib/config'
 import { type ModuleContext, createLogger, getPaths } from '@jib/core'
 import { isInteractive, promptConfirm } from '@jib/tui'
@@ -113,6 +114,14 @@ export default defineCommand({
       ? true
       : await promptConfirm({ message: 'Install nginx reverse-proxy module?', initialValue: true })
     if (wantNginx) await installMod(nginxMod, ctx)
+
+    const wantWebhook = nonInteractive
+      ? false
+      : await promptConfirm({
+          message: 'Install webhook receiver module?',
+          initialValue: false,
+        })
+    if (wantWebhook) await installMod(webhookMod, ctx)
 
     consola.box(
       'jib initialized. Next:\n  jib add <app> --repo org/repo --domain example.com\n  jib deploy <app>',
