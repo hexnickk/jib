@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises'
 import { JibError } from '@jib/core'
 import type { AppState } from '@jib/state'
 import type { Engine } from './engine.ts'
@@ -28,6 +29,14 @@ export async function rollback(engine: Engine, cmd: RollbackCmd): Promise<Rollba
   }
   const appCfg = engine.deps.config.apps[cmd.app]
   if (!appCfg) throw new JibError('rollback', `app "${cmd.app}" not found in config`)
+  try {
+    await stat(state.previous_workdir)
+  } catch {
+    throw new JibError(
+      'rollback',
+      `previous workdir ${state.previous_workdir} no longer exists on disk`,
+    )
+  }
 
   const compose = engine.composeFor(cmd.app, appCfg, state.previous_workdir)
   await compose.up({ services: appCfg.services ?? [] })

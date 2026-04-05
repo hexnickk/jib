@@ -82,4 +82,26 @@ describe('rollback', () => {
     const engine = new Engine({ config: cfg, paths, store, log: createLogger('test') })
     await expect(rollback(engine, { app: 'demo' })).rejects.toThrow(/no previous deploy/)
   })
+
+  test('errors with a clear message when previous_workdir no longer exists', async () => {
+    const { paths, store } = await mkEnv()
+    await store.save('demo', {
+      schema_version: 1,
+      app: 'demo',
+      strategy: 'restart',
+      deployed_sha: 'new',
+      deployed_workdir: '/tmp/jib-cur-missing',
+      previous_sha: 'old',
+      previous_workdir: '/tmp/jib-does-not-exist-xyz',
+      pinned: false,
+      last_deploy: '',
+      last_deploy_status: '',
+      last_deploy_error: '',
+      last_deploy_trigger: '',
+      last_deploy_user: '',
+      consecutive_failures: 0,
+    })
+    const engine = new Engine({ config: cfg, paths, store, log: createLogger('test') })
+    await expect(rollback(engine, { app: 'demo' })).rejects.toThrow(/no longer exists on disk/)
+  })
 })
