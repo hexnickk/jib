@@ -66,6 +66,41 @@ export const EvtRollbackProgressSchema = EnvelopeSchema.extend({
 export const EvtResumeSuccessSchema = EnvelopeSchema.extend({ app })
 export const EvtResumeFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
 
+const port = z.number().int().min(1).max(65535)
+const rootDomain = z.string().min(1)
+
+export const CmdNginxClaimSchema = EnvelopeSchema.extend({
+  app,
+  domains: z
+    .array(
+      z.object({
+        host: z.string().min(1),
+        port,
+        containerPort: port,
+      }),
+    )
+    .min(1),
+})
+export const CmdNginxReleaseSchema = EnvelopeSchema.extend({ app })
+export const CmdCloudflareDomainAddSchema = EnvelopeSchema.extend({ rootDomain })
+export const CmdCloudflareDomainRemoveSchema = EnvelopeSchema.extend({ rootDomain })
+
+export const EvtNginxReadySchema = EnvelopeSchema.extend({ app })
+export const EvtNginxReleasedSchema = EnvelopeSchema.extend({ app })
+export const EvtNginxFailedSchema = EnvelopeSchema.extend({ app, error: z.string() })
+export const EvtNginxProgressSchema = EnvelopeSchema.extend({ app, message: z.string() })
+
+export const EvtCloudflareDomainReadySchema = EnvelopeSchema.extend({ rootDomain })
+export const EvtCloudflareDomainRemovedSchema = EnvelopeSchema.extend({ rootDomain })
+export const EvtCloudflareDomainFailedSchema = EnvelopeSchema.extend({
+  rootDomain,
+  error: z.string(),
+})
+export const EvtCloudflareDomainProgressSchema = EnvelopeSchema.extend({
+  rootDomain,
+  message: z.string(),
+})
+
 export type CmdRepoPrepare = z.infer<typeof CmdRepoPrepareSchema>
 export type CmdRepoRemove = z.infer<typeof CmdRepoRemoveSchema>
 export type CmdDeploy = z.infer<typeof CmdDeploySchema>
@@ -85,6 +120,20 @@ export type EvtRollbackFailure = z.infer<typeof EvtRollbackFailureSchema>
 export type EvtRollbackProgress = z.infer<typeof EvtRollbackProgressSchema>
 export type EvtResumeSuccess = z.infer<typeof EvtResumeSuccessSchema>
 export type EvtResumeFailure = z.infer<typeof EvtResumeFailureSchema>
+
+export type CmdNginxClaim = z.infer<typeof CmdNginxClaimSchema>
+export type CmdNginxRelease = z.infer<typeof CmdNginxReleaseSchema>
+export type CmdCloudflareDomainAdd = z.infer<typeof CmdCloudflareDomainAddSchema>
+export type CmdCloudflareDomainRemove = z.infer<typeof CmdCloudflareDomainRemoveSchema>
+
+export type EvtNginxReady = z.infer<typeof EvtNginxReadySchema>
+export type EvtNginxReleased = z.infer<typeof EvtNginxReleasedSchema>
+export type EvtNginxFailed = z.infer<typeof EvtNginxFailedSchema>
+export type EvtNginxProgress = z.infer<typeof EvtNginxProgressSchema>
+export type EvtCloudflareDomainReady = z.infer<typeof EvtCloudflareDomainReadySchema>
+export type EvtCloudflareDomainRemoved = z.infer<typeof EvtCloudflareDomainRemovedSchema>
+export type EvtCloudflareDomainFailed = z.infer<typeof EvtCloudflareDomainFailedSchema>
+export type EvtCloudflareDomainProgress = z.infer<typeof EvtCloudflareDomainProgressSchema>
 
 /**
  * Lookup table from subject to schema. Used by `emitAndWait`/`handleCmd` to
@@ -109,4 +158,16 @@ export const SCHEMAS = {
   [SUBJECTS.evt.rollbackProgress]: EvtRollbackProgressSchema,
   [SUBJECTS.evt.resumeSuccess]: EvtResumeSuccessSchema,
   [SUBJECTS.evt.resumeFailure]: EvtResumeFailureSchema,
+  [SUBJECTS.cmd.nginxClaim]: CmdNginxClaimSchema,
+  [SUBJECTS.cmd.nginxRelease]: CmdNginxReleaseSchema,
+  [SUBJECTS.cmd.cloudflareDomainAdd]: CmdCloudflareDomainAddSchema,
+  [SUBJECTS.cmd.cloudflareDomainRemove]: CmdCloudflareDomainRemoveSchema,
+  [SUBJECTS.evt.nginxReady]: EvtNginxReadySchema,
+  [SUBJECTS.evt.nginxReleased]: EvtNginxReleasedSchema,
+  [SUBJECTS.evt.nginxFailed]: EvtNginxFailedSchema,
+  [SUBJECTS.evt.nginxProgress]: EvtNginxProgressSchema,
+  [SUBJECTS.evt.cloudflareDomainReady]: EvtCloudflareDomainReadySchema,
+  [SUBJECTS.evt.cloudflareDomainRemoved]: EvtCloudflareDomainRemovedSchema,
+  [SUBJECTS.evt.cloudflareDomainFailed]: EvtCloudflareDomainFailedSchema,
+  [SUBJECTS.evt.cloudflareDomainProgress]: EvtCloudflareDomainProgressSchema,
 } as const satisfies Record<string, z.ZodTypeAny>

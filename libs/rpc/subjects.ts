@@ -14,6 +14,10 @@ export const SUBJECTS = {
     rollback: 'jib.cmd.rollback',
     resume: 'jib.cmd.resume',
     configReload: 'jib.cmd.config.reload',
+    nginxClaim: 'jib.cmd.nginx.claim',
+    nginxRelease: 'jib.cmd.nginx.release',
+    cloudflareDomainAdd: 'jib.cmd.cloudflare.domain.add',
+    cloudflareDomainRemove: 'jib.cmd.cloudflare.domain.remove',
   },
   evt: {
     repoReady: 'jib.evt.repo.ready',
@@ -28,6 +32,14 @@ export const SUBJECTS = {
     rollbackProgress: 'jib.evt.rollback.progress',
     resumeSuccess: 'jib.evt.resume.success',
     resumeFailure: 'jib.evt.resume.failure',
+    nginxReady: 'jib.evt.nginx.ready',
+    nginxReleased: 'jib.evt.nginx.released',
+    nginxFailed: 'jib.evt.nginx.failed',
+    nginxProgress: 'jib.evt.nginx.progress',
+    cloudflareDomainReady: 'jib.evt.cloudflare.domain.ready',
+    cloudflareDomainRemoved: 'jib.evt.cloudflare.domain.removed',
+    cloudflareDomainFailed: 'jib.evt.cloudflare.domain.failed',
+    cloudflareDomainProgress: 'jib.evt.cloudflare.domain.progress',
   },
 } as const
 

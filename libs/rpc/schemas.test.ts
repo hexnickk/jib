@@ -1,9 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  CmdCloudflareDomainAddSchema,
   CmdDeploySchema,
+  CmdNginxClaimSchema,
   CmdRepoPrepareSchema,
   EnvelopeSchema,
+  EvtCloudflareDomainReadySchema,
   EvtDeploySuccessSchema,
+  EvtNginxReadySchema,
   SCHEMAS,
 } from './schemas.ts'
 import { SUBJECTS } from './subjects.ts'
@@ -51,6 +55,60 @@ describe('schemas', () => {
       durationMs: 1000,
     })
     expect(ok.success).toBe(true)
+  })
+
+  test('CmdNginxClaim round-trips with domain list', () => {
+    const v = CmdNginxClaimSchema.parse({
+      corrId: 'c',
+      ts: '2024-01-01T00:00:00Z',
+      source: 'cli',
+      app: 'web',
+      domains: [{ host: 'example.com', port: 20000, containerPort: 8080 }],
+    })
+    expect(v.domains[0]?.port).toBe(20000)
+    expect(v.domains[0]?.containerPort).toBe(8080)
+  })
+
+  test('CmdNginxClaim rejects empty domains list', () => {
+    expect(
+      CmdNginxClaimSchema.safeParse({
+        corrId: 'c',
+        ts: '2024-01-01T00:00:00Z',
+        source: 'cli',
+        app: 'web',
+        domains: [],
+      }).success,
+    ).toBe(false)
+  })
+
+  test('EvtNginxReady round-trips', () => {
+    const v = EvtNginxReadySchema.parse({
+      corrId: 'c',
+      ts: '2024-01-01T00:00:00Z',
+      source: 'nginx',
+      app: 'web',
+    })
+    expect(v.app).toBe('web')
+  })
+
+  test('CmdCloudflareDomainAdd round-trips', () => {
+    const v = CmdCloudflareDomainAddSchema.parse({
+      corrId: 'c',
+      ts: '2024-01-01T00:00:00Z',
+      source: 'cli',
+      rootDomain: 'example.com',
+    })
+    expect(v.rootDomain).toBe('example.com')
+  })
+
+  test('EvtCloudflareDomainReady round-trips', () => {
+    const v = EvtCloudflareDomainReadySchema.parse({
+      corrId: 'c',
+      ts: '2024-01-01T00:00:00Z',
+      source: 'cloudflare',
+      rootDomain: 'example.com',
+    })
+    expect(v.rootDomain).toBe('example.com')
   })
 
   test('SCHEMAS table covers every subject in SUBJECTS', () => {
