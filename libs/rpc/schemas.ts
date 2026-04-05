@@ -28,6 +28,12 @@ export const CmdDeploySchema = EnvelopeSchema.extend({
   user: z.string().optional(),
 })
 export const CmdResumeSchema = EnvelopeSchema.extend({ app })
+export const CmdAppUpSchema = EnvelopeSchema.extend({ app })
+export const CmdAppDownSchema = EnvelopeSchema.extend({
+  app,
+  volumes: z.boolean().default(false),
+})
+export const CmdAppRestartSchema = EnvelopeSchema.extend({ app })
 export const CmdConfigReloadSchema = EnvelopeSchema
 
 export const EvtRepoReadySchema = EnvelopeSchema.extend({
@@ -57,6 +63,12 @@ export const EvtDeployProgressSchema = EnvelopeSchema.extend({
 
 export const EvtResumeSuccessSchema = EnvelopeSchema.extend({ app })
 export const EvtResumeFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
+export const EvtAppUpSuccessSchema = EnvelopeSchema.extend({ app })
+export const EvtAppUpFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
+export const EvtAppDownSuccessSchema = EnvelopeSchema.extend({ app })
+export const EvtAppDownFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
+export const EvtAppRestartSuccessSchema = EnvelopeSchema.extend({ app })
+export const EvtAppRestartFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
 
 const port = z.number().int().min(1).max(65535)
 const rootDomain = z.string().min(1)
@@ -101,6 +113,9 @@ export type CmdRepoPrepare = z.infer<typeof CmdRepoPrepareSchema>
 export type CmdRepoRemove = z.infer<typeof CmdRepoRemoveSchema>
 export type CmdDeploy = z.infer<typeof CmdDeploySchema>
 export type CmdResume = z.infer<typeof CmdResumeSchema>
+export type CmdAppUp = z.infer<typeof CmdAppUpSchema>
+export type CmdAppDown = z.infer<typeof CmdAppDownSchema>
+export type CmdAppRestart = z.infer<typeof CmdAppRestartSchema>
 export type CmdConfigReload = z.infer<typeof CmdConfigReloadSchema>
 
 export type EvtRepoReady = z.infer<typeof EvtRepoReadySchema>
@@ -112,6 +127,12 @@ export type EvtDeployFailure = z.infer<typeof EvtDeployFailureSchema>
 export type EvtDeployProgress = z.infer<typeof EvtDeployProgressSchema>
 export type EvtResumeSuccess = z.infer<typeof EvtResumeSuccessSchema>
 export type EvtResumeFailure = z.infer<typeof EvtResumeFailureSchema>
+export type EvtAppUpSuccess = z.infer<typeof EvtAppUpSuccessSchema>
+export type EvtAppUpFailure = z.infer<typeof EvtAppUpFailureSchema>
+export type EvtAppDownSuccess = z.infer<typeof EvtAppDownSuccessSchema>
+export type EvtAppDownFailure = z.infer<typeof EvtAppDownFailureSchema>
+export type EvtAppRestartSuccess = z.infer<typeof EvtAppRestartSuccessSchema>
+export type EvtAppRestartFailure = z.infer<typeof EvtAppRestartFailureSchema>
 
 export type CmdNginxClaim = z.infer<typeof CmdNginxClaimSchema>
 export type CmdNginxRelease = z.infer<typeof CmdNginxReleaseSchema>
@@ -136,6 +157,9 @@ export const SCHEMAS = {
   [SUBJECTS.cmd.repoRemove]: CmdRepoRemoveSchema,
   [SUBJECTS.cmd.deploy]: CmdDeploySchema,
   [SUBJECTS.cmd.resume]: CmdResumeSchema,
+  [SUBJECTS.cmd.appUp]: CmdAppUpSchema,
+  [SUBJECTS.cmd.appDown]: CmdAppDownSchema,
+  [SUBJECTS.cmd.appRestart]: CmdAppRestartSchema,
   [SUBJECTS.cmd.configReload]: CmdConfigReloadSchema,
   [SUBJECTS.evt.repoReady]: EvtRepoReadySchema,
   [SUBJECTS.evt.repoRemoved]: EvtRepoRemovedSchema,
@@ -146,6 +170,12 @@ export const SCHEMAS = {
   [SUBJECTS.evt.deployProgress]: EvtDeployProgressSchema,
   [SUBJECTS.evt.resumeSuccess]: EvtResumeSuccessSchema,
   [SUBJECTS.evt.resumeFailure]: EvtResumeFailureSchema,
+  [SUBJECTS.evt.appUpSuccess]: EvtAppUpSuccessSchema,
+  [SUBJECTS.evt.appUpFailure]: EvtAppUpFailureSchema,
+  [SUBJECTS.evt.appDownSuccess]: EvtAppDownSuccessSchema,
+  [SUBJECTS.evt.appDownFailure]: EvtAppDownFailureSchema,
+  [SUBJECTS.evt.appRestartSuccess]: EvtAppRestartSuccessSchema,
+  [SUBJECTS.evt.appRestartFailure]: EvtAppRestartFailureSchema,
   [SUBJECTS.cmd.nginxClaim]: CmdNginxClaimSchema,
   [SUBJECTS.cmd.nginxRelease]: CmdNginxReleaseSchema,
   [SUBJECTS.cmd.cloudflareDomainAdd]: CmdCloudflareDomainAddSchema,

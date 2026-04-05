@@ -1,7 +1,7 @@
 import { stat, symlink, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { App, Config } from '@jib/config'
-import { JibError, type Logger, type Paths } from '@jib/core'
+import { JibError, type Logger, type Paths, repoPath } from '@jib/core'
 import {
   type CheckHealthOptions,
   Compose,
@@ -176,6 +176,38 @@ export class Engine {
     } finally {
       await release()
     }
+  }
+
+  /**
+   * Resolve the app's Compose handle without running any side effects.
+   * Used by the lightweight lifecycle commands (`up`/`down`/`restart`) that
+   * reuse the override + secrets + workdir resolution the engine already
+   * owns, but skip the full deploy ceremony.
+   */
+  private async composeFor(appName: string): Promise<{ compose: Compose; appCfg: App }> {
+    const appCfg = this.deps.config.apps[appName]
+    if (!appCfg) throw new JibError('deploy', `app "${appName}" not found in config`)
+    const workdir = repoPath(this.deps.paths, appName, appCfg.repo)
+    await this.linkSecrets(appName, appCfg, workdir)
+    return { compose: this.newCompose(appName, appCfg, workdir), appCfg }
+  }
+
+  /** `jib up` equivalent — start containers without rebuilding. */
+  async up(appName: string): Promise<void> {
+    const { compose, appCfg } = await this.composeFor(appName)
+    await compose.up({ services: appCfg.services ?? [] })
+  }
+
+  /** `jib down` equivalent — stop containers. Optionally removes volumes. */
+  async down(appName: string, removeVolumes = false): Promise<void> {
+    const { compose } = await this.composeFor(appName)
+    await compose.down(removeVolumes)
+  }
+
+  /** `jib restart` equivalent — restart containers in place. */
+  async restart(appName: string): Promise<void> {
+    const { compose } = await this.composeFor(appName)
+    await compose.restart()
   }
 }
 

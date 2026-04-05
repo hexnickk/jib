@@ -4,15 +4,20 @@ import type { Engine } from './engine.ts'
 import { resume } from './resume.ts'
 
 /**
- * Registers the two command handlers (`cmd.deploy`, `cmd.resume`) on `bus`
- * and wires each to the matching Engine method. jib intentionally has no
- * rollback: data-changing migrations aren't reversible, so reverting code
- * without reverting data gives false safety. Operators fix-forward instead.
+ * Registers every deployer command handler on `bus`:
+ *   - `cmd.deploy` / `cmd.resume` — full deploy flow + failure recovery
+ *   - `cmd.app.up` / `cmd.app.down` / `cmd.app.restart` — lightweight
+ *     lifecycle wrappers over docker compose. Moved from the CLI so every
+ *     docker operation lives in a single process; the CLI becomes a pure
+ *     event emitter with zero `@jib/docker` imports for these paths.
+ *
+ * jib intentionally has no rollback: data-changing migrations aren't
+ * reversible, so reverting code without data gives false safety. Fix-forward.
  *
  * `engineFactory` is invoked per command so the engine sees a freshly loaded
  * config. This sidesteps the stale-cache race where the CLI writes config and
- * emits `cmd.deploy` before the operator's `cmd.config.reload` subscription
- * has fired. Engine construction is a pure object allocation — zero overhead.
+ * emits `cmd.*` before the operator's `cmd.config.reload` subscription has
+ * fired. Engine construction is a pure object allocation — zero overhead.
  */
 export function registerDeployerHandlers(
   bus: Bus,
@@ -82,8 +87,80 @@ export function registerDeployerHandlers(
     },
   )
 
+  const upSub = handleCmd(
+    bus,
+    SUBJECTS.cmd.appUp,
+    'deployer',
+    'deployer',
+    undefined,
+    SUBJECTS.evt.appUpFailure,
+    async (cmd) => {
+      const engine = await engineFactory()
+      try {
+        await engine.up(cmd.app)
+        return { success: { subject: SUBJECTS.evt.appUpSuccess, body: { app: cmd.app } } }
+      } catch (err) {
+        return {
+          failure: {
+            subject: SUBJECTS.evt.appUpFailure,
+            body: { app: cmd.app, error: (err as Error).message },
+          },
+        }
+      }
+    },
+  )
+
+  const downSub = handleCmd(
+    bus,
+    SUBJECTS.cmd.appDown,
+    'deployer',
+    'deployer',
+    undefined,
+    SUBJECTS.evt.appDownFailure,
+    async (cmd) => {
+      const engine = await engineFactory()
+      try {
+        await engine.down(cmd.app, cmd.volumes)
+        return { success: { subject: SUBJECTS.evt.appDownSuccess, body: { app: cmd.app } } }
+      } catch (err) {
+        return {
+          failure: {
+            subject: SUBJECTS.evt.appDownFailure,
+            body: { app: cmd.app, error: (err as Error).message },
+          },
+        }
+      }
+    },
+  )
+
+  const restartSub = handleCmd(
+    bus,
+    SUBJECTS.cmd.appRestart,
+    'deployer',
+    'deployer',
+    undefined,
+    SUBJECTS.evt.appRestartFailure,
+    async (cmd) => {
+      const engine = await engineFactory()
+      try {
+        await engine.restart(cmd.app)
+        return { success: { subject: SUBJECTS.evt.appRestartSuccess, body: { app: cmd.app } } }
+      } catch (err) {
+        return {
+          failure: {
+            subject: SUBJECTS.evt.appRestartFailure,
+            body: { app: cmd.app, error: (err as Error).message },
+          },
+        }
+      }
+    },
+  )
+
   return () => {
     deploySub.unsubscribe()
     resumeSub.unsubscribe()
+    upSub.unsubscribe()
+    downSub.unsubscribe()
+    restartSub.unsubscribe()
   }
 }
