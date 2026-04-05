@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { defineCommand, runMain } from 'citty'
+import pkg from './package.json' with { type: 'json' }
 import {
   addCmd,
   configCmd,
@@ -29,7 +30,7 @@ import { moduleSubCommands } from './src/module-cli.ts'
 const main = defineCommand({
   meta: {
     name: 'jib',
-    version: '0.0.0',
+    version: pkg.version,
     description: 'Lightweight deploy tool for docker-compose apps over SSH',
   },
   subCommands: {

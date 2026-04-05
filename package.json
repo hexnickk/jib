@@ -1,11 +1,11 @@
 {
   "name": "jib",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "workspaces": ["modules/*", "libs/*"],
   "engines": {
-    "bun": ">=1.3.0"
+    "bun": "1.3.11"
   },
   "scripts": {
     "build": "bun build --compile main.ts --outfile dist/jib",
