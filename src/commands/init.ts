@@ -116,6 +116,14 @@ export default defineCommand({
     const wantCFD = nonInteractive
       ? false
       : await promptConfirm({ message: 'Install cloudflared tunnel daemon?', initialValue: false })
+    if (wantCFD && !wantNginx) {
+      // cloudflared tunnels to localhost:80 — that port is nginx's job. Without
+      // nginx the tunnel will land on nothing. Warn loudly but don't block;
+      // operators running a custom proxy on :80 may know what they're doing.
+      consola.warn(
+        'cloudflared without nginx: the tunnel will hit localhost:80 with no default handler',
+      )
+    }
     if (wantCFD) await installMod(cloudflaredMod, ctx)
 
     const wantCFOp = nonInteractive
