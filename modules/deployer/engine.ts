@@ -50,9 +50,8 @@ export interface DeployResult {
 
 /**
  * Deploy engine. Owns the deploy flow: lock, disk check, build, pre-deploy
- * hooks, compose up, health, state update. `resume.ts` shares the engine's
- * constructor + state store. jib has no rollback — operators fix-forward
- * because data-changing migrations aren't reversible.
+ * hooks, compose up, health, state update. jib has no rollback — operators
+ * fix-forward because data-changing migrations aren't reversible.
  */
 export class Engine {
   constructor(readonly deps: EngineDeps) {}
