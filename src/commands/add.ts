@@ -4,7 +4,7 @@ import { isInteractive, promptString } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { loadAppConfig } from './_ctx.ts'
-import { provisionApp } from './_provision.ts'
+import { provisionApp, rollbackRepo } from './_provision.ts'
 
 /**
  * `jib add <app>` — parse flags → allocate host ports → write config →
@@ -178,8 +178,11 @@ export default defineCommand({
     if (args['config-only']) return
 
     try {
-      await provisionApp(args.app, newApp, DEFAULT_TIMEOUT_MS, DEFAULT_CONTAINER_PORT)
+      await provisionApp(args.app, newApp, DEFAULT_TIMEOUT_MS)
     } catch (err) {
+      // Order matters: `cmd.repo.remove` reads the config to find the
+      // workdir, so it must fire *before* we drop the app entry.
+      await rollbackRepo(args.app, DEFAULT_TIMEOUT_MS)
       const rollbackApps = { ...nextCfg.apps }
       delete rollbackApps[args.app]
       await writeConfig(paths.configFile, { ...nextCfg, apps: rollbackApps })

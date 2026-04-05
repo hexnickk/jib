@@ -2,6 +2,7 @@ import { withBus } from '@jib/bus'
 import type { App } from '@jib/config'
 import { SUBJECTS, emitAndWait } from '@jib/rpc'
 import { spinner } from '@jib/tui'
+import { consola } from 'consola'
 
 /**
  * Runs the post-writeConfig provisioning chain for `jib add`: asks gitsitter
@@ -9,12 +10,7 @@ import { spinner } from '@jib/tui'
  * steps stream progress to a clack spinner. Throws on any failure so the
  * caller can roll back the config entry.
  */
-export async function provisionApp(
-  app: string,
-  appCfg: App,
-  timeoutMs: number,
-  defaultContainerPort: number,
-): Promise<void> {
+export async function provisionApp(app: string, appCfg: App, timeoutMs: number): Promise<void> {
   await withBus(async (bus) => {
     const s = spinner()
     s.start(`preparing ${app}`)
@@ -40,8 +36,10 @@ export async function provisionApp(
           // `assignPorts` in add.ts guarantees `port` is populated before we
           // get here; treat undefined as a programming error.
           port: d.port as number,
-          containerPort: d.container_port ?? defaultContainerPort,
           isTunnel: d.ingress === 'cloudflare-tunnel',
+          // TODO(stage-5): wire `hasSSL` from a per-domain cert-presence
+          // check (or a future `tls:` config field). Hardcoded false today
+          // because Stage 4 only covers plaintext + tunnel listeners.
           hasSSL: false,
         })),
       },
@@ -51,4 +49,28 @@ export async function provisionApp(
     )
     s2.stop('nginx ready')
   })
+}
+
+/**
+ * Best-effort cleanup of gitsitter's workdir when `jib add` fails after
+ * `cmd.repo.prepare` succeeded. Must be called *before* the caller removes
+ * the app from config — the gitsitter handler reads the config to locate
+ * the workdir. Any failure (repo never prepared, bus down, handler throws)
+ * is logged and swallowed so the caller can still drop the config entry.
+ */
+export async function rollbackRepo(app: string, timeoutMs: number): Promise<void> {
+  try {
+    await withBus(async (bus) => {
+      await emitAndWait(
+        bus,
+        SUBJECTS.cmd.repoRemove,
+        { app },
+        { success: SUBJECTS.evt.repoRemoved, failure: SUBJECTS.evt.repoFailed },
+        undefined,
+        { source: 'cli', timeoutMs },
+      )
+    })
+  } catch (err) {
+    consola.warn(`repo rollback: ${err instanceof Error ? err.message : String(err)}`)
+  }
 }
