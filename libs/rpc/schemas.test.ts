@@ -64,10 +64,9 @@ describe('schemas', () => {
       ts: '2024-01-01T00:00:00Z',
       source: 'cli',
       app: 'web',
-      domains: [{ host: 'example.com', port: 20000, containerPort: 8080 }],
+      domains: [{ host: 'example.com', port: 20000 }],
     })
     expect(v.domains[0]?.port).toBe(20000)
-    expect(v.domains[0]?.containerPort).toBe(8080)
   })
 
   test('CmdNginxClaim rejects empty domains list', () => {

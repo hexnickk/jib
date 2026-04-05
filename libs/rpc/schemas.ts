@@ -76,7 +76,6 @@ export const CmdNginxClaimSchema = EnvelopeSchema.extend({
       z.object({
         host: z.string().min(1),
         port,
-        containerPort: port,
         isTunnel: z.boolean().default(false),
         hasSSL: z.boolean().default(false),
       }),

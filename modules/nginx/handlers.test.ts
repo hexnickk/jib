@@ -51,7 +51,7 @@ function claim(app: string) {
     ts: new Date().toISOString(),
     source: 'test',
     app,
-    domains: [{ host: `${app}.example.com`, port: 8080, containerPort: 80 }],
+    domains: [{ host: `${app}.example.com`, port: 8080 }],
   }
 }
 
@@ -175,9 +175,7 @@ describe('nginx operator handlers', () => {
       ts: new Date().toISOString(),
       source: 'test',
       app: 'tun',
-      domains: [
-        { host: 'tun.example.com', port: 20000, containerPort: 80, isTunnel: true, hasSSL: false },
-      ],
+      domains: [{ host: 'tun.example.com', port: 20000, isTunnel: true, hasSSL: false }],
     })
     await waitFor(() => (ready.length ? ready : undefined))
     const body = await readFile(join(paths.nginxDir, 'tun', 'tun.example.com.conf'), 'utf8')
@@ -196,9 +194,7 @@ describe('nginx operator handlers', () => {
       ts: new Date().toISOString(),
       source: 'test',
       app: 'ssl',
-      domains: [
-        { host: 'ssl.example.com', port: 20001, containerPort: 80, isTunnel: false, hasSSL: true },
-      ],
+      domains: [{ host: 'ssl.example.com', port: 20001, isTunnel: false, hasSSL: true }],
     })
     await waitFor(() => (ready.length ? ready : undefined))
     const body = await readFile(join(paths.nginxDir, 'ssl', 'ssl.example.com.conf'), 'utf8')
