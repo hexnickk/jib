@@ -1,28 +1,26 @@
 #!/usr/bin/env bash
 set -e
 
-# Check formatting
-unformatted=$(gofmt -l $(find . -name '*.go' -not -path './vendor/*') 2>/dev/null)
-if [ -n "$unformatted" ]; then
-    echo "ERROR: The following files are not formatted with gofmt:"
-    echo "$unformatted"
-    echo ""
-    echo "Run 'gofmt -w' on these files or 'make fmt' before committing."
-    exit 1
+# Legacy Go checks (only while _legacy/go.mod is present)
+if [ -f _legacy/go.mod ]; then
+    pushd _legacy >/dev/null
+    unformatted=$(gofmt -l $(find . -name '*.go' -not -path './vendor/*') 2>/dev/null || true)
+    if [ -n "$unformatted" ]; then
+        echo "ERROR: The following files in _legacy/ are not formatted with gofmt:"
+        echo "$unformatted"
+        exit 1
+    fi
+    if ! go vet ./... 2>&1; then
+        echo "ERROR: go vet found issues in _legacy/."
+        exit 1
+    fi
+    popd >/dev/null
 fi
 
-# Run go vet
-if ! go vet ./... 2>&1; then
-    echo ""
-    echo "ERROR: go vet found issues. Fix them before committing."
-    exit 1
-fi
-
-# Run golangci-lint (if installed)
-if command -v golangci-lint &>/dev/null; then
-    if ! golangci-lint run ./... 2>&1; then
-        echo ""
-        echo "ERROR: golangci-lint found issues. Fix them before committing."
+# TypeScript checks via biome (only once biome is configured)
+if [ -f biome.json ] && command -v bun &>/dev/null; then
+    if ! bun x biome check . 2>&1; then
+        echo "ERROR: biome check failed. Run 'make fmt' or fix before committing."
         exit 1
     fi
 fi
