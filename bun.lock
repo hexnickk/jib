@@ -6,6 +6,13 @@
       "name": "jib",
       "dependencies": {
         "@clack/prompts": "^0.8.2",
+        "@jib-module/deployer": "workspace:*",
+        "@jib-module/gitsitter": "workspace:*",
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+        "@jib/docker": "workspace:*",
+        "@jib/rpc": "workspace:*",
+        "@jib/state": "workspace:*",
         "citty": "^0.1.6",
         "consola": "^3.2.3",
         "nats": "^2.29.3",
@@ -93,6 +100,42 @@
         "@jib/core": "workspace:*",
       },
     },
+    "modules/deployer": {
+      "name": "@jib-module/deployer",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/bus": "workspace:*",
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+        "@jib/docker": "workspace:*",
+        "@jib/rpc": "workspace:*",
+        "@jib/secrets": "workspace:*",
+        "@jib/state": "workspace:*",
+      },
+    },
+    "modules/github": {
+      "name": "@jib-module/github",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+        "@jib/tui": "workspace:*",
+        "citty": "*",
+        "consola": "*",
+      },
+    },
+    "modules/gitsitter": {
+      "name": "@jib-module/gitsitter",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib-module/github": "workspace:*",
+        "@jib/bus": "workspace:*",
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+        "@jib/rpc": "workspace:*",
+        "@jib/state": "workspace:*",
+      },
+    },
     "modules/nats": {
       "name": "@jib-module/nats",
       "version": "0.0.0",
@@ -135,6 +178,12 @@
     "@jib-module/cloudflare": ["@jib-module/cloudflare@workspace:modules/cloudflare"],
 
     "@jib-module/cloudflared": ["@jib-module/cloudflared@workspace:modules/cloudflared"],
+
+    "@jib-module/deployer": ["@jib-module/deployer@workspace:modules/deployer"],
+
+    "@jib-module/github": ["@jib-module/github@workspace:modules/github"],
+
+    "@jib-module/gitsitter": ["@jib-module/gitsitter@workspace:modules/gitsitter"],
 
     "@jib-module/nats": ["@jib-module/nats@workspace:modules/nats"],
 
