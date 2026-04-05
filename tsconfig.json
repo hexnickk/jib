@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ESNext"],
-    "types": ["bun-types"],
+    "types": ["bun"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
@@ -20,11 +20,7 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "@jib/*": ["libs/*", "modules/*"]
-    }
+    "noEmit": true
   },
   "include": ["main.ts", "libs/**/*.ts", "modules/**/*.ts"],
   "exclude": ["node_modules", "dist", "_legacy"]
