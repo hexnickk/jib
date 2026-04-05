@@ -60,7 +60,12 @@ function collectUsed(config: PortAllocatorConfig): Set<number> {
   return used
 }
 
-/** Resolves true iff `port` on `host` can be bound right now. */
+/**
+ * Resolves true iff `port` on `host` can be bound right now. Never rejects:
+ * any synchronous throw from `server.listen` (e.g. invalid host, EACCES on a
+ * privileged port) is caught and treated as "port not free" so the allocator
+ * can fall through to the next candidate instead of exploding.
+ */
 export async function isPortFree(port: number, host = '127.0.0.1'): Promise<boolean> {
   return new Promise((resolve) => {
     const server = net.createServer()
@@ -68,6 +73,10 @@ export async function isPortFree(port: number, host = '127.0.0.1'): Promise<bool
     server.once('listening', () => {
       server.close(() => resolve(true))
     })
-    server.listen(port, host)
+    try {
+      server.listen(port, host)
+    } catch {
+      resolve(false)
+    }
   })
 }
