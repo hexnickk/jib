@@ -4,6 +4,7 @@ import {
   type CheckHealthOptions,
   Compose,
   type DockerExec,
+  type OverrideService,
   allHealthy,
   checkHealth,
   overridePath,
@@ -93,7 +94,8 @@ export class Engine {
       const prevState = await this.deps.store.load(cmd.app)
       const previousSHA = prevState.deployed_sha
 
-      const services = parseComposeServices(cmd.workdir, appCfg.compose ?? []).map((s) => s.name)
+      const parsed = parseComposeServices(cmd.workdir, appCfg.compose ?? [])
+      const services = buildOverrideServices(parsed, appCfg.domains)
       await writeOverride(this.deps.paths.overridesDir, cmd.app, services)
       const compose = this.newCompose(cmd.app, appCfg, cmd.workdir)
 
@@ -159,4 +161,30 @@ export class Engine {
 /** Build an `Engine` from a `ModuleContext`-shaped deps bag. Convenience for `start.ts`. */
 export function newEngine(deps: EngineDeps): Engine {
   return new Engine(deps)
+}
+
+/**
+ * Group domains by target compose service and build the `OverrideService[]`
+ * list the deployer passes to `writeOverride`. Every discovered compose
+ * service gets an entry so the override file can stamp jib labels and log
+ * rotation onto all of them; only services targeted by a domain pick up a
+ * `!override` `ports:` block.
+ */
+export function buildOverrideServices(
+  parsed: { name: string }[],
+  domains: App['domains'],
+): OverrideService[] {
+  const byService = new Map<string, { host: number; container: number }[]>()
+  const single = parsed.length === 1 ? parsed[0]?.name : undefined
+  for (const d of domains) {
+    const target = d.service ?? single
+    if (!target || d.port === undefined || d.container_port === undefined) continue
+    const list = byService.get(target) ?? []
+    list.push({ host: d.port, container: d.container_port })
+    byService.set(target, list)
+  }
+  return parsed.map((s) => {
+    const ports = byService.get(s.name)
+    return ports && ports.length > 0 ? { name: s.name, ports } : { name: s.name }
+  })
 }

@@ -8,9 +8,17 @@ export {
   type HealthResult,
 } from './health.ts'
 export { imageExists, pruneImages, tagRollbackImages } from './images.ts'
-export { buildOverride, type OverrideFile, overridePath, writeOverride } from './override.ts'
+export {
+  buildOverride,
+  type OverrideFile,
+  type OverrideService,
+  overridePath,
+  writeOverride,
+} from './override.ts'
 export {
   type ComposeService,
+  hasPublishedPorts,
+  inferContainerPort,
   inferHealthAndPort,
   inferPorts,
   parseComposeServices,

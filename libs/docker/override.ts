@@ -1,60 +1,80 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { stringify as yamlStringify } from 'yaml'
+import { Document, Scalar, YAMLSeq } from 'yaml'
 
-interface ServiceOverride {
-  labels: Record<string, string>
-  restart: string
-  logging: {
-    driver: string
-    options: Record<string, string>
-  }
+/** One `host:container` port pair for a service's `ports:` list. */
+export interface PortMapping {
+  host: number
+  container: number
+}
+
+/** Input shape for `buildOverride`: per-service labels + optional port list. */
+export interface OverrideService {
+  name: string
+  /** Extra ports to publish. Emitted with YAML `!override` to replace the
+   * user's `ports:` list (requires Docker Compose 2.24+). */
+  ports?: PortMapping[]
 }
 
 export interface OverrideFile {
-  services: Record<string, ServiceOverride>
+  services: Record<
+    string,
+    {
+      labels: Record<string, string>
+      restart: string
+      logging: { driver: string; options: Record<string, string> }
+      ports?: string[]
+    }
+  >
 }
+
+const JIB_LABELS = (app: string) => ({ 'jib.app': app, 'jib.managed': 'true' })
+const LOG_OPTS = { driver: 'json-file', options: { 'max-size': '50m', 'max-file': '3' } }
 
 /**
  * Build the jib-managed override structure for a set of discovered services.
- * Pure function — no disk access — so it's trivial to unit test.
- *
- * TODO(future): also publish `<hostPort>:<containerPort>` per domain so
- * nginx can reach `127.0.0.1:<hostPort>`. Today the compose file itself is
- * expected to publish the port; jib's port allocator hands out a host port
- * to the nginx operator but nothing threads it through the generated
- * override. This is a design tension, not a mechanical fix:
- *
- *   - If the user's compose file pins a host port (e.g. `ports: ["8080:80"]`)
- *     then jib's allocator picks, say, 20000, tells nginx to proxy
- *     `127.0.0.1:20000`, and nginx hits nothing because the container is on
- *     8080. Broken v0 for any compose file that publishes ports.
- *   - Forcing `buildOverride` to emit a `ports:` entry would *silently*
- *     shadow whatever the user wrote, which is a different footgun.
- *   - The clean resolution is probably: stop publishing in user compose
- *     files, let jib own the host port end-to-end, and infer
- *     `containerPort` (today hardcoded to 80 in `src/commands/add.ts`)
- *     from the service's `EXPOSE` or the compose `expose:` key.
- *
- * Scoped to a dedicated deployer pass; needs a product decision before
- * code. Tracked alongside the add-command TODO in `src/commands/add.ts`.
+ * Pure function — no disk access — so it's trivial to unit test. Returned
+ * shape is informational; `writeOverride` serialises via a yaml `Document`
+ * so it can stamp the `!override` tag on the `ports:` sequence.
  */
-export function buildOverride(app: string, services: string[]): OverrideFile {
-  const svcOverride: ServiceOverride = {
-    labels: { 'jib.app': app, 'jib.managed': 'true' },
-    restart: 'unless-stopped',
-    logging: {
-      driver: 'json-file',
-      options: { 'max-size': '50m', 'max-file': '3' },
-    },
+export function buildOverride(app: string, services: OverrideService[]): OverrideFile {
+  const out: OverrideFile['services'] = {}
+  for (const s of services) {
+    out[s.name] = {
+      labels: JIB_LABELS(app),
+      restart: 'unless-stopped',
+      logging: LOG_OPTS,
+      ...(s.ports && s.ports.length > 0
+        ? { ports: s.ports.map((p) => `${p.host}:${p.container}`) }
+        : {}),
+    }
   }
-  const entries = services.map((s) => [s, svcOverride] as const)
-  return { services: Object.fromEntries(entries) }
+  return { services: out }
 }
 
 /** Deterministic on-disk path for an app's generated override file. */
 export function overridePath(overrideDir: string, app: string): string {
   return join(overrideDir, `${app}.yml`)
+}
+
+/**
+ * Build a yaml `Document` and stamp `!override` on every service's `ports:`
+ * sequence. Compose 2.24+ treats that tag as a list-replacement marker
+ * instead of merging with the user's compose file.
+ */
+export function renderOverrideYAML(app: string, services: OverrideService[]): string {
+  const doc = new Document(buildOverride(app, services))
+  for (const s of services) {
+    if (!s.ports || s.ports.length === 0) continue
+    const seq = doc.getIn(['services', s.name, 'ports'], true)
+    if (seq instanceof YAMLSeq) {
+      seq.tag = '!override'
+      for (const item of seq.items) {
+        if (item instanceof Scalar) item.type = Scalar.QUOTE_DOUBLE
+      }
+    }
+  }
+  return doc.toString()
 }
 
 /**
@@ -64,10 +84,9 @@ export function overridePath(overrideDir: string, app: string): string {
 export async function writeOverride(
   overrideDir: string,
   app: string,
-  services: string[],
+  services: OverrideService[],
 ): Promise<string> {
-  const override = buildOverride(app, services)
-  const yaml = yamlStringify(override)
+  const yaml = renderOverrideYAML(app, services)
   const header = '# Auto-generated by jib — do not edit\n'
   await mkdir(overrideDir, { recursive: true, mode: 0o750 })
   const outPath = overridePath(overrideDir, app)
