@@ -1,0 +1,16 @@
+{
+  "name": "@jib-module/nats",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "jib": {
+    "module": true
+  },
+  "dependencies": {
+    "@jib/core": "workspace:*"
+  }
+}

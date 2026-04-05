@@ -6,6 +6,14 @@ export interface ModuleManifest {
   name: string
   deps?: string[]
   requiresRoot?: boolean
+  description?: string
+  /**
+   * Install + setup-hook ordering. Lower numbers run first on add
+   * (`install`, `onAppAdd`); higher numbers run first on removal
+   * (`uninstall`, `onAppRemove`). Default is 100. Used to enforce
+   * cloudflare-before-nginx on add and nginx-before-cloudflare on remove.
+   */
+  installOrder?: number
 }
 
 export type InstallFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>

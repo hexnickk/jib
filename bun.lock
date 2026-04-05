@@ -37,6 +37,15 @@
       "name": "@jib/core",
       "version": "0.0.0",
     },
+    "libs/docker": {
+      "name": "@jib/docker",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+        "yaml": "*",
+      },
+    },
     "libs/rpc": {
       "name": "@jib/rpc",
       "version": "0.0.0",
@@ -67,6 +76,38 @@
         "@jib/core": "workspace:*",
       },
     },
+    "modules/cloudflare": {
+      "name": "@jib-module/cloudflare",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+        "@jib/tui": "workspace:*",
+        "citty": "*",
+      },
+    },
+    "modules/cloudflared": {
+      "name": "@jib-module/cloudflared",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/core": "workspace:*",
+      },
+    },
+    "modules/nats": {
+      "name": "@jib-module/nats",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/core": "workspace:*",
+      },
+    },
+    "modules/nginx": {
+      "name": "@jib-module/nginx",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+      },
+    },
   },
   "packages": {
     "@biomejs/biome": ["@biomejs/biome@1.9.4", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "1.9.4", "@biomejs/cli-darwin-x64": "1.9.4", "@biomejs/cli-linux-arm64": "1.9.4", "@biomejs/cli-linux-arm64-musl": "1.9.4", "@biomejs/cli-linux-x64": "1.9.4", "@biomejs/cli-linux-x64-musl": "1.9.4", "@biomejs/cli-win32-arm64": "1.9.4", "@biomejs/cli-win32-x64": "1.9.4" }, "bin": { "biome": "bin/biome" } }, "sha512-1rkd7G70+o9KkTn5KLmDYXihGoTaIGO9PIIN2ZB7UJxFrWw04CZHPYiMRjYsaDvVV7hP1dYNRLxSANLaBFGpog=="],
@@ -91,11 +132,21 @@
 
     "@clack/prompts": ["@clack/prompts@0.8.2", "", { "dependencies": { "@clack/core": "0.3.5", "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-6b9Ab2UiZwJYA9iMyboYyW9yJvAO9V753ZhS+DHKEjZRKAxPPOb7MXXu84lsPFG+vZt6FRFniZ8rXi+zCIw4yQ=="],
 
+    "@jib-module/cloudflare": ["@jib-module/cloudflare@workspace:modules/cloudflare"],
+
+    "@jib-module/cloudflared": ["@jib-module/cloudflared@workspace:modules/cloudflared"],
+
+    "@jib-module/nats": ["@jib-module/nats@workspace:modules/nats"],
+
+    "@jib-module/nginx": ["@jib-module/nginx@workspace:modules/nginx"],
+
     "@jib/bus": ["@jib/bus@workspace:libs/bus"],
 
     "@jib/config": ["@jib/config@workspace:libs/config"],
 
     "@jib/core": ["@jib/core@workspace:libs/core"],
+
+    "@jib/docker": ["@jib/docker@workspace:libs/docker"],
 
     "@jib/rpc": ["@jib/rpc@workspace:libs/rpc"],
 
