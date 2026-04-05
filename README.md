@@ -1,189 +1,115 @@
-# Jib
+# jib
 
-A single Go binary that deploys docker-compose apps on bare machines with auto-SSL, autodeploy, backups, and basic monitoring. For small teams running 3-7 apps per machine.
+Lightweight CLI for deploying docker-compose apps on bare servers via SSH.
+GitHub App auth drives repo polling, a deployer service runs
+`docker compose` on the host, and optional modules wire up Cloudflare
+tunnels and an nginx reverse proxy. Designed to replace Coolify for small
+fleets of home servers and single-box VPS deployments.
 
-Jib lives on the server. You SSH in and run commands, or use `ssh <host> jib <command>` from your laptop. No local install needed.
+## Status
 
-## Quick Start
+Very early. No stable API. Actively developed. Currently being rewritten
+from Go to TypeScript (Bun single-binary) — the legacy Go tree lives under
+`_legacy/` and will be removed once the rewrite is complete.
+
+## Install
+
+On the server you want to deploy onto:
 
 ```bash
-# Install on a fresh Ubuntu 22.04+ server (installs + runs jib init):
-curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/refs/heads/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/main/scripts/install.sh | bash
+```
 
-# Add an app (port and health check inferred from docker-compose.yml):
-jib add myapp --repo myorg/myapp --domain myapp.com
+The script detects your OS/arch, downloads the matching binary from the
+latest GitHub release, and installs it to `/usr/local/bin/jib`. Supported
+targets: `linux-x64`, `linux-arm64`, `darwin-arm64`.
 
-# Set secrets and deploy:
-jib secrets set myapp --file .env.production
+Override the release tag or install prefix via env vars:
+
+```bash
+JIB_VERSION=v0.1.0 JIB_PREFIX=$HOME/.local/bin \
+  curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/main/scripts/install.sh | bash
+```
+
+## Quickstart
+
+```bash
+# 1. Bootstrap jib on a fresh server. Installs the NATS bus, deployer,
+#    and gitsitter systemd units under $JIB_ROOT (default /opt/jib).
+jib init
+
+# 2. Register a GitHub App so jib can clone private repos. Walks through
+#    the manifest flow and stores credentials under /opt/jib/secrets.
+jib github app setup my-org
+
+# 3. Add an app. Port + health check are inferred from the compose file
+#    in the target repo.
+jib add myapp --repo my-org/myapp --domain myapp.example.com:8080
+
+# 4. Deploy.
 jib deploy myapp
 ```
 
-## What Can You Deploy?
+After the initial deploy, gitsitter polls the repo and publishes a deploy
+event whenever the tracked branch advances. The deployer subscribes and
+re-runs the deploy end to end.
 
-**Frontend + Backend + Database** — a React app, Node API, and Postgres with persistent volumes, all in one compose file. Jib builds, deploys, health-checks, and reverse-proxies each domain.
+## Commands
 
-**Multiple backends talking to each other** — deploy a worker service that polls your API. Each app gets its own Docker network; cross-app communication works via `host.docker.internal`.
+| Command | Description |
+|---|---|
+| `jib init` | Bootstrap jib on the current host (bus, deployer, gitsitter). |
+| `jib add <app>` | Register a new app (repo, branch, domains, compose path). |
+| `jib remove <app>` | Unregister an app and tear down its containers. |
+| `jib deploy <app>` | Deploy the tracked branch of an app now. |
+| `jib rollback <app>` | Roll back to the previous successful deploy. |
+| `jib resume <app>` | Resume a paused/failed deploy loop. |
+| `jib config` | Inspect or edit the jib config. |
+| `jib edit <app>` | Edit a single app's config entry. |
+| `jib up \| down \| restart <app>` | Control an app's compose project. |
+| `jib exec <app> <service>` | Exec into a running container. |
+| `jib run <app> <service>` | Run a one-off container in the app project. |
+| `jib secrets <app>` | Manage per-app secrets under `/opt/jib/secrets/<app>`. |
+| `jib service` | Manage jib's own systemd units (bus, deployer, gitsitter). |
+| `jib webhook` | Manage GitHub webhook routing. |
+| `jib github` | GitHub App setup and token management. |
+| `jib cloudflare` | Cloudflare tunnel module commands. |
 
-**Apps with migrations** — define a `pre_deploy` hook that runs your migration service before the main deploy. If the migration fails, the deploy aborts.
-
-**Multi-environment configs** — use compose overlays (`docker-compose.yml` + `docker-compose.prod.yml`) to override env vars, resource limits, or log levels per environment.
-
-**Apps with build-time configuration** — pass `build_args` like API URLs or version strings that get baked into Docker images at build time.
-
-## Use Cases
-
-### Deploy and forget
-```bash
-jib add myapp --repo myorg/myapp --domain myapp.com
-jib deploy myapp
-jib serve                    # Start daemon for autodeploy on push
-```
-
-### Something broke — rollback in seconds
-```bash
-jib status myapp             # See the failure
-jib logs myapp --tail 200    # Find the error
-jib rollback myapp           # Back to previous version
-```
-
-### Secrets management
-```bash
-jib secrets set myapp --file .env.production
-jib deploy myapp             # Secrets injected via symlink
-jib env myapp                # Verify (values redacted)
-```
-
-### Multiple apps, one server
-```bash
-jib apps
-# APP        REPO           BRANCH  STRATEGY  DOMAINS
-# frontend   myorg/web      main    restart   myapp.com:8080
-# api        myorg/api      main    restart   api.myapp.com:3000
-# worker     myorg/worker   main    restart   worker.myapp.com:4000
-
-jib status
-# APP       SHA      STATUS   LAST DEPLOY          FAILURES  PINNED
-# frontend  a1b2c3d  success  2025-03-23 10:30:00  0         false
-# api       e4f5g6h  success  2025-03-23 10:31:00  0         false
-# worker    i7j8k9l  success  2025-03-23 10:32:00  0         false
-```
-
-### Debug a running container
-```bash
-jib exec myapp api -- sh                    # Shell into running container
-jib exec myapp db -- psql -U postgres       # Database console
-jib run myapp api -- npx prisma migrate     # One-off migration in fresh container
-jib logs myapp api -f --tail 50             # Stream logs
-jib metrics myapp                           # CPU/memory/network stats
-```
-
-### SSL + reverse proxy — automatic
-```bash
-jib provision myapp          # Generates nginx config + obtains Let's Encrypt cert
-```
-
-### Compose overlays for production
-```yaml
-# config.yml
-apps:
-  myapp:
-    compose:
-      - docker-compose.yml
-      - docker-compose.prod.yml    # Overrides env vars, resource limits
-```
-
-### Pre-deploy hooks (migrations)
-```yaml
-apps:
-  myapp:
-    pre_deploy:
-      - service: migrations        # Runs before deploy
-    services: [api, web]           # Only these stay running
-```
-
-## AI Agent Integration
-
-Jib ships with **[SKILL.md](SKILL.md)** — a comprehensive reference designed for AI agents (Claude, etc.) to operate jib autonomously. It covers every command, config option, workflow, and troubleshooting scenario. Point your agent at this file and it can deploy, rollback, debug, and manage your infrastructure.
+Run `jib <command> --help` for details on any command.
 
 ## Architecture
 
-```
-cmd/jib/                    CLI entrypoint (cobra)
-internal/
-├── config/                 YAML config parsing + validation
-├── state/                  State persistence (flock + atomic writes)
-├── deploy/                 Deploy + rollback orchestration
-├── docker/                 Compose wrappers, health checks, override generation
-├── secrets/                Secrets management + symlinks
-├── proxy/                  Nginx config generation
-├── ssl/                    Certbot wrapper + cert expiry
-└── platform/               OS abstraction + dependency checks
-```
+Jib is split into small services that talk over a local NATS bus:
 
-### Deploy Flow
+- `main.ts` (CLI) — compiled to a single `jib` binary via `bun build --compile`.
+- `modules/nats` — embedded NATS server installed as a systemd unit on `jib init`.
+- `modules/deployer` — subscribes to deploy/rollback events and runs `docker compose`.
+- `modules/gitsitter` — polls registered repos and publishes deploy events.
+- `modules/github` — GitHub App auth + installation token minting.
+- `modules/nginx`, `modules/cloudflare`, `modules/cloudflared` — optional
+  ingress modules that react to app add/remove events.
+- `modules/webhook` — optional inbound webhook handler for push events.
 
-1. Acquire per-app file lock
-2. Check disk space (abort if < 2GB)
-3. Validate secrets
-4. `git fetch` + `git checkout <ref>`
-5. Symlink secrets, generate compose override
-6. `docker compose build` (with build_args)
-7. Run pre-deploy hooks
-8. `docker compose up -d --force-recreate`
-9. Warmup → health check (5 retries with backoff)
-10. Update state, prune old images
+Shared libraries live under `libs/` (`@jib/config`, `@jib/state`,
+`@jib/docker`, `@jib/secrets`, `@jib/bus`, `@jib/rpc`, `@jib/tui`,
+`@jib/core`). All jib-managed paths honor `$JIB_ROOT` (default `/opt/jib`).
 
-### Docker Isolation
+## Contributing
 
-Every app is namespaced via `-p jib-<app>`. Two apps defining `db_data` won't clash. Jib auto-generates an override with labels, restart policy, and log rotation — your compose file is never modified.
-
-### Filesystem
-
-```
-/opt/jib/
-├── config.yml
-├── state/<app>.json           # deploy state (atomic writes)
-├── secrets/<app>/.env         # app secrets (0700/0600)
-├── repos/<app>/               # git checkouts
-├── overrides/<app>.yml        # generated compose overrides
-├── nginx/<domain>.conf        # generated nginx configs
-├── locks/<app>.lock           # flock files
-└── deploy-keys/<app>          # SSH keys
-```
-
-## Building
+Requirements: [Bun](https://bun.sh) 1.3.11.
 
 ```bash
-make build          # produces bin/jib with embedded version
-make install
+bun install           # install workspace deps
+make build            # compile the single-binary CLI to dist/jib
+make test             # bun test (uses bun:test)
+make lint             # biome check
+make fmt              # biome format --write
 ```
 
-### Dependencies
-
-| Dep | Min Version | Why |
-|-----|-------------|-----|
-| Docker Engine | 24.0 | Compose V2, `--remove-orphans` |
-| Docker Compose | 2.20 | `--dry-run`, consistent `run --rm` |
-| Nginx | 1.18 | `conf.d/` includes, SSL directives |
-| Certbot | 2.0 | Webroot mode |
-| Git | 2.25 | `ls-remote` with ref filtering |
-| Rclone | 1.50 | R2/S3 backups (optional) |
-
-Ubuntu 22.04+ supported. Checked at `jib init`.
-
-## Samples
-
-See [`samples/`](samples/) for ready-to-deploy example apps covering common patterns:
-
-| Sample | What it demonstrates |
-|--------|---------------------|
-| `fullstack/` | Frontend + API + Postgres with persistent volume |
-| `worker/` | Background service polling another app's API |
-| `secretapp/` | Secrets injection via `secrets_env` |
-| `hookapp/` | Pre-deploy migration hooks |
-| `multicompose/` | Compose overlay (base + prod) |
-| `buildargapp/` | Build-time args baked into image |
+Pre-commit hooks run biome and the type checker. Fix issues before
+committing. See `CLAUDE.md` for project conventions (file size caps,
+secrets handling, module layout).
 
 ## License
 
-MIT
+TBD.
