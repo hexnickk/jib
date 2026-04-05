@@ -5,7 +5,7 @@ import { registerHandlers } from './handlers.ts'
 import { runPoller } from './poller.ts'
 
 /**
- * Entry point for `jib run gitsitter`. Connects to NATS, registers the
+ * Entry point for `jib service start gitsitter`. Connects to NATS, registers the
  * `cmd.repo.*` handlers, and kicks off the polling loop. Shuts down cleanly
  * on SIGTERM/SIGINT by aborting the poller and draining the bus.
  */

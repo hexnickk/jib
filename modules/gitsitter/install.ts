@@ -5,7 +5,7 @@ import { SERVICE_NAME, UNIT_PATH, systemdUnit } from './templates.ts'
 
 /**
  * Installs the gitsitter systemd unit. Requires root. The unit's ExecStart
- * runs the compiled `jib` binary via `jib run gitsitter`, so the binary has
+ * runs the compiled `jib` binary via `jib service start gitsitter`, so the binary has
  * to be on the host at `/usr/local/bin/jib` by the time the unit starts.
  */
 export const install: InstallFn = async (ctx) => {

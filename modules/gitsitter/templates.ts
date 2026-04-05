@@ -17,7 +17,7 @@ Requires=jib-bus.service
 [Service]
 Type=simple
 Environment=JIB_ROOT=${vars.jibRoot}
-ExecStart=${vars.binPath} run gitsitter
+ExecStart=${vars.binPath} service start gitsitter
 Restart=on-failure
 RestartSec=5
 

@@ -6,7 +6,7 @@ import { Engine } from './engine.ts'
 import { registerDeployerHandlers } from './handlers.ts'
 
 /**
- * Entry point for `jib run deployer`. Connects to NATS, constructs an
+ * Entry point for `jib service start deployer`. Connects to NATS, constructs an
  * `Engine` bound to the current config + state store, registers the three
  * command handlers, and listens for config reloads. Blocks until
  * SIGTERM/SIGINT.
