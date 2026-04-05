@@ -87,17 +87,15 @@ export function confFilename(host: string): string {
 }
 
 /**
- * App-scoped filename: `<app>-<host>.conf`. Used by the nginx operator so
- * `cmd.nginx.release {app}` can remove every file belonging to an app via a
- * single `<app>-*` glob without needing the domain list.
+ * Per-app subdirectory inside `$JIB_ROOT/nginx/`. The nginx operator writes
+ * every site config for `app` under `${nginxDir}/${app}/<host>.conf` so
+ * `cmd.nginx.release {app}` can remove every file belonging to an app by
+ * deleting a single directory. A subdir (rather than a `<app>-` filename
+ * prefix) avoids the collision where `app = 'foo'` would match files
+ * belonging to `app = 'foo-bar'`.
  */
-export function appConfFilename(app: string, host: string): string {
-  return `${app}-${host}.conf`
-}
-
-/** Prefix for all files belonging to `app`. Used by `cmd.nginx.release`. */
-export function appConfPrefix(app: string): string {
-  return `${app}-`
+export function appConfDir(nginxDir: string, app: string): string {
+  return `${nginxDir}/${app}`
 }
 
 export interface SystemdUnitVars {

@@ -1,10 +1,10 @@
-import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Bus } from '@jib/bus'
 import type { Logger, Paths } from '@jib/core'
 import { SUBJECTS, handleCmd } from '@jib/rpc'
 import { type ExecFn, getExec } from './shell.ts'
-import { appConfFilename, appConfPrefix, renderSite } from './templates.ts'
+import { appConfDir, confFilename, renderSite } from './templates.ts'
 
 /**
  * Injection seam for the nginx operator. Tests pass a recording fake; the
@@ -21,48 +21,40 @@ export interface NginxOperatorDeps {
   exec?: ExecFn
 }
 
-/** Writes all config files for a claim, returning the paths written. */
+/**
+ * Writes all config files for a claim into `${nginxDir}/${app}/`, returning
+ * the per-app directory so the caller can nuke it on rollback. The subdir
+ * is created fresh every claim so stale files from an earlier claim never
+ * linger.
+ */
 async function renderAndWrite(
-  dir: string,
+  nginxDir: string,
   app: string,
   domains: ReadonlyArray<{ host: string; port: number }>,
-): Promise<string[]> {
+): Promise<string> {
+  const dir = appConfDir(nginxDir, app)
+  await rm(dir, { recursive: true, force: true })
   await mkdir(dir, { recursive: true, mode: 0o755 })
-  const written: string[] = []
   for (const d of domains) {
-    // Operator never sees TLS/cloudflare nuance — that's the CLI's job at add
-    // time. For now every operator-written file is the HTTP proxy variant;
-    // SSL + tunnel flags are revisited when let's-encrypt lands.
+    // TODO(stage-4): the operator currently hardcodes plain HTTP proxy for
+    // every domain because `CmdNginxClaim` carries no ingress/SSL metadata.
+    // Stage 4 extends the schema so the CLI can pass `isTunnel`/`hasSSL`
+    // through; until then this matches the pre-operator default.
     const body = renderSite({ host: d.host, port: d.port, isTunnel: false, hasSSL: false })
-    const path = join(dir, appConfFilename(app, d.host))
-    await writeFile(path, body, { mode: 0o644 })
-    written.push(path)
+    await writeFile(join(dir, confFilename(d.host)), body, { mode: 0o644 })
   }
-  return written
+  return dir
 }
 
-/** Best-effort unlink of every path, swallowing ENOENT-style errors. */
-async function cleanupFiles(paths: string[]): Promise<void> {
-  for (const p of paths) await rm(p, { force: true })
-}
-
-/** Removes every `<app>-*.conf` under `dir`. Returns the removed paths. */
-async function removeAppFiles(dir: string, app: string): Promise<string[]> {
-  const prefix = appConfPrefix(app)
-  let entries: string[]
+/** Removes the per-app config directory. Returns true if anything existed. */
+async function removeAppDir(nginxDir: string, app: string): Promise<boolean> {
+  const dir = appConfDir(nginxDir, app)
   try {
-    entries = await readdir(dir)
+    await rm(dir, { recursive: true })
+    return true
   } catch {
-    return []
+    return false
   }
-  const removed: string[] = []
-  for (const name of entries) {
-    if (!name.startsWith(prefix) || !name.endsWith('.conf')) continue
-    const p = join(dir, name)
-    await rm(p, { force: true })
-    removed.push(p)
-  }
-  return removed
 }
 
 async function reload(exec: ExecFn): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -93,14 +85,14 @@ export function registerNginxHandlers(bus: Bus, deps: NginxOperatorDeps): () => 
     SUBJECTS.evt.nginxFailed,
     async (cmd, ctx) => {
       ctx.emitProgress?.({ app: cmd.app, message: `writing ${cmd.domains.length} config(s)` })
-      const written = await renderAndWrite(dir, cmd.app, cmd.domains)
+      await renderAndWrite(dir, cmd.app, cmd.domains)
       ctx.emitProgress?.({ app: cmd.app, message: 'running nginx -t + reload' })
       const r = await reload(exec)
       if (!r.ok) {
-        await cleanupFiles(written)
-        // Re-run `nginx -t` so failure mode leaves nginx in a known-good
-        // state on disk (files we wrote are gone).
-        await exec(['nginx', '-t']).catch(() => undefined)
+        // Cleanup is a blind `rm -rf` of the per-app dir we just wrote; no
+        // need to re-run `nginx -t` afterwards since cleanup is pure
+        // deletion and the pre-reload state was already green.
+        await removeAppDir(dir, cmd.app)
         log.warn(`nginx claim failed for ${cmd.app}: ${r.error}`)
         return {
           failure: {
@@ -123,8 +115,8 @@ export function registerNginxHandlers(bus: Bus, deps: NginxOperatorDeps): () => 
     SUBJECTS.evt.nginxFailed,
     async (cmd, ctx) => {
       ctx.emitProgress?.({ app: cmd.app, message: `removing configs for ${cmd.app}` })
-      const removed = await removeAppFiles(dir, cmd.app)
-      if (removed.length === 0) {
+      const existed = await removeAppDir(dir, cmd.app)
+      if (!existed) {
         log.info(`nginx release: no files for ${cmd.app} (idempotent)`)
         return { success: { subject: SUBJECTS.evt.nginxReleased, body: { app: cmd.app } } }
       }
@@ -138,7 +130,7 @@ export function registerNginxHandlers(bus: Bus, deps: NginxOperatorDeps): () => 
           },
         }
       }
-      log.info(`nginx released ${cmd.app} (${removed.length} file(s))`)
+      log.info(`nginx released ${cmd.app}`)
       return { success: { subject: SUBJECTS.evt.nginxReleased, body: { app: cmd.app } } }
     },
   )

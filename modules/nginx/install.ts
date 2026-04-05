@@ -13,8 +13,13 @@ import { NGINX_SERVICE_NAME, NGINX_UNIT_PATH, renderSystemdUnit } from './templa
 const JIB_INCLUDE_PATH = '/etc/nginx/conf.d/jib.conf'
 
 function includeSnippet(nginxDir: string): string {
+  // Two globs: the flat form for legacy `hooks.ts` output (single-level
+  // `<host>.conf` files, deleted in stage 4) and the per-app subdir form
+  // used by the operator (`<app>/<host>.conf`). Both coexist during the
+  // stage-2→stage-4 overlap; the flat glob drops out with hooks.ts.
   return `# Managed by jib (modules/nginx) — do not edit.
 include ${nginxDir}/*.conf;
+include ${nginxDir}/*/*.conf;
 `
 }
 
@@ -51,11 +56,15 @@ export const install: InstallFn = async (ctx) => {
   }
   if (existing === desired) {
     log.info(`${JIB_INCLUDE_PATH} already current`)
-    return
+  } else {
+    log.info(`writing ${JIB_INCLUDE_PATH}`)
+    await writeFile(JIB_INCLUDE_PATH, desired, { mode: 0o644 })
   }
-  log.info(`writing ${JIB_INCLUDE_PATH}`)
-  await writeFile(JIB_INCLUDE_PATH, desired, { mode: 0o644 })
 
+  // Always (re)install the systemd unit — cheap, idempotent, and means a
+  // reinstall recovers if someone deleted `/etc/systemd/system/jib-nginx.service`
+  // by hand. Previously this lived behind the `include` early-return and
+  // got skipped on every subsequent `jib install` run.
   await installOperatorUnit(ctx.paths.root, log)
 }
 

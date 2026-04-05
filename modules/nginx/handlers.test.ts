@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createLogger, getPaths } from '@jib/core'
@@ -64,8 +64,8 @@ describe('nginx operator handlers', () => {
     })
     bus.publish(SUBJECTS.cmd.nginxClaim, claim('web'))
     await waitFor(() => (ready.length ? ready : undefined))
-    const files = await readdir(paths.nginxDir)
-    expect(files).toContain('web-web.example.com.conf')
+    const files = await readdir(join(paths.nginxDir, 'web'))
+    expect(files).toContain('web.example.com.conf')
     expect(calls[0]).toEqual(['nginx', '-t'])
     expect(calls[1]).toEqual(['systemctl', 'reload', 'nginx'])
   })
@@ -160,7 +160,34 @@ describe('nginx operator handlers', () => {
     await waitFor(() => ready.length >= 1 || undefined)
     bus.publish(SUBJECTS.cmd.nginxClaim, claim('api'))
     await waitFor(() => ready.length >= 2 || undefined)
-    const files = (await readdir(paths.nginxDir)).sort()
-    expect(files).toEqual(['api-api.example.com.conf', 'web-web.example.com.conf'])
+    const dirs = (await readdir(paths.nginxDir)).sort()
+    expect(dirs).toEqual(['api', 'web'])
+  })
+
+  test('cmd.nginx.release for `foo` leaves `foo-bar` untouched (no prefix collision)', async () => {
+    const { bus, paths } = setup(fakeExec(() => ({ ok: true, stdout: '', stderr: '' })))
+    const ready: unknown[] = []
+    const released: unknown[] = []
+    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+      ready.push(p)
+    })
+    bus.subscribe(SUBJECTS.evt.nginxReleased, (p) => {
+      released.push(p)
+    })
+    bus.publish(SUBJECTS.cmd.nginxClaim, claim('foo'))
+    await waitFor(() => ready.length >= 1 || undefined)
+    bus.publish(SUBJECTS.cmd.nginxClaim, claim('foo-bar'))
+    await waitFor(() => ready.length >= 2 || undefined)
+    bus.publish(SUBJECTS.cmd.nginxRelease, {
+      corrId: 'r-foo',
+      ts: new Date().toISOString(),
+      source: 'test',
+      app: 'foo',
+    })
+    await waitFor(() => (released.length ? released : undefined))
+    const fooBarStat = await stat(join(paths.nginxDir, 'foo-bar')).catch(() => null)
+    expect(fooBarStat?.isDirectory()).toBe(true)
+    const fooStat = await stat(join(paths.nginxDir, 'foo')).catch(() => null)
+    expect(fooStat).toBeNull()
   })
 })

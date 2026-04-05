@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { appConfFilename, confFilename, renderSite, renderSystemdUnit } from './templates.ts'
+import { appConfDir, confFilename, renderSite, renderSystemdUnit } from './templates.ts'
 
 describe('nginx templates', () => {
   test('HTTP-only site emits port 80 server block with proxy_pass', () => {
@@ -32,8 +32,12 @@ describe('nginx templates', () => {
     expect(confFilename('app.example.com')).toBe('app.example.com.conf')
   })
 
-  test('appConfFilename scopes by app name', () => {
-    expect(appConfFilename('web', 'web.example.com')).toBe('web-web.example.com.conf')
+  test('appConfDir scopes by app name without prefix collisions', () => {
+    expect(appConfDir('/opt/jib/nginx', 'web')).toBe('/opt/jib/nginx/web')
+    // `foo` and `foo-bar` are fully isolated: neither path is a prefix of
+    // the other at the directory boundary, so release by app never leaks.
+    expect(appConfDir('/opt/jib/nginx', 'foo')).toBe('/opt/jib/nginx/foo')
+    expect(appConfDir('/opt/jib/nginx', 'foo-bar')).toBe('/opt/jib/nginx/foo-bar')
   })
 
   test('renderSystemdUnit contains JIB_ROOT, bus requirement and bin path', () => {
