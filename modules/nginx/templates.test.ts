@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { confFilename, renderSite } from './templates.ts'
+import { appConfFilename, confFilename, renderSite, renderSystemdUnit } from './templates.ts'
 
 describe('nginx templates', () => {
   test('HTTP-only site emits port 80 server block with proxy_pass', () => {
@@ -30,5 +30,18 @@ describe('nginx templates', () => {
 
   test('confFilename appends .conf', () => {
     expect(confFilename('app.example.com')).toBe('app.example.com.conf')
+  })
+
+  test('appConfFilename scopes by app name', () => {
+    expect(appConfFilename('web', 'web.example.com')).toBe('web-web.example.com.conf')
+  })
+
+  test('renderSystemdUnit contains JIB_ROOT, bus requirement and bin path', () => {
+    const unit = renderSystemdUnit({ jibRoot: '/var/lib/jib', binPath: '/usr/local/bin/jib' })
+    expect(unit).toContain('Environment=JIB_ROOT=/var/lib/jib')
+    expect(unit).toContain('Requires=jib-bus.service')
+    expect(unit).toContain('After=jib-bus.service')
+    expect(unit).toContain('ExecStart=/usr/local/bin/jib service start nginx')
+    expect(unit).toContain('[Install]')
   })
 })

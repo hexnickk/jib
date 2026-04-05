@@ -85,3 +85,48 @@ ${proxyLocation(input.port)}}
 export function confFilename(host: string): string {
   return `${host}.conf`
 }
+
+/**
+ * App-scoped filename: `<app>-<host>.conf`. Used by the nginx operator so
+ * `cmd.nginx.release {app}` can remove every file belonging to an app via a
+ * single `<app>-*` glob without needing the domain list.
+ */
+export function appConfFilename(app: string, host: string): string {
+  return `${app}-${host}.conf`
+}
+
+/** Prefix for all files belonging to `app`. Used by `cmd.nginx.release`. */
+export function appConfPrefix(app: string): string {
+  return `${app}-`
+}
+
+export interface SystemdUnitVars {
+  jibRoot: string
+  binPath: string
+}
+
+/**
+ * Systemd unit for the long-running nginx operator. Requires `jib-bus` so the
+ * bus is up before the operator tries to connect. Honors `$JIB_ROOT` via an
+ * explicit `Environment=` line rather than hard-coding `/opt/jib`.
+ */
+export function renderSystemdUnit(vars: SystemdUnitVars): string {
+  return `[Unit]
+Description=jib nginx operator
+Requires=jib-bus.service
+After=jib-bus.service
+
+[Service]
+Type=simple
+Environment=JIB_ROOT=${vars.jibRoot}
+ExecStart=${vars.binPath} service start nginx
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+`
+}
+
+export const NGINX_UNIT_PATH = '/etc/systemd/system/jib-nginx.service'
+export const NGINX_SERVICE_NAME = 'jib-nginx.service'

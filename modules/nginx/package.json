@@ -11,7 +11,9 @@
     "module": true
   },
   "dependencies": {
+    "@jib/bus": "workspace:*",
     "@jib/config": "workspace:*",
-    "@jib/core": "workspace:*"
+    "@jib/core": "workspace:*",
+    "@jib/rpc": "workspace:*"
   }
 }

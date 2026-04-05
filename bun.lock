@@ -155,8 +155,10 @@
       "name": "@jib-module/nginx",
       "version": "0.0.0",
       "dependencies": {
+        "@jib/bus": "workspace:*",
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
+        "@jib/rpc": "workspace:*",
       },
     },
   },
