@@ -5,13 +5,14 @@ import { credsPath, getPaths } from '@jib/core'
 import { promptPassword, promptSelect, promptString } from '@jib/tui'
 import { type CommandDef, defineCommand } from 'citty'
 import { consola } from 'consola'
+import { addDomain, emitDomainAdd, removeDomain } from './cli-domain.ts'
 import { CloudflareClient } from './client.ts'
 
 /**
- * `jib cloudflare setup` and `jib cloudflare status`. Mounted under the root
- * CLI via `src/module-cli.ts` discovery. Both commands call
- * `loadConfig(getPaths().configFile)` directly — citty does not expose a
- * context-injection hook yet, so state lookup stays module-local.
+ * `jib cloudflare setup|status|add-domain|remove-domain`. Mounted under the
+ * root CLI via `src/module-cli.ts` discovery. `setup` + `status` stay
+ * in-process (direct Cloudflare API calls); `add-domain`/`remove-domain`
+ * live in `cli-domain.ts` and go through the NATS operator.
  */
 
 const setup = defineCommand({
@@ -63,6 +64,19 @@ const setup = defineCommand({
     cfg.tunnel = { provider: 'cloudflare', tunnel_id: tunnelId, account_id: accountId }
     await writeConfig(paths.configFile, cfg)
     consola.success('cloudflare tunnel configured')
+
+    const rootDomain = await promptString({
+      message: 'Add a root domain now? (leave blank to skip)',
+    }).catch(() => '')
+    if (rootDomain.trim().length > 0) {
+      try {
+        await emitDomainAdd(rootDomain.trim())
+      } catch (err) {
+        consola.warn(
+          `could not add domain via operator: ${err instanceof Error ? err.message : String(err)}`,
+        )
+      }
+    }
   },
 })
 
@@ -96,7 +110,7 @@ const status = defineCommand({
 const commands: CommandDef[] = [
   defineCommand({
     meta: { name: 'cloudflare', description: 'Manage Cloudflare Tunnel integration' },
-    subCommands: { setup, status },
+    subCommands: { setup, status, 'add-domain': addDomain, 'remove-domain': removeDomain },
   }),
 ]
 export default commands
