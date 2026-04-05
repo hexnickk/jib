@@ -8,12 +8,45 @@
         "@clack/prompts": "^0.8.2",
         "citty": "^0.1.6",
         "consola": "^3.2.3",
+        "yaml": "^2.8.3",
         "zod": "^3.23.8",
       },
       "devDependencies": {
         "@biomejs/biome": "^1.9.4",
         "@types/bun": "^1.2.0",
         "typescript": "^5.6.3",
+      },
+    },
+    "libs/config": {
+      "name": "@jib/config",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/core": "workspace:*",
+      },
+    },
+    "libs/core": {
+      "name": "@jib/core",
+      "version": "0.0.0",
+    },
+    "libs/secrets": {
+      "name": "@jib/secrets",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/core": "workspace:*",
+      },
+    },
+    "libs/state": {
+      "name": "@jib/state",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/core": "workspace:*",
+      },
+    },
+    "libs/tui": {
+      "name": "@jib/tui",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/core": "workspace:*",
       },
     },
   },
@@ -40,6 +73,16 @@
 
     "@clack/prompts": ["@clack/prompts@0.8.2", "", { "dependencies": { "@clack/core": "0.3.5", "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-6b9Ab2UiZwJYA9iMyboYyW9yJvAO9V753ZhS+DHKEjZRKAxPPOb7MXXu84lsPFG+vZt6FRFniZ8rXi+zCIw4yQ=="],
 
+    "@jib/config": ["@jib/config@workspace:libs/config"],
+
+    "@jib/core": ["@jib/core@workspace:libs/core"],
+
+    "@jib/secrets": ["@jib/secrets@workspace:libs/secrets"],
+
+    "@jib/state": ["@jib/state@workspace:libs/state"],
+
+    "@jib/tui": ["@jib/tui@workspace:libs/tui"],
+
     "@types/bun": ["@types/bun@1.3.11", "", { "dependencies": { "bun-types": "1.3.11" } }, "sha512-5vPne5QvtpjGpsGYXiFyycfpDF2ECyPcTSsFBMa0fraoxiQyMJ3SmuQIGhzPg2WJuWxVBoxWJ2kClYTcw/4fAg=="],
 
     "@types/node": ["@types/node@25.5.2", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-tO4ZIRKNC+MDWV4qKVZe3Ql/woTnmHDr5JD8UI5hn2pwBrHEwOEMZK7WlNb5RKB6EoJ02gwmQS9OrjuFnZYdpg=="],
@@ -57,6 +100,8 @@
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "undici-types": ["undici-types@7.18.2", "", {}, "sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w=="],
+
+    "yaml": ["yaml@2.8.3", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-AvbaCLOO2Otw/lW5bmh9d/WEdcDFdQp2Z2ZUH3pX9U2ihyUY0nvLv7J6TrWowklRGPYbB/IuIMfYgxaCPg5Bpg=="],
 
     "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
   }
