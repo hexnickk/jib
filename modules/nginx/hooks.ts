@@ -22,26 +22,34 @@ async function hasLetsEncryptCert(host: string): Promise<boolean> {
   }
 }
 
-async function reloadNginx(ctx: Ctx): Promise<void> {
+/**
+ * Runs `nginx -t` and (on success) `systemctl reload nginx`. Returns `true`
+ * only when both succeed. The caller is responsible for rolling back any
+ * on-disk changes when this returns `false` so the filesystem never drifts
+ * from the running nginx config. Both commands' stderr is surfaced via
+ * `logger.warn` for debugging.
+ */
+async function reloadNginx(ctx: Ctx): Promise<boolean> {
   const exec = getExec()
   const test = await exec(['nginx', '-t'])
   if (!test.ok) {
     ctx.logger.warn(`nginx -t failed, NOT reloading: ${test.stderr.trim()}`)
-    return
+    return false
   }
   const reload = await exec(['systemctl', 'reload', 'nginx'])
   if (!reload.ok) {
     ctx.logger.warn(`systemctl reload nginx failed: ${reload.stderr.trim()}`)
-    return
+    return false
   }
   ctx.logger.info('nginx reloaded')
+  return true
 }
 
-async function writeAppConfigs(ctx: Ctx, app: string): Promise<number> {
+async function writeAppConfigs(ctx: Ctx, app: string): Promise<string[]> {
   const appCfg = ctx.config.apps[app]
-  if (!appCfg || appCfg.domains.length === 0) return 0
+  if (!appCfg || appCfg.domains.length === 0) return []
   await mkdir(ctx.paths.nginxDir, { recursive: true, mode: 0o755 })
-  let written = 0
+  const written: string[] = []
   for (const d of appCfg.domains) {
     const isTunnel = d.ingress === 'cloudflare-tunnel'
     const hasSSL = isTunnel ? false : await hasLetsEncryptCert(d.host)
@@ -49,9 +57,17 @@ async function writeAppConfigs(ctx: Ctx, app: string): Promise<number> {
     const path = join(ctx.paths.nginxDir, confFilename(d.host))
     await writeFile(path, body, { mode: 0o644 })
     ctx.logger.info(`nginx: wrote ${path}`)
-    written++
+    written.push(path)
   }
   return written
+}
+
+/** Best-effort rollback: deletes a list of paths, swallowing errors. */
+async function rollback(ctx: Ctx, paths: string[]): Promise<void> {
+  for (const p of paths) {
+    await rm(p, { force: true })
+    ctx.logger.warn(`nginx: rolled back ${p}`)
+  }
 }
 
 async function removeAppConfigs(ctx: Ctx, app: string): Promise<number> {
@@ -70,8 +86,10 @@ async function removeAppConfigs(ctx: Ctx, app: string): Promise<number> {
 export const setupHooks: SetupHook<Config> = {
   async onAppAdd(ctx, app) {
     const c = ctx as Ctx
-    const n = await writeAppConfigs(c, app)
-    if (n > 0) await reloadNginx(c)
+    const written = await writeAppConfigs(c, app)
+    if (written.length === 0) return
+    const ok = await reloadNginx(c)
+    if (!ok) await rollback(c, written)
   },
   async onAppRemove(ctx, app) {
     const c = ctx as Ctx

@@ -65,7 +65,7 @@ describe('nginx setupHooks', () => {
     expect(calls[1]).toEqual(['systemctl', 'reload', 'nginx'])
   })
 
-  test('onAppAdd does NOT reload when nginx -t fails', async () => {
+  test('onAppAdd does NOT reload and rolls back written configs when nginx -t fails', async () => {
     setExec(
       fakeExec((cmd) =>
         cmd === 'nginx'
@@ -75,6 +75,23 @@ describe('nginx setupHooks', () => {
     )
     await setupHooks.onAppAdd?.(makeCtx(makeConfig('cloudflare-tunnel')), 'web')
     expect(calls.map((c) => c[0])).toEqual(['nginx'])
+    // Rollback: the conf file we wrote must be gone so on-disk state matches
+    // the (unreloaded) running nginx config.
+    const files = await readdir(getPaths(tmpRoot).nginxDir).catch(() => [])
+    expect(files).toEqual([])
+  })
+
+  test('onAppAdd rolls back when systemctl reload fails after nginx -t passes', async () => {
+    setExec(
+      fakeExec((cmd) =>
+        cmd === 'systemctl'
+          ? { ok: false, stdout: '', stderr: 'reload failed' }
+          : { ok: true, stdout: '', stderr: '' },
+      ),
+    )
+    await setupHooks.onAppAdd?.(makeCtx(makeConfig('cloudflare-tunnel')), 'web')
+    const files = await readdir(getPaths(tmpRoot).nginxDir).catch(() => [])
+    expect(files).toEqual([])
   })
 
   test('onAppRemove deletes confs and reloads', async () => {
