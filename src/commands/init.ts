@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
+import * as cloudflareMod from '@jib-module/cloudflare'
 import * as cloudflaredMod from '@jib-module/cloudflared'
 import * as deployerMod from '@jib-module/deployer'
 import * as gitsitterMod from '@jib-module/gitsitter'
@@ -14,8 +15,9 @@ import { consola } from 'consola'
 /**
  * `jib init` — bootstrap a server. Creates the jib filesystem layout, a
  * minimal v3 config, and installs required modules (nats, deployer,
- * gitsitter) plus optional ones (cloudflared, nginx) on interactive
- * confirmation.
+ * gitsitter) plus optional ones (nginx, cloudflared, cloudflare operator)
+ * on interactive confirmation. Install order: nats → deployer → gitsitter
+ * → nginx → cloudflared → cloudflare operator.
  */
 
 const MINIMAL_CONFIG = `config_version: 3
@@ -103,16 +105,26 @@ export default defineCommand({
     await installMod(deployerMod, ctx)
     await installMod(gitsitterMod, ctx)
 
-    // Optional modules: cloudflared (tunnel daemon), nginx (reverse proxy).
-    const wantCF = nonInteractive
-      ? false
-      : await promptConfirm({ message: 'Install cloudflared tunnel module?', initialValue: false })
-    if (wantCF) await installMod(cloudflaredMod, ctx)
-
+    // Optional modules: nginx (strongly recommended — sole routing layer
+    // for apps with domains), cloudflared (tunnel daemon), and the
+    // cloudflare operator (DNS + ingress via the Cloudflare API).
     const wantNginx = nonInteractive
       ? true
       : await promptConfirm({ message: 'Install nginx reverse-proxy module?', initialValue: true })
     if (wantNginx) await installMod(nginxMod, ctx)
+
+    const wantCFD = nonInteractive
+      ? false
+      : await promptConfirm({ message: 'Install cloudflared tunnel daemon?', initialValue: false })
+    if (wantCFD) await installMod(cloudflaredMod, ctx)
+
+    const wantCFOp = nonInteractive
+      ? false
+      : await promptConfirm({
+          message: 'Install cloudflare operator (DNS/ingress API)?',
+          initialValue: false,
+        })
+    if (wantCFOp) await installMod(cloudflareMod, ctx)
 
     consola.box(
       'jib initialized. Next:\n  jib add <app> --repo org/repo --domain example.com\n  jib deploy <app>',
