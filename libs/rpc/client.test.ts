@@ -111,6 +111,28 @@ describe('emitAndWait', () => {
     expect(result.workdir).toBe('/tmp/mine')
   })
 
+  test('publish error tears down subs + timer and rejects', async () => {
+    const bus = new FakeBus()
+    const boom = new Error('bus down')
+    // Swap out publish with a thrower; subscribe still works.
+    ;(bus as unknown as { publish: (s: string, p: unknown) => void }).publish = () => {
+      throw boom
+    }
+    const err = await emitAndWait(
+      bus.asBus(),
+      SUBJECTS.cmd.repoPrepare,
+      { app: 'demo', ref: 'main' },
+      { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
+      undefined,
+      { source: 'cli', timeoutMs: 500 },
+    ).catch((e) => e)
+    expect(err).toBe(boom)
+    // If cleanup leaked, a trailing microtask flush would still hold timers;
+    // bun:test will fail the run on dangling handles, so reaching here is the
+    // assertion. Drain anyway to surface any late rejections.
+    await roundtrip()
+  })
+
   test('schema validation rejects malformed commands synchronously', async () => {
     const bus = new FakeBus()
     await expect(

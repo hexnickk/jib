@@ -81,7 +81,15 @@ export async function emitAndWait<
       for (const s of subs) s.unsubscribe()
     }
 
-    bus.publish(cmdSubject, parsed.data)
+    // Publish last. If the bus throws synchronously we MUST still cleanup
+    // subs + timer, otherwise the caller leaks a subscription and a timer
+    // for every failed emit.
+    try {
+      bus.publish(cmdSubject, parsed.data)
+    } catch (err) {
+      cleanup()
+      reject(err instanceof Error ? err : new JibError('rpc.publish', String(err)))
+    }
   })
 }
 
