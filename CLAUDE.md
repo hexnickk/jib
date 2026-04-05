@@ -34,12 +34,17 @@ Layout:
 - `src/commands/` — top-level CLI command implementations
 - `libs/*` — shared workspaces: `@jib/config`, `@jib/state`, `@jib/docker`,
   `@jib/secrets`, `@jib/bus`, `@jib/rpc`, `@jib/tui`, `@jib/core`
-- `modules/*` — feature workspaces: `deployer`, `gitsitter`, `github`,
-  `cloudflare`, `cloudflared`, `nginx`, `nats`
+- `modules/*` — feature workspaces: `deployer`, `gitsitter`, `nginx`,
+  `cloudflare` (long-running NATS operators), plus `github`, `cloudflared`,
+  `nats` (installers / helpers)
 - `tests/` — integration tests (`bun:test`)
 
 Each module under `modules/` can expose a systemd service installer and
-its own CLI subcommands, discovered via the module registry.
+its own CLI subcommands, discovered via the module registry. Operators
+communicate exclusively via NATS command/event subjects (see
+`libs/rpc/subjects.ts` and `libs/rpc/schemas.ts`); the CLI is a thin client
+that emits commands and waits for the matching event. There is no
+in-process `setupHook` mechanism — every side effect crosses the bus.
 
 ## Build & Test
 

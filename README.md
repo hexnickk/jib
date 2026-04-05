@@ -34,7 +34,9 @@ JIB_VERSION=v0.1.0 JIB_PREFIX=$HOME/.local/bin \
 
 ```bash
 # 1. Bootstrap jib on a fresh server. Installs the NATS bus, deployer,
-#    and gitsitter systemd units under $JIB_ROOT (default /opt/jib).
+#    gitsitter, and nginx operator systemd units under $JIB_ROOT (default
+#    /opt/jib). The cloudflare operator is installed alongside when a
+#    cloudflared tunnel is configured.
 jib init
 
 # 2. Register a GitHub App so jib can clone private repos. Walks through
@@ -69,9 +71,9 @@ re-runs the deploy end to end.
 | `jib exec <app> <service>` | Exec into a running container. |
 | `jib run <app> <service>` | Run a one-off container in the app project. |
 | `jib secrets <app>` | Manage per-app secrets under `/opt/jib/secrets/<app>`. |
-| `jib service` | Manage jib's own systemd units (bus, deployer, gitsitter). |
+| `jib service` | Manage jib's own systemd units (bus, deployer, gitsitter, nginx, cloudflare). |
 | `jib github` | GitHub App setup and token management. |
-| `jib cloudflare` | Cloudflare tunnel module commands. |
+| `jib cloudflare` | Cloudflare tunnel + DNS operator commands (`setup`, `status`, `add-domain`, `remove-domain`). |
 
 Run `jib <command> --help` for details on any command.
 
@@ -81,11 +83,18 @@ Jib is split into small services that talk over a local NATS bus:
 
 - `main.ts` (CLI) — compiled to a single `jib` binary via `bun build --compile`.
 - `modules/nats` — embedded NATS server installed as a systemd unit on `jib init`.
-- `modules/deployer` — subscribes to deploy/rollback events and runs `docker compose`.
-- `modules/gitsitter` — polls registered repos and publishes deploy events.
+- `modules/deployer` — long-running operator; subscribes to deploy/rollback
+  commands and runs `docker compose`.
+- `modules/gitsitter` — long-running operator; polls registered repos and
+  prepares workdirs on `cmd.repo.prepare`.
+- `modules/nginx` — long-running operator; writes per-app nginx site
+  configs on `cmd.nginx.claim` / `cmd.nginx.release` and probes
+  `/etc/letsencrypt/live` to decide whether to emit a TLS server block.
+- `modules/cloudflare` — long-running operator; adds and removes DNS
+  records for tunnel-fronted domains on `cmd.cloudflare.domain.{add,remove}`.
+- `modules/cloudflared` — optional tunnel daemon installed as a compose
+  unit alongside the cloudflare operator.
 - `modules/github` — GitHub App auth + installation token minting.
-- `modules/nginx`, `modules/cloudflare`, `modules/cloudflared` — optional
-  ingress modules that react to app add/remove events.
 
 Shared libraries live under `libs/` (`@jib/config`, `@jib/state`,
 `@jib/docker`, `@jib/secrets`, `@jib/bus`, `@jib/rpc`, `@jib/tui`,
