@@ -6,6 +6,10 @@ export interface ComposeService {
   name: string
   /** First host-mapped port, 0 if none. */
   hostPort: number
+  /** Raw `ports:` entries from the compose file (normalised to an array). */
+  ports: unknown[]
+  /** Raw `expose:` entries from the compose file. */
+  expose: unknown[]
   /** `jib.domain` label, if set. */
   domain?: string
   /** `jib.ingress` label, if set. */
@@ -17,6 +21,7 @@ export interface ComposeService {
 
 interface RawService {
   ports?: unknown[]
+  expose?: unknown[]
   labels?: Record<string, string> | string[]
   healthcheck?: { test?: unknown }
 }
@@ -43,6 +48,7 @@ export function parseComposeServices(
       const existing = merged.get(name) ?? {}
       const next: RawService = { ...existing }
       if (svc.ports) next.ports = svc.ports
+      if (svc.expose) next.expose = svc.expose
       if (svc.labels) next.labels = svc.labels
       if (svc.healthcheck) next.healthcheck = svc.healthcheck
       merged.set(name, next)
@@ -55,6 +61,8 @@ export function parseComposeServices(
     const cs: ComposeService = {
       name,
       hostPort: svc.ports?.length ? parseFirstHostPort(svc.ports[0]) : 0,
+      ports: svc.ports ?? [],
+      expose: svc.expose ?? [],
     }
     if (labels['jib.domain']) cs.domain = labels['jib.domain']
     if (labels['jib.ingress']) cs.ingress = labels['jib.ingress']
@@ -135,4 +143,52 @@ export function inferPorts(services: ComposeService[]): number[] {
 
 export function servicesWithDomainLabels(services: ComposeService[]): ComposeService[] {
   return services.filter((s) => s.domain)
+}
+
+/**
+ * Infer the port exposed *inside* the container for a service. Priority:
+ *   1. first entry in `ports:` (container side of `host:container`)
+ *   2. first entry in `expose:`
+ *   3. undefined
+ * Used by `jib add` to fill `domain.container_port` from the compose file
+ * so the deployer can emit a correct `!override` ports list.
+ */
+export function inferContainerPort(service: ComposeService): number | undefined {
+  if (service.ports.length > 0) {
+    const p = parseContainerSide(service.ports[0])
+    if (p) return p
+  }
+  if (service.expose.length > 0) {
+    const e = service.expose[0]
+    const n = typeof e === 'number' ? e : Number.parseInt(String(e), 10)
+    if (Number.isFinite(n) && n > 0) return Math.floor(n)
+  }
+  return undefined
+}
+
+/** True when the user's compose file declares a non-empty `ports:` list. */
+export function hasPublishedPorts(service: ComposeService): boolean {
+  return service.ports.length > 0
+}
+
+/** Extract the *container* side of a single `ports:` entry. */
+function parseContainerSide(p: unknown): number | undefined {
+  if (typeof p === 'number') return Math.floor(p)
+  if (typeof p === 'string') {
+    const stripped = p.split('/')[0] ?? p
+    const parts = stripped.split(':')
+    // "80" → container 80; "8080:80" → 80; "127.0.0.1:8080:80" → 80
+    const tail = parts[parts.length - 1] ?? ''
+    const n = Number.parseInt(tail, 10)
+    return Number.isFinite(n) && n > 0 ? n : undefined
+  }
+  if (p && typeof p === 'object' && 'target' in p) {
+    const v = (p as { target: unknown }).target
+    if (typeof v === 'number') return Math.floor(v)
+    if (typeof v === 'string') {
+      const n = Number.parseInt(v, 10)
+      return Number.isFinite(n) && n > 0 ? n : undefined
+    }
+  }
+  return undefined
 }

@@ -3,11 +3,18 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  type ComposeService,
+  hasPublishedPorts,
+  inferContainerPort,
   inferHealthAndPort,
   parseComposeServices,
   parseFirstHostPort,
   parseHealthcheck,
 } from './parse.ts'
+
+function svc(partial: Partial<ComposeService>): ComposeService {
+  return { name: 'x', hostPort: 0, ports: [], expose: [], ...partial }
+}
 
 function fixture(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), 'jib-docker-'))
@@ -99,16 +106,51 @@ describe('parseComposeServices', () => {
 describe('inferHealthAndPort', () => {
   test('prefers service with both health + host port', () => {
     const got = inferHealthAndPort([
-      { name: 'a', hostPort: 1000 },
-      { name: 'b', hostPort: 2000, healthPath: '/ready', healthPort: 80 },
+      svc({ name: 'a', hostPort: 1000 }),
+      svc({ name: 'b', hostPort: 2000, healthPath: '/ready', healthPort: 80 }),
     ])
     expect(got).toEqual({ path: '/ready', port: 2000 })
   })
   test('falls back to first host-mapped port with default /health', () => {
-    const got = inferHealthAndPort([{ name: 'a', hostPort: 1234 }])
+    const got = inferHealthAndPort([svc({ name: 'a', hostPort: 1234 })])
     expect(got).toEqual({ path: '/health', port: 1234 })
   })
   test('no ports -> port=0', () => {
     expect(inferHealthAndPort([])).toEqual({ path: '/health', port: 0 })
+  })
+})
+
+describe('inferContainerPort / hasPublishedPorts', () => {
+  test('ports: ["8080:80"] -> container 80, published=true', () => {
+    const s = svc({ ports: ['8080:80'] })
+    expect(inferContainerPort(s)).toBe(80)
+    expect(hasPublishedPorts(s)).toBe(true)
+  })
+  test('ports: ["80"] (no host) -> container 80, published=true', () => {
+    const s = svc({ ports: ['80'] })
+    expect(inferContainerPort(s)).toBe(80)
+    expect(hasPublishedPorts(s)).toBe(true)
+  })
+  test('expose: ["3000"] -> container 3000, published=false', () => {
+    const s = svc({ expose: ['3000'] })
+    expect(inferContainerPort(s)).toBe(3000)
+    expect(hasPublishedPorts(s)).toBe(false)
+  })
+  test('both ports and expose -> ports wins', () => {
+    const s = svc({ ports: ['8080:80'], expose: ['3000'] })
+    expect(inferContainerPort(s)).toBe(80)
+  })
+  test('neither -> undefined, false', () => {
+    const s = svc({})
+    expect(inferContainerPort(s)).toBeUndefined()
+    expect(hasPublishedPorts(s)).toBe(false)
+  })
+  test('long-form {target: 80} object', () => {
+    const s = svc({ ports: [{ target: 80, published: 8080 }] })
+    expect(inferContainerPort(s)).toBe(80)
+  })
+  test('127.0.0.1:8080:80 -> container 80', () => {
+    const s = svc({ ports: ['127.0.0.1:8080:80'] })
+    expect(inferContainerPort(s)).toBe(80)
   })
 })

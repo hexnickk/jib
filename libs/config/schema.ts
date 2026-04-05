@@ -28,6 +28,11 @@ export const DomainSchema = z.object({
   port: z.number().int().min(1).max(65535).optional(),
   container_port: z.number().int().min(1).max(65535).optional(),
   ingress: z.enum(['', 'direct', 'cloudflare-tunnel']).optional(),
+  // Compose service name this domain targets. Required when the compose
+  // file has multiple services; `jib add` auto-fills it for single-service
+  // apps. The deployer uses it to attach the `!override` ports list to the
+  // right service.
+  service: z.string().min(1).optional(),
 })
 
 export const HealthCheckSchema = z.object({
