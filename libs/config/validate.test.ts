@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { ConfigError } from '@jib/core'
 import { ConfigSchema } from './schema.ts'
-import { parseDuration, validate } from './validate.ts'
+import { parseDuration, validate, validateRepo } from './validate.ts'
 
 describe('parseDuration', () => {
   test('parses seconds, minutes, hours', () => {
@@ -33,6 +33,35 @@ const base = (overrides: Record<string, unknown> = {}) =>
     },
     ...overrides,
   })
+
+describe('validateRepo', () => {
+  test('accepts empty and "local"', () => {
+    expect(validateRepo('')).toBeNull()
+    expect(validateRepo('local')).toBeNull()
+  })
+  test('accepts owner/name', () => {
+    expect(validateRepo('hexnickk/jib')).toBeNull()
+  })
+  test('accepts scheme URLs and git@host:path', () => {
+    expect(validateRepo('file:///tmp/foo')).toBeNull()
+    expect(validateRepo('https://example.com/foo.git')).toBeNull()
+    expect(validateRepo('ssh://git@example.com/foo.git')).toBeNull()
+    expect(validateRepo('git@github.com:owner/name.git')).toBeNull()
+  })
+  test('accepts absolute paths', () => {
+    expect(validateRepo('/srv/repos/app')).toBeNull()
+  })
+  test('rejects path traversal', () => {
+    expect(validateRepo('../../etc')).not.toBeNull()
+    expect(validateRepo('owner/..')).not.toBeNull()
+  })
+  test('rejects too many slashes in slug', () => {
+    expect(validateRepo('a/b/c')).not.toBeNull()
+  })
+  test('rejects random garbage', () => {
+    expect(validateRepo('not a repo')).not.toBeNull()
+  })
+})
 
 describe('validate', () => {
   test('accepts valid config', () => {
@@ -90,6 +119,33 @@ describe('validate', () => {
           provider: 'prod',
           domains: [{ host: 'example.com', port: 80 }],
         },
+      },
+    })
+    expect(() => validate(cfg)).not.toThrow()
+  })
+
+  test('rejects repo with ".." traversal', () => {
+    const cfg = base({
+      apps: {
+        web: { repo: '../../etc/passwd', domains: [{ host: 'example.com', port: 80 }] },
+      },
+    })
+    expect(() => validate(cfg)).toThrow(/repo/)
+  })
+
+  test('rejects repo with embedded slash beyond owner/name', () => {
+    const cfg = base({
+      apps: {
+        web: { repo: 'a/b/c', domains: [{ host: 'example.com', port: 80 }] },
+      },
+    })
+    expect(() => validate(cfg)).toThrow(/repo/)
+  })
+
+  test('accepts file:// repo', () => {
+    const cfg = base({
+      apps: {
+        web: { repo: 'file:///tmp/src', domains: [{ host: 'example.com', port: 80 }] },
       },
     })
     expect(() => validate(cfg)).not.toThrow()

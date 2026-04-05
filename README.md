@@ -41,10 +41,11 @@ JIB_VERSION=v0.1.0 JIB_PREFIX=$HOME/.local/bin \
 ## Quickstart
 
 ```bash
-# 1. Bootstrap jib on a fresh server. Installs the NATS bus, deployer,
-#    gitsitter, and nginx operator systemd units under $JIB_ROOT (default
-#    /opt/jib). The cloudflare operator is installed alongside when a
-#    cloudflared tunnel is configured.
+# 1. Bootstrap jib on a fresh server. Installs the NATS bus, deployer, and
+#    gitsitter systemd units under $JIB_ROOT (default /opt/jib), and
+#    interactively prompts for optional modules: nginx reverse proxy,
+#    cloudflared tunnel daemon, and the cloudflare DNS operator. Must run
+#    as root (use `sudo jib init`).
 jib init
 
 # 2. Register a GitHub App so jib can clone private repos. Walks through
@@ -86,7 +87,7 @@ re-runs the deploy end to end.
 | `jib run <app> <service>` | Run a one-off container in the app project. |
 | `jib secrets <app>` | Manage per-app secrets under `/opt/jib/secrets/<app>`. |
 | `jib service` | Manage jib's own systemd units (bus, deployer, gitsitter, nginx, cloudflare). |
-| `jib github` | GitHub App setup and token management. |
+| `jib github` | Manage git auth providers (GitHub App or SSH deploy key). |
 | `jib cloudflare` | Cloudflare tunnel + DNS operator commands (`setup`, `status`, `add-domain`, `remove-domain`). |
 
 Run `jib <command> --help` for details on any command.

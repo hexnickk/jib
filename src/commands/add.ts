@@ -1,4 +1,11 @@
-import { type App, AppSchema, type Config, type Domain, writeConfig } from '@jib/config'
+import {
+  type App,
+  AppSchema,
+  type Config,
+  type Domain,
+  validateRepo,
+  writeConfig,
+} from '@jib/config'
 import { isInteractive, promptString } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
@@ -68,6 +75,12 @@ export default defineCommand({
         process.exit(1)
       }
       repo = await promptString({ message: 'GitHub repo (org/name, or "local")' })
+    }
+
+    const repoErr = validateRepo(repo)
+    if (repoErr) {
+      consola.error(`--repo "${repo}" ${repoErr}`)
+      process.exit(1)
     }
 
     const ingressDefault = args.ingress ?? 'direct'

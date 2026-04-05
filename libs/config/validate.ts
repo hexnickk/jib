@@ -3,6 +3,28 @@ import type { Config } from './schema.ts'
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/
+// GitHub slug: `owner/name` — both segments [A-Za-z0-9._-], no `..`, no slashes.
+const GITHUB_SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/
+const EXTERNAL_REPO_PREFIXES = ['file://', 'http://', 'https://', 'ssh://', 'git://']
+
+/**
+ * Returns an error message if `repo` is not a supported shape, else `null`.
+ * Accepted: `"local"`, `""`, an absolute path, a scheme URL, `git@host:path`,
+ * or an `owner/name` GitHub slug. Rejects anything containing `..` segments
+ * or embedded slashes beyond the one in the GitHub slug — those would let a
+ * maliciously-crafted config escape `$JIB_ROOT/repos/` via `repoPath`.
+ */
+export function validateRepo(repo: string): string | null {
+  if (repo === '' || repo === 'local') return null
+  if (repo.includes('..')) return 'contains ".." path segment'
+  if (repo.startsWith('/')) return null
+  if (repo.startsWith('git@') && /^git@[^:\s]+:[^\s]+$/.test(repo)) return null
+  for (const prefix of EXTERNAL_REPO_PREFIXES) {
+    if (repo.startsWith(prefix)) return null
+  }
+  if (GITHUB_SLUG_RE.test(repo)) return null
+  return 'must be "local", "owner/name", an absolute path, or a file://, http(s)://, ssh://, git://, or git@host: URL'
+}
 
 /**
  * Parses a duration string like `5m`, `30s`, `1h`, `1h30m`, `1.5h`, `0s`.
@@ -49,6 +71,8 @@ export function validate(cfg: Config): void {
   let needsTunnel = false
   for (const [name, app] of Object.entries(cfg.apps)) {
     if (!APP_NAME_RE.test(name)) errs.push(`app '${name}': name must match [a-z0-9-]+`)
+    const repoErr = validateRepo(app.repo)
+    if (repoErr) errs.push(`app '${name}': repo "${app.repo}" ${repoErr}`)
     if (app.provider && app.repo !== 'local' && !providerNames.has(app.provider)) {
       errs.push(`app '${name}': provider "${app.provider}" not found in github.providers`)
     }
