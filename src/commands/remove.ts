@@ -1,19 +1,22 @@
-import { type Config, writeConfig } from '@jib/config'
-import { type ModuleContext, createLogger } from '@jib/core'
+import { withBus } from '@jib/bus'
+import { writeConfig } from '@jib/config'
 import { SUBJECTS, emitAndWait } from '@jib/rpc'
 import { promptConfirm } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { withBus } from '../bus-client.ts'
-import { runSetupHooks } from '../setup-hooks.ts'
 import { composeFor } from './_compose.ts'
 import { loadAppOrExit } from './_ctx.ts'
 
 /**
- * `jib remove <app>` — reverse of add. Runs hook teardown in reverse order,
- * brings containers down, asks gitsitter to clean its workdir, then drops
- * the config entry. Every step is best-effort: even if an integration
- * fails, we keep going so the operator can finish removal by hand.
+ * `jib remove <app>` — reverse of add. Order matters:
+ *   1. `cmd.nginx.release` — stop accepting traffic first
+ *   2. `docker compose down` — stop the app itself
+ *   3. `cmd.repo.remove` — cleanup gitsitter's workdir
+ *   4. drop the config entry
+ *
+ * Every step is best-effort: if one fails we log and continue so the
+ * operator can finish teardown by hand rather than being left with a
+ * half-removed app.
  */
 
 const DEFAULT_TIMEOUT_MS = 2 * 60_000
@@ -41,12 +44,21 @@ export default defineCommand({
       }
     }
 
-    const ctx: ModuleContext<Config> = {
-      config: cfg,
-      logger: createLogger('remove'),
-      paths,
+    try {
+      await withBus(async (bus) => {
+        await emitAndWait(
+          bus,
+          SUBJECTS.cmd.nginxRelease,
+          { app: args.app },
+          { success: SUBJECTS.evt.nginxReleased, failure: SUBJECTS.evt.nginxFailed },
+          SUBJECTS.evt.nginxProgress,
+          { source: 'cli', timeoutMs: DEFAULT_TIMEOUT_MS },
+        )
+        consola.info('nginx routes released')
+      })
+    } catch (err) {
+      consola.warn(`nginx release: ${err instanceof Error ? err.message : String(err)}`)
     }
-    await runSetupHooks(ctx, args.app, 'remove')
 
     try {
       const compose = composeFor(cfg, paths, args.app)
