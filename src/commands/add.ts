@@ -31,7 +31,10 @@ export default defineCommand({
   meta: { name: 'add', description: 'Register a new app (config + repo + nginx claim)' },
   args: {
     app: { type: 'positional', required: true },
-    repo: { type: 'string', description: 'Git repo (org/name) or "local"' },
+    repo: {
+      type: 'string',
+      description: 'Git repo: "owner/name", "local", file:// URL, http(s):// URL, or absolute path',
+    },
     'git-provider': { type: 'string', description: 'Git provider name' },
     ingress: {
       type: 'string',

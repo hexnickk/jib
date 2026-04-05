@@ -14,13 +14,15 @@ export const start: StartFn<Config> = async (ctx: ModuleContext<Config>) => {
   log.info('starting gitsitter')
   const bus = await Bus.connect()
 
-  let config = ctx.config
-  const disposer = registerHandlers(bus, ctx.paths, () => config)
+  // Handlers reload config on every command so the CLI's `writeConfig` is
+  // always observed. The poller still uses a cached snapshot (updated via
+  // `cmd.config.reload`) because per-tick disk reads are wasteful.
+  let cachedConfig = ctx.config
+  const disposer = registerHandlers(bus, ctx.paths, () => loadConfig(ctx.paths.configFile))
 
-  // Config reload: swap the in-memory copy when anyone publishes `cmd.config.reload`.
   bus.subscribe('jib.cmd.config.reload', async () => {
     try {
-      config = await loadConfig(ctx.paths.configFile)
+      cachedConfig = await loadConfig(ctx.paths.configFile)
       log.info('config reloaded')
     } catch (err) {
       log.warn(`config reload failed: ${(err as Error).message}`)
@@ -37,5 +39,5 @@ export const start: StartFn<Config> = async (ctx: ModuleContext<Config>) => {
   process.once('SIGTERM', shutdown)
   process.once('SIGINT', shutdown)
 
-  await runPoller({ bus, paths: ctx.paths, getConfig: () => config, log }, abort.signal)
+  await runPoller({ bus, paths: ctx.paths, getConfig: () => cachedConfig, log }, abort.signal)
 }

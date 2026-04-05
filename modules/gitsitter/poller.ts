@@ -1,7 +1,7 @@
 import { httpsCloneURL, refreshAuth, sshCloneURL } from '@jib-module/github'
 import type { Bus } from '@jib/bus'
 import type { App, Config } from '@jib/config'
-import { type Logger, type Paths, repoPath } from '@jib/core'
+import { type Logger, type Paths, isExternalRepoURL, repoPath } from '@jib/core'
 import { SUBJECTS } from '@jib/rpc'
 import * as git from './src/git.ts'
 
@@ -20,6 +20,7 @@ export function parsePollInterval(raw: string): number {
 }
 
 function cloneURL(app: App, cfg: Config): string {
+  if (isExternalRepoURL(app.repo)) return app.repo
   const providerType = app.provider ? cfg.github?.providers?.[app.provider]?.type : undefined
   return providerType === 'app' ? httpsCloneURL(app.repo) : sshCloneURL(app.repo)
 }
@@ -45,9 +46,10 @@ export async function pollApp(
 ): Promise<void> {
   const app = cfg.apps[appName]
   if (!app || !app.repo || app.repo === 'local') return
+  const external = isExternalRepoURL(app.repo)
   const lsRemote = deps.lsRemote ?? git.lsRemote
   try {
-    const auth = app.provider ? await refreshAuth(app.provider, cfg, app, paths) : {}
+    const auth = !external && app.provider ? await refreshAuth(app.provider, cfg, app, paths) : {}
     const env = auth.sshKeyPath ? git.configureSSHKey(auth.sshKeyPath) : {}
     const sha = await lsRemote(cloneURL(app, cfg), app.branch, env)
     if (!sha) return

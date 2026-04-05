@@ -2,16 +2,18 @@ import { rm, stat } from 'node:fs/promises'
 import { applyAuth, httpsCloneURL, refreshAuth, sshCloneURL } from '@jib-module/github'
 import type { Bus } from '@jib/bus'
 import type { App, Config } from '@jib/config'
-import { type Paths, repoPath } from '@jib/core'
+import { type Paths, isExternalRepoURL, repoPath } from '@jib/core'
 import { SUBJECTS, handleCmd } from '@jib/rpc'
 import * as git from './src/git.ts'
 
 /**
- * Resolves the clone URL for an app: GitHub App providers use HTTPS (token
- * baked into the URL later via `applyAuth`), deploy-key providers use SSH.
- * Local ("" or "local") apps aren't polled; the handler rejects them.
+ * Resolves the clone URL for an app. External URLs (file://, http(s)://,
+ * ssh://, git@host:…, absolute paths) pass through verbatim. Otherwise
+ * GitHub App providers use HTTPS (token baked later via `applyAuth`) and
+ * deploy-key providers use SSH.
  */
 function cloneURL(app: App, providerType: 'key' | 'app' | undefined): string {
+  if (isExternalRepoURL(app.repo)) return app.repo
   return providerType === 'app' ? httpsCloneURL(app.repo) : sshCloneURL(app.repo)
 }
 
@@ -41,14 +43,15 @@ export async function prepareRepo(
   const workdir = repoPath(paths, appName, app.repo)
   const target = ref ?? app.branch
 
-  const auth = app.provider ? await refreshAuth(app.provider, cfg, app, paths) : {}
+  const external = isExternalRepoURL(app.repo)
+  const auth = !external && app.provider ? await refreshAuth(app.provider, cfg, app, paths) : {}
   const env = auth.sshKeyPath ? git.configureSSHKey(auth.sshKeyPath) : {}
   const providerType = app.provider ? cfg.github?.providers?.[app.provider]?.type : undefined
 
   if (!(await pathExists(workdir))) {
     await git.clone(cloneURL(app, providerType), workdir, { branch: app.branch, env })
   }
-  await applyAuth(auth, workdir, app.repo)
+  if (!external) await applyAuth(auth, workdir, app.repo)
   await git.fetch(workdir, target, env)
   const sha = await git.remoteSHA(workdir, target)
   await git.checkout(workdir, sha)
@@ -60,7 +63,15 @@ export async function prepareRepo(
  * Called by `start.ts` after connecting. Returns a disposer that unsubscribes
  * both handlers — used by tests and graceful shutdown.
  */
-export function registerHandlers(bus: Bus, paths: Paths, getConfig: () => Config): () => void {
+export function registerHandlers(
+  bus: Bus,
+  paths: Paths,
+  getConfig: () => Promise<Config> | Config,
+): () => void {
+  // `getConfig` is invoked per command, not cached. Production passes a
+  // loader that re-reads `config.yml` on every call so the CLI's
+  // `writeConfig` is always observed without a round-trip through
+  // `cmd.config.reload`. Tests inject a synchronous stub.
   const prep = handleCmd(
     bus,
     SUBJECTS.cmd.repoPrepare,
@@ -69,7 +80,8 @@ export function registerHandlers(bus: Bus, paths: Paths, getConfig: () => Config
     SUBJECTS.evt.repoProgress,
     SUBJECTS.evt.repoFailed,
     async (cmd) => {
-      const { workdir, sha } = await prepareRepo(getConfig(), paths, cmd.app, cmd.ref)
+      const cfg = await getConfig()
+      const { workdir, sha } = await prepareRepo(cfg, paths, cmd.app, cmd.ref)
       return { success: { subject: SUBJECTS.evt.repoReady, body: { app: cmd.app, workdir, sha } } }
     },
   )
@@ -82,7 +94,8 @@ export function registerHandlers(bus: Bus, paths: Paths, getConfig: () => Config
     undefined,
     SUBJECTS.evt.repoFailed,
     async (cmd) => {
-      const app = getConfig().apps[cmd.app]
+      const cfg = await getConfig()
+      const app = cfg.apps[cmd.app]
       if (!app) throw new Error(`app "${cmd.app}" not in config`)
       const workdir = repoPath(paths, cmd.app, app.repo)
       await rm(workdir, { recursive: true, force: true })
