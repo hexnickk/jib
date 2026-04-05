@@ -25,7 +25,7 @@ export function resolveFromCompose(appCfg: App, workdir: string): App {
   if (parsed.length === 0) throw new Error('compose file has no services')
   const byName = new Map(parsed.map((s) => [s.name, s]))
   const single = parsed.length === 1 ? parsed[0]?.name : undefined
-  const publishing = new Set<string>()
+  const publishing = new Map<string, ComposeService>()
 
   const nextDomains: Domain[] = appCfg.domains.map((d) => {
     const serviceName = d.service ?? single
@@ -36,7 +36,7 @@ export function resolveFromCompose(appCfg: App, workdir: string): App {
     }
     const svc = byName.get(serviceName)
     if (!svc) throw new Error(`--domain ${d.host}: compose has no service "${serviceName}"`)
-    if (hasPublishedPorts(svc)) publishing.add(svc.name)
+    if (hasPublishedPorts(svc)) publishing.set(svc.name, svc)
     const containerPort = d.container_port ?? resolvePort(svc)
     return { ...d, service: svc.name, container_port: containerPort }
   })
@@ -54,13 +54,16 @@ function resolvePort(svc: ComposeService): number {
   return FALLBACK_CONTAINER_PORT
 }
 
-function warnPublished(publishing: Set<string>, domains: Domain[]): void {
-  const list = [...publishing].join(', ')
-  const mapping = domains
-    .filter((d) => d.service && publishing.has(d.service))
-    .map((d) => `${d.port} → ${d.container_port}`)
-    .join(', ')
-  consola.warn(`compose file publishes ports for service(s) ${list}.`)
-  consola.warn(`jib will override these with allocated host ports (${mapping}).`)
+function warnPublished(publishing: Map<string, ComposeService>, domains: Domain[]): void {
+  for (const [name, svc] of publishing) {
+    const original = svc.ports.map((p) => JSON.stringify(p)).join(', ')
+    const replacements = domains
+      .filter((d) => d.service === name)
+      .map((d) => `${d.port}:${d.container_port}`)
+      .join(', ')
+    consola.warn(
+      `service "${name}" publishes ports in compose (${original}); jib will replace with [${replacements}] via !override at deploy time.`,
+    )
+  }
   consola.warn('consider removing `ports:` from your compose file to avoid confusion.')
 }
