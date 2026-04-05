@@ -1,7 +1,9 @@
 import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { InstallFn } from '@jib/core'
+import { $ } from 'bun'
 import { JIB_NGINX_INCLUDE_PATH } from './install.ts'
+import { NGINX_SERVICE_NAME, NGINX_UNIT_PATH } from './templates.ts'
 
 /**
  * Removes the jib include snippet and every generated site config under
@@ -10,6 +12,12 @@ import { JIB_NGINX_INCLUDE_PATH } from './install.ts'
  */
 export const uninstall: InstallFn = async (ctx) => {
   const log = ctx.logger
+
+  log.info(`systemctl disable --now ${NGINX_SERVICE_NAME}`)
+  await $`systemctl disable --now ${NGINX_SERVICE_NAME}`.nothrow()
+  log.info(`removing ${NGINX_UNIT_PATH}`)
+  await rm(NGINX_UNIT_PATH, { force: true })
+  await $`systemctl daemon-reload`.nothrow()
 
   log.info(`removing ${JIB_NGINX_INCLUDE_PATH}`)
   await rm(JIB_NGINX_INCLUDE_PATH, { force: true })

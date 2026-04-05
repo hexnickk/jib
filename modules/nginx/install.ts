@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import type { InstallFn } from '@jib/core'
+import { $ } from 'bun'
 import { getExec } from './shell.ts'
+import { NGINX_SERVICE_NAME, NGINX_UNIT_PATH, renderSystemdUnit } from './templates.ts'
 
 /**
  * Jib-owned snippet that pulls every file under `$JIB_ROOT/nginx/` into the
@@ -53,6 +55,23 @@ export const install: InstallFn = async (ctx) => {
   }
   log.info(`writing ${JIB_INCLUDE_PATH}`)
   await writeFile(JIB_INCLUDE_PATH, desired, { mode: 0o644 })
+
+  await installOperatorUnit(ctx.paths.root, log)
+}
+
+/**
+ * Writes `/etc/systemd/system/jib-nginx.service` from the template and
+ * enables it. Idempotent: rewriting the unit is cheap and `enable --now`
+ * short-circuits when the service is already active.
+ */
+async function installOperatorUnit(jibRoot: string, log: { info: (m: string) => void }) {
+  const unit = renderSystemdUnit({ jibRoot, binPath: '/usr/local/bin/jib' })
+  log.info(`writing ${NGINX_UNIT_PATH}`)
+  await writeFile(NGINX_UNIT_PATH, unit, { mode: 0o644 })
+  log.info('systemctl daemon-reload')
+  await $`systemctl daemon-reload`
+  log.info(`systemctl enable --now ${NGINX_SERVICE_NAME}`)
+  await $`systemctl enable --now ${NGINX_SERVICE_NAME}`
 }
 
 export const JIB_NGINX_INCLUDE_PATH = JIB_INCLUDE_PATH
