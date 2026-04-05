@@ -1,5 +1,6 @@
 import { JibError } from '@jib/core'
 import { $ } from 'bun'
+import { consola } from 'consola'
 
 export interface ManifestResult {
   appId: number
@@ -77,7 +78,7 @@ export async function runManifestFlow(providerName: string): Promise<ManifestRes
   try {
     await openBrowser(formURL)
   } catch {
-    console.log(`Open this URL to continue:\n  ${formURL}\n`)
+    consola.log(`Open this URL to continue:\n  ${formURL}\n`)
   }
 
   try {
