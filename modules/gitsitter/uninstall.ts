@@ -1,0 +1,13 @@
+import { rm } from 'node:fs/promises'
+import type { InstallFn } from '@jib/core'
+import { $ } from 'bun'
+import { SERVICE_NAME, UNIT_PATH } from './templates.ts'
+
+/** Stops the unit, deletes it, and reloads systemd so the file is fully gone. */
+export const uninstall: InstallFn = async (ctx) => {
+  ctx.logger.info(`systemctl disable --now ${SERVICE_NAME}`)
+  await $`systemctl disable --now ${SERVICE_NAME}`.nothrow()
+  ctx.logger.info(`removing ${UNIT_PATH}`)
+  await rm(UNIT_PATH, { force: true })
+  await $`systemctl daemon-reload`.nothrow()
+}
