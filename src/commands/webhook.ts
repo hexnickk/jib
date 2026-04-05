@@ -81,8 +81,8 @@ const setup = defineCommand({
     await writeConfig(paths.configFile, cfg)
     consola.success('config updated with webhook block')
 
-    printInstructions(url, secret, true)
     if (isInteractive()) {
+      printInstructions(url, secret, true)
       const reveal = await promptConfirm({ message: 'Reveal secret?', initialValue: false })
       if (reveal) printInstructions(url, secret, false)
     } else {

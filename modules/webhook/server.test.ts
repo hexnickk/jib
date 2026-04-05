@@ -112,6 +112,24 @@ describe('handleRequest', () => {
     expect(published).toEqual([])
   })
 
+  test('200 skip on tag push (non-branch ref)', async () => {
+    const { bus, deps } = makeDeps()
+    const published: string[] = []
+    bus.subscribe(SUBJECTS.cmd.repoPrepare, () => void published.push('prepare'))
+    const body = JSON.stringify({
+      ref: 'refs/tags/v1.0.0',
+      after: 'abc123',
+      repository: { full_name: 'acme/demo' },
+    })
+    const res = await handleRequest(
+      makeReq(body, { 'x-hub-signature-256': sign(body), 'x-github-event': 'push' }),
+      deps,
+    )
+    await flush()
+    expect(res.status).toBe(200)
+    expect(published).toEqual([])
+  })
+
   test('202 + publishes cmd.repo.prepare for matching repo', async () => {
     const { bus, deps } = makeDeps()
     const seen: unknown[] = []

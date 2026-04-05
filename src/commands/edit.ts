@@ -1,5 +1,6 @@
 import { loadConfig } from '@jib/config'
 import { getPaths } from '@jib/core'
+import { SUBJECTS } from '@jib/rpc'
 import { isInteractive, promptConfirm } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
@@ -14,7 +15,8 @@ import { withBus } from '../bus-client.ts'
  */
 
 function resolveEditor(): string {
-  return process.env.EDITOR ?? process.env.VISUAL ?? 'vi'
+  // Unix convention: $VISUAL (full-screen editor) wins over $EDITOR (line editor).
+  return process.env.VISUAL ?? process.env.EDITOR ?? 'vi'
 }
 
 async function spawnEditor(cmd: string, file: string): Promise<number> {
@@ -50,7 +52,7 @@ async function editLoop(file: string): Promise<boolean> {
 async function notifyReload(): Promise<void> {
   try {
     await withBus(async (bus) => {
-      bus.publish('jib.cmd.config.reload', {
+      bus.publish(SUBJECTS.cmd.configReload, {
         corrId: crypto.randomUUID(),
         ts: new Date().toISOString(),
         source: 'jib-edit',

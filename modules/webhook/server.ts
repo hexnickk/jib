@@ -56,10 +56,11 @@ export async function handleRequest(req: Request, deps: WebhookServerDeps): Prom
   if (req.method !== 'POST' || new URL(req.url).pathname !== '/webhooks/jib') {
     return new Response('not found', { status: 404 })
   }
+  const delivery = req.headers.get('x-github-delivery') ?? 'unknown'
   const body = await req.text()
   const sig = req.headers.get('x-hub-signature-256')
   if (!verifySignature(deps.secret, body, sig)) {
-    deps.log.warn('rejected webhook: bad signature')
+    deps.log.warn(`rejected webhook ${delivery}: bad signature`)
     return new Response('bad signature', { status: 401 })
   }
   if (req.headers.get('x-github-event') !== 'push') {
@@ -70,13 +71,18 @@ export async function handleRequest(req: Request, deps: WebhookServerDeps): Prom
   const ref = payload.ref
   const sha = payload.after
   if (!repo || !ref || !sha) return new Response('malformed push payload', { status: 400 })
+  // Tag pushes (`refs/tags/...`) aren't branch deploys — silent skip for now.
+  if (!ref.startsWith('refs/heads/')) {
+    deps.log.info(`${delivery}: non-branch ref ${ref} — ignored`)
+    return new Response('non-branch ref', { status: 200 })
+  }
   const match = findAppForPush(deps.getConfig(), repo, ref)
   if (!match) {
-    deps.log.info(`no app for ${repo}@${ref} — ignored`)
+    deps.log.info(`${delivery}: no app for ${repo}@${ref} — ignored`)
     return new Response('no matching app', { status: 200 })
   }
   void dispatchDeploy(match.app, sha, deps).catch((err) =>
-    deps.log.error(`webhook deploy failed: ${(err as Error).message}`),
+    deps.log.error(`${delivery}: webhook deploy failed: ${(err as Error).message}`),
   )
   return new Response('accepted', { status: 202 })
 }
