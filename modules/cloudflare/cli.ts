@@ -8,15 +8,10 @@ import { consola } from 'consola'
 import { CloudflareClient } from './client.ts'
 
 /**
- * `jib cloudflare setup` and `jib cloudflare status`. Root CLI will mount
- * these under a `cloudflare` group when the loader wiring lands in Stage 5b;
- * until then they remain importable and testable in isolation.
- *
- * TODO(stage-5b): citty does not yet expose a context-injection hook, so
- * both commands call `loadConfig(getPaths().configFile)` directly. Once the
- * Stage 5b loader lands we should pass `ctx` (config + paths + logger) via
- * citty's shared context so these commands become fully testable and stop
- * reaching into global state at run time.
+ * `jib cloudflare setup` and `jib cloudflare status`. Mounted under the root
+ * CLI via `src/module-cli.ts` discovery. Both commands call
+ * `loadConfig(getPaths().configFile)` directly — citty does not expose a
+ * context-injection hook yet, so state lookup stays module-local.
  */
 
 const setup = defineCommand({
@@ -99,6 +94,9 @@ const status = defineCommand({
 })
 
 const commands: CommandDef[] = [
-  defineCommand({ meta: { name: 'cloudflare' }, subCommands: { setup, status } }),
+  defineCommand({
+    meta: { name: 'cloudflare', description: 'Manage Cloudflare Tunnel integration' },
+    subCommands: { setup, status },
+  }),
 ]
 export default commands

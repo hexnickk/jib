@@ -19,10 +19,9 @@ import { deployKeyPaths, generateDeployKey, keyFingerprint } from './keygen.ts'
 import { runManifestFlow } from './manifest-flow.ts'
 
 /**
- * `jib github key|app {setup,status,remove}`. CLI-only concerns (prompts,
- * printing) live here; every disk/network op delegates to a sibling helper.
- * TODO(stage-5b): once the loader injects `ctx`, swap `getPaths()` /
- * `loadConfig(...)` for values threaded through citty context.
+ * `jib github key|app {setup,status,remove}`. Mounted under the root CLI via
+ * `src/module-cli.ts` discovery. CLI-only concerns (prompts, printing) live
+ * here; every disk/network op delegates to a sibling helper.
  */
 
 async function fileExists(p: string): Promise<boolean> {

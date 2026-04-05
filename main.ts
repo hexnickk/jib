@@ -18,6 +18,7 @@ import {
   upCmd,
   webhookCmd,
 } from './src/commands/index.ts'
+import { moduleSubCommands } from './src/module-cli.ts'
 
 /**
  * CLI entry point. Kept intentionally thin: every command's business logic
@@ -48,6 +49,7 @@ const main = defineCommand({
     secrets: secretsCmd,
     service: serviceCmd,
     webhook: webhookCmd,
+    ...moduleSubCommands(),
   },
 })
 
