@@ -183,8 +183,12 @@ export function buildOverrideServices(
     list.push({ host: d.port, container: d.container_port })
     byService.set(target, list)
   }
-  return parsed.map((s) => {
-    const ports = byService.get(s.name)
-    return ports && ports.length > 0 ? { name: s.name, ports } : { name: s.name }
-  })
+  // Only emit overrides for services that own a domain. Services without a
+  // jib-allocated port (helpers, pre-deploy hooks, workers) inherit their
+  // restart/logging from the user's compose file. Applying `restart:
+  // unless-stopped` to a one-shot migration service would trap it in a
+  // restart loop, so we leave it alone.
+  return parsed
+    .filter((s) => byService.has(s.name))
+    .map((s) => ({ name: s.name, ports: byService.get(s.name) ?? [] }))
 }

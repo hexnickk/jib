@@ -30,25 +30,25 @@ describe('buildOverrideServices', () => {
     ])
   })
 
-  test('services with no matching domain still get an entry (no ports)', () => {
+  test('services without a matching domain are omitted (user compose wins)', () => {
+    // Services with no jib-allocated port inherit restart/logging from the
+    // user's compose file. Forcing `restart: unless-stopped` on one-shot
+    // services (migrations) would trap them in a loop.
     const domains: Domain[] = [
       { host: 'a.example.com', port: 20000, container_port: 80, service: 'web' },
     ]
     const out = buildOverrideServices(parsed('web', 'worker'), domains)
-    expect(out).toEqual([
-      { name: 'web', ports: [{ host: 20000, container: 80 }] },
-      { name: 'worker' },
-    ])
+    expect(out).toEqual([{ name: 'web', ports: [{ host: 20000, container: 80 }] }])
   })
 
-  test('domain without container_port is silently dropped (not a deployer concern)', () => {
+  test('domain without container_port is silently dropped → service absent', () => {
     const domains: Domain[] = [{ host: 'a.example.com', port: 20000 }]
     const out = buildOverrideServices(parsed('web'), domains)
-    expect(out).toEqual([{ name: 'web' }])
+    expect(out).toEqual([])
   })
 
-  test('no domains: every service still listed without ports', () => {
+  test('no domains: override is empty (user compose untouched)', () => {
     const out = buildOverrideServices(parsed('web', 'api'), [])
-    expect(out).toEqual([{ name: 'web' }, { name: 'api' }])
+    expect(out).toEqual([])
   })
 })
