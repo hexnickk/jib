@@ -11,6 +11,12 @@ import { CloudflareClient } from './client.ts'
  * `jib cloudflare setup` and `jib cloudflare status`. Root CLI will mount
  * these under a `cloudflare` group when the loader wiring lands in Stage 5b;
  * until then they remain importable and testable in isolation.
+ *
+ * TODO(stage-5b): citty does not yet expose a context-injection hook, so
+ * both commands call `loadConfig(getPaths().configFile)` directly. Once the
+ * Stage 5b loader lands we should pass `ctx` (config + paths + logger) via
+ * citty's shared context so these commands become fully testable and stop
+ * reaching into global state at run time.
  */
 
 const setup = defineCommand({
