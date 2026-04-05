@@ -200,11 +200,6 @@ export class Engine {
   }
 }
 
-/** Build an `Engine` from a `ModuleContext`-shaped deps bag. Convenience for `start.ts`. */
-export function newEngine(deps: EngineDeps): Engine {
-  return new Engine(deps)
-}
-
 /**
  * Group domains by target compose service and build the `OverrideService[]`
  * list the deployer passes to `writeOverride`. Every discovered compose
