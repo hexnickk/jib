@@ -1,7 +1,7 @@
 import type { Bus } from '@jib/bus'
 import { createLogger } from '@jib/core'
 import type { z } from 'zod'
-import { type Envelope, SCHEMAS } from './schemas.ts'
+import { type Envelope, EnvelopeSchema, SCHEMAS } from './schemas.ts'
 
 type SchemaOf<S extends keyof typeof SCHEMAS> = (typeof SCHEMAS)[S]
 type PayloadOf<S extends keyof typeof SCHEMAS> = z.infer<SchemaOf<S>>
@@ -48,7 +48,14 @@ export function handleCmd<
   return bus.queueSubscribe<unknown>(cmdSubject, queue, async (raw) => {
     const parsed = SCHEMAS[cmdSubject].safeParse(raw)
     if (!parsed.success) {
-      log.warn(`dropped invalid ${cmdSubject}: ${parsed.error.message}`)
+      // Recover corrId + app from the raw payload so the waiting client gets
+      // a failure event instead of hanging until its timeout fires.
+      const env = EnvelopeSchema.safeParse(raw)
+      const msg = `invalid ${cmdSubject}: ${parsed.error.message}`
+      log.warn(msg)
+      if (env.success) {
+        publishFallback(bus, source, env.data.corrId, raw, fallbackFailure, msg)
+      }
       return
     }
     const cmd = parsed.data as PayloadOf<TCmd> & Envelope
@@ -58,14 +65,37 @@ export function handleCmd<
       publishResult(bus, source, cmd.corrId, result)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      publishResult(bus, source, cmd.corrId, {
-        failure: {
-          subject: fallbackFailure,
-          body: { error: message } as unknown as Body<TFailure>,
-        },
-      })
+      publishFallback(bus, source, cmd.corrId, raw, fallbackFailure, message)
     }
   })
+}
+
+/**
+ * Emit a best-effort failure event when the handler couldn't produce one
+ * (schema fail or thrown exception). Carries over `app` from the raw payload
+ * if present, since most failure schemas require it.
+ */
+function publishFallback<TFailure extends keyof typeof SCHEMAS>(
+  bus: Bus,
+  source: string,
+  corrId: string,
+  raw: unknown,
+  subject: TFailure,
+  error: string,
+): void {
+  const body: Record<string, unknown> = { error }
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    'app' in raw &&
+    typeof (raw as { app: unknown }).app === 'string'
+  ) {
+    body.app = (raw as { app: string }).app
+  }
+  const payload = { corrId, ts: new Date().toISOString(), source, ...body }
+  const parsed = SCHEMAS[subject].safeParse(payload)
+  if (parsed.success) bus.publish(subject, parsed.data)
+  else log.error(`invalid fallback failure on ${subject}: ${parsed.error.message}`)
 }
 
 function makeCtx<TProgress extends keyof typeof SCHEMAS | undefined>(
