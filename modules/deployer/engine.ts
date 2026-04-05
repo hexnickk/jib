@@ -39,13 +39,14 @@ export interface ProgressCtx {
 
 export type DeployCmd = Pick<CmdDeploy, 'app' | 'workdir' | 'sha' | 'trigger'> & { user?: string }
 
+/**
+ * Minimal return shape for `Engine.deploy`. Only fields the NATS handler
+ * actually forwards into `evt.deploy.success` — failure flows through
+ * thrown errors, not a result field, so there's no `error`/`success` here.
+ */
 export interface DeployResult {
-  app: string
-  previousSHA: string
   deployedSHA: string
-  success: boolean
   durationMs: number
-  error?: string
 }
 
 /**
@@ -114,7 +115,6 @@ export class Engine {
       }
 
       const prevState = await this.deps.store.load(cmd.app)
-      const previousSHA = prevState.deployed_sha // retained for DeployResult audit
 
       const parsed = parseComposeServices(cmd.workdir, appCfg.compose ?? [])
       const services = buildOverrideServices(parsed, appCfg.domains)
@@ -156,13 +156,7 @@ export class Engine {
       }
       await this.deps.store.save(cmd.app, next)
 
-      return {
-        app: cmd.app,
-        previousSHA,
-        deployedSHA: cmd.sha,
-        success: true,
-        durationMs: Date.now() - start,
-      }
+      return { deployedSHA: cmd.sha, durationMs: Date.now() - start }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       this.deps.log.error(`deploy ${cmd.app} failed: ${message}`)

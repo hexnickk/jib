@@ -75,7 +75,6 @@ describe('Engine.deploy', () => {
       { app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' },
       noProgress,
     )
-    expect(res.success).toBe(true)
     expect(res.deployedSHA).toBe('deadbeef')
     const state = await store.load('demo')
     expect(state.deployed_sha).toBe('deadbeef')
