@@ -1,4 +1,4 @@
-import { chmod, copyFile, mkdir, stat } from 'node:fs/promises'
+import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export interface AppSecretStatus {
@@ -33,11 +33,19 @@ export class SecretsManager {
     return appDir
   }
 
-  /** Copies `sourceFile` into the app's secrets dir under `envFile`. */
+  /**
+   * Copies `sourceFile` into the app's secrets dir under `envFile`. The
+   * destination is written with `mode: 0600` up front — we deliberately do
+   * not use `copyFile` because it creates the target with the default umask
+   * first, leaving a brief window where the secret is world-readable.
+   */
   async set(app: string, sourceFile: string, envFile?: string): Promise<string> {
     const appDir = await this.ensureAppDir(app)
     const dst = join(appDir, envFileName(envFile))
-    await copyFile(sourceFile, dst)
+    const data = await readFile(sourceFile)
+    await writeFile(dst, data, { mode: FILE_MODE })
+    // `writeFile`'s mode only applies when it creates the file; on overwrite
+    // it preserves the existing mode. Belt and braces.
     await chmod(dst, FILE_MODE)
     return dst
   }
