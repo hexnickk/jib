@@ -22,7 +22,7 @@ export interface ConnectOptions {
 
 export type Handler<T> = (msg: T, raw: Msg) => void | Promise<void>
 
-/** Thin wrapper around `NatsConnection` with typed JSON pub/sub/request. */
+/** Thin wrapper around `NatsConnection` with typed JSON pub/sub. */
 export class Bus {
   /**
    * Internal: construct directly from an existing connection. Kept non-private
@@ -81,13 +81,6 @@ export class Bus {
     opts?: Omit<SubscriptionOptions, 'queue'>,
   ): Subscription {
     return this.attach(this.conn.subscribe(subject, { ...opts, queue }), subject, handler)
-  }
-
-  async request<TReq, TRes>(subject: string, payload: TReq, timeoutMs: number): Promise<TRes> {
-    const reply = await this.conn.request(subject, jsonCodec<TReq>().encode(payload), {
-      timeout: timeoutMs,
-    })
-    return jsonCodec<TRes>().decode(reply.data)
   }
 
   /** Wire up a subscription to decode JSON and swallow handler errors. */
