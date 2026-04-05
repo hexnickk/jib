@@ -6,10 +6,10 @@ import { Engine } from './engine.ts'
 import { registerDeployerHandlers } from './handlers.ts'
 
 /**
- * Entry point for `jib service start deployer`. Connects to NATS, constructs an
- * `Engine` bound to the current config + state store, registers the three
- * command handlers, and listens for config reloads. Blocks until
- * SIGTERM/SIGINT.
+ * Entry point for `jib service start deployer`. Connects to NATS, registers
+ * the three command handlers with a factory that re-reads config on every
+ * command (so the CLI's `writeConfig` is always observed without a
+ * round-trip through `cmd.config.reload`). Blocks until SIGTERM/SIGINT.
  */
 export const start: StartFn<Config> = async (ctx: ModuleContext<Config>) => {
   const log = ctx.logger
@@ -17,20 +17,11 @@ export const start: StartFn<Config> = async (ctx: ModuleContext<Config>) => {
   const bus = await Bus.connect()
   const store = new Store(ctx.paths.stateDir)
 
-  let engine = new Engine({ config: ctx.config, paths: ctx.paths, store, log })
-  let disposer = registerDeployerHandlers(bus, engine)
-
-  bus.subscribe('jib.cmd.config.reload', async () => {
-    try {
-      const cfg = await loadConfig(ctx.paths.configFile)
-      disposer()
-      engine = new Engine({ config: cfg, paths: ctx.paths, store, log })
-      disposer = registerDeployerHandlers(bus, engine)
-      log.info('config reloaded')
-    } catch (err) {
-      log.warn(`config reload failed: ${(err as Error).message}`)
-    }
-  })
+  const engineFactory = async () => {
+    const config = await loadConfig(ctx.paths.configFile)
+    return new Engine({ config, paths: ctx.paths, store, log })
+  }
+  const disposer = registerDeployerHandlers(bus, engineFactory)
 
   await new Promise<void>((resolve) => {
     const shutdown = async () => {

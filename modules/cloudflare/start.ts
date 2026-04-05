@@ -5,30 +5,19 @@ import { registerCloudflareHandlers } from './handlers.ts'
 
 /**
  * Entry point for `jib service start cloudflare`. Connects to NATS, registers
- * the `cmd.cloudflare.domain.*` handlers, and blocks until SIGTERM/SIGINT.
- * Post-initial-setup the operator is mostly idle — its only job is to handle
- * add-domain/remove-domain commands emitted from the CLI.
+ * the `cmd.cloudflare.domain.*` handlers with a fresh-config provider, and
+ * blocks until SIGTERM/SIGINT. Post-initial-setup the operator is mostly idle
+ * — its only job is to handle add-domain/remove-domain commands from the CLI.
  */
 export const start: StartFn<Config> = async (ctx: ModuleContext<Config>) => {
   const log = ctx.logger
   log.info('starting cloudflare operator')
   const bus = await Bus.connect()
 
-  let disposer = registerCloudflareHandlers(bus, {
+  const disposer = registerCloudflareHandlers(bus, {
     paths: ctx.paths,
     log,
-    config: ctx.config,
-  })
-
-  bus.subscribe('jib.cmd.config.reload', async () => {
-    try {
-      const cfg = await loadConfig(ctx.paths.configFile)
-      disposer()
-      disposer = registerCloudflareHandlers(bus, { paths: ctx.paths, log, config: cfg })
-      log.info('config reloaded')
-    } catch (err) {
-      log.warn(`config reload failed: ${(err as Error).message}`)
-    }
+    getConfig: () => loadConfig(ctx.paths.configFile),
   })
 
   await new Promise<void>((resolve) => {

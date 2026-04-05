@@ -20,7 +20,8 @@ export const defaultClientFactory: ClientFactory = (t) => new CloudflareClient({
 export interface CloudflareOperatorDeps {
   paths: Paths
   log: Logger
-  config: Config
+  /** Resolved per command so each invocation sees the latest config.yml. */
+  getConfig: () => Promise<Config> | Config
   clientFactory?: ClientFactory
 }
 
@@ -120,7 +121,8 @@ async function runDomainOp(
   const factory = deps.clientFactory ?? defaultClientFactory
   emitProgress?.({ rootDomain, message: 'loading token + tunnel config' })
   const token = await loadToken(deps.paths)
-  const { accountId, tunnelId } = tunnelIds(deps.config)
+  const config = await deps.getConfig()
+  const { accountId, tunnelId } = tunnelIds(config)
   const client = factory(token)
   emitProgress?.({
     rootDomain,

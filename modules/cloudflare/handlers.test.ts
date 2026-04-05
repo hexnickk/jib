@@ -65,7 +65,7 @@ function setup(client: CloudflareClient, cfg: Config = configWithTunnel()) {
   registerCloudflareHandlers(bus.asBus(), {
     paths: getPaths(tmpRoot),
     log: createLogger('cf-test'),
-    config: cfg,
+    getConfig: () => cfg,
     clientFactory: () => client,
   })
   return bus

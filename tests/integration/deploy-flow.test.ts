@@ -78,7 +78,7 @@ describe('deploy-flow integration', () => {
     })
 
     registerGitsitter(bus.asBus(), paths, () => cfg)
-    registerDeployerHandlers(bus.asBus(), engine)
+    registerDeployerHandlers(bus.asBus(), () => engine)
 
     // Wire the CLI-orchestrator flow: when evt.repo.ready fires, emit cmd.deploy.
     const deployResults: unknown[] = []

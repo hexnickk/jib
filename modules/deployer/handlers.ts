@@ -9,8 +9,16 @@ import { rollback } from './rollback.ts'
  * `cmd.resume`) on `bus` and wires each to the matching Engine method. The
  * handler adapter shape is identical across all three — each wraps the engine
  * call, forwards progress events, and returns a success/failure terminal event.
+ *
+ * `engineFactory` is invoked per command so the engine sees a freshly loaded
+ * config. This sidesteps the stale-cache race where the CLI writes config and
+ * emits `cmd.deploy` before the operator's `cmd.config.reload` subscription
+ * has fired. Engine construction is a pure object allocation — zero overhead.
  */
-export function registerDeployerHandlers(bus: Bus, engine: Engine): () => void {
+export function registerDeployerHandlers(
+  bus: Bus,
+  engineFactory: () => Promise<Engine> | Engine,
+): () => void {
   const deploySub = handleCmd(
     bus,
     SUBJECTS.cmd.deploy,
@@ -23,6 +31,7 @@ export function registerDeployerHandlers(bus: Bus, engine: Engine): () => void {
         emit: (step: string, message: string) =>
           ctx.emitProgress?.({ app: cmd.app, step, message }),
       }
+      const engine = await engineFactory()
       try {
         const res = await engine.deploy(
           {
@@ -59,6 +68,7 @@ export function registerDeployerHandlers(bus: Bus, engine: Engine): () => void {
     SUBJECTS.evt.rollbackProgress,
     SUBJECTS.evt.rollbackFailure,
     async (cmd) => {
+      const engine = await engineFactory()
       try {
         await rollback(engine, { app: cmd.app })
         return { success: { subject: SUBJECTS.evt.rollbackSuccess, body: { app: cmd.app } } }
@@ -81,6 +91,7 @@ export function registerDeployerHandlers(bus: Bus, engine: Engine): () => void {
     undefined,
     SUBJECTS.evt.resumeFailure,
     async (cmd) => {
+      const engine = await engineFactory()
       try {
         await resume(engine, { app: cmd.app })
         return { success: { subject: SUBJECTS.evt.resumeSuccess, body: { app: cmd.app } } }

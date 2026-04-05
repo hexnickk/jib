@@ -54,7 +54,7 @@ describe('deployer handlers', () => {
     bus.subscribe(SUBJECTS.evt.deploySuccess, (p) => {
       successes.push(p)
     })
-    registerDeployerHandlers(bus.asBus(), engine)
+    registerDeployerHandlers(bus.asBus(), () => engine)
 
     const workdir = await mkWorkdir()
     bus.publish(SUBJECTS.cmd.deploy, {
