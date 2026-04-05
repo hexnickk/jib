@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Bus } from '@jib/bus'
 import type { Logger, Paths } from '@jib/core'
@@ -15,10 +15,30 @@ export interface NginxExec {
   exec: ExecFn
 }
 
+/**
+ * Returns `true` when a Let's Encrypt cert exists for `host`. The operator
+ * uses this to decide whether to emit a 443 server block. Injectable so
+ * tests can fake it without touching `/etc/letsencrypt`.
+ */
+export type CertExistsFn = (host: string) => Promise<boolean>
+
+const LETSENCRYPT_LIVE = '/etc/letsencrypt/live'
+
+const defaultCertExists: CertExistsFn = async (host) => {
+  try {
+    await stat(`${LETSENCRYPT_LIVE}/${host}/fullchain.pem`)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export interface NginxOperatorDeps {
   paths: Paths
   log: Logger
   exec?: ExecFn
+  /** Cert-presence probe; defaults to `stat /etc/letsencrypt/live/<host>/fullchain.pem`. */
+  certExists?: CertExistsFn
 }
 
 /**
@@ -30,17 +50,20 @@ export interface NginxOperatorDeps {
 async function renderAndWrite(
   nginxDir: string,
   app: string,
-  domains: ReadonlyArray<{ host: string; port: number; isTunnel: boolean; hasSSL: boolean }>,
+  domains: ReadonlyArray<{ host: string; port: number; isTunnel: boolean }>,
+  certExists: CertExistsFn,
 ): Promise<string> {
   const dir = appConfDir(nginxDir, app)
   await rm(dir, { recursive: true, force: true })
   await mkdir(dir, { recursive: true, mode: 0o755 })
   for (const d of domains) {
+    // Tunnel backends terminate TLS at Cloudflare's edge, so skip the probe.
+    const hasSSL = d.isTunnel ? false : await certExists(d.host)
     const body = renderSite({
       host: d.host,
       port: d.port,
       isTunnel: d.isTunnel,
-      hasSSL: d.hasSSL,
+      hasSSL,
     })
     await writeFile(join(dir, confFilename(d.host)), body, { mode: 0o644 })
   }
@@ -74,6 +97,7 @@ async function reload(exec: ExecFn): Promise<{ ok: true } | { ok: false; error: 
  */
 export function registerNginxHandlers(bus: Bus, deps: NginxOperatorDeps): () => void {
   const exec = deps.exec ?? getExec()
+  const certExists = deps.certExists ?? defaultCertExists
   const dir = deps.paths.nginxDir
   const log = deps.log
 
@@ -86,7 +110,7 @@ export function registerNginxHandlers(bus: Bus, deps: NginxOperatorDeps): () => 
     SUBJECTS.evt.nginxFailed,
     async (cmd, ctx) => {
       ctx.emitProgress?.({ app: cmd.app, message: `writing ${cmd.domains.length} config(s)` })
-      await renderAndWrite(dir, cmd.app, cmd.domains)
+      await renderAndWrite(dir, cmd.app, cmd.domains, certExists)
       ctx.emitProgress?.({ app: cmd.app, message: 'running nginx -t + reload' })
       const r = await reload(exec)
       if (!r.ok) {

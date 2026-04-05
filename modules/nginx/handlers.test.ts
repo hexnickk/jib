@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createLogger, getPaths } from '@jib/core'
 import { FakeBus, SUBJECTS, flush } from '@jib/rpc'
-import { registerNginxHandlers } from './handlers.ts'
+import { type CertExistsFn, registerNginxHandlers } from './handlers.ts'
 import type { ExecFn, ExecResult } from './shell.ts'
 
 let tmpRoot: string
@@ -34,13 +34,16 @@ afterEach(async () => {
   await rm(tmpRoot, { recursive: true, force: true })
 })
 
-function setup(exec: ExecFn) {
+const noCerts: CertExistsFn = async () => false
+
+function setup(exec: ExecFn, certExists: CertExistsFn = noCerts) {
   const bus = new FakeBus()
   const paths = getPaths(tmpRoot)
   const disposer = registerNginxHandlers(bus.asBus(), {
     paths,
     log: createLogger('nginx-test'),
     exec,
+    certExists,
   })
   return { bus, paths, disposer }
 }
@@ -175,7 +178,7 @@ describe('nginx operator handlers', () => {
       ts: new Date().toISOString(),
       source: 'test',
       app: 'tun',
-      domains: [{ host: 'tun.example.com', port: 20000, isTunnel: true, hasSSL: false }],
+      domains: [{ host: 'tun.example.com', port: 20000, isTunnel: true }],
     })
     await waitFor(() => (ready.length ? ready : undefined))
     const body = await readFile(join(paths.nginxDir, 'tun', 'tun.example.com.conf'), 'utf8')
@@ -183,8 +186,16 @@ describe('nginx operator handlers', () => {
     expect(body).not.toContain('listen 443')
   })
 
-  test('cmd.nginx.claim honors hasSSL flag (emits 443 block + redirect)', async () => {
-    const { bus, paths } = setup(fakeExec(() => ({ ok: true, stdout: '', stderr: '' })))
+  test('operator probes certExists and emits 443 block when cert present', async () => {
+    const seen: string[] = []
+    const certExists: CertExistsFn = async (host) => {
+      seen.push(host)
+      return host === 'ssl.example.com'
+    }
+    const { bus, paths } = setup(
+      fakeExec(() => ({ ok: true, stdout: '', stderr: '' })),
+      certExists,
+    )
     const ready: unknown[] = []
     bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
       ready.push(p)
@@ -194,13 +205,39 @@ describe('nginx operator handlers', () => {
       ts: new Date().toISOString(),
       source: 'test',
       app: 'ssl',
-      domains: [{ host: 'ssl.example.com', port: 20001, isTunnel: false, hasSSL: true }],
+      domains: [{ host: 'ssl.example.com', port: 20001, isTunnel: false }],
     })
     await waitFor(() => (ready.length ? ready : undefined))
     const body = await readFile(join(paths.nginxDir, 'ssl', 'ssl.example.com.conf'), 'utf8')
     expect(body).toContain('listen 443 ssl')
     expect(body).toContain('fullchain.pem')
     expect(body).toContain('return 301 https://')
+    expect(seen).toEqual(['ssl.example.com'])
+  })
+
+  test('operator skips certExists probe for tunnel backends', async () => {
+    let probed = 0
+    const certExists: CertExistsFn = async () => {
+      probed++
+      return true
+    }
+    const { bus } = setup(
+      fakeExec(() => ({ ok: true, stdout: '', stderr: '' })),
+      certExists,
+    )
+    const ready: unknown[] = []
+    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+      ready.push(p)
+    })
+    bus.publish(SUBJECTS.cmd.nginxClaim, {
+      corrId: 'c-tun2',
+      ts: new Date().toISOString(),
+      source: 'test',
+      app: 'tun2',
+      domains: [{ host: 'tun2.example.com', port: 20002, isTunnel: true }],
+    })
+    await waitFor(() => (ready.length ? ready : undefined))
+    expect(probed).toBe(0)
   })
 
   test('cmd.nginx.release for `foo` leaves `foo-bar` untouched (no prefix collision)', async () => {

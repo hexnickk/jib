@@ -37,10 +37,6 @@ export async function provisionApp(app: string, appCfg: App, timeoutMs: number):
           // get here; treat undefined as a programming error.
           port: d.port as number,
           isTunnel: d.ingress === 'cloudflare-tunnel',
-          // TODO(stage-5): wire `hasSSL` from a per-domain cert-presence
-          // check (or a future `tls:` config field). Hardcoded false today
-          // because Stage 4 only covers plaintext + tunnel listeners.
-          hasSSL: false,
         })),
       },
       { success: SUBJECTS.evt.nginxReady, failure: SUBJECTS.evt.nginxFailed },

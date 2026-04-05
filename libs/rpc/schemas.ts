@@ -71,13 +71,16 @@ const rootDomain = z.string().min(1)
 
 export const CmdNginxClaimSchema = EnvelopeSchema.extend({
   app,
+  // `hasSSL` intentionally absent: whether a host has a TLS cert is a
+  // filesystem property of the server, not something the CLI can know or
+  // care about. The nginx operator probes `/etc/letsencrypt/live/<host>/`
+  // at render time. `isTunnel` stays because it's a user-declared intent.
   domains: z
     .array(
       z.object({
         host: z.string().min(1),
         port,
         isTunnel: z.boolean().default(false),
-        hasSSL: z.boolean().default(false),
       }),
     )
     .min(1),
