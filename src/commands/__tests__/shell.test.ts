@@ -40,7 +40,19 @@ describe('parseRunArgs', () => {
     expect(parseRunArgs(['web', 'api'])).toEqual({ app: 'web', service: 'api', cmd: [] })
   })
 
-  test('missing service → throws', () => {
-    expect(() => parseRunArgs(['web'])).toThrow(/service required/)
+  test('app only → service defaults to empty (resolved at runtime)', () => {
+    expect(parseRunArgs(['web'])).toEqual({ app: 'web', service: '', cmd: [] })
+  })
+
+  test('app + -- + cmd (service defaults to empty)', () => {
+    expect(parseRunArgs(['web', '--', 'ls', '/'])).toEqual({
+      app: 'web',
+      service: '',
+      cmd: ['ls', '/'],
+    })
+  })
+
+  test('empty argv → throws', () => {
+    expect(() => parseRunArgs([])).toThrow(/missing app/)
   })
 })

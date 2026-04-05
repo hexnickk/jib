@@ -4,9 +4,12 @@ import { defineCommand } from 'citty'
 import { consola } from 'consola'
 
 /**
- * `jib service start <name>` / `jib service list` — drive long-running jib
- * services (deployer, gitsitter). Formerly `jib run <module>`; renamed so
- * `jib run <app> <service>` (compose run) gets the intuitive verb.
+ * `jib service` — inspect and (internally) launch the long-running jib
+ * operators. `jib service list` is user-facing (shows what operators are
+ * runnable on this host). `jib service start <name>` is **strictly for
+ * systemd** — it's the ExecStart target of every `jib-<operator>.service`
+ * unit. A human running it directly will bypass systemd supervision and
+ * block the terminal.
  *
  * The registry is a plain object (not `import()` on a computed name) so
  * `bun build --compile` can see every dependency at build time.
@@ -42,7 +45,11 @@ async function startService(name: string): Promise<never> {
 }
 
 const start = defineCommand({
-  meta: { name: 'start', description: 'Run a jib service in the foreground' },
+  meta: {
+    name: 'start',
+    description:
+      '[systemd only] Run a jib operator in the foreground. Invoked by jib-<name>.service units; not for direct use.',
+  },
   args: { name: { type: 'positional', required: true } },
   async run({ args }) {
     await startService(args.name)
@@ -50,13 +57,13 @@ const start = defineCommand({
 })
 
 const list = defineCommand({
-  meta: { name: 'list', description: 'List runnable jib services' },
+  meta: { name: 'list', description: 'List runnable jib operators' },
   run() {
     for (const name of Object.keys(RUNNABLE)) consola.log(name)
   },
 })
 
 export default defineCommand({
-  meta: { name: 'service', description: 'Manage long-running jib services' },
+  meta: { name: 'service', description: 'Inspect long-running jib operators' },
   subCommands: { start, list },
 })
