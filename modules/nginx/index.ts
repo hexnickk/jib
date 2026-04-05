@@ -1,5 +1,4 @@
 export { default as manifest } from './manifest.ts'
-export { install, JIB_NGINX_INCLUDE_PATH } from './install.ts'
+export { install } from './install.ts'
 export { uninstall } from './uninstall.ts'
 export { setupHooks } from './hooks.ts'
-export * as templates from './templates.ts'
