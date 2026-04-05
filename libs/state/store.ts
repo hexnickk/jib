@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { StateError } from '@jib/core'
 import { ZodError } from 'zod'
@@ -47,6 +47,9 @@ export class Store {
       await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o640 })
       await rename(tmp, target)
     } catch (err) {
+      // Best-effort cleanup: if the write succeeded but `rename` failed the
+      // tmp file is still on disk and would otherwise accumulate forever.
+      await unlink(tmp).catch(() => undefined)
       throw new StateError(`writing state ${target}: ${(err as Error).message}`, { cause: err })
     }
   }
