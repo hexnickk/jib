@@ -47,11 +47,3 @@ export interface Module {
 export interface LoadedModule extends Module {
   path: string
 }
-
-/**
- * Stage 0 stub. The real implementation (walking `modules/*` and validating
- * each manifest) lands in Stage 1.
- */
-export async function loadModules(): Promise<LoadedModule[]> {
-  return []
-}
