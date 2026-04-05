@@ -68,26 +68,4 @@ describe('deploy flow', () => {
     await flush()
     expect(captured.map((c) => c.subject)).toEqual([SUBJECTS.cmd.repoPrepare, SUBJECTS.cmd.deploy])
   })
-
-  test('rollback: simple cmd → terminal event roundtrip', async () => {
-    const bus = new FakeBus()
-    bus.subscribe(SUBJECTS.cmd.rollback, (raw) => {
-      const cmd = raw as { corrId: string; app: string }
-      bus.publish(SUBJECTS.evt.rollbackSuccess, {
-        corrId: cmd.corrId,
-        ts: new Date().toISOString(),
-        source: 'deployer',
-        app: cmd.app,
-      })
-    })
-    const out = await emitAndWait(
-      bus.asBus(),
-      SUBJECTS.cmd.rollback,
-      { app: 'web' },
-      { success: SUBJECTS.evt.rollbackSuccess, failure: SUBJECTS.evt.rollbackFailure },
-      undefined,
-      { source: 'cli', timeoutMs: 1000 },
-    )
-    expect(out.app).toBe('web')
-  })
 })

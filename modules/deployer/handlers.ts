@@ -2,13 +2,12 @@ import type { Bus } from '@jib/bus'
 import { SUBJECTS, handleCmd } from '@jib/rpc'
 import type { Engine } from './engine.ts'
 import { resume } from './resume.ts'
-import { rollback } from './rollback.ts'
 
 /**
- * Registers the three command handlers (`cmd.deploy`, `cmd.rollback`,
- * `cmd.resume`) on `bus` and wires each to the matching Engine method. The
- * handler adapter shape is identical across all three — each wraps the engine
- * call, forwards progress events, and returns a success/failure terminal event.
+ * Registers the two command handlers (`cmd.deploy`, `cmd.resume`) on `bus`
+ * and wires each to the matching Engine method. jib intentionally has no
+ * rollback: data-changing migrations aren't reversible, so reverting code
+ * without reverting data gives false safety. Operators fix-forward instead.
  *
  * `engineFactory` is invoked per command so the engine sees a freshly loaded
  * config. This sidesteps the stale-cache race where the CLI writes config and
@@ -60,29 +59,6 @@ export function registerDeployerHandlers(
     },
   )
 
-  const rollbackSub = handleCmd(
-    bus,
-    SUBJECTS.cmd.rollback,
-    'deployer',
-    'deployer',
-    SUBJECTS.evt.rollbackProgress,
-    SUBJECTS.evt.rollbackFailure,
-    async (cmd) => {
-      const engine = await engineFactory()
-      try {
-        await rollback(engine, { app: cmd.app })
-        return { success: { subject: SUBJECTS.evt.rollbackSuccess, body: { app: cmd.app } } }
-      } catch (err) {
-        return {
-          failure: {
-            subject: SUBJECTS.evt.rollbackFailure,
-            body: { app: cmd.app, error: (err as Error).message },
-          },
-        }
-      }
-    },
-  )
-
   const resumeSub = handleCmd(
     bus,
     SUBJECTS.cmd.resume,
@@ -108,7 +84,6 @@ export function registerDeployerHandlers(
 
   return () => {
     deploySub.unsubscribe()
-    rollbackSub.unsubscribe()
     resumeSub.unsubscribe()
   }
 }

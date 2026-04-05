@@ -9,8 +9,6 @@ export const AppStateSchema = z.object({
   strategy: z.string().default(''),
   deployed_sha: z.string().default(''),
   deployed_workdir: z.string().default(''),
-  previous_sha: z.string().default(''),
-  previous_workdir: z.string().default(''),
   pinned: z.boolean().default(false),
   last_deploy: z.string().default(''),
   last_deploy_status: z.string().default(''),

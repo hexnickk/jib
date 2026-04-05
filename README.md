@@ -79,7 +79,6 @@ re-runs the deploy end to end.
 | `jib add <app>` | Register a new app (repo, branch, domains, compose path). |
 | `jib remove <app>` | Unregister an app and tear down its containers. |
 | `jib deploy <app>` | Deploy the tracked branch of an app now. |
-| `jib rollback <app>` | Roll back to the previous successful deploy. |
 | `jib resume <app>` | Resume a paused/failed deploy loop. |
 | `jib config` | Inspect or edit the jib config. |
 | `jib edit` | Open `config.yml` in `$EDITOR` with validation on save. |
@@ -99,8 +98,10 @@ Jib is split into small services that talk over a local NATS bus:
 
 - `main.ts` (CLI) — compiled to a single `jib` binary via `bun build --compile`.
 - `modules/nats` — embedded NATS server installed as a systemd unit on `jib init`.
-- `modules/deployer` — long-running operator; subscribes to deploy/rollback
-  commands and runs `docker compose`.
+- `modules/deployer` — long-running operator; subscribes to deploy commands
+  and runs `docker compose`. jib does not roll back: if a deploy breaks,
+  push a fix-forward commit. Migrations aren't safely reversible, so
+  reverting only the code would leave the app out of sync with its data.
 - `modules/gitsitter` — long-running operator; polls registered repos and
   prepares workdirs on `cmd.repo.prepare`.
 - `modules/nginx` — long-running operator; writes per-app nginx site

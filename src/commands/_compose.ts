@@ -26,7 +26,9 @@ export function composeFor(cfg: Config, paths: Paths, app: string): Compose {
     appCfg.compose && appCfg.compose.length > 0 ? appCfg.compose : ['docker-compose.yml']
   ).map((f) => (f.startsWith('/') ? f : join(dir, f)))
 
-  const envFileCandidate = appCfg.env_file ? join(paths.secretsDir, app, appCfg.env_file) : undefined
+  const envFileCandidate = appCfg.env_file
+    ? join(paths.secretsDir, app, appCfg.env_file)
+    : undefined
   const envFile = envFileCandidate && existsSync(envFileCandidate) ? envFileCandidate : undefined
 
   const config: ConstructorParameters<typeof Compose>[0] = {

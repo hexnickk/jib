@@ -49,9 +49,10 @@ export interface DeployResult {
 }
 
 /**
- * Deploy engine. Owns the restart-strategy flow: lock, disk check, build,
- * pre-deploy hooks, compose up, health, state update. `rollback.ts` and
- * `resume.ts` share the engine's constructor + state store.
+ * Deploy engine. Owns the deploy flow: lock, disk check, build, pre-deploy
+ * hooks, compose up, health, state update. `resume.ts` shares the engine's
+ * constructor + state store. jib has no rollback — operators fix-forward
+ * because data-changing migrations aren't reversible.
  */
 export class Engine {
   constructor(readonly deps: EngineDeps) {}
@@ -114,7 +115,7 @@ export class Engine {
       }
 
       const prevState = await this.deps.store.load(cmd.app)
-      const previousSHA = prevState.deployed_sha
+      const previousSHA = prevState.deployed_sha // retained for DeployResult audit
 
       const parsed = parseComposeServices(cmd.workdir, appCfg.compose ?? [])
       const services = buildOverrideServices(parsed, appCfg.domains)
@@ -151,8 +152,6 @@ export class Engine {
         strategy: 'restart',
         deployed_sha: cmd.sha,
         deployed_workdir: cmd.workdir,
-        previous_sha: previousSHA,
-        previous_workdir: prevState.deployed_workdir,
         last_deploy: new Date().toISOString(),
         last_deploy_status: 'success',
         last_deploy_error: '',
@@ -177,11 +176,6 @@ export class Engine {
     } finally {
       await release()
     }
-  }
-
-  /** Build a Compose helper against an arbitrary workdir (used by rollback). */
-  composeFor(app: string, appCfg: App, workdir: string): Compose {
-    return this.newCompose(app, appCfg, workdir)
   }
 }
 

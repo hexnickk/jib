@@ -27,7 +27,6 @@ export const CmdDeploySchema = EnvelopeSchema.extend({
   trigger: z.enum(['manual', 'auto']),
   user: z.string().optional(),
 })
-export const CmdRollbackSchema = EnvelopeSchema.extend({ app })
 export const CmdResumeSchema = EnvelopeSchema.extend({ app })
 export const CmdConfigReloadSchema = EnvelopeSchema
 
@@ -56,13 +55,6 @@ export const EvtDeployProgressSchema = EnvelopeSchema.extend({
   message: z.string(),
 })
 
-export const EvtRollbackSuccessSchema = EnvelopeSchema.extend({ app })
-export const EvtRollbackFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
-export const EvtRollbackProgressSchema = EnvelopeSchema.extend({
-  app,
-  step: z.string(),
-  message: z.string(),
-})
 export const EvtResumeSuccessSchema = EnvelopeSchema.extend({ app })
 export const EvtResumeFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
 
@@ -108,7 +100,6 @@ export const EvtCloudflareDomainProgressSchema = EnvelopeSchema.extend({
 export type CmdRepoPrepare = z.infer<typeof CmdRepoPrepareSchema>
 export type CmdRepoRemove = z.infer<typeof CmdRepoRemoveSchema>
 export type CmdDeploy = z.infer<typeof CmdDeploySchema>
-export type CmdRollback = z.infer<typeof CmdRollbackSchema>
 export type CmdResume = z.infer<typeof CmdResumeSchema>
 export type CmdConfigReload = z.infer<typeof CmdConfigReloadSchema>
 
@@ -119,9 +110,6 @@ export type EvtRepoProgress = z.infer<typeof EvtRepoProgressSchema>
 export type EvtDeploySuccess = z.infer<typeof EvtDeploySuccessSchema>
 export type EvtDeployFailure = z.infer<typeof EvtDeployFailureSchema>
 export type EvtDeployProgress = z.infer<typeof EvtDeployProgressSchema>
-export type EvtRollbackSuccess = z.infer<typeof EvtRollbackSuccessSchema>
-export type EvtRollbackFailure = z.infer<typeof EvtRollbackFailureSchema>
-export type EvtRollbackProgress = z.infer<typeof EvtRollbackProgressSchema>
 export type EvtResumeSuccess = z.infer<typeof EvtResumeSuccessSchema>
 export type EvtResumeFailure = z.infer<typeof EvtResumeFailureSchema>
 
@@ -147,7 +135,6 @@ export const SCHEMAS = {
   [SUBJECTS.cmd.repoPrepare]: CmdRepoPrepareSchema,
   [SUBJECTS.cmd.repoRemove]: CmdRepoRemoveSchema,
   [SUBJECTS.cmd.deploy]: CmdDeploySchema,
-  [SUBJECTS.cmd.rollback]: CmdRollbackSchema,
   [SUBJECTS.cmd.resume]: CmdResumeSchema,
   [SUBJECTS.cmd.configReload]: CmdConfigReloadSchema,
   [SUBJECTS.evt.repoReady]: EvtRepoReadySchema,
@@ -157,9 +144,6 @@ export const SCHEMAS = {
   [SUBJECTS.evt.deploySuccess]: EvtDeploySuccessSchema,
   [SUBJECTS.evt.deployFailure]: EvtDeployFailureSchema,
   [SUBJECTS.evt.deployProgress]: EvtDeployProgressSchema,
-  [SUBJECTS.evt.rollbackSuccess]: EvtRollbackSuccessSchema,
-  [SUBJECTS.evt.rollbackFailure]: EvtRollbackFailureSchema,
-  [SUBJECTS.evt.rollbackProgress]: EvtRollbackProgressSchema,
   [SUBJECTS.evt.resumeSuccess]: EvtResumeSuccessSchema,
   [SUBJECTS.evt.resumeFailure]: EvtResumeFailureSchema,
   [SUBJECTS.cmd.nginxClaim]: CmdNginxClaimSchema,

@@ -57,22 +57,14 @@ export function parseRunArgs(raw: string[]): ExecParts {
  * resolution: single-service compose auto-targets; multi-service compose
  * requires the caller to be explicit.
  */
-function resolveService(
-  requested: string,
-  appName: string,
-  appCfg: App,
-  paths: Paths,
-): string {
+function resolveService(requested: string, appName: string, appCfg: App, paths: Paths): string {
   if (requested) return requested
   const dir = repoPath(paths, appName, appCfg.repo)
   const services = parseComposeServices(dir, appCfg.compose ?? [])
   if (services.length === 1) return services[0]?.name ?? ''
-  if (services.length === 0)
-    throw new Error(`app "${appName}" has no services in its compose file`)
+  if (services.length === 0) throw new Error(`app "${appName}" has no services in its compose file`)
   const names = services.map((s) => s.name).join(', ')
-  throw new Error(
-    `app "${appName}" has multiple services (${names}); specify one explicitly`,
-  )
+  throw new Error(`app "${appName}" has multiple services (${names}); specify one explicitly`)
 }
 
 async function handle(parts: ExecParts, mode: 'exec' | 'run'): Promise<void> {

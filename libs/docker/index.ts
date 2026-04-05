@@ -7,7 +7,7 @@ export {
   checkHealth,
   type HealthResult,
 } from './health.ts'
-export { imageExists, pruneImages, tagRollbackImages } from './images.ts'
+export { imageExists, pruneImages } from './images.ts'
 export {
   buildOverride,
   type OverrideFile,
