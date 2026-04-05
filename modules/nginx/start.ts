@@ -5,24 +5,18 @@ import { registerNginxHandlers } from './handlers.ts'
 
 /**
  * Entry point for `jib service start nginx`. Connects to NATS, registers the
- * `cmd.nginx.*` handlers, listens for config reloads (not currently needed by
- * handlers — they read no config — but kept for consistency with peer
- * operators), and blocks until SIGTERM/SIGINT.
+ * `cmd.nginx.*` handlers, and blocks until SIGTERM/SIGINT. Unlike the
+ * deployer/gitsitter/cloudflare operators, nginx handlers read no config —
+ * they only touch filesystem state under `$JIB_ROOT/nginx/` — so there's no
+ * `config.reload` subscription to refresh. Add one if that invariant ever
+ * changes.
  */
 export const start: StartFn<Config> = async (ctx: ModuleContext<Config>) => {
   const log = ctx.logger
   log.info('starting nginx operator')
   const bus = await Bus.connect()
 
-  let disposer = registerNginxHandlers(bus, { paths: ctx.paths, log })
-
-  bus.subscribe('jib.cmd.config.reload', async () => {
-    // Handlers are config-agnostic today, but we still re-register so any
-    // future per-config state (e.g. global SSL flags) picks up cleanly.
-    disposer()
-    disposer = registerNginxHandlers(bus, { paths: ctx.paths, log })
-    log.info('config reloaded')
-  })
+  const disposer = registerNginxHandlers(bus, { paths: ctx.paths, log })
 
   await new Promise<void>((resolve) => {
     const shutdown = async () => {
