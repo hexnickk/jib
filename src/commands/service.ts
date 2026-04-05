@@ -14,7 +14,6 @@ import { consola } from 'consola'
 const RUNNABLE = {
   deployer: () => import('@jib-module/deployer'),
   gitsitter: () => import('@jib-module/gitsitter'),
-  webhook: () => import('@jib-module/webhook'),
 } as const
 
 type RunnableName = keyof typeof RUNNABLE

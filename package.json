@@ -27,7 +27,6 @@
     "@jib-module/gitsitter": "workspace:*",
     "@jib-module/nats": "workspace:*",
     "@jib-module/nginx": "workspace:*",
-    "@jib-module/webhook": "workspace:*",
     "@jib/bus": "workspace:*",
     "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",

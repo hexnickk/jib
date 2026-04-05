@@ -54,20 +54,12 @@ export const TunnelConfigSchema = z.object({
   account_id: z.string().optional(),
 })
 
-export const WebhookConfigSchema = z.object({
-  enabled: z.boolean().default(true),
-  url: z.string().min(1),
-  secret_path: z.string().min(1),
-  listen: z.string().default(':9876'),
-})
-
 export const ConfigSchema = z.object({
   config_version: z.literal(3),
   poll_interval: z.string().default('5m'),
   github: GitHubConfigSchema.optional(),
   apps: z.record(z.string(), AppSchema).default({}),
   tunnel: TunnelConfigSchema.optional(),
-  webhook: WebhookConfigSchema.optional(),
 })
 
 export type GitHubProvider = z.infer<typeof GitHubProviderSchema>
@@ -77,5 +69,4 @@ export type HealthCheck = z.infer<typeof HealthCheckSchema>
 export type PreDeployHook = z.infer<typeof PreDeployHookSchema>
 export type App = z.infer<typeof AppSchema>
 export type TunnelConfig = z.infer<typeof TunnelConfigSchema>
-export type WebhookConfig = z.infer<typeof WebhookConfigSchema>
 export type Config = z.infer<typeof ConfigSchema>

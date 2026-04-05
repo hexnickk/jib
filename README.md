@@ -70,7 +70,6 @@ re-runs the deploy end to end.
 | `jib run <app> <service>` | Run a one-off container in the app project. |
 | `jib secrets <app>` | Manage per-app secrets under `/opt/jib/secrets/<app>`. |
 | `jib service` | Manage jib's own systemd units (bus, deployer, gitsitter). |
-| `jib webhook` | Manage GitHub webhook routing. |
 | `jib github` | GitHub App setup and token management. |
 | `jib cloudflare` | Cloudflare tunnel module commands. |
 
@@ -87,7 +86,6 @@ Jib is split into small services that talk over a local NATS bus:
 - `modules/github` — GitHub App auth + installation token minting.
 - `modules/nginx`, `modules/cloudflare`, `modules/cloudflared` — optional
   ingress modules that react to app add/remove events.
-- `modules/webhook` — optional inbound webhook handler for push events.
 
 Shared libraries live under `libs/` (`@jib/config`, `@jib/state`,
 `@jib/docker`, `@jib/secrets`, `@jib/bus`, `@jib/rpc`, `@jib/tui`,

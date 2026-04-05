@@ -17,7 +17,6 @@ import {
   secretsCmd,
   serviceCmd,
   upCmd,
-  webhookCmd,
 } from './src/commands/index.ts'
 import { moduleSubCommands } from './src/module-cli.ts'
 
@@ -49,7 +48,6 @@ const main = defineCommand({
     run: runCmd,
     secrets: secretsCmd,
     service: serviceCmd,
-    webhook: webhookCmd,
     ...moduleSubCommands(),
   },
 })

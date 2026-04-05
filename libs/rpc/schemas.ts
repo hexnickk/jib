@@ -24,7 +24,7 @@ export const CmdDeploySchema = EnvelopeSchema.extend({
   app,
   workdir: z.string().min(1),
   sha: z.string().min(1),
-  trigger: z.enum(['manual', 'auto', 'webhook']),
+  trigger: z.enum(['manual', 'auto']),
   user: z.string().optional(),
 })
 export const CmdRollbackSchema = EnvelopeSchema.extend({ app })

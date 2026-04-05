@@ -35,7 +35,7 @@ Layout:
 - `libs/*` — shared workspaces: `@jib/config`, `@jib/state`, `@jib/docker`,
   `@jib/secrets`, `@jib/bus`, `@jib/rpc`, `@jib/tui`, `@jib/core`
 - `modules/*` — feature workspaces: `deployer`, `gitsitter`, `github`,
-  `cloudflare`, `cloudflared`, `nginx`, `nats`, `webhook`
+  `cloudflare`, `cloudflared`, `nginx`, `nats`
 - `tests/` — integration tests (`bun:test`)
 
 Each module under `modules/` can expose a systemd service installer and
