@@ -59,6 +59,7 @@ function httpServer(input: SiteInput): string {
     : `\n${proxyLocation(input.port)}`
   return `server {
     listen 80;
+    listen [::]:80;
     server_name ${input.host};
 ${acme}${body}}
 `
@@ -68,6 +69,7 @@ function httpsServer(input: SiteInput): string {
   return `
 server {
     listen 443 ssl;
+    listen [::]:443 ssl;
     server_name ${input.host};
 
     ssl_certificate     /etc/letsencrypt/live/${input.host}/fullchain.pem;
