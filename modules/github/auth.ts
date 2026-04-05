@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { type App, type Config, loadConfig } from '@jib/config'
+import type { App, Config } from '@jib/config'
 import { JibError, type Paths, credsPath } from '@jib/core'
 import { getProvider } from './config-edit.ts'
 import { findInstallationForOrg } from './installation.ts'
@@ -52,20 +52,6 @@ export async function refreshAuth(
   const installationId = await findInstallationForOrg(provider.app_id, pem, org)
   const { token } = await generateInstallationToken(provider.app_id, pem, installationId)
   return { token }
-}
-
-/**
- * Convenience entry point for watchers that need both config + paths from a
- * live file — used by gitsitter so it doesn't bake config-loading logic into
- * its poller.
- */
-export async function refreshAuthFromDisk(
-  providerName: string,
-  app: App,
-  paths: Paths,
-): Promise<AuthResult> {
-  const cfg = await loadConfig(paths.configFile)
-  return refreshAuth(providerName, cfg, app, paths)
 }
 
 /**
