@@ -13,12 +13,21 @@ import { parse, stringify } from 'yaml'
  * — operators should use `jib edit` for those.
  */
 
-const SECRET_KEYS = new Set(['token', 'key', 'secret', 'password', 'private_key', 'pem'])
+const SECRET_KEYS = ['token', 'key', 'secret', 'password', 'private_key', 'pem'] as const
 
+/**
+ * Key is treated as a secret iff (a) it equals a marker exactly, or (b) it
+ * ends with `_<marker>` / `.marker` (common suffixes like `api_token`,
+ * `db_password`). Substring matching caught too many false positives — any
+ * app whose name contained "secret" would be wholesale redacted.
+ */
 export function isSecretKey(key: string): boolean {
   const lower = key.toLowerCase()
-  if (SECRET_KEYS.has(lower)) return true
-  for (const marker of SECRET_KEYS) if (lower.includes(marker)) return true
+  for (const marker of SECRET_KEYS) {
+    if (lower === marker) return true
+    if (lower.endsWith(`_${marker}`)) return true
+    if (lower.endsWith(`.${marker}`)) return true
+  }
   return false
 }
 
@@ -116,14 +125,27 @@ const set = defineCommand({
 
     const { path, doc } = await readRaw()
     setNested(doc, args.key, parsed)
-    await writeFile(path, stringify(doc), { mode: 0o600 })
 
+    // Validate against a temp file BEFORE overwriting config.yml. Writing
+    // first and validating after left the user with a corrupt config on
+    // type errors (e.g. setting a scalar where the schema expects a list),
+    // which then blocked every subsequent command.
+    const tmpPath = `${path}.tmp-${process.pid}`
+    const serialized = stringify(doc)
+    await writeFile(tmpPath, serialized, { mode: 0o600 })
     try {
-      await loadConfig(path)
+      await loadConfig(tmpPath)
     } catch (err) {
+      await readFile(tmpPath).catch(() => undefined) // keep ref
+      await writeFile(tmpPath, '', { mode: 0o600 }).catch(() => undefined)
+      const { unlink } = await import('node:fs/promises')
+      await unlink(tmpPath).catch(() => undefined)
       const msg = err instanceof Error ? err.message : String(err)
-      consola.warn(`config validation failed after set: ${msg}`)
+      consola.error(`validation failed, config unchanged: ${msg}`)
+      process.exit(1)
     }
+    const { rename } = await import('node:fs/promises')
+    await rename(tmpPath, path)
     consola.success(`Set ${args.key} = ${String(parsed)}`)
   },
 })
