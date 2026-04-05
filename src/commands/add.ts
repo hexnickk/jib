@@ -1,29 +1,29 @@
-import { type App, AppSchema, type Config, writeConfig } from '@jib/config'
-import { type ModuleContext, createLogger } from '@jib/core'
-import { SUBJECTS, emitAndWait } from '@jib/rpc'
-import { isInteractive, promptString, spinner } from '@jib/tui'
+import { type App, AppSchema, type Config, type Domain, writeConfig } from '@jib/config'
+import { allocatePort } from '@jib/core'
+import { isInteractive, promptString } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { withBus } from '../bus-client.ts'
-import { runSetupHooks } from '../setup-hooks.ts'
 import { loadAppConfig } from './_ctx.ts'
+import { provisionApp } from './_provision.ts'
 
 /**
- * `jib add <app>` — register and (unless `--config-only`) provision an app.
+ * `jib add <app>` — parse flags → allocate host ports → write config →
+ * `cmd.repo.prepare` → `cmd.nginx.claim`. On any failure after writeConfig
+ * the app entry is rolled back so the file never points at a half-baked app.
  *
- * Flow: validate → write config → gitsitter prepares repo → run setup hooks
- * (nginx, cloudflare, ...). The heavy port/domain inference that lived in
- * Go's 931-line setup.go is deliberately trimmed: users pass `--domain
- * host:port` directly. Automatic compose-label discovery can land later as
- * a separate helper without bloating this file.
+ * Domain syntax: `host[:containerPort][@ingress]`. `containerPort` is the
+ * port *inside* the container (default `80`). Jib always auto-allocates the
+ * *host* port from the managed range — operators never think about host
+ * ports. Compose-file inference for `containerPort` lands in Stage 5.
  */
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
+const DEFAULT_CONTAINER_PORT = 80
 
 interface ParsedDomain {
   host: string
-  port: number
+  container_port: number
   ingress?: '' | 'direct' | 'cloudflare-tunnel'
 }
 
@@ -36,15 +36,19 @@ function parseDomain(raw: string, fallback: string): ParsedDomain {
     rest = raw.slice(0, at)
   }
   const [host, portStr] = rest.split(':')
-  if (!host || !portStr) throw new Error(`invalid --domain "${raw}" (expected host:port)`)
-  const port = Number(portStr)
-  if (!Number.isInteger(port) || port < 1 || port > 65535)
-    throw new Error(`invalid port in --domain "${raw}"`)
-  const normalized: ParsedDomain = { host, port }
-  if (ingress && ingress !== 'direct') {
-    normalized.ingress = ingress as Exclude<ParsedDomain['ingress'], undefined>
+  if (!host) throw new Error(`invalid --domain "${raw}" (expected host[:containerPort])`)
+  let container_port = DEFAULT_CONTAINER_PORT
+  if (portStr !== undefined && portStr !== '') {
+    container_port = Number(portStr)
+    if (!Number.isInteger(container_port) || container_port < 1 || container_port > 65535) {
+      throw new Error(`invalid containerPort in --domain "${raw}"`)
+    }
   }
-  return normalized
+  const out: ParsedDomain = { host, container_port }
+  if (ingress && ingress !== 'direct') {
+    out.ingress = ingress as Exclude<ParsedDomain['ingress'], undefined>
+  }
+  return out
 }
 
 function parseHealth(raw: string): { path: string; port: number } {
@@ -62,8 +66,34 @@ function toArray(value: string | string[] | undefined): string[] {
   return Array.isArray(value) ? value : [value]
 }
 
+/**
+ * Assigns a host port to every domain that lacks one. Each allocation
+ * re-reads the partially-filled config so two fresh domains in the same
+ * `add` never collide.
+ */
+export async function assignPorts(cfg: Config, app: string, domains: Domain[]): Promise<Domain[]> {
+  const out: Domain[] = []
+  // Scratch config tracks ports already assigned in this call so the
+  // allocator can see them.
+  const base = (cfg.apps[app] ?? { domains: [] as Domain[] }) as App
+  const scratch: Config = {
+    ...cfg,
+    apps: { ...cfg.apps, [app]: { ...base, domains: [] as Domain[] } },
+  }
+  for (const d of domains) {
+    const assigned =
+      d.port !== undefined
+        ? d
+        : { ...d, port: await allocatePort({ config: scratch, probeHost: true }) }
+    out.push(assigned)
+    const cur = scratch.apps[app] as App
+    scratch.apps[app] = { ...cur, domains: [...out] }
+  }
+  return out
+}
+
 export default defineCommand({
-  meta: { name: 'add', description: 'Register a new app (config + repo + setup hooks)' },
+  meta: { name: 'add', description: 'Register a new app (config + repo + nginx claim)' },
   args: {
     app: { type: 'positional', required: true },
     repo: { type: 'string', description: 'Git repo (org/name) or "local"' },
@@ -74,7 +104,10 @@ export default defineCommand({
       description: 'Default ingress: direct|cloudflare-tunnel',
     },
     compose: { type: 'string', description: 'Compose file (comma-separated)' },
-    domain: { type: 'string', description: 'host:port[@ingress] (repeatable via comma)' },
+    domain: {
+      type: 'string',
+      description: 'host[:containerPort][@ingress] (repeatable via comma)',
+    },
     health: { type: 'string', description: '/path:port (repeatable via comma)' },
     'config-only': { type: 'boolean', description: 'Write config without provisioning' },
   },
@@ -105,24 +138,26 @@ export default defineCommand({
     const composeRaw = args.compose ? args.compose.split(',') : undefined
 
     if (domainRaw.length === 0) {
-      consola.error('at least one --domain host:port is required')
+      consola.error('at least one --domain host is required')
       process.exit(1)
     }
 
-    let domains: ParsedDomain[]
+    let parsedDomains: ParsedDomain[]
     let healthChecks: { path: string; port: number }[]
     try {
-      domains = domainRaw.map((d) => parseDomain(d, ingressDefault))
+      parsedDomains = domainRaw.map((d) => parseDomain(d, ingressDefault))
       healthChecks = healthRaw.map(parseHealth)
     } catch (err) {
       consola.error(err instanceof Error ? err.message : String(err))
       process.exit(1)
     }
 
-    const appObj: Partial<App> & { repo: string; domains: ParsedDomain[] } = {
+    const domainsWithPorts = await assignPorts(cfg, args.app, parsedDomains as Domain[])
+
+    const appObj: Partial<App> & { repo: string; domains: Domain[] } = {
       repo,
       branch: 'main',
-      domains,
+      domains: domainsWithPorts,
       env_file: '.env',
     }
     if (args['git-provider']) appObj.provider = args['git-provider']
@@ -143,37 +178,19 @@ export default defineCommand({
     if (args['config-only']) return
 
     try {
-      await withBus(async (bus) => {
-        const s = spinner()
-        s.start(`preparing ${args.app}`)
-        await emitAndWait(
-          bus,
-          SUBJECTS.cmd.repoPrepare,
-          { app: args.app },
-          { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
-          SUBJECTS.evt.repoProgress,
-          {
-            source: 'cli',
-            timeoutMs: DEFAULT_TIMEOUT_MS,
-            onProgress: (p) => s.message(p.message),
-          },
-        )
-        s.stop('repo ready')
-      })
-
-      const ctx: ModuleContext<Config> = {
-        config: nextCfg,
-        logger: createLogger('add'),
-        paths,
-      }
-      await runSetupHooks(ctx, args.app, 'add')
+      await provisionApp(args.app, newApp, DEFAULT_TIMEOUT_MS, DEFAULT_CONTAINER_PORT)
     } catch (err) {
+      const rollbackApps = { ...nextCfg.apps }
+      delete rollbackApps[args.app]
+      await writeConfig(paths.configFile, { ...nextCfg, apps: rollbackApps })
       consola.error(err instanceof Error ? err.message : String(err))
+      consola.warn(`rolled back ${args.app} from ${paths.configFile}`)
       process.exit(1)
     }
 
+    const routes = newApp.domains.map((d) => `${d.host} → 127.0.0.1:${d.port}`).join('\n    ')
     consola.box(
-      `app "${args.app}" ready\n  domains: ${newApp.domains.map((d) => d.host).join(', ')}\n  next:   jib deploy ${args.app}`,
+      `app "${args.app}" ready\n  routes:\n    ${routes}\n  next:   jib deploy ${args.app}`,
     )
   },
 })

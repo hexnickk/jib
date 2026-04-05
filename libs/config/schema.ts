@@ -14,14 +14,19 @@ export const GitHubConfigSchema = z.object({
   providers: z.record(z.string(), GitHubProviderSchema).optional(),
 })
 
-// NOTE: `port` is optional at parse time because `jib add` populates it via
-// `allocatePort` before the first `writeConfig`. Every code path that loads a
+// NOTE: `port` is the *host* port jib proxies to, and is optional at parse
+// time because `jib add` populates it via `allocatePort` before the first
+// `writeConfig`. `container_port` is the port exposed *inside* the container
+// (passed through to `cmd.nginx.claim` for completeness and future use by
+// the deployer — currently nginx only needs `port`). Both are optional on
+// input; the CLI fills them in before writing. Every code path that loads a
 // config *after* jib has written it (operators, the deployer, the CLI on
-// subsequent runs) will see a populated port — treat an undefined port as
-// unreachable. The CLI is the single writer responsible for filling it in.
+// subsequent runs) will see a populated `port` — treat an undefined one as
+// unreachable.
 export const DomainSchema = z.object({
   host: z.string().min(1),
   port: z.number().int().min(1).max(65535).optional(),
+  container_port: z.number().int().min(1).max(65535).optional(),
   ingress: z.enum(['', 'direct', 'cloudflare-tunnel']).optional(),
 })
 

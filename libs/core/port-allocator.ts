@@ -8,7 +8,7 @@ import { JibError } from './errors.ts'
  * types. Any `Config` from `@jib/config` is structurally assignable.
  */
 export interface PortAllocatorConfig {
-  apps: Record<string, { domains: ReadonlyArray<{ port?: number }> }>
+  apps: Record<string, { domains: ReadonlyArray<{ port?: number | undefined }> }>
 }
 
 export interface AllocatePortOpts {
