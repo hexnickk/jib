@@ -74,13 +74,13 @@ export async function runManifestFlow(providerName: string): Promise<ManifestRes
 
   callback = `http://localhost:${server.port}/callback`
   const formURL = `http://localhost:${server.port}/`
+  const timer = setTimeout(() => reject(new JibError('github.manifest', 'timed out')), FIVE_MIN)
   try {
     await openBrowser(formURL)
   } catch {
     console.log(`Open this URL to continue:\n  ${formURL}\n`)
   }
 
-  const timer = setTimeout(() => reject(new JibError('github.manifest', 'timed out')), FIVE_MIN)
   try {
     const code = await promise
     return await exchangeCode(code)
@@ -90,11 +90,21 @@ export async function runManifestFlow(providerName: string): Promise<ManifestRes
   }
 }
 
+function escapeHTML(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function renderForm(state: string, manifestJSON: string): string {
-  const esc = manifestJSON.replace(/"/g, '&quot;')
+  const esc = escapeHTML(manifestJSON)
+  const stateEsc = escapeHTML(state)
   return `<!DOCTYPE html><html><body>
 <h2>Creating GitHub App...</h2>
-<form id="mf" action="https://github.com/settings/apps/new?state=${state}" method="post">
+<form id="mf" action="https://github.com/settings/apps/new?state=${stateEsc}" method="post">
 <input type="hidden" name="manifest" value="${esc}">
 <button type="submit">Create GitHub App</button>
 </form>
