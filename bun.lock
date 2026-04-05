@@ -8,6 +8,7 @@
         "@clack/prompts": "^0.8.2",
         "citty": "^0.1.6",
         "consola": "^3.2.3",
+        "nats": "^2.29.3",
         "yaml": "^2.8.3",
         "zod": "^3.23.8",
       },
@@ -15,6 +16,14 @@
         "@biomejs/biome": "^1.9.4",
         "@types/bun": "^1.2.0",
         "typescript": "^5.6.3",
+      },
+    },
+    "libs/bus": {
+      "name": "@jib/bus",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/core": "workspace:*",
+        "nats": "*",
       },
     },
     "libs/config": {
@@ -27,6 +36,15 @@
     "libs/core": {
       "name": "@jib/core",
       "version": "0.0.0",
+    },
+    "libs/rpc": {
+      "name": "@jib/rpc",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/bus": "workspace:*",
+        "@jib/core": "workspace:*",
+        "zod": "*",
+      },
     },
     "libs/secrets": {
       "name": "@jib/secrets",
@@ -73,9 +91,13 @@
 
     "@clack/prompts": ["@clack/prompts@0.8.2", "", { "dependencies": { "@clack/core": "0.3.5", "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-6b9Ab2UiZwJYA9iMyboYyW9yJvAO9V753ZhS+DHKEjZRKAxPPOb7MXXu84lsPFG+vZt6FRFniZ8rXi+zCIw4yQ=="],
 
+    "@jib/bus": ["@jib/bus@workspace:libs/bus"],
+
     "@jib/config": ["@jib/config@workspace:libs/config"],
 
     "@jib/core": ["@jib/core@workspace:libs/core"],
+
+    "@jib/rpc": ["@jib/rpc@workspace:libs/rpc"],
 
     "@jib/secrets": ["@jib/secrets@workspace:libs/secrets"],
 
@@ -93,9 +115,15 @@
 
     "consola": ["consola@3.4.2", "", {}, "sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA=="],
 
+    "nats": ["nats@2.29.3", "", { "dependencies": { "nkeys.js": "1.1.0" } }, "sha512-tOQCRCwC74DgBTk4pWZ9V45sk4d7peoE2njVprMRCBXrhJ5q5cYM7i6W+Uvw2qUrcfOSnuisrX7bEx3b3Wx4QA=="],
+
+    "nkeys.js": ["nkeys.js@1.1.0", "", { "dependencies": { "tweetnacl": "1.0.3" } }, "sha512-tB/a0shZL5UZWSwsoeyqfTszONTt4k2YS0tuQioMOD180+MbombYVgzDUYHlx+gejYK6rgf08n/2Df99WY0Sxg=="],
+
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 
     "sisteransi": ["sisteransi@1.0.5", "", {}, "sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg=="],
+
+    "tweetnacl": ["tweetnacl@1.0.3", "", {}, "sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
