@@ -1,10 +1,10 @@
+import { withBus } from '@jib/bus'
 import { loadConfig } from '@jib/config'
 import { getPaths } from '@jib/core'
 import { SUBJECTS } from '@jib/rpc'
 import { isInteractive, promptConfirm } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { withBus } from '../bus-client.ts'
 
 /**
  * `jib edit` — opens `$EDITOR` on `config.yml`, validates on save, offers to

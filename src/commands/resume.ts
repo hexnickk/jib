@@ -1,7 +1,7 @@
+import { withBus } from '@jib/bus'
 import { SUBJECTS, emitAndWait } from '@jib/rpc'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { withBus } from '../bus-client.ts'
 import { loadAppOrExit } from './_ctx.ts'
 
 const DEFAULT_TIMEOUT_MS = 30_000

@@ -1,8 +1,8 @@
+import { withBus } from '@jib/bus'
 import { type EvtDeployProgress, type EvtRepoProgress, SUBJECTS, emitAndWait } from '@jib/rpc'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { withBus } from '../bus-client.ts'
 import { loadAppOrExit } from './_ctx.ts'
 
 /**
