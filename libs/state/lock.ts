@@ -33,6 +33,17 @@ export async function acquire(dir: string, app: string, opts: LockOptions = {}):
 
   const ready = await waitForReady(proc)
   if (!ready) {
+    // The child is either still running (stdout closed without READY is
+    // unexpected) or already exited without acquiring the lock. Either way
+    // kill it explicitly and wait for it to reap so we don't leak a zombie
+    // process — a tight loop of failed `acquire()` calls would otherwise
+    // burn through PIDs.
+    try {
+      proc.kill()
+    } catch {
+      // already exited
+    }
+    await proc.exited.catch(() => undefined)
     const msg = blocking
       ? `timed out waiting for lock on ${app}`
       : `lock on ${app} is held by another process`
@@ -53,13 +64,16 @@ async function waitForReady(proc: Bun.Subprocess<'pipe', 'pipe', 'pipe'>): Promi
   const reader = proc.stdout.getReader()
   const decoder = new TextDecoder()
   let buf = ''
-  while (true) {
-    const { value, done } = await reader.read()
-    if (done) return false
-    buf += decoder.decode(value)
-    if (buf.includes('READY')) {
-      reader.releaseLock()
-      return true
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) return false
+      buf += decoder.decode(value)
+      if (buf.includes('READY')) return true
     }
+  } finally {
+    // Always release the reader lock — otherwise callers can't drain stdout
+    // or close the stream on the failure path.
+    reader.releaseLock()
   }
 }
