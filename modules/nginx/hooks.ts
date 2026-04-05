@@ -53,6 +53,10 @@ async function writeAppConfigs(ctx: Ctx, app: string): Promise<string[]> {
   for (const d of appCfg.domains) {
     const isTunnel = d.ingress === 'cloudflare-tunnel'
     const hasSSL = isTunnel ? false : await hasLetsEncryptCert(d.host)
+    // Narrow assertion: jib's CLI fills `port` in via `allocatePort` before
+    // the first writeConfig, so by the time nginx sees a domain it's always
+    // populated. See DomainSchema NOTE. This hook file is removed in stage 2.
+    if (d.port === undefined) throw new Error(`unreachable: domain ${d.host} has no port`)
     const body = renderSite({ host: d.host, port: d.port, isTunnel, hasSSL })
     const path = join(ctx.paths.nginxDir, confFilename(d.host))
     await writeFile(path, body, { mode: 0o644 })

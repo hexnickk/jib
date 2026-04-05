@@ -64,6 +64,20 @@ describe('ConfigSchema', () => {
     expect(cfg.tunnel?.provider).toBe('cloudflare')
   })
 
+  test('domain port is optional at parse time', () => {
+    const cfg = ConfigSchema.parse({
+      config_version: 3,
+      apps: {
+        web: {
+          repo: 'hexnickk/web',
+          domains: [{ host: 'example.com' }],
+        },
+      },
+    })
+    expect(cfg.apps.web?.domains[0]?.port).toBeUndefined()
+    expect(cfg.apps.web?.domains[0]?.host).toBe('example.com')
+  })
+
   test('rejects missing required domains', () => {
     expect(() =>
       ConfigSchema.parse({
