@@ -77,19 +77,14 @@ export class Compose {
   }
 
   async exec(service: string, cmd: string[]): Promise<void> {
-    await this.runOrThrow(['docker', ...this.baseArgs(), 'exec', service, ...cmd])
+    await this.runOrThrow(['docker', ...this.baseArgs(), 'exec', service, ...cmd], { tty: true })
   }
 
   async run(service: string, cmd: string[]): Promise<void> {
-    await this.runOrThrow([
-      'docker',
-      ...this.baseArgs(),
-      ...this.envArgs(),
-      'run',
-      '--rm',
-      service,
-      ...cmd,
-    ])
+    await this.runOrThrow(
+      ['docker', ...this.baseArgs(), ...this.envArgs(), 'run', '--rm', service, ...cmd],
+      { tty: true },
+    )
   }
 
   async logs(service?: string, opts: { follow?: boolean; tail?: number } = {}): Promise<void> {
@@ -106,10 +101,11 @@ export class Compose {
 
   private async runOrThrow(
     args: string[],
-    opts: { env?: Record<string, string> } = {},
+    opts: { env?: Record<string, string>; tty?: boolean } = {},
   ): Promise<void> {
     const callOpts: Parameters<DockerExec>[1] = { cwd: this.cfg.dir }
     if (opts.env) callOpts.env = opts.env
+    if (opts.tty) callOpts.tty = true
     const res = await this.runner(args, callOpts)
     if (res.exitCode !== 0) {
       throw new JibError(

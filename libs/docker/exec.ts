@@ -7,21 +7,55 @@ export interface ExecResult {
   exitCode: number
 }
 
+export interface ExecOpts {
+  cwd?: string
+  capture?: boolean
+  env?: Record<string, string>
+  /**
+   * When true, bypasses `Bun.$` and spawns with inherited stdio (including
+   * stdin) so interactive flows like `docker compose exec -it` forward a real
+   * TTY. Mutually exclusive with `capture`.
+   */
+  tty?: boolean
+}
+
 /**
  * Thin indirection over `Bun.$` so tests can inject a fake. Takes the full
  * argv (first element is always `docker`) plus the working directory; returns
  * stdout/stderr as trimmed strings.
  */
-export type DockerExec = (
-  args: string[],
-  opts: { cwd?: string; capture?: boolean; env?: Record<string, string> },
-) => Promise<ExecResult>
+export type DockerExec = (args: string[], opts: ExecOpts) => Promise<ExecResult>
+
+/**
+ * Spawns a command with inherited stdio so the caller's TTY flows straight
+ * through to the child. Split out from `realExec` so tests can target it
+ * without stubbing `Bun.$`.
+ */
+export async function spawnInherit(
+  cmd: string[],
+  cwd: string | undefined,
+  env: Record<string, string>,
+): Promise<ExecResult> {
+  const proc = Bun.spawn({
+    cmd,
+    stdin: 'inherit',
+    stdout: 'inherit',
+    stderr: 'inherit',
+    ...(cwd !== undefined && { cwd }),
+    env,
+  })
+  const exitCode = await proc.exited
+  return { stdout: '', stderr: '', exitCode }
+}
 
 export const realExec: DockerExec = async (args, opts) => {
+  const env = { ...process.env, ...(opts.env ?? {}) } as Record<string, string>
+  if (opts.tty) {
+    return spawnInherit(args, opts.cwd, env)
+  }
   const [_cmd, ...rest] = args
   const built = $`docker ${rest}`.cwd(opts.cwd ?? process.cwd())
-  const env = { ...process.env, ...(opts.env ?? {}) }
-  const shell = built.env(env as Record<string, string>)
+  const shell = built.env(env)
   if (opts.capture) {
     const res = await shell.quiet().nothrow()
     return {

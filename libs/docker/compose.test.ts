@@ -7,6 +7,7 @@ interface Call {
   cwd?: string
   env?: Record<string, string>
   capture?: boolean
+  tty?: boolean
 }
 
 function recorder(result: Partial<ExecResult> = {}): { exec: DockerExec; calls: Call[] } {
@@ -16,6 +17,7 @@ function recorder(result: Partial<ExecResult> = {}): { exec: DockerExec; calls: 
     if (opts.cwd !== undefined) call.cwd = opts.cwd
     if (opts.env !== undefined) call.env = opts.env
     if (opts.capture !== undefined) call.capture = opts.capture
+    if (opts.tty !== undefined) call.tty = opts.tty
     calls.push(call)
     return { stdout: '', stderr: '', exitCode: 0, ...result }
   }
@@ -72,6 +74,18 @@ describe('Compose', () => {
     await compose.exec('web', ['sh', '-c', 'ls'])
     const args = calls[0]?.args ?? []
     expect(args.slice(-5)).toEqual(['exec', 'web', 'sh', '-c', 'ls'])
+  })
+
+  test('exec requests a TTY so stdin forwards through', async () => {
+    const { compose, calls } = make()
+    await compose.exec('web', ['sh'])
+    expect(calls[0]?.tty).toBe(true)
+  })
+
+  test('run requests a TTY so stdin forwards through', async () => {
+    const { compose, calls } = make()
+    await compose.run('web', ['sh'])
+    expect(calls[0]?.tty).toBe(true)
   })
 
   test('throws JibError on non-zero exit', async () => {
