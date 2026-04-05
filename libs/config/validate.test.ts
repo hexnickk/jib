@@ -12,11 +12,16 @@ describe('parseDuration', () => {
   test('parses compound durations', () => {
     expect(parseDuration('1h30m')).toBe(5_400_000)
   })
+  test('accepts 0 and decimals', () => {
+    expect(parseDuration('0s')).toBe(0)
+    expect(parseDuration('1.5h')).toBe(5_400_000)
+  })
   test('rejects bad input', () => {
     expect(parseDuration('')).toBeNull()
     expect(parseDuration('5')).toBeNull()
     expect(parseDuration('5x')).toBeNull()
     expect(parseDuration('abc')).toBeNull()
+    expect(parseDuration('-5s')).toBeNull()
   })
 })
 

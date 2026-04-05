@@ -5,9 +5,11 @@ const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/
 
 /**
- * Parses a Go-style duration string (`5m`, `30s`, `1h`, `1h30m`). Returns
- * milliseconds, or `null` on parse failure. We roll our own to avoid adding
- * a dependency just for this — the legacy Go code used `time.ParseDuration`.
+ * Parses a duration string like `5m`, `30s`, `1h`, `1h30m`, `1.5h`, `0s`.
+ * Returns milliseconds, or `null` on parse failure. Supported units: `s`, `m`,
+ * `h`. Non-negative only — `-5s`, empty strings, unit-less numbers (`5`), and
+ * any unknown unit all return `null`. Narrower than Go's `time.ParseDuration`
+ * (no `ns`/`us`/`ms`) but covers every value jib's config actually uses.
  */
 export function parseDuration(s: string): number | null {
   if (!s) return null
