@@ -1,18 +1,17 @@
 import type { Bus } from '@jib/bus'
 import { SUBJECTS, handleCmd } from '@jib/rpc'
 import type { Engine } from './engine.ts'
-import { resume } from './resume.ts'
 
 /**
  * Registers every deployer command handler on `bus`:
- *   - `cmd.deploy` / `cmd.resume` — full deploy flow + failure recovery
+ *   - `cmd.deploy` — full deploy flow (fetch, build, up, health, state)
  *   - `cmd.app.up` / `cmd.app.down` / `cmd.app.restart` — lightweight
  *     lifecycle wrappers over docker compose. Moved from the CLI so every
  *     docker operation lives in a single process; the CLI becomes a pure
  *     event emitter with zero `@jib/docker` imports for these paths.
  *
- * jib intentionally has no rollback: data-changing migrations aren't
- * reversible, so reverting code without data gives false safety. Fix-forward.
+ * jib intentionally has no rollback: migrations aren't reversible so
+ * reverting code without data gives false safety. Fix-forward only.
  *
  * `engineFactory` is invoked per command so the engine sees a freshly loaded
  * config. This sidesteps the stale-cache race where the CLI writes config and
@@ -58,29 +57,6 @@ export function registerDeployerHandlers(
           failure: {
             subject: SUBJECTS.evt.deployFailure,
             body: { app: cmd.app, error: (err as Error).message, step: 'deploy' },
-          },
-        }
-      }
-    },
-  )
-
-  const resumeSub = handleCmd(
-    bus,
-    SUBJECTS.cmd.resume,
-    'deployer',
-    'deployer',
-    undefined,
-    SUBJECTS.evt.resumeFailure,
-    async (cmd) => {
-      const engine = await engineFactory()
-      try {
-        await resume(engine, { app: cmd.app })
-        return { success: { subject: SUBJECTS.evt.resumeSuccess, body: { app: cmd.app } } }
-      } catch (err) {
-        return {
-          failure: {
-            subject: SUBJECTS.evt.resumeFailure,
-            body: { app: cmd.app, error: (err as Error).message },
           },
         }
       }
@@ -158,7 +134,6 @@ export function registerDeployerHandlers(
 
   return () => {
     deploySub.unsubscribe()
-    resumeSub.unsubscribe()
     upSub.unsubscribe()
     downSub.unsubscribe()
     restartSub.unsubscribe()

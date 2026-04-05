@@ -51,17 +51,16 @@ export class Store {
     }
   }
 
-  async updatePin(app: string, pinned: boolean): Promise<void> {
+  /**
+   * Record a failed deploy attempt in the last-deploy summary. Purely
+   * informational — jib has no auto-pinning or retry-counting logic, so
+   * nothing reads this field except a human running `cat state/<app>.json`.
+   */
+  async recordFailure(app: string, errorMsg: string): Promise<void> {
     const st = await this.load(app)
-    st.pinned = pinned
-    await this.save(app, st)
-  }
-
-  async updateFailure(app: string, errorMsg: string): Promise<void> {
-    const st = await this.load(app)
-    st.consecutive_failures += 1
     st.last_deploy_status = 'failure'
     st.last_deploy_error = errorMsg
+    st.last_deploy = new Date().toISOString()
     await this.save(app, st)
   }
 }

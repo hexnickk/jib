@@ -27,7 +27,6 @@ export const CmdDeploySchema = EnvelopeSchema.extend({
   trigger: z.enum(['manual', 'auto']),
   user: z.string().optional(),
 })
-export const CmdResumeSchema = EnvelopeSchema.extend({ app })
 export const CmdAppUpSchema = EnvelopeSchema.extend({ app })
 export const CmdAppDownSchema = EnvelopeSchema.extend({
   app,
@@ -61,8 +60,6 @@ export const EvtDeployProgressSchema = EnvelopeSchema.extend({
   message: z.string(),
 })
 
-export const EvtResumeSuccessSchema = EnvelopeSchema.extend({ app })
-export const EvtResumeFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
 export const EvtAppUpSuccessSchema = EnvelopeSchema.extend({ app })
 export const EvtAppUpFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
 export const EvtAppDownSuccessSchema = EnvelopeSchema.extend({ app })
@@ -112,7 +109,6 @@ export const EvtCloudflareDomainProgressSchema = EnvelopeSchema.extend({
 export type CmdRepoPrepare = z.infer<typeof CmdRepoPrepareSchema>
 export type CmdRepoRemove = z.infer<typeof CmdRepoRemoveSchema>
 export type CmdDeploy = z.infer<typeof CmdDeploySchema>
-export type CmdResume = z.infer<typeof CmdResumeSchema>
 export type CmdAppUp = z.infer<typeof CmdAppUpSchema>
 export type CmdAppDown = z.infer<typeof CmdAppDownSchema>
 export type CmdAppRestart = z.infer<typeof CmdAppRestartSchema>
@@ -125,8 +121,6 @@ export type EvtRepoProgress = z.infer<typeof EvtRepoProgressSchema>
 export type EvtDeploySuccess = z.infer<typeof EvtDeploySuccessSchema>
 export type EvtDeployFailure = z.infer<typeof EvtDeployFailureSchema>
 export type EvtDeployProgress = z.infer<typeof EvtDeployProgressSchema>
-export type EvtResumeSuccess = z.infer<typeof EvtResumeSuccessSchema>
-export type EvtResumeFailure = z.infer<typeof EvtResumeFailureSchema>
 export type EvtAppUpSuccess = z.infer<typeof EvtAppUpSuccessSchema>
 export type EvtAppUpFailure = z.infer<typeof EvtAppUpFailureSchema>
 export type EvtAppDownSuccess = z.infer<typeof EvtAppDownSuccessSchema>
@@ -156,7 +150,6 @@ export const SCHEMAS = {
   [SUBJECTS.cmd.repoPrepare]: CmdRepoPrepareSchema,
   [SUBJECTS.cmd.repoRemove]: CmdRepoRemoveSchema,
   [SUBJECTS.cmd.deploy]: CmdDeploySchema,
-  [SUBJECTS.cmd.resume]: CmdResumeSchema,
   [SUBJECTS.cmd.appUp]: CmdAppUpSchema,
   [SUBJECTS.cmd.appDown]: CmdAppDownSchema,
   [SUBJECTS.cmd.appRestart]: CmdAppRestartSchema,
@@ -168,8 +161,6 @@ export const SCHEMAS = {
   [SUBJECTS.evt.deploySuccess]: EvtDeploySuccessSchema,
   [SUBJECTS.evt.deployFailure]: EvtDeployFailureSchema,
   [SUBJECTS.evt.deployProgress]: EvtDeployProgressSchema,
-  [SUBJECTS.evt.resumeSuccess]: EvtResumeSuccessSchema,
-  [SUBJECTS.evt.resumeFailure]: EvtResumeFailureSchema,
   [SUBJECTS.evt.appUpSuccess]: EvtAppUpSuccessSchema,
   [SUBJECTS.evt.appUpFailure]: EvtAppUpFailureSchema,
   [SUBJECTS.evt.appDownSuccess]: EvtAppDownSuccessSchema,

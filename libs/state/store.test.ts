@@ -37,25 +37,14 @@ describe('Store', () => {
     })
   })
 
-  test('updatePin toggles pin', async () => {
+  test('recordFailure writes last-deploy summary', async () => {
     await withStore(async (s) => {
       await s.save('web', emptyState('web'))
-      await s.updatePin('web', true)
-      expect((await s.load('web')).pinned).toBe(true)
-      await s.updatePin('web', false)
-      expect((await s.load('web')).pinned).toBe(false)
-    })
-  })
-
-  test('updateFailure increments counter', async () => {
-    await withStore(async (s) => {
-      await s.save('web', emptyState('web'))
-      await s.updateFailure('web', 'boom')
-      await s.updateFailure('web', 'boom2')
+      await s.recordFailure('web', 'boom')
       const st = await s.load('web')
-      expect(st.consecutive_failures).toBe(2)
-      expect(st.last_deploy_error).toBe('boom2')
+      expect(st.last_deploy_error).toBe('boom')
       expect(st.last_deploy_status).toBe('failure')
+      expect(st.last_deploy).not.toBe('')
     })
   })
 

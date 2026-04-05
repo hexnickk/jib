@@ -79,7 +79,6 @@ re-runs the deploy end to end.
 | `jib add <app>` | Register a new app (repo, branch, domains, compose path). |
 | `jib remove <app>` | Unregister an app and tear down its containers. |
 | `jib deploy <app>` | Deploy the tracked branch of an app now. |
-| `jib resume <app>` | Resume a paused/failed deploy loop. |
 | `jib config` | Inspect or edit the jib config. |
 | `jib edit` | Open `config.yml` in `$EDITOR` with validation on save. |
 | `jib up \| down \| restart <app>` | Control an app's compose project. |

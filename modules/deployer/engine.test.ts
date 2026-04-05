@@ -101,7 +101,7 @@ describe('Engine.deploy', () => {
     ).rejects.toThrow(/insufficient disk space/)
   })
 
-  test('build failure increments consecutive_failures', async () => {
+  test('build failure records the failure in last-deploy state', async () => {
     const { paths, store, log } = await mkEnv()
     const calls: Call[] = []
     const engine = new Engine({
@@ -121,6 +121,7 @@ describe('Engine.deploy', () => {
       engine.deploy({ app: 'demo', workdir, sha: 'x', trigger: 'manual' }, noProgress),
     ).rejects.toThrow()
     const state = await store.load('demo')
-    expect(state.consecutive_failures).toBe(1)
+    expect(state.last_deploy_status).toBe('failure')
+    expect(state.last_deploy_error).toContain('boom')
   })
 })

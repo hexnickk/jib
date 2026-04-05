@@ -149,15 +149,11 @@ export class Engine {
       const next: AppState = {
         ...prevState,
         app: cmd.app,
-        strategy: 'restart',
         deployed_sha: cmd.sha,
         deployed_workdir: cmd.workdir,
         last_deploy: new Date().toISOString(),
         last_deploy_status: 'success',
         last_deploy_error: '',
-        last_deploy_trigger: cmd.trigger,
-        last_deploy_user: cmd.user ?? '',
-        consecutive_failures: 0,
       }
       await this.deps.store.save(cmd.app, next)
 
@@ -171,7 +167,7 @@ export class Engine {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       this.deps.log.error(`deploy ${cmd.app} failed: ${message}`)
-      await this.deps.store.updateFailure(cmd.app, message)
+      await this.deps.store.recordFailure(cmd.app, message)
       throw err
     } finally {
       await release()

@@ -63,9 +63,6 @@ export function validate(cfg: Config): void {
         errs.push(`app '${name}': health check path must start with '/'`)
       }
     }
-    if (app.warmup && parseDuration(app.warmup) === null) {
-      errs.push(`app '${name}': warmup: invalid duration "${app.warmup}"`)
-    }
   }
 
   if (needsTunnel && !cfg.tunnel) {

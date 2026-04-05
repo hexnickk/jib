@@ -50,7 +50,6 @@ export const AppSchema = z.object({
   branch: z.string().default('main'),
   compose: StringOrSlice.optional(),
   health: z.array(HealthCheckSchema).optional(),
-  warmup: z.string().optional(),
   pre_deploy: z.array(PreDeployHookSchema).optional(),
   build_args: z.record(z.string(), z.string()).optional(),
   domains: z.array(DomainSchema).min(1),
