@@ -39,12 +39,33 @@ export function getPaths(root?: string): Paths {
 }
 
 /**
- * On-disk path for an app's git checkout. Matches Go `RepoPath`: local repos
- * land under `repos/local/<app>`, GitHub repos under `repos/github/<org>/<name>`.
+ * Returns true for repo strings that are already complete clone URLs
+ * (file://, ssh://, http(s)://, git://, git@host:…, or absolute paths).
+ * These bypass GitHub URL construction and land under `repos/external/<app>`.
+ */
+export function isExternalRepoURL(repo: string): boolean {
+  return (
+    repo.startsWith('/') ||
+    repo.startsWith('file://') ||
+    repo.startsWith('http://') ||
+    repo.startsWith('https://') ||
+    repo.startsWith('ssh://') ||
+    repo.startsWith('git://') ||
+    /^git@[^:]+:/.test(repo)
+  )
+}
+
+/**
+ * On-disk path for an app's git checkout. Local repos land under
+ * `repos/local/<app>`, external URLs under `repos/external/<app>`, and
+ * GitHub `owner/name` repos under `repos/github/<owner>/<name>`.
  */
 export function repoPath(paths: Paths, app: string, repo: string): string {
   if (repo === '' || repo === 'local') {
     return join(paths.reposDir, 'local', app)
+  }
+  if (isExternalRepoURL(repo)) {
+    return join(paths.reposDir, 'external', app)
   }
   return join(paths.reposDir, 'github', repo)
 }
