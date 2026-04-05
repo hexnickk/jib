@@ -8,6 +8,7 @@ export interface Paths {
   secretsDir: string
   overridesDir: string
   reposDir: string
+  repoRoot: string
   nginxDir: string
   busDir: string
   cloudflaredDir: string
@@ -31,6 +32,7 @@ export function getPaths(root?: string): Paths {
     secretsDir: join(base, 'secrets'),
     overridesDir: join(base, 'overrides'),
     reposDir: join(base, 'repos'),
+    repoRoot: join(base, 'src'),
     nginxDir: join(base, 'nginx'),
     busDir: join(base, 'bus'),
     cloudflaredDir: join(base, 'cloudflared'),

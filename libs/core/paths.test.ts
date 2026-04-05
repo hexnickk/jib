@@ -20,6 +20,7 @@ describe('getPaths', () => {
     expect(p.secretsDir).toBe('/opt/jib/secrets')
     expect(p.overridesDir).toBe('/opt/jib/overrides')
     expect(p.reposDir).toBe('/opt/jib/repos')
+    expect(p.repoRoot).toBe('/opt/jib/src')
     expect(p.nginxDir).toBe('/opt/jib/nginx')
     expect(p.busDir).toBe('/opt/jib/bus')
     expect(p.cloudflaredDir).toBe('/opt/jib/cloudflared')
