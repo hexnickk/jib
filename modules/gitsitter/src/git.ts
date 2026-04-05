@@ -6,7 +6,7 @@ type ShellOutput = Awaited<ReturnType<ReturnType<typeof $>['nothrow']>>
 /**
  * Private git ops for gitsitter. Every command goes through `Bun.$` and
  * returns trimmed stdout; errors are wrapped in `JibError('git', ...)` with
- * stderr attached for diagnostics. Reference: `_legacy/internal/git/git.go`.
+ * stderr attached for diagnostics.
  *
  * This file is NOT exported from `modules/gitsitter/index.ts` — it is the
  * sole owner of git operations in jib, and nothing outside this module

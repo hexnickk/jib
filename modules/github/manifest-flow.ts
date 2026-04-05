@@ -35,8 +35,7 @@ const FIVE_MIN = 5 * 60 * 1000
  * Runs GitHub's App manifest flow: spins up an ephemeral local HTTP server,
  * opens the user's browser to a self-submitting form that POSTs the manifest
  * to GitHub, then waits for the redirect back with a code to exchange for
- * the App's PEM + ID. Times out after 5 minutes. Reference:
- * `_legacy/cmd/jib/github_manifest.go`.
+ * the App's PEM + ID. Times out after 5 minutes.
  */
 export async function runManifestFlow(providerName: string): Promise<ManifestResult> {
   const state = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>

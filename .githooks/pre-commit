@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-# _legacy/ is frozen Go reference material, scheduled for removal in
-# Stage 7 of the TS rewrite. It is intentionally not linted here.
-
 if [ -f biome.json ] && command -v bun &>/dev/null; then
     if ! bun x biome check . 2>&1; then
         echo "ERROR: biome check failed. Run 'make fmt' or fix before committing."

@@ -8,9 +8,8 @@ fleets of home servers and single-box VPS deployments.
 
 ## Status
 
-Very early. No stable API. Actively developed. Currently being rewritten
-from Go to TypeScript (Bun single-binary) — the legacy Go tree lives under
-`_legacy/` and will be removed once the rewrite is complete.
+Very early. No stable API. Actively developed. Single-binary CLI built
+on Bun.
 
 ## Install
 

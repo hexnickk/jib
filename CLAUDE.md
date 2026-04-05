@@ -24,48 +24,53 @@ Stack: GitHub App auth → git polling → docker-compose deploy → Cloudflare 
 
 ## Architecture
 
-Micro-service design — each service is a separate binary with one responsibility. Services communicate via NATS. This is NOT for scalability — it's so Claude agents can hold each service entirely in context.
+Single-binary CLI built on Bun, compiled via `bun build --compile`.
+Internally split into small modules that talk over a local NATS bus. The
+split is NOT for scalability — it's so Claude agents can hold each
+module entirely in context.
 
-All binaries live under `cmd/` in the monorepo. Shared code lives under `internal/`.
+Layout:
+- `main.ts` — CLI entrypoint, compiled to the `jib` binary
+- `src/commands/` — top-level CLI command implementations
+- `libs/*` — shared workspaces: `@jib/config`, `@jib/state`, `@jib/docker`,
+  `@jib/secrets`, `@jib/bus`, `@jib/rpc`, `@jib/tui`, `@jib/core`
+- `modules/*` — feature workspaces: `deployer`, `gitsitter`, `github`,
+  `cloudflare`, `cloudflared`, `nginx`, `nats`, `webhook`
+- `tests/` — integration tests (`bun:test`)
 
-Services:
-- `cmd/jib/` — CLI (deploy, rollback, resume, setup, config management)
-- `cmd/jib-deployer/` — handles deploys, rollbacks, resume via NATS
-- `cmd/jib-watcher/` — polls git repos, triggers deploys via NATS
-- `cmd/jib-bus/` — systemd unit installer for the NATS message bus (docker compose oneshot)
-- `cmd/jib-cloudflared/` — systemd unit installer for the cloudflared tunnel (docker compose oneshot, opt-in)
+Each module under `modules/` can expose a systemd service installer and
+its own CLI subcommands, discovered via the module registry.
 
 ## Build & Test
 
 ```
-make build      # build jib binary
-make build-all  # build jib + all services
-make install-all # build and install all binaries
-make test       # go test ./...
-make lint       # golangci-lint
-make fmt        # gofmt
-make bootstrap  # install dev tools (gopls)
+make build       # compile dist/jib via bun build --compile
+make test        # bun test
+make lint        # biome check .
+make fmt         # biome format --write .
+make install-all # build and install dist/jib to /usr/local/bin
 ```
 
-Pre-commit hooks run `gofmt` and `golangci-lint`. Fix issues before committing.
+Pre-commit hooks run `biome check`. Fix issues before committing.
 
 ## Conventions
 
-- Go, standard project layout
-- Config: `/opt/jib/config.yml` (schema v3)
-- Secrets: `/opt/jib/secrets/<app>/.env` (auto-detected, no config flag needed)
-- State: `/opt/jib/state/<app>.json`
-- NATS for inter-service messaging
-- Modules in `internal/module/` register at startup via `module.Register()`
+- TypeScript + Bun, strict mode, zero `any`
+- Config: `$JIB_ROOT/config.yml` (default `/opt/jib/config.yml`)
+- Secrets: `$JIB_ROOT/secrets/<app>/.env` (auto-detected, no config flag needed)
+- State: `$JIB_ROOT/state/<app>.json`
+- NATS for inter-module messaging
+- Module CLI commands are registered via the module workspace exports,
+  discovered at startup from `modules/*`
 - **Secrets in compose files**: pass secrets to containers as environment
   variables only, via `env_file:` or `environment:`. Never mount secret
   files as volumes (no `volumes: - /path/to/secret:/run/secrets/...`). This
   applies to every compose file jib generates or owns, including infra
-  containers under `cmd/jib-*/`. Config files that aren't secrets (e.g.
+  containers under `modules/*`. Config files that aren't secrets (e.g.
   `nats.conf`) may still be volume-mounted.
 - All jib-managed paths honor `$JIB_ROOT`. When an installer embeds a
-  systemd unit or compose file that references a path, template it via
-  `text/template` at install time — do not hardcode `/opt/jib`.
+  systemd unit or compose file that references a path, template it at
+  install time — do not hardcode `/opt/jib`.
 
 # Important
 

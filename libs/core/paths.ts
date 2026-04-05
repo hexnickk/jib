@@ -19,8 +19,7 @@ const DEFAULT_ROOT = '/opt/jib'
 /**
  * Resolves every jib-managed directory under a single root. `$JIB_ROOT`
  * overrides the default `/opt/jib`; callers may pass an explicit root for
- * tests. Keep the layout identical to the Go implementation (see
- * `_legacy/internal/config/dirs.go`) — shared disk state is the contract.
+ * tests. Shared disk state is the contract.
  */
 export function getPaths(root?: string): Paths {
   const base = root ?? process.env.JIB_ROOT ?? DEFAULT_ROOT

@@ -16,7 +16,7 @@ import { consola } from 'consola'
  * `jib init` — bootstrap a server. Creates the jib filesystem layout, a
  * minimal v3 config, and installs required modules (nats, deployer,
  * gitsitter) plus optional ones (cloudflared, nginx) on interactive
- * confirmation. Replaces Go `runInit` from `_legacy/cmd/jib/setup.go`.
+ * confirmation.
  */
 
 const MINIMAL_CONFIG = `config_version: 3

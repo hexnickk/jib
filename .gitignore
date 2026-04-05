@@ -1,31 +1,10 @@
 # Binaries
-/jib
-/jib-deployer
-/jib-watcher
-/jib-bus
-/jib-cloudflared
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
 /bin/
 /dist/
 
 # Bun / Node
 node_modules/
 .bun/
-
-# Test binary
-*.test
-
-# Output of go coverage
-*.out
-*.prof
-
-# Go workspace
-go.work
-go.work.sum
 
 # IDE
 .idea/

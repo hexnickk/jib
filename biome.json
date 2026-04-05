@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": ["_legacy/**", "dist/**", "node_modules/**", ".bun/**", "samples/**", "bin/**"]
+    "ignore": ["dist/**", "node_modules/**", ".bun/**", "samples/**", "bin/**"]
   },
   "organizeImports": {
     "enabled": true
