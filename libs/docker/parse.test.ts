@@ -6,14 +6,11 @@ import {
   type ComposeService,
   hasPublishedPorts,
   inferContainerPort,
-  inferHealthAndPort,
   parseComposeServices,
-  parseFirstHostPort,
-  parseHealthcheck,
 } from './parse.ts'
 
 function svc(partial: Partial<ComposeService>): ComposeService {
-  return { name: 'x', hostPort: 0, ports: [], expose: [], ...partial }
+  return { name: 'x', ports: [], expose: [], ...partial }
 }
 
 function fixture(files: Record<string, string>): string {
@@ -24,61 +21,30 @@ function fixture(files: Record<string, string>): string {
   return dir
 }
 
-describe('parseFirstHostPort', () => {
-  test('"3000:3000" -> 3000', () => expect(parseFirstHostPort('3000:3000')).toBe(3000))
-  test('"8080:80/tcp" -> 8080', () => expect(parseFirstHostPort('8080:80/tcp')).toBe(8080))
-  test('"127.0.0.1:5000:80" -> 5000', () =>
-    expect(parseFirstHostPort('127.0.0.1:5000:80')).toBe(5000))
-  test('3000 -> 3000', () => expect(parseFirstHostPort(3000)).toBe(3000))
-  test('{published:8080} -> 8080', () => expect(parseFirstHostPort({ published: 8080 })).toBe(8080))
-  test('garbage -> 0', () => expect(parseFirstHostPort(null)).toBe(0))
-})
-
-describe('parseHealthcheck', () => {
-  test('CMD array with curl', () => {
-    const got = parseHealthcheck(['CMD', 'curl', '-f', 'http://localhost:3000/health'])
-    expect(got).toEqual({ path: '/health', port: 3000 })
-  })
-  test('CMD-SHELL string', () => {
-    const got = parseHealthcheck('curl -f http://localhost:8080/status || exit 1')
-    expect(got).toEqual({ path: '/status', port: 8080 })
-  })
-  test('non-http command returns undefined', () => {
-    expect(parseHealthcheck(['CMD', 'pg_isready'])).toBeUndefined()
-  })
-})
-
 describe('parseComposeServices', () => {
   test('minimal compose extracts service name', () => {
     const dir = fixture({
       'docker-compose.yml': 'services:\n  web:\n    image: nginx\n',
     })
-    const svc = parseComposeServices(dir)
-    expect(svc).toHaveLength(1)
-    expect(svc[0]?.name).toBe('web')
-    expect(svc[0]?.hostPort).toBe(0)
+    const out = parseComposeServices(dir)
+    expect(out).toHaveLength(1)
+    expect(out[0]?.name).toBe('web')
+    expect(out[0]?.ports).toEqual([])
+    expect(out[0]?.expose).toEqual([])
   })
 
-  test('extracts ports, labels, and healthcheck', () => {
+  test('extracts ports and expose', () => {
     const dir = fixture({
       'docker-compose.yml': `services:
   api:
     image: api
     ports: ["8080:80"]
-    labels:
-      jib.domain: api.example.com
-      jib.ingress: cloudflare-tunnel
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+    expose: ["9000"]
 `,
     })
-    const svc = parseComposeServices(dir)
-    const api = svc[0]
-    expect(api?.hostPort).toBe(8080)
-    expect(api?.domain).toBe('api.example.com')
-    expect(api?.ingress).toBe('cloudflare-tunnel')
-    expect(api?.healthPath).toBe('/health')
-    expect(api?.healthPort).toBe(80)
+    const out = parseComposeServices(dir)
+    expect(out[0]?.ports).toEqual(['8080:80'])
+    expect(out[0]?.expose).toEqual(['9000'])
   })
 
   test('later file overrides earlier file field-by-field', () => {
@@ -86,37 +52,8 @@ describe('parseComposeServices', () => {
       'base.yml': 'services:\n  web:\n    ports: ["3000:3000"]\n',
       'over.yml': 'services:\n  web:\n    ports: ["4000:3000"]\n',
     })
-    const svc = parseComposeServices(dir, ['base.yml', 'over.yml'])
-    expect(svc[0]?.hostPort).toBe(4000)
-  })
-
-  test('list-form labels are normalised', () => {
-    const dir = fixture({
-      'docker-compose.yml': `services:
-  web:
-    labels:
-      - "jib.domain=foo.example.com"
-`,
-    })
-    const svc = parseComposeServices(dir)
-    expect(svc[0]?.domain).toBe('foo.example.com')
-  })
-})
-
-describe('inferHealthAndPort', () => {
-  test('prefers service with both health + host port', () => {
-    const got = inferHealthAndPort([
-      svc({ name: 'a', hostPort: 1000 }),
-      svc({ name: 'b', hostPort: 2000, healthPath: '/ready', healthPort: 80 }),
-    ])
-    expect(got).toEqual({ path: '/ready', port: 2000 })
-  })
-  test('falls back to first host-mapped port with default /health', () => {
-    const got = inferHealthAndPort([svc({ name: 'a', hostPort: 1234 })])
-    expect(got).toEqual({ path: '/health', port: 1234 })
-  })
-  test('no ports -> port=0', () => {
-    expect(inferHealthAndPort([])).toEqual({ path: '/health', port: 0 })
+    const out = parseComposeServices(dir, ['base.yml', 'over.yml'])
+    expect(out[0]?.ports).toEqual(['4000:3000'])
   })
 })
 

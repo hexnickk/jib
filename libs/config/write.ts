@@ -1,4 +1,4 @@
-import { chmod, rename, stat, writeFile } from 'node:fs/promises'
+import { chmod, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { ConfigError } from '@jib/core'
 import { stringify } from 'yaml'
@@ -26,6 +26,9 @@ export async function writeConfig(filePath: string, config: Config): Promise<voi
     }
     await rename(tmp, filePath)
   } catch (err) {
+    // Best-effort: ensure the partial tmp file doesn't linger after a crash
+    // mid-write. Ignored if rename already consumed it.
+    await unlink(tmp).catch(() => undefined)
     throw new ConfigError(`writing config ${filePath}: ${(err as Error).message}`, { cause: err })
   }
 }
