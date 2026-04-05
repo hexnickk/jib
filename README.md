@@ -11,6 +11,14 @@ fleets of home servers and single-box VPS deployments.
 Very early. No stable API. Actively developed. Single-binary CLI built
 on Bun.
 
+## Requirements
+
+- **Docker Compose 2.24+** on the target server. Jib writes override files
+  that use the `!override` YAML tag to *replace* the user's `ports:` list
+  instead of merging with it — a feature introduced in Compose 2.24 (Jan
+  2024). Older versions will silently merge, leaving containers bound to
+  the wrong host port and nginx routing to nothing.
+
 ## Install
 
 On the server you want to deploy onto:
@@ -43,9 +51,17 @@ jib init
 #    the manifest flow and stores credentials under /opt/jib/secrets.
 jib github app setup my-org
 
-# 3. Add an app. Port + health check are inferred from the compose file
-#    in the target repo.
-jib add myapp --repo my-org/myapp --domain myapp.example.com:8080
+# 3. Add an app. The target service's container port is inferred from the
+#    compose file's `ports:` or `expose:` section; host ports are allocated
+#    by jib and proxied by the nginx operator. Multi-service repos can
+#    pin each domain to a service via `=service`:
+#      jib add myapp --repo ... --domain api.example.com=api,web.example.com=web
+#
+#    Important: jib owns host port allocation. Any `ports:` field in your
+#    compose file will be *replaced* by jib's generated override at deploy
+#    time (via the `!override` tag — Compose 2.24+). Prefer `expose:` in
+#    your compose file to avoid surprise warnings.
+jib add myapp --repo my-org/myapp --domain myapp.example.com
 
 # 4. Deploy.
 jib deploy myapp

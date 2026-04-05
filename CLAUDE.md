@@ -22,6 +22,8 @@ Jib is a lightweight CLI tool for deploying docker-compose apps on bare servers 
 
 Stack: GitHub App auth → git polling → docker-compose deploy → Cloudflare tunnels + nginx reverse proxy.
 
+Target server runtime: **Docker Compose 2.24+** (required — jib's generated override file uses the `!override` YAML tag to replace the user's `ports:` list; older Compose merges silently and breaks port routing).
+
 ## Architecture
 
 Single-binary CLI built on Bun, compiled via `bun build --compile`.
