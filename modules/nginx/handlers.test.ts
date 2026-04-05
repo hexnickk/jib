@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, readdir, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createLogger, getPaths } from '@jib/core'
@@ -162,6 +162,49 @@ describe('nginx operator handlers', () => {
     await waitFor(() => ready.length >= 2 || undefined)
     const dirs = (await readdir(paths.nginxDir)).sort()
     expect(dirs).toEqual(['api', 'web'])
+  })
+
+  test('cmd.nginx.claim honors isTunnel flag (no acme-challenge block)', async () => {
+    const { bus, paths } = setup(fakeExec(() => ({ ok: true, stdout: '', stderr: '' })))
+    const ready: unknown[] = []
+    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+      ready.push(p)
+    })
+    bus.publish(SUBJECTS.cmd.nginxClaim, {
+      corrId: 'c-tun',
+      ts: new Date().toISOString(),
+      source: 'test',
+      app: 'tun',
+      domains: [
+        { host: 'tun.example.com', port: 20000, containerPort: 80, isTunnel: true, hasSSL: false },
+      ],
+    })
+    await waitFor(() => (ready.length ? ready : undefined))
+    const body = await readFile(join(paths.nginxDir, 'tun', 'tun.example.com.conf'), 'utf8')
+    expect(body).not.toContain('acme-challenge')
+    expect(body).not.toContain('listen 443')
+  })
+
+  test('cmd.nginx.claim honors hasSSL flag (emits 443 block + redirect)', async () => {
+    const { bus, paths } = setup(fakeExec(() => ({ ok: true, stdout: '', stderr: '' })))
+    const ready: unknown[] = []
+    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+      ready.push(p)
+    })
+    bus.publish(SUBJECTS.cmd.nginxClaim, {
+      corrId: 'c-ssl',
+      ts: new Date().toISOString(),
+      source: 'test',
+      app: 'ssl',
+      domains: [
+        { host: 'ssl.example.com', port: 20001, containerPort: 80, isTunnel: false, hasSSL: true },
+      ],
+    })
+    await waitFor(() => (ready.length ? ready : undefined))
+    const body = await readFile(join(paths.nginxDir, 'ssl', 'ssl.example.com.conf'), 'utf8')
+    expect(body).toContain('listen 443 ssl')
+    expect(body).toContain('fullchain.pem')
+    expect(body).toContain('return 301 https://')
   })
 
   test('cmd.nginx.release for `foo` leaves `foo-bar` untouched (no prefix collision)', async () => {

@@ -30,17 +30,18 @@ export interface NginxOperatorDeps {
 async function renderAndWrite(
   nginxDir: string,
   app: string,
-  domains: ReadonlyArray<{ host: string; port: number }>,
+  domains: ReadonlyArray<{ host: string; port: number; isTunnel: boolean; hasSSL: boolean }>,
 ): Promise<string> {
   const dir = appConfDir(nginxDir, app)
   await rm(dir, { recursive: true, force: true })
   await mkdir(dir, { recursive: true, mode: 0o755 })
   for (const d of domains) {
-    // TODO(stage-4): the operator currently hardcodes plain HTTP proxy for
-    // every domain because `CmdNginxClaim` carries no ingress/SSL metadata.
-    // Stage 4 extends the schema so the CLI can pass `isTunnel`/`hasSSL`
-    // through; until then this matches the pre-operator default.
-    const body = renderSite({ host: d.host, port: d.port, isTunnel: false, hasSSL: false })
+    const body = renderSite({
+      host: d.host,
+      port: d.port,
+      isTunnel: d.isTunnel,
+      hasSSL: d.hasSSL,
+    })
     await writeFile(join(dir, confFilename(d.host)), body, { mode: 0o644 })
   }
   return dir
