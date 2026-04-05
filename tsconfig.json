@@ -22,6 +22,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["main.ts", "libs/**/*.ts", "modules/**/*.ts"],
+  "include": ["main.ts", "libs/**/*.ts", "modules/**/*.ts", "tests/**/*.ts"],
   "exclude": ["node_modules", "dist", "_legacy"]
 }

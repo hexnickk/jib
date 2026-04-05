@@ -20,6 +20,13 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
+    "@jib-module/deployer": "workspace:*",
+    "@jib-module/gitsitter": "workspace:*",
+    "@jib/config": "workspace:*",
+    "@jib/core": "workspace:*",
+    "@jib/docker": "workspace:*",
+    "@jib/rpc": "workspace:*",
+    "@jib/state": "workspace:*",
     "@clack/prompts": "^0.8.2",
     "citty": "^0.1.6",
     "consola": "^3.2.3",
