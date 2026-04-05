@@ -91,10 +91,14 @@ async function applyDNS(
     if (mode === 'add') {
       try {
         await client.createDNSRecord(zoneId, { type: 'CNAME', name, content: cname, proxied: true })
-        log.info(`dns: ${name} -> ${cname}`)
+        log.info(`dns: ${rootDomain} CNAME ${name} -> ${cname}`)
       } catch (e) {
-        // Cloudflare returns an error on duplicates; swallow so `add` is idempotent.
-        log.info(`dns: ${name} already present (${(e as Error).message})`)
+        // Cloudflare returns an error on duplicate record names. We only want
+        // to swallow that specific case so `add` stays idempotent; everything
+        // else (auth, quota, bad zone) must still surface.
+        const msg = (e as Error).message
+        if (!/already exists|identical record|duplicate|81053|81057/i.test(msg)) throw e
+        log.info(`dns: ${rootDomain} CNAME ${name} already present`)
       }
     } else {
       const records = await client.listDNSRecords(zoneId, name).catch(() => [])
