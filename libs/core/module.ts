@@ -8,23 +8,23 @@ export interface ModuleManifest {
   requiresRoot?: boolean
 }
 
-export type InstallFn = (ctx: ModuleContext) => Promise<void>
-export type StartFn = (ctx: ModuleContext) => Promise<void>
+export type InstallFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>
+export type StartFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>
 
 /**
  * A hook that participates in multi-module lifecycle events
  * (e.g. adding an app runs every module's `onAppAdd`).
  */
-export interface SetupHook {
-  onAppAdd?: (ctx: ModuleContext, app: string) => Promise<void>
-  onAppRemove?: (ctx: ModuleContext, app: string) => Promise<void>
+export interface SetupHook<C = unknown> {
+  onAppAdd?: (ctx: ModuleContext<C>, app: string) => Promise<void>
+  onAppRemove?: (ctx: ModuleContext<C>, app: string) => Promise<void>
 }
 
 /** Contract implemented by modules that provide git credentials to gitsitter. */
-export interface GitAuthProvider {
+export interface GitAuthProvider<C = unknown> {
   name: string
   credentialsFor: (
-    ctx: ModuleContext,
+    ctx: ModuleContext<C>,
     repo: string,
   ) => Promise<{ username: string; password: string } | null>
 }
@@ -33,17 +33,17 @@ export interface GitAuthProvider {
  * Shape a module file tree conforms to once resolved by the loader.
  * Each field mirrors a convention file (`install.ts`, `start.ts`, ...).
  */
-export interface Module {
+export interface Module<C = unknown> {
   manifest: ModuleManifest
-  install?: InstallFn
-  uninstall?: InstallFn
-  start?: StartFn
+  install?: InstallFn<C>
+  uninstall?: InstallFn<C>
+  start?: StartFn<C>
   cli?: CommandDef[]
-  setupHooks?: SetupHook
-  gitAuthProvider?: GitAuthProvider
+  setupHooks?: SetupHook<C>
+  gitAuthProvider?: GitAuthProvider<C>
 }
 
 /** A module plus bookkeeping the loader attaches (e.g. source path). */
-export interface LoadedModule extends Module {
+export interface LoadedModule<C = unknown> extends Module<C> {
   path: string
 }
