@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Config } from '@jib/config'
+import { type Config, writeConfig } from '@jib/config'
 import { getPaths } from '@jib/core'
 import { FakeBus, SUBJECTS, flush } from '@jib/rpc'
 import { $ } from 'bun'
@@ -34,6 +34,10 @@ async function makeConfigAndPaths(upstream: string) {
       },
     },
   } as Config
+  // Write config to disk so the per-command freshConfig() in handlers.ts
+  // can read it (handlers call loadConfig(paths.configFile) on each command).
+  await mkdir(root, { recursive: true })
+  await writeConfig(paths.configFile, cfg)
   return { paths, cfg }
 }
 
