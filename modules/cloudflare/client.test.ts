@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { CloudflareClient, type FetchFn, baseDomain } from './client.ts'
+import { CloudflareClient, type FetchFn } from './client.ts'
 
 type Call = { url: string; method: string; body?: unknown; headers: Record<string, string> }
 
@@ -32,17 +32,6 @@ function err(code: number, message: string): Response {
     status: 400,
   })
 }
-
-describe('baseDomain', () => {
-  test('reduces multi-label hostnames to last two labels', () => {
-    expect(baseDomain('api.example.com')).toBe('example.com')
-    expect(baseDomain('a.b.c.example.com')).toBe('example.com')
-  })
-  test('leaves two-label hostnames unchanged', () => {
-    expect(baseDomain('example.com')).toBe('example.com')
-    expect(baseDomain('localhost')).toBe('localhost')
-  })
-})
 
 describe('CloudflareClient', () => {
   test('verifyToken hits /user/tokens/verify then /accounts and returns accountId', async () => {
@@ -78,61 +67,18 @@ describe('CloudflareClient', () => {
     })
   })
 
-  test('getTunnelIngress unwraps config.ingress shape', async () => {
-    const { fn } = makeFetch(() =>
-      ok({ config: { ingress: [{ hostname: 'a.example.com', service: 'http://localhost:80' }] } }),
-    )
+  test('listTunnels GETs account tunnels', async () => {
+    const { fn, calls } = makeFetch(() => ok([{ id: 't1', name: 'my-tunnel' }]))
     const client = new CloudflareClient({ token: 'x', fetchFn: fn })
-    const rules = await client.getTunnelIngress('acct', 't1')
-    expect(rules).toHaveLength(1)
-    expect(rules[0]?.hostname).toBe('a.example.com')
-  })
-
-  test('getTunnelIngress defaults to [] when config missing', async () => {
-    const { fn } = makeFetch(() => ok({}))
-    const client = new CloudflareClient({ token: 'x', fetchFn: fn })
-    expect(await client.getTunnelIngress('acct', 't1')).toEqual([])
-  })
-
-  test('putTunnelIngress sends {config:{ingress}} body', async () => {
-    const { fn, calls } = makeFetch(() => ok({}))
-    const client = new CloudflareClient({ token: 'x', fetchFn: fn })
-    await client.putTunnelIngress('acct', 't1', [{ service: 'http_status:404' }])
-    expect(calls[0]?.method).toBe('PUT')
-    expect(calls[0]?.body).toEqual({ config: { ingress: [{ service: 'http_status:404' }] } })
-  })
-
-  test('getTunnelToken parses raw-string response (not enveloped)', async () => {
-    const { fn } = makeFetch(() => new Response(JSON.stringify('raw-token-value'), { status: 200 }))
-    const client = new CloudflareClient({ token: 'x', fetchFn: fn })
-    expect(await client.getTunnelToken('acct', 't1')).toBe('raw-token-value')
-  })
-
-  test('findZoneId returns first match', async () => {
-    const { fn, calls } = makeFetch(() => ok([{ id: 'zone1', name: 'example.com' }]))
-    const client = new CloudflareClient({ token: 'x', fetchFn: fn })
-    const id = await client.findZoneId('api.example.com')
-    expect(id).toBe('zone1')
-    expect(calls[0]?.url).toContain('name=example.com')
-  })
-
-  test('findZoneId returns null when no match', async () => {
-    const { fn } = makeFetch(() => ok([]))
-    const client = new CloudflareClient({ token: 'x', fetchFn: fn })
-    expect(await client.findZoneId('nope.example.com')).toBeNull()
+    const tunnels = await client.listTunnels('acct')
+    expect(tunnels).toHaveLength(1)
+    expect(tunnels[0]?.name).toBe('my-tunnel')
+    expect(calls[0]?.url).toContain('/accounts/acct/cfd_tunnel')
   })
 
   test('error envelope is surfaced as Error with [code] messages', async () => {
     const { fn } = makeFetch(() => err(1001, 'nope'))
     const client = new CloudflareClient({ token: 'x', fetchFn: fn })
     await expect(client.listTunnels('acct')).rejects.toThrow(/\[1001\] nope/)
-  })
-
-  test('deleteDNSRecord uses DELETE', async () => {
-    const { fn, calls } = makeFetch(() => ok({}))
-    const client = new CloudflareClient({ token: 'x', fetchFn: fn })
-    await client.deleteDNSRecord('zone1', 'rec1')
-    expect(calls[0]?.method).toBe('DELETE')
-    expect(calls[0]?.url).toContain('/zones/zone1/dns_records/rec1')
   })
 })

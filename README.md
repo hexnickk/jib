@@ -85,9 +85,9 @@ re-runs the deploy end to end.
 | `jib exec <app> <service>` | Exec into a running container. |
 | `jib run <app> <service>` | Run a one-off container in the app project. |
 | `jib secrets <app>` | Manage per-app secrets under `/opt/jib/secrets/<app>`. |
-| `jib service` | Manage jib's own systemd units (bus, deployer, gitsitter, nginx, cloudflare). |
+| `jib service` | Manage jib's own systemd units (bus, deployer, gitsitter, nginx). |
 | `jib github` | Manage git auth providers (GitHub App or SSH deploy key). |
-| `jib cloudflare` | Cloudflare tunnel + DNS operator commands (`setup`, `status`, `add-domain`, `remove-domain`). |
+| `jib cloudflare` | Cloudflare tunnel commands (`setup`, `status`, `set-token`). |
 
 Run `jib <command> --help` for details on any command.
 
@@ -106,10 +106,11 @@ Jib is split into small services that talk over a local NATS bus:
 - `modules/nginx` — long-running operator; writes per-app nginx site
   configs on `cmd.nginx.claim` / `cmd.nginx.release` and probes
   `/etc/letsencrypt/live` to decide whether to emit a TLS server block.
-- `modules/cloudflare` — long-running operator; adds and removes DNS
-  records for tunnel-fronted domains on `cmd.cloudflare.domain.{add,remove}`.
+- `modules/cloudflare` — CLI-only module; provides `setup`, `status`, and
+  `set-token` commands for configuring Cloudflare Tunnel credentials.
 - `modules/cloudflared` — optional tunnel daemon installed as a compose
-  unit alongside the cloudflare operator.
+  unit; enabled after a tunnel token is stored via `jib init` or
+  `jib cloudflare set-token`.
 - `modules/github` — GitHub App auth + installation token minting.
 
 Shared libraries live under `libs/` (`@jib/config`, `@jib/state`,
