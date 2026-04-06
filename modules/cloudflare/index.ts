@@ -1,5 +1,2 @@
 export { default as manifest } from './manifest.ts'
-export { install } from './install.ts'
-export { uninstall } from './uninstall.ts'
 export { default as cli } from './cli.ts'
-export { start } from './start.ts'

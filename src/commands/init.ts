@@ -177,10 +177,11 @@ export default defineCommand({
           await mkdir(dirname(tokenPath), { recursive: true, mode: 0o700 })
           await writeFile(tokenPath, `TUNNEL_TOKEN=${token.trim()}\n`, { mode: 0o600 })
           consola.success('tunnel token stored')
-          // Restart cloudflared so it picks up the token
+          // Now enable + start cloudflared (install.ts deliberately skipped
+          // this because cloudflared can't run without a token).
           const { $ } = await import('bun')
-          await $`systemctl restart jib-cloudflared`.quiet().nothrow()
-          consola.success('cloudflared restarted with tunnel token')
+          await $`systemctl enable --now jib-cloudflared`.quiet().nothrow()
+          consola.success('cloudflared started')
         }
       } catch (err) {
         consola.warn(

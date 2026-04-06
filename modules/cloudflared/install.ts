@@ -1,13 +1,13 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { type InstallFn, credsPath } from '@jib/core'
-import { SERVICE_NAME, UNIT_PATH, composeYaml, systemdUnit } from './templates.ts'
+import { UNIT_PATH, composeYaml, systemdUnit } from './templates.ts'
 
 /**
- * Writes the compose file + systemd unit under `$JIB_ROOT/cloudflared/` and
- * enables the unit. Does NOT write the tunnel token — that's `jib cloudflare
- * setup`'s job; until the env file exists, the unit will fail to start
- * (by design). Must run as root.
+ * Writes the compose file + systemd unit under `$JIB_ROOT/cloudflared/` but
+ * does NOT enable or start the service. cloudflared requires a tunnel token
+ * to run; the service is enabled+started only after the user provides a
+ * token via `jib init` (tunnel mode) or `jib cloudflare set-token`.
  */
 export const install: InstallFn = async (ctx) => {
   const log = ctx.logger
@@ -27,6 +27,7 @@ export const install: InstallFn = async (ctx) => {
 
   log.info('systemctl daemon-reload')
   await Bun.$`systemctl daemon-reload`
-  log.info(`systemctl enable ${SERVICE_NAME}`)
-  await Bun.$`systemctl enable ${SERVICE_NAME}`
+  // NOT enabled — cloudflared can't run without a tunnel token. The token
+  // is stored by `jib init` or `jib cloudflare set-token`, which also
+  // enables + starts the service.
 }

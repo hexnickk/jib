@@ -1,11 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  CmdCloudflareDomainAddSchema,
   CmdDeploySchema,
   CmdNginxClaimSchema,
   CmdRepoPrepareSchema,
   EnvelopeSchema,
-  EvtCloudflareDomainReadySchema,
   EvtDeploySuccessSchema,
   EvtNginxProgressSchema,
   EvtNginxReadySchema,
@@ -106,26 +104,6 @@ describe('schemas', () => {
       message: 'reloading nginx',
     })
     expect(v.message).toBe('reloading nginx')
-  })
-
-  test('CmdCloudflareDomainAdd round-trips', () => {
-    const v = CmdCloudflareDomainAddSchema.parse({
-      corrId: 'c',
-      ts: '2024-01-01T00:00:00Z',
-      source: 'cli',
-      rootDomain: 'example.com',
-    })
-    expect(v.rootDomain).toBe('example.com')
-  })
-
-  test('EvtCloudflareDomainReady round-trips', () => {
-    const v = EvtCloudflareDomainReadySchema.parse({
-      corrId: 'c',
-      ts: '2024-01-01T00:00:00Z',
-      source: 'cloudflare',
-      rootDomain: 'example.com',
-    })
-    expect(v.rootDomain).toBe('example.com')
   })
 
   test('SCHEMAS table covers every subject in SUBJECTS', () => {

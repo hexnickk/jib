@@ -5,13 +5,12 @@ import { credsPath, getPaths } from '@jib/core'
 import { promptPassword, promptSelect, promptString } from '@jib/tui'
 import { type CommandDef, defineCommand } from 'citty'
 import { consola } from 'consola'
-import { addDomain, removeDomain } from './cli-domain.ts'
 import { CloudflareClient } from './client.ts'
 
 /**
- * `jib cloudflare setup|status|add-domain|remove-domain`. Advanced commands
- * for users who want API-managed tunnel routes + DNS. For basic tunnel
- * usage, `jib init` handles token storage and cloudflared install directly.
+ * `jib cloudflare setup|status`. Advanced commands for API-managed tunnel
+ * configuration. For basic tunnel usage, `jib init` handles token storage
+ * and cloudflared install directly — no API calls needed.
  */
 
 const setup = defineCommand({
@@ -83,10 +82,39 @@ const status = defineCommand({
   },
 })
 
+const setToken = defineCommand({
+  meta: {
+    name: 'set-token',
+    description: 'Store a Cloudflare Tunnel token and start cloudflared',
+  },
+  args: {
+    token: {
+      type: 'positional',
+      description: 'Tunnel token from the CF dashboard install command',
+    },
+  },
+  async run({ args }) {
+    const paths = getPaths()
+    const token =
+      args.token ?? (await promptPassword({ message: 'Tunnel token (paste from CF dashboard)' }))
+    if (!token.trim()) {
+      consola.error('empty token')
+      process.exit(1)
+    }
+    const tokenPath = credsPath(paths, 'cloudflare', 'tunnel.env')
+    await mkdir(dirname(tokenPath), { recursive: true, mode: 0o700 })
+    await writeFile(tokenPath, `TUNNEL_TOKEN=${token.trim()}\n`, { mode: 0o600 })
+    consola.success('tunnel token stored')
+    const { $ } = await import('bun')
+    await $`systemctl enable --now jib-cloudflared`.quiet().nothrow()
+    consola.success('cloudflared started')
+  },
+})
+
 const commands: CommandDef[] = [
   defineCommand({
-    meta: { name: 'cloudflare', description: 'Manage Cloudflare Tunnel (advanced)' },
-    subCommands: { setup, status, 'add-domain': addDomain, 'remove-domain': removeDomain },
+    meta: { name: 'cloudflare', description: 'Manage Cloudflare Tunnel' },
+    subCommands: { setup, status, 'set-token': setToken },
   }),
 ]
 export default commands

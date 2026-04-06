@@ -68,8 +68,6 @@ export const EvtAppRestartSuccessSchema = EnvelopeSchema.extend({ app })
 export const EvtAppRestartFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
 
 const port = z.number().int().min(1).max(65535)
-const rootDomain = z.string().min(1)
-
 export const CmdNginxClaimSchema = EnvelopeSchema.extend({
   app,
   // `hasSSL` intentionally absent: whether a host has a TLS cert is a
@@ -87,24 +85,11 @@ export const CmdNginxClaimSchema = EnvelopeSchema.extend({
     .min(1),
 })
 export const CmdNginxReleaseSchema = EnvelopeSchema.extend({ app })
-export const CmdCloudflareDomainAddSchema = EnvelopeSchema.extend({ rootDomain })
-export const CmdCloudflareDomainRemoveSchema = EnvelopeSchema.extend({ rootDomain })
 
 export const EvtNginxReadySchema = EnvelopeSchema.extend({ app })
 export const EvtNginxReleasedSchema = EnvelopeSchema.extend({ app })
 export const EvtNginxFailedSchema = EnvelopeSchema.extend({ app, error: z.string() })
 export const EvtNginxProgressSchema = EnvelopeSchema.extend({ app, message: z.string() })
-
-export const EvtCloudflareDomainReadySchema = EnvelopeSchema.extend({ rootDomain })
-export const EvtCloudflareDomainRemovedSchema = EnvelopeSchema.extend({ rootDomain })
-export const EvtCloudflareDomainFailedSchema = EnvelopeSchema.extend({
-  rootDomain,
-  error: z.string(),
-})
-export const EvtCloudflareDomainProgressSchema = EnvelopeSchema.extend({
-  rootDomain,
-  message: z.string(),
-})
 
 export type CmdRepoPrepare = z.infer<typeof CmdRepoPrepareSchema>
 export type CmdRepoRemove = z.infer<typeof CmdRepoRemoveSchema>
@@ -130,17 +115,11 @@ export type EvtAppRestartFailure = z.infer<typeof EvtAppRestartFailureSchema>
 
 export type CmdNginxClaim = z.infer<typeof CmdNginxClaimSchema>
 export type CmdNginxRelease = z.infer<typeof CmdNginxReleaseSchema>
-export type CmdCloudflareDomainAdd = z.infer<typeof CmdCloudflareDomainAddSchema>
-export type CmdCloudflareDomainRemove = z.infer<typeof CmdCloudflareDomainRemoveSchema>
 
 export type EvtNginxReady = z.infer<typeof EvtNginxReadySchema>
 export type EvtNginxReleased = z.infer<typeof EvtNginxReleasedSchema>
 export type EvtNginxFailed = z.infer<typeof EvtNginxFailedSchema>
 export type EvtNginxProgress = z.infer<typeof EvtNginxProgressSchema>
-export type EvtCloudflareDomainReady = z.infer<typeof EvtCloudflareDomainReadySchema>
-export type EvtCloudflareDomainRemoved = z.infer<typeof EvtCloudflareDomainRemovedSchema>
-export type EvtCloudflareDomainFailed = z.infer<typeof EvtCloudflareDomainFailedSchema>
-export type EvtCloudflareDomainProgress = z.infer<typeof EvtCloudflareDomainProgressSchema>
 
 /**
  * Lookup table from subject to schema. Used by `emitAndWait`/`handleCmd` to
@@ -169,14 +148,8 @@ export const SCHEMAS = {
   [SUBJECTS.evt.appRestartFailure]: EvtAppRestartFailureSchema,
   [SUBJECTS.cmd.nginxClaim]: CmdNginxClaimSchema,
   [SUBJECTS.cmd.nginxRelease]: CmdNginxReleaseSchema,
-  [SUBJECTS.cmd.cloudflareDomainAdd]: CmdCloudflareDomainAddSchema,
-  [SUBJECTS.cmd.cloudflareDomainRemove]: CmdCloudflareDomainRemoveSchema,
   [SUBJECTS.evt.nginxReady]: EvtNginxReadySchema,
   [SUBJECTS.evt.nginxReleased]: EvtNginxReleasedSchema,
   [SUBJECTS.evt.nginxFailed]: EvtNginxFailedSchema,
   [SUBJECTS.evt.nginxProgress]: EvtNginxProgressSchema,
-  [SUBJECTS.evt.cloudflareDomainReady]: EvtCloudflareDomainReadySchema,
-  [SUBJECTS.evt.cloudflareDomainRemoved]: EvtCloudflareDomainRemovedSchema,
-  [SUBJECTS.evt.cloudflareDomainFailed]: EvtCloudflareDomainFailedSchema,
-  [SUBJECTS.evt.cloudflareDomainProgress]: EvtCloudflareDomainProgressSchema,
 } as const satisfies Record<string, z.ZodTypeAny>
