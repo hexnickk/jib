@@ -2,8 +2,21 @@
 set -e
 
 if [ -f biome.json ] && command -v bun &>/dev/null; then
+    echo "pre-commit: biome check"
     if ! bun x biome check . 2>&1; then
         echo "ERROR: biome check failed. Run 'make fmt' or fix before committing."
+        exit 1
+    fi
+
+    echo "pre-commit: tsc --noEmit"
+    if ! bun x tsc --noEmit 2>&1; then
+        echo "ERROR: typecheck failed. Fix type errors before committing."
+        exit 1
+    fi
+
+    echo "pre-commit: bun test"
+    if ! bun test 2>&1; then
+        echo "ERROR: tests failed. Fix before committing."
         exit 1
     fi
 fi
