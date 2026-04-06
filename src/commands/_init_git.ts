@@ -70,8 +70,8 @@ async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<void> {
     const appId = await promptInt({ message: 'GitHub App ID', min: 1 })
     const pem = await promptPEM({ message: 'Private key PEM' })
     const pemPath = appPemPath(ctx.paths, name)
-    await mkdir(dirname(pemPath), { recursive: true, mode: 0o700 })
-    await writeFile(pemPath, pem, { mode: 0o600 })
+    await mkdir(dirname(pemPath), { recursive: true, mode: 0o750 })
+    await writeFile(pemPath, pem, { mode: 0o640 })
     await addAppProvider(ctx.paths.configFile, name, appId)
     consola.success(`provider "${name}" (app ${appId}) created`)
   } catch (err) {

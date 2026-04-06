@@ -29,13 +29,13 @@ export async function generateDeployKey(name: string, paths: Paths): Promise<str
   if (await exists(privateKey)) {
     throw new JibError('github.keygen', `deploy key already exists at ${privateKey}`)
   }
-  await mkdir(dirname(privateKey), { recursive: true, mode: 0o700 })
+  await mkdir(dirname(privateKey), { recursive: true, mode: 0o750 })
   const comment = `jib-${name}`
   const res = await $`ssh-keygen -t ed25519 -f ${privateKey} -N "" -C ${comment}`.quiet().nothrow()
   if (res.exitCode !== 0) {
     throw new JibError('github.keygen', `ssh-keygen failed: ${res.stderr.toString()}`)
   }
-  await chmod(privateKey, 0o600)
+  await chmod(privateKey, 0o640)
   return (await readFile(publicKey, 'utf8')).trimEnd()
 }
 

@@ -81,8 +81,8 @@ async function savePem(
   pem: string,
 ): Promise<void> {
   const pemPath = appPemPath(paths, name)
-  await mkdir(dirname(pemPath), { recursive: true, mode: 0o700 })
-  await writeFile(pemPath, pem, { mode: 0o600 })
+  await mkdir(dirname(pemPath), { recursive: true, mode: 0o750 })
+  await writeFile(pemPath, pem, { mode: 0o640 })
 }
 
 const appSetup = defineCommand({

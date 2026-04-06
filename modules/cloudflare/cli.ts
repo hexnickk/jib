@@ -55,8 +55,8 @@ const setup = defineCommand({
     }
 
     const tokenFile = credsPath(paths, 'cloudflare', 'api-token')
-    await mkdir(dirname(tokenFile), { recursive: true, mode: 0o700 })
-    await writeFile(tokenFile, token, { mode: 0o600 })
+    await mkdir(dirname(tokenFile), { recursive: true, mode: 0o750 })
+    await writeFile(tokenFile, token, { mode: 0o640 })
 
     const cfg = await loadConfig(paths.configFile)
     cfg.tunnel = { provider: 'cloudflare', tunnel_id: tunnelId, account_id: accountId }
@@ -107,8 +107,8 @@ const setToken = defineCommand({
       process.exit(1)
     }
     const tokenPath = credsPath(paths, 'cloudflare', 'tunnel.env')
-    await mkdir(dirname(tokenPath), { recursive: true, mode: 0o700 })
-    await writeFile(tokenPath, `TUNNEL_TOKEN=${token}\n`, { mode: 0o600 })
+    await mkdir(dirname(tokenPath), { recursive: true, mode: 0o750 })
+    await writeFile(tokenPath, `TUNNEL_TOKEN=${token}\n`, { mode: 0o640 })
     consola.success('tunnel token stored')
     const { $ } = await import('bun')
     await $`systemctl enable --now jib-cloudflared`.quiet().nothrow()

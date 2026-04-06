@@ -20,7 +20,7 @@ describe('SecretsManager', () => {
       const content = await Bun.file(join(dir, 'web', '.env')).text()
       expect(content).toContain('FOO=bar')
       const info = await stat(join(dir, 'web', '.env'))
-      expect(info.mode & 0o777).toBe(0o600)
+      expect(info.mode & 0o777).toBe(0o640)
     })
   })
 
@@ -95,7 +95,7 @@ describe('SecretsManager', () => {
     await withMgr(async (mgr, dir) => {
       await mgr.upsert('web', 'A', '1')
       const dirInfo = await stat(join(dir, 'web'))
-      expect(dirInfo.mode & 0o777).toBe(0o700)
+      expect(dirInfo.mode & 0o777).toBe(0o750)
     })
   })
 })

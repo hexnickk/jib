@@ -7,8 +7,8 @@ export interface AppSecretStatus {
   path: string
 }
 
-const FILE_MODE = 0o600
-const DIR_MODE = 0o700
+const FILE_MODE = 0o640
+const DIR_MODE = 0o750
 
 function envFileName(name?: string): string {
   return name && name !== '' ? name : '.env'

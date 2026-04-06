@@ -6,36 +6,18 @@ const GROUP = 'jib'
 
 /**
  * Ensure the `jib` system group exists and set `root:jib` ownership on
- * jib-managed directories. Secrets stay root-only (0700); everything
- * else becomes group-readable (0750) so non-root members of the `jib`
- * group can run read-only commands like `jib status`.
+ * everything under JIB_ROOT. Group members get read + traverse access
+ * so non-root users can run jib commands without sudo.
  */
 export async function ensureGroup(paths: Paths): Promise<void> {
   await $`groupadd --system ${GROUP} 2>/dev/null || true`.quiet()
 
-  // Directories that jib group members may read
-  const groupDirs = [
-    paths.root,
-    paths.stateDir,
-    paths.locksDir,
-    paths.overridesDir,
-    paths.reposDir,
-    paths.repoRoot,
-    paths.nginxDir,
-    paths.busDir,
-    paths.cloudflaredDir,
-  ]
-  for (const d of groupDirs) {
-    await $`chown root:${GROUP} ${d}`.quiet().nothrow()
-    await $`chmod 750 ${d}`.quiet().nothrow()
-  }
+  // Set root:jib on everything under JIB_ROOT recursively
+  await $`chown -R root:${GROUP} ${paths.root}`.quiet().nothrow()
+  await $`chmod -R g+rX ${paths.root}`.quiet().nothrow()
 
   // Config file: group-readable but not world-readable
-  await $`chown root:${GROUP} ${paths.configFile}`.quiet().nothrow()
   await $`chmod 640 ${paths.configFile}`.quiet().nothrow()
-
-  // Secrets dir stays root-only
-  await $`chmod 700 ${paths.secretsDir}`.quiet().nothrow()
 
   consola.success('jib group ready')
 }

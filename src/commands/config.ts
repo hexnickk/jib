@@ -133,12 +133,12 @@ const set = defineCommand({
     // which then blocked every subsequent command.
     const tmpPath = `${path}.tmp-${process.pid}`
     const serialized = stringify(doc)
-    await writeFile(tmpPath, serialized, { mode: 0o600 })
+    await writeFile(tmpPath, serialized, { mode: 0o640 })
     try {
       await loadConfig(tmpPath)
     } catch (err) {
       await readFile(tmpPath).catch(() => undefined) // keep ref
-      await writeFile(tmpPath, '', { mode: 0o600 }).catch(() => undefined)
+      await writeFile(tmpPath, '', { mode: 0o640 }).catch(() => undefined)
       const { unlink } = await import('node:fs/promises')
       await unlink(tmpPath).catch(() => undefined)
       const msg = err instanceof Error ? err.message : String(err)
