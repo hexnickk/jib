@@ -13,7 +13,7 @@ export const install: InstallFn = async (ctx) => {
   ctx.logger.info(`writing ${UNIT_PATH}`)
   await writeFile(UNIT_PATH, systemdUnit(vars), { mode: 0o644 })
   ctx.logger.info('systemctl daemon-reload')
-  await $`systemctl daemon-reload`
+  await $`systemctl daemon-reload`.quiet()
   ctx.logger.info(`systemctl enable --now ${SERVICE_NAME}`)
-  await $`systemctl enable --now ${SERVICE_NAME}`
+  await $`systemctl enable --now ${SERVICE_NAME}`.quiet()
 }

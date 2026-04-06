@@ -37,19 +37,21 @@ async function ensureDirs(): Promise<void> {
     p.busDir,
     p.cloudflaredDir,
   ]
+  const log = createLogger('init')
   for (const d of dirs) {
     await mkdir(d, { recursive: true, mode: 0o755 })
   }
-  consola.info(`directories ready under ${p.root}`)
+  log.info(`directories ready under ${p.root}`)
 }
 
 async function ensureConfig(): Promise<Config> {
+  const log = createLogger('init')
   const p = getPaths()
   if (!existsSync(p.configFile)) {
     await writeFile(p.configFile, MINIMAL_CONFIG, { mode: 0o600 })
     consola.success(`wrote ${p.configFile}`)
   } else {
-    consola.info(`${p.configFile} exists, skipping`)
+    log.info(`${p.configFile} exists, skipping`)
   }
   return loadConfig(p.configFile)
 }

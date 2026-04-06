@@ -14,7 +14,7 @@ export const uninstall: InstallFn = async (ctx) => {
   const busDir = ctx.paths.busDir
 
   log.info(`systemctl disable --now ${SERVICE_NAME}`)
-  await Bun.$`systemctl disable --now ${SERVICE_NAME}`.nothrow()
+  await Bun.$`systemctl disable --now ${SERVICE_NAME}`.nothrow().quiet()
 
   log.info(`removing ${UNIT_PATH}`)
   await rm(UNIT_PATH, { force: true })
@@ -26,5 +26,5 @@ export const uninstall: InstallFn = async (ctx) => {
   }
 
   log.info('systemctl daemon-reload')
-  await Bun.$`systemctl daemon-reload`.nothrow()
+  await Bun.$`systemctl daemon-reload`.nothrow().quiet()
 }
