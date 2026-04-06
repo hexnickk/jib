@@ -1,5 +1,5 @@
 import { addKeyProvider, deployKeyPaths, generateDeployKey } from '@jib-module/github'
-import type { Config } from '@jib/config'
+import { type Config, loadConfig } from '@jib/config'
 import type { ModuleContext } from '@jib/core'
 import { promptSelect, promptString } from '@jib/tui'
 import { consola } from 'consola'
@@ -21,6 +21,11 @@ export async function promptGitAuth(ctx: ModuleContext<Config>): Promise<void> {
   if (gitAuth === 'key') {
     try {
       const name = await promptString({ message: 'Provider name (e.g. my-org-key)' })
+      const cfg = await loadConfig(ctx.paths.configFile)
+      if (cfg.github?.providers?.[name]) {
+        consola.warn(`provider "${name}" already exists — skipping`)
+        return
+      }
       const pubKey = await generateDeployKey(name, ctx.paths)
       await addKeyProvider(ctx.paths.configFile, name)
       const keyPaths = deployKeyPaths(ctx.paths, name)
