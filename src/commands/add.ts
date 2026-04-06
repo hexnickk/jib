@@ -93,6 +93,13 @@ export default defineCommand({
       process.exit(1)
     }
 
+    for (const pair of envRaw) {
+      if (pair.indexOf('=') < 1) {
+        consola.error(`invalid --env "${pair}" — expected KEY=VALUE`)
+        process.exit(1)
+      }
+    }
+
     let parsedDomains: ParsedDomain[]
     let healthChecks: { path: string; port: number }[]
     try {
@@ -130,10 +137,6 @@ export default defineCommand({
       const mgr = new SecretsManager(paths.secretsDir)
       for (const pair of envRaw) {
         const eq = pair.indexOf('=')
-        if (eq < 1) {
-          consola.error(`invalid --env "${pair}" — expected KEY=VALUE`)
-          process.exit(1)
-        }
         await mgr.upsert(args.app, pair.slice(0, eq), pair.slice(eq + 1), newApp.env_file)
       }
       consola.success(`${envRaw.length} secret(s) set for ${args.app}`)

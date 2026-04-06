@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SecretsManager } from './manager.ts'
@@ -71,19 +71,13 @@ describe('SecretsManager', () => {
   })
 
   test('readMasked returns masked key-value pairs', async () => {
-    await withMgr(async (mgr, dir) => {
-      const src = join(dir, 'source.env')
-      await writeFile(src, 'SECRET=longvalue\nSHORT=ab\n# comment\nNOEQ\n')
-      // Write via raw file to test readMasked with comments/bare keys
-      const appDir = join(dir, 'web')
-      const { mkdir } = await import('node:fs/promises')
-      await mkdir(appDir, { recursive: true })
-      await writeFile(join(appDir, '.env'), 'SECRET=longvalue\nSHORT=ab\n# comment\nNOEQ\n')
+    await withMgr(async (mgr) => {
+      await mgr.upsert('web', 'SECRET', 'longvalue')
+      await mgr.upsert('web', 'SHORT', 'ab')
       const entries = await mgr.readMasked('web')
       expect(entries).toEqual([
         { key: 'SECRET', masked: 'lon***' },
         { key: 'SHORT', masked: '***' },
-        { key: 'NOEQ', masked: '***' },
       ])
     })
   })

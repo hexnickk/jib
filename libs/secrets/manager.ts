@@ -108,16 +108,13 @@ export class SecretsManager {
   async readMasked(app: string, envFile?: string): Promise<{ key: string; masked: string }[]> {
     const path = this.envPath(app, envFile)
     const content = await readFile(path, 'utf8')
-    return content
-      .split('\n')
-      .filter((l) => l.trim() && !l.trim().startsWith('#'))
-      .map((line) => {
-        const eq = line.indexOf('=')
-        if (eq === -1) return { key: line.trim(), masked: '***' }
-        const key = line.slice(0, eq)
-        const val = line.slice(eq + 1)
-        const visible = val.length >= 3 ? val.slice(0, 3) : ''
-        return { key, masked: `${visible}***` }
-      })
+    const { lines, entries } = parseEnv(content)
+    return [...entries.entries()].map(([key, idx]) => {
+      const line = lines[idx] ?? ''
+      const eq = line.indexOf('=')
+      const val = eq >= 0 ? line.slice(eq + 1) : ''
+      const visible = val.length >= 3 ? val.slice(0, 3) : ''
+      return { key, masked: `${visible}***` }
+    })
   }
 }
