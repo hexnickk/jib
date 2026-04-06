@@ -167,6 +167,20 @@ export default defineCommand({
       process.exit(1)
     }
 
+    // If cloudflare was installed, walk the user through tunnel setup
+    // (API token, create/pick tunnel, optional root domain) inline —
+    // don't make them run a separate `jib cloudflare setup` command.
+    if (wantCloudflare && !nonInteractive) {
+      consola.info('setting up Cloudflare Tunnel...')
+      try {
+        const { runCloudflareSetup } = await import('@jib-module/cloudflare')
+        await runCloudflareSetup(ctx.paths)
+      } catch (err) {
+        consola.warn(`cloudflare setup failed: ${err instanceof Error ? err.message : String(err)}`)
+        consola.warn('run `jib cloudflare setup` later to retry')
+      }
+    }
+
     consola.box(
       [
         'jib initialized. Next:',
