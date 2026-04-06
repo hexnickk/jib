@@ -1,14 +1,20 @@
-import { type ConsolaInstance, consola } from 'consola'
+import { LogLevels, type ConsolaInstance, consola } from 'consola'
 
-/** Root logger used by the CLI entry point and anywhere a tag isn't meaningful. */
+const debug = !!process.env.JIB_DEBUG
+
+/** Root logger used by the CLI entry point — always shows info+success. */
 export const rootLogger: ConsolaInstance = consola
 
 /**
- * Returns a child logger that prefixes every message with `[tag]`. Tags are
- * how we keep log lines attributable once modules run concurrently.
+ * Returns a child logger prefixed with `[tag]`. By default, tagged loggers
+ * only show warnings and errors — the step-by-step detail (writing files,
+ * systemctl calls, etc) is noise for normal users. Set `JIB_DEBUG=1` to
+ * see everything.
  */
 export function createLogger(tag: string): ConsolaInstance {
-  return consola.withTag(tag)
+  const child = consola.withTag(tag)
+  if (!debug) child.level = LogLevels.warn
+  return child
 }
 
 export type Logger = ConsolaInstance
