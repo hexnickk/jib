@@ -79,13 +79,7 @@ export default defineCommand({
     await ensureGroup(paths)
 
     const sudoUser = process.env.SUDO_USER
-    if (sudoUser && !nonInteractive) {
-      const add = await promptConfirm({
-        message: `Add ${sudoUser} to jib group? (allows running jib without sudo)`,
-        initialValue: true,
-      })
-      if (add) await addUserToGroup(sudoUser)
-    }
+    if (sudoUser) await addUserToGroup(sudoUser)
 
     if (skipInstall) {
       consola.info('--skip-install: done (no modules installed)')
