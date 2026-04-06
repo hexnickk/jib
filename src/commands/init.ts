@@ -13,10 +13,9 @@ import { consola } from 'consola'
 
 /**
  * `jib init` — bootstrap a server. Creates the jib filesystem layout, a
- * minimal v3 config, and installs required modules (nats, deployer,
- * gitsitter) plus optional ones (nginx, cloudflared, cloudflare operator)
- * on interactive confirmation. Install order: nats → deployer → gitsitter
- * → nginx → cloudflared → cloudflare operator.
+ * minimal v3 config, and installs required modules. Always installs: nats,
+ * deployer, gitsitter, nginx. If the user picks Cloudflare Tunnel ingress,
+ * also installs cloudflared and prompts for a tunnel token.
  */
 
 const MINIMAL_CONFIG = `config_version: 3

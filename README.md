@@ -41,11 +41,10 @@ JIB_VERSION=v0.1.0 JIB_PREFIX=$HOME/.local/bin \
 ## Quickstart
 
 ```bash
-# 1. Bootstrap jib on a fresh server. Installs the NATS bus, deployer, and
-#    gitsitter systemd units under $JIB_ROOT (default /opt/jib), and
-#    interactively prompts for optional modules: nginx reverse proxy,
-#    cloudflared tunnel daemon, and the cloudflare DNS operator. Must run
-#    as root (use `sudo jib init`).
+# 1. Bootstrap jib on a fresh server. Installs the NATS bus, deployer,
+#    gitsitter, and nginx under $JIB_ROOT (default /opt/jib). Asks how
+#    traffic reaches the server — if via Cloudflare Tunnel, also installs
+#    cloudflared and prompts for a tunnel token. Must run as root.
 jib init
 
 # 2. Register a GitHub App so jib can clone private repos. Walks through
