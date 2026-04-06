@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import * as cloudflaredMod from '@jib-module/cloudflared'
 import * as deployerMod from '@jib-module/deployer'
@@ -6,12 +6,13 @@ import * as gitsitterMod from '@jib-module/gitsitter'
 import * as natsMod from '@jib-module/nats'
 import * as nginxMod from '@jib-module/nginx'
 import { type Config, loadConfig } from '@jib/config'
-import { type ModuleContext, createLogger, credsPath, getPaths } from '@jib/core'
+import { type ModuleContext, createLogger, getPaths } from '@jib/core'
 import { isInteractive, promptConfirm, promptSelect } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { promptGitAuth } from './_init_git.ts'
 import { promptTunnelToken } from './_init_tunnel.ts'
+import { hasTunnelToken } from './_status_collect.ts'
 
 /**
  * `jib init` — bootstrap a server. Creates the jib filesystem layout, a
@@ -136,8 +137,7 @@ export default defineCommand({
 
     const mods: ModLike[] = [natsMod, deployerMod, gitsitterMod, nginxMod]
 
-    const tokenPath = credsPath(ctx.paths, 'cloudflare', 'tunnel.env')
-    const hasTunnel = existsSync(tokenPath) && readFileSync(tokenPath, 'utf8').trim().length > 0
+    const hasTunnel = hasTunnelToken(ctx.paths)
 
     const ingress = nonInteractive
       ? 'direct'

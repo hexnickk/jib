@@ -14,6 +14,7 @@ import {
   runCmd,
   secretsCmd,
   serviceCmd,
+  statusCmd,
   upCmd,
 } from './src/commands/index.ts'
 import { moduleSubCommands } from './src/module-cli.ts'
@@ -44,6 +45,7 @@ const main = defineCommand({
     run: runCmd,
     secrets: secretsCmd,
     service: serviceCmd,
+    status: statusCmd,
     ...moduleSubCommands(),
   },
 })
