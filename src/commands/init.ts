@@ -172,11 +172,11 @@ export default defineCommand({
       try {
         const token = await promptPassword({ message: 'Tunnel token' })
         if (token.trim()) {
-          const { mkdir, writeFile } = await import('node:fs/promises')
           const { dirname } = await import('node:path')
-          const tokenPath = `${ctx.paths.secretsDir}/_jib/cloudflare/tunnel-token`
+          const { credsPath } = await import('@jib/core')
+          const tokenPath = credsPath(ctx.paths, 'cloudflare', 'tunnel.env')
           await mkdir(dirname(tokenPath), { recursive: true, mode: 0o700 })
-          await writeFile(tokenPath, token.trim(), { mode: 0o600 })
+          await writeFile(tokenPath, `TUNNEL_TOKEN=${token.trim()}\n`, { mode: 0o600 })
           consola.success('tunnel token stored')
           // Restart cloudflared so it picks up the token
           const { $ } = await import('bun')
