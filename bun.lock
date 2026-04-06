@@ -19,6 +19,7 @@
         "@jib/docker": "workspace:*",
         "@jib/rpc": "workspace:*",
         "@jib/secrets": "workspace:*",
+        "@jib/state": "workspace:*",
         "@jib/tui": "workspace:*",
         "citty": "^0.1.6",
         "consola": "^3.2.3",

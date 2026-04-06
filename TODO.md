@@ -1,10 +1,9 @@
 # V0
 
-- [ ] add documentation
-- [ ] consider if any other linters can be added
-- [ ] there must be no external dependencies with "*" as a version (see nats & yaml)
-- [ ] introduce jib-stack.service as a systemd oneshot unit that manages the Docker Compose stack (jib-bus + module containers). Wire the native services (jib-deployer, jib-watcher) to depend on it explicitly, replacing the implicit nc -z 4222 busy-wait.
-- [ ] `jib env` commands (get/set/remove env vars via CLI)
+- add documentation
+- there must be no external dependencies with "*" as a version (see nats & yaml)
+- introduce jib-stack.service as a systemd oneshot unit that manages the Docker Compose stack (jib-bus + module containers). Wire the native services (jib-deployer, jib-watcher) to depend on it explicitly, replacing the implicit nc -z 4222 busy-wait.
+- `jib env` commands (get/set/remove env vars via CLI)
 
 # V1
 
