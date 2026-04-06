@@ -1,3 +1,4 @@
+import { createInterface } from 'node:readline'
 import * as clack from '@clack/prompts'
 import { ValidationError } from '@jib/core'
 import { assertInteractive } from './interactive.ts'
@@ -105,15 +106,18 @@ export function promptMultiSelect<T extends string>(opts: SelectOpts<T>): Promis
 export async function promptPEM(opts: { message: string }): Promise<string> {
   assertInteractive()
   clack.log.info(`${opts.message} (paste full PEM block)`)
-  const rl = (await import('node:readline')).createInterface({ input: process.stdin })
+  const rl = createInterface({ input: process.stdin })
   const lines: string[] = []
+  const MAX_LINES = 200
   for await (const line of rl) {
     lines.push(line)
     if (line.startsWith('-----END ') && line.endsWith('-----')) break
+    if (lines.length >= MAX_LINES) break
   }
   rl.close()
   const pem = lines.join('\n')
   if (!pem.includes('-----BEGIN ')) throw new ValidationError('invalid PEM: missing BEGIN marker')
+  if (!pem.includes('-----END ')) throw new ValidationError('invalid PEM: missing END marker')
   return pem
 }
 
