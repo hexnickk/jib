@@ -11,6 +11,8 @@ import { isInteractive, promptConfirm, promptSelect } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { promptGitAuth } from './_init_git.ts'
+import { addUserToGroup, ensureGroup } from './_init_group.ts'
+import { type ModLike, runInstallsTx } from './_init_install.ts'
 import { promptTunnelToken } from './_init_tunnel.ts'
 import { hasTunnelToken } from './_status_collect.ts'
 
@@ -42,7 +44,7 @@ async function ensureDirs(): Promise<void> {
   ]
   const log = createLogger('init')
   for (const d of dirs) {
-    await mkdir(d, { recursive: true, mode: 0o755 })
+    await mkdir(d, { recursive: true, mode: 0o750 })
   }
   log.info(`directories ready under ${p.root}`)
 }
@@ -51,60 +53,12 @@ async function ensureConfig(): Promise<Config> {
   const log = createLogger('init')
   const p = getPaths()
   if (!existsSync(p.configFile)) {
-    await writeFile(p.configFile, MINIMAL_CONFIG, { mode: 0o600 })
+    await writeFile(p.configFile, MINIMAL_CONFIG, { mode: 0o640 })
     consola.success(`wrote ${p.configFile}`)
   } else {
     log.info(`${p.configFile} exists, skipping`)
   }
   return loadConfig(p.configFile)
-}
-
-export interface ModLike {
-  manifest: { name: string }
-  install?: (ctx: ModuleContext<Config>) => Promise<void>
-  uninstall?: (ctx: ModuleContext<Config>) => Promise<void>
-}
-
-/**
- * Install every module in `mods` in order. On the first failure, walk the
- * already-installed set in reverse and call each module's `uninstall()` as
- * best-effort rollback, so the host is either fully initialized or fully
- * unchanged. Each rollback step is independently try/catch'd — a failing
- * uninstall doesn't abort the rest; we just log and continue. Re-throws
- * the original install error once rollback finishes so callers can surface
- * it and exit.
- */
-export async function runInstallsTx(mods: ModLike[], ctx: ModuleContext<Config>): Promise<void> {
-  const installed: ModLike[] = []
-  try {
-    for (const m of mods) {
-      if (!m.install) {
-        consola.warn(`${m.manifest.name}: no install() — skipping`)
-        continue
-      }
-      await m.install(ctx)
-      consola.success(`${m.manifest.name}`)
-      installed.push(m)
-    }
-  } catch (err) {
-    if (installed.length > 0) {
-      consola.warn(`install failed; rolling back ${installed.length} module(s)…`)
-      for (const m of [...installed].reverse()) {
-        if (!m.uninstall) {
-          consola.warn(`${m.manifest.name}: no uninstall() — leaving in place`)
-          continue
-        }
-        try {
-          await m.uninstall(ctx)
-          consola.info(`rolled back ${m.manifest.name}`)
-        } catch (e) {
-          const em = e instanceof Error ? e.message : String(e)
-          consola.warn(`${m.manifest.name} uninstall failed: ${em}`)
-        }
-      }
-    }
-    throw err
-  }
 }
 
 export default defineCommand({
@@ -123,6 +77,16 @@ export default defineCommand({
 
     await ensureDirs()
     const config = await ensureConfig()
+    await ensureGroup(getPaths())
+
+    const sudoUser = process.env.SUDO_USER
+    if (sudoUser && !nonInteractive) {
+      const add = await promptConfirm({
+        message: `Add ${sudoUser} to jib group? (allows running jib without sudo)`,
+        initialValue: true,
+      })
+      if (add) await addUserToGroup(sudoUser)
+    }
 
     if (skipInstall) {
       consola.info('--skip-install: done (no modules installed)')

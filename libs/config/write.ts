@@ -16,7 +16,7 @@ export async function writeConfig(filePath: string, config: Config): Promise<voi
   const dir = dirname(filePath)
   const tmp = join(dir, `.jib-config-${process.pid}-${Date.now()}.yml`)
   try {
-    await writeFile(tmp, yaml, { mode: 0o600 })
+    await writeFile(tmp, yaml, { mode: 0o640 })
     // Preserve the mode of any existing file; best-effort.
     try {
       const info = await stat(filePath)

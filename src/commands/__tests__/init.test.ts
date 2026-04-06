@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { type ModuleContext, createLogger, getPaths } from '@jib/core'
-import { type ModLike, runInstallsTx } from '../init.ts'
+import { type ModLike, runInstallsTx } from '../_init_install.ts'
 
 /**
  * Covers the transactional semantics of `jib init`'s module install loop.
