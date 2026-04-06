@@ -154,6 +154,7 @@ export default defineCommand({
       await runInstallsTx(mods, ctx)
     } catch (err) {
       consola.error(`jib init failed: ${err instanceof Error ? err.message : String(err)}`)
+      consola.info('safe to retry: sudo jib init')
       process.exit(1)
     }
 
@@ -182,7 +183,7 @@ export default defineCommand({
     consola.box(
       [
         'jib initialized. Next:',
-        '  jib add <app> --repo org/repo --domain example.com',
+        '  jib add <app> --repo org/repo --domain host=example.com',
         '  jib deploy <app>',
       ].join('\n'),
     )

@@ -1,8 +1,8 @@
-import { readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { loadConfig } from '@jib/config'
-import { getPaths } from '@jib/core'
+import { getPaths, pathExists } from '@jib/core'
 import { isInteractive, promptInt, promptPEM, promptSelect } from '@jib/tui'
 import { type CommandDef, defineCommand } from 'citty'
 import { consola } from 'consola'
@@ -23,15 +23,6 @@ import { runManifestFlow } from './manifest-flow.ts'
  * `src/module-cli.ts` discovery. CLI-only concerns (prompts, printing) live
  * here; every disk/network op delegates to a sibling helper.
  */
-
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await stat(p)
-    return true
-  } catch {
-    return false
-  }
-}
 
 const keySetup = defineCommand({
   meta: { name: 'setup', description: 'Generate an SSH deploy key provider' },
@@ -59,7 +50,7 @@ const keyStatus = defineCommand({
     const p = getProvider(cfg, args.name)
     if (!p || p.type !== 'key') return consola.error(`provider "${args.name}" is not a deploy key`)
     const { publicKey } = deployKeyPaths(paths, args.name)
-    if (await fileExists(publicKey)) consola.log(`  key: ${await keyFingerprint(publicKey)}`)
+    if (await pathExists(publicKey)) consola.log(`  key: ${await keyFingerprint(publicKey)}`)
     else consola.warn('  key: file missing')
     const apps = appsUsingProvider(cfg, args.name)
     consola.log(`  used by: ${apps.length === 0 ? '(none)' : apps.join(', ')}`)
@@ -145,7 +136,7 @@ const appStatus = defineCommand({
     if (!p || p.type !== 'app') return consola.error(`provider "${args.name}" is not a GitHub App`)
     consola.log(`  app id: ${p.app_id}`)
     const pem = appPemPath(paths, args.name)
-    consola.log(`  pem: ${(await fileExists(pem)) ? pem : 'missing!'}`)
+    consola.log(`  pem: ${(await pathExists(pem)) ? pem : 'missing!'}`)
     const apps = appsUsingProvider(cfg, args.name)
     consola.log(`  used by: ${apps.length === 0 ? '(none)' : apps.join(', ')}`)
   },

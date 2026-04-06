@@ -37,7 +37,7 @@ export default defineCommand({
     try {
       await withBus(async (bus) => {
         const s = spinner()
-        s.start(`preparing ${args.app}`)
+        s.start(`[1/2] preparing ${args.app}`)
 
         const prepBody: { app: string; ref?: string } = { app: args.app }
         if (args.ref) prepBody.ref = args.ref
@@ -54,7 +54,7 @@ export default defineCommand({
             onProgress: (p: EvtRepoProgress) => s.message(p.message),
           },
         )
-        s.stop(`repo ready @ ${ready.sha.slice(0, 8)}`)
+        s.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
 
         if (args['dry-run']) {
           consola.info(`[dry-run] prepared ${ready.workdir} @ ${ready.sha}`)
@@ -62,7 +62,7 @@ export default defineCommand({
         }
 
         const s2 = spinner()
-        s2.start('deploying')
+        s2.start(`[2/2] deploying ${args.app}`)
         const result = await emitAndWait(
           bus,
           SUBJECTS.cmd.deploy,
@@ -81,10 +81,11 @@ export default defineCommand({
             onProgress: (p: EvtDeployProgress) => s2.message(`${p.step}: ${p.message}`),
           },
         )
-        s2.stop(`OK  ${args.app} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
+        s2.stop(`[2/2] ${args.app} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
       })
     } catch (err) {
       consola.error(err instanceof Error ? err.message : String(err))
+      consola.info('check logs: journalctl -u jib-deployer -u jib-gitsitter --since "5m ago"')
       process.exit(1)
     }
   },

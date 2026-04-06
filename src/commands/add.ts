@@ -20,15 +20,11 @@ import { claimNginxRoutes, prepareAppRepo, rollbackRepo } from './_provision.ts'
  * → `cmd.nginx.claim`. On any failure after writeConfig the app entry is
  * rolled back so the file never points at a half-baked app.
  *
- * Domain syntax: `host[:containerPort][@ingress][=service]`.
- *   - `containerPort` is the port *inside* the container. If omitted, jib
- *     infers it from the target service's `ports:`/`expose:` after the
- *     repo is cloned; ultimate fallback is 80 with a warning.
- *   - `=service` names the compose service this domain routes to. Only
- *     required for multi-service compose files; single-service apps have
- *     it auto-filled.
- * Jib always auto-allocates the *host* port from the managed range —
- * operators never think about host ports.
+ * Domain syntax (key-value, repeatable):
+ *   `--domain host=<domain>[,port=<n>][,service=<name>][,ingress=direct|cloudflare-tunnel]`
+ * Only `host` is required. `port` is the container port (inferred from
+ * compose if omitted). `service` is only needed for multi-service compose
+ * files. Host ports are always auto-allocated from the managed range.
  */
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
@@ -51,7 +47,8 @@ export default defineCommand({
     compose: { type: 'string', description: 'Compose file (comma-separated)' },
     domain: {
       type: 'string',
-      description: 'host[:containerPort][@ingress][=service] (repeatable via comma)',
+      description:
+        'host=<domain>[,port=<port>][,service=<name>][,ingress=direct|cloudflare-tunnel] (repeatable)',
     },
     health: { type: 'string', description: '/path:port (repeatable via comma)' },
     'config-only': { type: 'boolean', description: 'Write config without provisioning' },
@@ -84,7 +81,7 @@ export default defineCommand({
     }
 
     const ingressDefault = args.ingress ?? 'direct'
-    const domainRaw = toArray(args.domain).flatMap((d) => d.split(','))
+    const domainRaw = toArray(args.domain)
     const healthRaw = toArray(args.health).flatMap((h) => h.split(','))
     const composeRaw = args.compose ? args.compose.split(',') : undefined
 
@@ -144,6 +141,7 @@ export default defineCommand({
       await writeConfig(paths.configFile, { ...nextCfg, apps: rollbackApps })
       consola.error(err instanceof Error ? err.message : String(err))
       consola.warn(`rolled back ${args.app} from ${paths.configFile}`)
+      consola.info('safe to retry: jib add ...')
       process.exit(1)
     }
 

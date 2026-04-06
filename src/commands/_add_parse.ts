@@ -8,36 +8,35 @@ export interface ParsedDomain {
   ingress?: '' | 'direct' | 'cloudflare-tunnel'
 }
 
-/** Parse `host[:containerPort][@ingress][=service]` into a `ParsedDomain`. */
+const VALID_INGRESS = new Set(['direct', 'cloudflare-tunnel'])
+
+/** Parse `host=<domain>[,port=<n>][,service=<name>][,ingress=direct|cloudflare-tunnel]`. */
 export function parseDomain(raw: string, fallback: string): ParsedDomain {
-  let rest = raw
-  let service: string | undefined
-  const eq = rest.lastIndexOf('=')
-  if (eq > 0) {
-    service = rest.slice(eq + 1)
-    rest = rest.slice(0, eq)
+  const pairs = new Map<string, string>()
+  for (const part of raw.split(',')) {
+    const eq = part.indexOf('=')
+    if (eq < 1) throw new Error(`invalid --domain "${raw}" (expected key=value pairs)`)
+    pairs.set(part.slice(0, eq), part.slice(eq + 1))
   }
-  let ingress = fallback
-  const at = rest.lastIndexOf('@')
-  if (at > 0) {
-    ingress = rest.slice(at + 1)
-    rest = rest.slice(0, at)
-  }
-  const [host, portStr] = rest.split(':')
-  if (!host)
-    throw new Error(`invalid --domain "${raw}" (expected host[:containerPort][@ingress][=service])`)
+  const host = pairs.get('host')
+  if (!host) throw new Error(`invalid --domain "${raw}" (missing required "host" key)`)
   const out: ParsedDomain = { host }
-  if (portStr !== undefined && portStr !== '') {
+  const portStr = pairs.get('port')
+  if (portStr !== undefined) {
     const container_port = Number(portStr)
-    if (!Number.isInteger(container_port) || container_port < 1 || container_port > 65535) {
-      throw new Error(`invalid containerPort in --domain "${raw}"`)
-    }
+    if (!Number.isInteger(container_port) || container_port < 1 || container_port > 65535)
+      throw new Error(`invalid port in --domain "${raw}" (expected integer 1-65535)`)
     out.container_port = container_port
   }
+  const service = pairs.get('service')
   if (service) out.service = service
-  if (ingress && ingress !== 'direct') {
+  const ingress = pairs.get('ingress') ?? fallback
+  if (ingress && !VALID_INGRESS.has(ingress))
+    throw new Error(
+      `invalid ingress "${ingress}" in --domain "${raw}" (expected direct|cloudflare-tunnel)`,
+    )
+  if (ingress && ingress !== 'direct')
     out.ingress = ingress as Exclude<ParsedDomain['ingress'], undefined>
-  }
   return out
 }
 

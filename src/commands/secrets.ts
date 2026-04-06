@@ -32,47 +32,45 @@ const setCmd = defineCommand({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       consola.error(`setting secrets for ${args.app}: ${msg}`)
+      consola.info('expected .env format: KEY=value, one per line')
       process.exit(1)
     }
-    consola.success(`Secrets set for ${args.app}.`)
+    consola.success(`secrets set for ${args.app}`)
   },
 })
 
 const checkCmd = defineCommand({
-  meta: { name: 'check', description: 'Verify secrets file exists for an app (or all apps)' },
+  meta: { name: 'check', description: 'Show secrets status for an app (or all apps)' },
   args: { app: { type: 'positional', required: false } },
   async run({ args }) {
     const { cfg, mgr } = await loadCtx()
-    if (args.app) {
-      const appCfg = cfg.apps[args.app]
-      if (!appCfg) {
-        consola.error(`app "${args.app}" not found in config`)
-        process.exit(1)
-      }
-      const status = await mgr.check(args.app, appCfg.env_file)
-      if (status.exists) {
-        consola.log(`OK       ${args.app}  ${status.path}`)
-        return
-      }
-      consola.log(`MISSING  ${args.app}  ${status.path}`)
-      consola.error(`secrets file missing for ${args.app}`)
-      process.exit(1)
-    }
 
-    const results = await mgr.checkAll(cfg.apps)
-    if (results.length === 0) {
-      consola.log('No apps configured.')
+    const apps = args.app ? [args.app] : Object.keys(cfg.apps).sort()
+    if (apps.length === 0) {
+      consola.log('no apps configured')
       return
     }
-    let allOK = true
-    for (const r of results) {
-      if (r.exists) consola.log(`OK       ${r.app}  ${r.path}`)
-      else {
-        consola.log(`MISSING  ${r.app}  ${r.path}`)
-        allOK = false
+
+    let hasMissing = false
+    for (const name of apps) {
+      const appCfg = cfg.apps[name]
+      if (!appCfg) {
+        consola.error(`app "${name}" not found in config`)
+        process.exit(1)
+      }
+      const status = await mgr.check(name, appCfg.env_file)
+      if (!status.exists) {
+        consola.log(`${name} missing`)
+        hasMissing = true
+        continue
+      }
+      consola.log(`${name} ${status.path}`)
+      const entries = await mgr.readMasked(name, appCfg.env_file)
+      for (const e of entries) {
+        consola.log(`  ${e.key}=${e.masked}`)
       }
     }
-    if (!allOK) process.exit(1)
+    if (hasMissing) process.exit(1)
   },
 })
 

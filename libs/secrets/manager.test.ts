@@ -48,18 +48,17 @@ describe('SecretsManager', () => {
     })
   })
 
-  test('checkAll returns sorted status', async () => {
+  test('readMasked returns masked key-value pairs', async () => {
     await withMgr(async (mgr, dir) => {
       const src = join(dir, 'source.env')
-      await writeFile(src, 'A=1')
+      await writeFile(src, 'SECRET=longvalue\nSHORT=ab\n# comment\nNOEQ\n')
       await mgr.set('web', src)
-      const results = await mgr.checkAll({
-        worker: { env_file: '.env' },
-        web: { env_file: '.env' },
-      })
-      expect(results.map((r) => r.app)).toEqual(['web', 'worker'])
-      expect(results[0]?.exists).toBe(true)
-      expect(results[1]?.exists).toBe(false)
+      const entries = await mgr.readMasked('web')
+      expect(entries).toEqual([
+        { key: 'SECRET', masked: 'lon***' },
+        { key: 'SHORT', masked: '***' },
+        { key: 'NOEQ', masked: '***' },
+      ])
     })
   })
 

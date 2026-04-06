@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export interface Paths {
@@ -76,4 +77,14 @@ export function repoPath(paths: Paths, app: string, repo: string): string {
  */
 export function credsPath(paths: Paths, kind: string, name: string): string {
   return join(paths.secretsDir, '_jib', kind, name)
+}
+
+/** Returns true if a file or directory exists at `path`. */
+export async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path)
+    return true
+  } catch {
+    return false
+  }
 }

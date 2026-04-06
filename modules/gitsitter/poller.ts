@@ -1,8 +1,9 @@
-import { httpsCloneURL, refreshAuth, sshCloneURL } from '@jib-module/github'
+import { refreshAuth } from '@jib-module/github'
 import type { Bus } from '@jib/bus'
-import type { App, Config } from '@jib/config'
+import type { Config } from '@jib/config'
 import { type Logger, type Paths, isExternalRepoURL, repoPath } from '@jib/core'
 import { SUBJECTS } from '@jib/rpc'
+import { cloneURL } from './src/clone-url.ts'
 import * as git from './src/git.ts'
 
 /**
@@ -17,12 +18,6 @@ export function parsePollInterval(raw: string): number {
   const unit = m[2] as 's' | 'm' | 'h'
   const mult = unit === 's' ? 1_000 : unit === 'm' ? 60_000 : 3_600_000
   return n * mult
-}
-
-function cloneURL(app: App, cfg: Config): string {
-  if (isExternalRepoURL(app.repo)) return app.repo
-  const providerType = app.provider ? cfg.github?.providers?.[app.provider]?.type : undefined
-  return providerType === 'app' ? httpsCloneURL(app.repo) : sshCloneURL(app.repo)
 }
 
 /**

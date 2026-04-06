@@ -60,12 +60,19 @@ export class SecretsManager {
     }
   }
 
-  async checkAll(apps: Record<string, { env_file?: string }>): Promise<AppSecretStatus[]> {
-    const names = Object.keys(apps).sort()
-    const out: AppSecretStatus[] = []
-    for (const name of names) {
-      out.push(await this.check(name, apps[name]?.env_file))
-    }
-    return out
+  async readMasked(app: string, envFile?: string): Promise<{ key: string; masked: string }[]> {
+    const path = this.symlinkPath(app, envFile)
+    const content = await readFile(path, 'utf8')
+    return content
+      .split('\n')
+      .filter((l) => l.trim() && !l.trim().startsWith('#'))
+      .map((line) => {
+        const eq = line.indexOf('=')
+        if (eq === -1) return { key: line.trim(), masked: '***' }
+        const key = line.slice(0, eq)
+        const val = line.slice(eq + 1)
+        const visible = val.length >= 3 ? val.slice(0, 3) : ''
+        return { key, masked: `${visible}***` }
+      })
   }
 }

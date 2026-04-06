@@ -1,30 +1,11 @@
-import { rm, stat } from 'node:fs/promises'
-import { applyAuth, httpsCloneURL, refreshAuth, sshCloneURL } from '@jib-module/github'
+import { rm } from 'node:fs/promises'
+import { applyAuth, refreshAuth } from '@jib-module/github'
 import type { Bus } from '@jib/bus'
-import type { App, Config } from '@jib/config'
-import { type Paths, isExternalRepoURL, repoPath } from '@jib/core'
+import type { Config } from '@jib/config'
+import { type Paths, isExternalRepoURL, pathExists, repoPath } from '@jib/core'
 import { SUBJECTS, handleCmd } from '@jib/rpc'
+import { cloneURL } from './src/clone-url.ts'
 import * as git from './src/git.ts'
-
-/**
- * Resolves the clone URL for an app. External URLs (file://, http(s)://,
- * ssh://, git@host:…, absolute paths) pass through verbatim. Otherwise
- * GitHub App providers use HTTPS (token baked later via `applyAuth`) and
- * deploy-key providers use SSH.
- */
-function cloneURL(app: App, providerType: 'key' | 'app' | undefined): string {
-  if (isExternalRepoURL(app.repo)) return app.repo
-  return providerType === 'app' ? httpsCloneURL(app.repo) : sshCloneURL(app.repo)
-}
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await stat(p)
-    return true
-  } catch {
-    return false
-  }
-}
 
 /**
  * Ensures a repo exists on disk at the expected workdir, authenticates via
@@ -46,10 +27,8 @@ export async function prepareRepo(
   const external = isExternalRepoURL(app.repo)
   const auth = !external && app.provider ? await refreshAuth(app.provider, cfg, app, paths) : {}
   const env = auth.sshKeyPath ? git.configureSSHKey(auth.sshKeyPath) : {}
-  const providerType = app.provider ? cfg.github?.providers?.[app.provider]?.type : undefined
-
   if (!(await pathExists(workdir))) {
-    await git.clone(cloneURL(app, providerType), workdir, { branch: app.branch, env })
+    await git.clone(cloneURL(app, cfg), workdir, { branch: app.branch, env })
   }
   if (!external) await applyAuth(auth, workdir, app.repo)
   await git.fetch(workdir, target, env)

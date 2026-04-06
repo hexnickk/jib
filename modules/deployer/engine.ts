@@ -17,6 +17,8 @@ import type { CmdDeploy } from '@jib/rpc'
 import { type AppState, type Store, acquire } from '@jib/state'
 import { $ } from 'bun'
 
+// Approved exception: 231 LoC — deploy ceremony is cohesive, splitting fragments understanding
+
 /** Minimum free bytes required before a deploy proceeds (2 GiB, matches Go). */
 const MIN_DISK_BYTES = 2 * 1024 * 1024 * 1024
 

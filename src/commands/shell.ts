@@ -79,15 +79,20 @@ async function handle(parts: ExecParts, mode: 'exec' | 'run'): Promise<void> {
 
 export const execCmd = defineCommand({
   meta: { name: 'exec', description: 'Execute command in a running container' },
+  args: {
+    app: { type: 'positional', required: true, description: 'App name' },
+    service: {
+      type: 'positional',
+      required: false,
+      description: 'Compose service (auto-detected for single-service apps)',
+    },
+  },
   async run({ rawArgs }) {
-    if (rawArgs.includes('--help') || rawArgs.includes('-h')) {
-      consola.log('usage: jib exec <app> [service] -- <cmd>')
-      return
-    }
     try {
       await handle(parseExecArgs(rawArgs), 'exec')
     } catch (err) {
       consola.error(err instanceof Error ? err.message : String(err))
+      consola.info('ensure app is running: jib up <app>')
       process.exit(1)
     }
   },
@@ -95,11 +100,15 @@ export const execCmd = defineCommand({
 
 export const runCmd = defineCommand({
   meta: { name: 'run', description: 'Run a one-off command in a new container' },
+  args: {
+    app: { type: 'positional', required: true, description: 'App name' },
+    service: {
+      type: 'positional',
+      required: false,
+      description: 'Compose service (auto-detected for single-service apps)',
+    },
+  },
   async run({ rawArgs }) {
-    if (rawArgs.includes('--help') || rawArgs.includes('-h')) {
-      consola.log('usage: jib run <app> [service] [-- <cmd>]')
-      return
-    }
     try {
       await handle(parseRunArgs(rawArgs), 'run')
     } catch (err) {

@@ -47,9 +47,10 @@ export const upCmd = defineCommand({
         SUBJECTS.evt.appUpSuccess,
         SUBJECTS.evt.appUpFailure,
       )
-      consola.success(`Started ${args.app}.`)
+      consola.success(`started ${args.app}`)
     } catch (err) {
       consola.error(err instanceof Error ? err.message : String(err))
+      consola.info('check logs: journalctl -u jib-deployer --since "5m ago"')
       process.exit(1)
     }
   },
@@ -59,7 +60,6 @@ export const downCmd = defineCommand({
   meta: { name: 'down', description: 'Stop containers without removing app from config' },
   args: {
     app: { type: 'positional', required: true },
-    volumes: { type: 'boolean', description: 'Also remove Docker volumes' },
   },
   async run({ args }) {
     try {
@@ -68,11 +68,12 @@ export const downCmd = defineCommand({
         SUBJECTS.cmd.appDown,
         SUBJECTS.evt.appDownSuccess,
         SUBJECTS.evt.appDownFailure,
-        { volumes: Boolean(args.volumes) },
+        {},
       )
-      consola.success(`Stopped ${args.app}.`)
+      consola.success(`stopped ${args.app}`)
     } catch (err) {
       consola.error(err instanceof Error ? err.message : String(err))
+      consola.info('check running containers: docker ps --filter label=com.docker.compose.project')
       process.exit(1)
     }
   },
@@ -89,9 +90,10 @@ export const restartCmd = defineCommand({
         SUBJECTS.evt.appRestartSuccess,
         SUBJECTS.evt.appRestartFailure,
       )
-      consola.success(`Restarted ${args.app}.`)
+      consola.success(`restarted ${args.app}`)
     } catch (err) {
       consola.error(err instanceof Error ? err.message : String(err))
+      consola.info('check logs: journalctl -u jib-deployer --since "5m ago"')
       process.exit(1)
     }
   },

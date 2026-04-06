@@ -29,7 +29,7 @@ export async function promptGitAuth(ctx: ModuleContext<Config>): Promise<void> {
       const pubKey = await generateDeployKey(name, ctx.paths)
       await addKeyProvider(ctx.paths.configFile, name)
       const keyPaths = deployKeyPaths(ctx.paths, name)
-      consola.success(`SSH deploy key "${name}" generated`)
+      consola.success(`deploy key "${name}" added to config`)
       consola.box(
         [
           'Add this public key to your GitHub repo → Settings → Deploy Keys:',

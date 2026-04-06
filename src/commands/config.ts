@@ -109,6 +109,7 @@ const set = defineCommand({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       consola.error(`parsing value "${args.value}": ${msg}`)
+      consola.info('value must be a YAML scalar (string, number, boolean)')
       process.exit(1)
     }
     if (parsed === null) {
@@ -142,11 +143,12 @@ const set = defineCommand({
       await unlink(tmpPath).catch(() => undefined)
       const msg = err instanceof Error ? err.message : String(err)
       consola.error(`validation failed, config unchanged: ${msg}`)
+      consola.info('safe to retry')
       process.exit(1)
     }
     const { rename } = await import('node:fs/promises')
     await rename(tmpPath, path)
-    consola.success(`Set ${args.key} = ${String(parsed)}`)
+    consola.success(`set ${args.key} = ${String(parsed)}`)
   },
 })
 

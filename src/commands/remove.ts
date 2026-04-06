@@ -26,7 +26,6 @@ export default defineCommand({
   args: {
     app: { type: 'positional', required: true },
     force: { type: 'boolean', description: 'Skip confirmation prompt' },
-    volumes: { type: 'boolean', description: 'Also remove Docker volumes' },
   },
   async run({ args }) {
     const { cfg, paths } = await loadAppOrExit(args.app)
@@ -62,7 +61,7 @@ export default defineCommand({
 
     try {
       const compose = composeFor(cfg, paths, args.app)
-      await compose.down(Boolean(args.volumes))
+      await compose.down(false)
       consola.info('containers stopped')
     } catch (err) {
       consola.warn(`compose down: ${err instanceof Error ? err.message : String(err)}`)
