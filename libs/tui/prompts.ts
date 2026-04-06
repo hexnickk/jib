@@ -105,19 +105,3 @@ export function promptConfirm(opts: ConfirmOpts): Promise<boolean> {
     }),
   )
 }
-
-/**
- * Multiline PEM paste. Clack has no native multiline widget, so we collect
- * lines until an empty line terminates the block.
- */
-export async function promptPEM(opts: { message: string }): Promise<string> {
-  assertInteractive()
-  clack.log.info(`${opts.message} (end with blank line)`)
-  const lines: string[] = []
-  while (true) {
-    const line = await ask<string>(() => clack.text({ message: '' }))
-    if (line === '') break
-    lines.push(line)
-  }
-  return lines.join('\n')
-}

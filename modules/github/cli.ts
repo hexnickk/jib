@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { loadConfig } from '@jib/config'
 import { getPaths, pathExists } from '@jib/core'
-import { isInteractive, promptInt, promptPEM, promptSelect } from '@jib/tui'
+import { isInteractive, promptInt, promptSelect, promptString } from '@jib/tui'
 import { type CommandDef, defineCommand } from 'citty'
 import { consola } from 'consola'
 import { appPemPath } from './auth.ts'
@@ -105,7 +105,7 @@ const appSetup = defineCommand({
         message: 'How would you like to create the GitHub App?',
         options: [
           { value: 'manifest', label: 'Automatic — creates the app in your browser' },
-          { value: 'manual', label: 'Manual — paste app-id + PEM' },
+          { value: 'manual', label: 'Manual — provide app-id + PEM file' },
         ],
       })
       if (method === 'manifest') {
@@ -117,9 +117,8 @@ const appSetup = defineCommand({
     }
 
     const appId = flagAppId || (await promptInt({ message: 'GitHub App ID', min: 1 }))
-    const pem = flagPemPath
-      ? await readFile(flagPemPath, 'utf8')
-      : await promptPEM({ message: 'Paste the private key PEM' })
+    const pemPath = flagPemPath || (await promptString({ message: 'Path to private key PEM file' }))
+    const pem = await readFile(pemPath, 'utf8')
     await savePem(paths, args.name, pem)
     await addAppProvider(paths.configFile, args.name, appId)
     consola.success(`provider "${args.name}" (app ${appId}) created`)
