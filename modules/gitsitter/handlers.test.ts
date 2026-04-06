@@ -76,8 +76,13 @@ describe('gitsitter handlers', () => {
       app: 'demo',
       ref: 'main',
     })
-    // wait for async handler
-    for (let i = 0; i < 10; i++) await flush()
+    // The handler does real I/O (loadConfig from disk + git fetch) so it
+    // needs more flush cycles than a pure-in-memory handler. On slow CI
+    // runners 10 wasn't enough.
+    for (let i = 0; i < 30; i++) {
+      await flush()
+      await new Promise((r) => setTimeout(r, 10))
+    }
     expect(events.some((e) => e.subject === 'ready')).toBe(true)
   })
 
