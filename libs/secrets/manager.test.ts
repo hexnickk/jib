@@ -14,35 +14,57 @@ async function withMgr<T>(fn: (mgr: SecretsManager, dir: string) => Promise<T>):
 }
 
 describe('SecretsManager', () => {
-  test('set copies file and enforces 0600/0700', async () => {
+  test('upsert creates file and inserts key', async () => {
     await withMgr(async (mgr, dir) => {
-      const src = join(dir, 'source.env')
-      await writeFile(src, 'FOO=bar\n', { mode: 0o644 })
-      const dst = await mgr.set('web', src)
-      expect(dst).toBe(join(dir, 'web', '.env'))
-
-      const fileInfo = await stat(dst)
-      expect(fileInfo.mode & 0o777).toBe(0o600)
-
-      const dirInfo = await stat(join(dir, 'web'))
-      expect(dirInfo.mode & 0o777).toBe(0o700)
+      await mgr.upsert('web', 'FOO', 'bar')
+      const content = await Bun.file(join(dir, 'web', '.env')).text()
+      expect(content).toContain('FOO=bar')
+      const info = await stat(join(dir, 'web', '.env'))
+      expect(info.mode & 0o777).toBe(0o600)
     })
   })
 
-  test('set honors custom env file name', async () => {
+  test('upsert updates existing key', async () => {
     await withMgr(async (mgr, dir) => {
-      const src = join(dir, 'source.env')
-      await writeFile(src, 'X=1\n')
-      const dst = await mgr.set('web', src, '.env.prod')
-      expect(dst.endsWith('/web/.env.prod')).toBe(true)
+      await mgr.upsert('web', 'FOO', 'bar')
+      await mgr.upsert('web', 'FOO', 'baz')
+      const content = await Bun.file(join(dir, 'web', '.env')).text()
+      expect(content).toContain('FOO=baz')
+      expect(content.match(/FOO=/g)?.length).toBe(1)
+    })
+  })
+
+  test('upsert preserves other keys', async () => {
+    await withMgr(async (mgr) => {
+      await mgr.upsert('web', 'A', '1')
+      await mgr.upsert('web', 'B', '2')
+      await mgr.upsert('web', 'A', '3')
+      const entries = await mgr.readMasked('web')
+      expect(entries.map((e) => e.key)).toEqual(['A', 'B'])
+    })
+  })
+
+  test('remove deletes a key', async () => {
+    await withMgr(async (mgr) => {
+      await mgr.upsert('web', 'A', '1')
+      await mgr.upsert('web', 'B', '2')
+      const removed = await mgr.remove('web', 'A')
+      expect(removed).toBe(true)
+      const entries = await mgr.readMasked('web')
+      expect(entries.map((e) => e.key)).toEqual(['B'])
+    })
+  })
+
+  test('remove returns false for missing key', async () => {
+    await withMgr(async (mgr) => {
+      const removed = await mgr.remove('web', 'NOPE')
+      expect(removed).toBe(false)
     })
   })
 
   test('check reports existence', async () => {
-    await withMgr(async (mgr, dir) => {
-      const src = join(dir, 'source.env')
-      await writeFile(src, 'A=1')
-      await mgr.set('web', src)
+    await withMgr(async (mgr) => {
+      await mgr.upsert('web', 'A', '1')
       expect((await mgr.check('web')).exists).toBe(true)
       expect((await mgr.check('ghost')).exists).toBe(false)
     })
@@ -52,7 +74,11 @@ describe('SecretsManager', () => {
     await withMgr(async (mgr, dir) => {
       const src = join(dir, 'source.env')
       await writeFile(src, 'SECRET=longvalue\nSHORT=ab\n# comment\nNOEQ\n')
-      await mgr.set('web', src)
+      // Write via raw file to test readMasked with comments/bare keys
+      const appDir = join(dir, 'web')
+      const { mkdir } = await import('node:fs/promises')
+      await mkdir(appDir, { recursive: true })
+      await writeFile(join(appDir, '.env'), 'SECRET=longvalue\nSHORT=ab\n# comment\nNOEQ\n')
       const entries = await mgr.readMasked('web')
       expect(entries).toEqual([
         { key: 'SECRET', masked: 'lon***' },
@@ -62,14 +88,20 @@ describe('SecretsManager', () => {
     })
   })
 
-  test('overwrite replaces contents', async () => {
+  test('upsert honors custom env file name', async () => {
     await withMgr(async (mgr, dir) => {
-      const src = join(dir, 'source.env')
-      await writeFile(src, 'V=1')
-      await mgr.set('web', src)
-      await writeFile(src, 'V=2')
-      const dst = await mgr.set('web', src)
-      expect(await Bun.file(dst).text()).toBe('V=2')
+      await mgr.upsert('web', 'X', '1', '.env.prod')
+      const path = join(dir, 'web', '.env.prod')
+      const content = await Bun.file(path).text()
+      expect(content).toContain('X=1')
+    })
+  })
+
+  test('dir permissions are 0700', async () => {
+    await withMgr(async (mgr, dir) => {
+      await mgr.upsert('web', 'A', '1')
+      const dirInfo = await stat(join(dir, 'web'))
+      expect(dirInfo.mode & 0o777).toBe(0o700)
     })
   })
 })

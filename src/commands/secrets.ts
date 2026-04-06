@@ -3,11 +3,6 @@ import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { loadAppConfig } from './_ctx.ts'
 
-/**
- * `jib secrets set|check` — bulk env-file management for apps. Replaces
- * Go's `registerSecretsCommands`. No bus: secrets live on local disk only.
- */
-
 async function loadCtx() {
   const { cfg, paths } = await loadAppConfig()
   const mgr = new SecretsManager(paths.secretsDir)
@@ -15,10 +10,10 @@ async function loadCtx() {
 }
 
 const setCmd = defineCommand({
-  meta: { name: 'set', description: 'Import env vars from a file (bulk replace)' },
+  meta: { name: 'set', description: 'Set a secret (KEY=VALUE)' },
   args: {
-    app: { type: 'positional', required: true },
-    file: { type: 'string', required: true, description: 'Path to secrets file' },
+    app: { type: 'positional', required: true, description: 'App name' },
+    pair: { type: 'positional', required: true, description: 'KEY=VALUE pair' },
   },
   async run({ args }) {
     const { cfg, mgr } = await loadCtx()
@@ -27,30 +22,28 @@ const setCmd = defineCommand({
       consola.error(`app "${args.app}" not found in config`)
       process.exit(1)
     }
-    try {
-      await mgr.set(args.app, args.file, appCfg.env_file)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      consola.error(`setting secrets for ${args.app}: ${msg}`)
-      consola.info('expected .env format: KEY=value, one per line')
+    const eq = args.pair.indexOf('=')
+    if (eq < 1) {
+      consola.error(`invalid format "${args.pair}" — expected KEY=VALUE`)
       process.exit(1)
     }
-    consola.success(`secrets set for ${args.app}`)
+    const key = args.pair.slice(0, eq)
+    const value = args.pair.slice(eq + 1)
+    await mgr.upsert(args.app, key, value, appCfg.env_file)
+    consola.success(`set ${key} for ${args.app}`)
   },
 })
 
-const checkCmd = defineCommand({
-  meta: { name: 'check', description: 'Show secrets status for an app (or all apps)' },
+const listCmd = defineCommand({
+  meta: { name: 'list', description: 'Show secrets for an app (or all apps)' },
   args: { app: { type: 'positional', required: false } },
   async run({ args }) {
     const { cfg, mgr } = await loadCtx()
-
     const apps = args.app ? [args.app] : Object.keys(cfg.apps).sort()
     if (apps.length === 0) {
       consola.log('no apps configured')
       return
     }
-
     let hasMissing = false
     for (const name of apps) {
       const appCfg = cfg.apps[name]
@@ -60,7 +53,7 @@ const checkCmd = defineCommand({
       }
       const status = await mgr.check(name, appCfg.env_file)
       if (!status.exists) {
-        consola.log(`${name} missing`)
+        consola.log(`${name} no secrets`)
         hasMissing = true
         continue
       }
@@ -70,11 +63,33 @@ const checkCmd = defineCommand({
         consola.log(`  ${e.key}=${e.masked}`)
       }
     }
-    if (hasMissing) process.exit(1)
+    if (hasMissing && args.app) process.exit(1)
+  },
+})
+
+const deleteCmd = defineCommand({
+  meta: { name: 'delete', description: 'Remove a secret key' },
+  args: {
+    app: { type: 'positional', required: true, description: 'App name' },
+    key: { type: 'positional', required: true, description: 'Secret key to remove' },
+  },
+  async run({ args }) {
+    const { cfg, mgr } = await loadCtx()
+    const appCfg = cfg.apps[args.app]
+    if (!appCfg) {
+      consola.error(`app "${args.app}" not found in config`)
+      process.exit(1)
+    }
+    const removed = await mgr.remove(args.app, args.key, appCfg.env_file)
+    if (removed) consola.success(`deleted ${args.key} from ${args.app}`)
+    else {
+      consola.warn(`key "${args.key}" not found in ${args.app}`)
+      process.exit(1)
+    }
   },
 })
 
 export default defineCommand({
-  meta: { name: 'secrets', description: 'Manage app secrets (bulk file import)' },
-  subCommands: { set: setCmd, check: checkCmd },
+  meta: { name: 'secrets', description: 'Manage app secrets' },
+  subCommands: { set: setCmd, list: listCmd, delete: deleteCmd },
 })

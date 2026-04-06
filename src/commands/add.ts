@@ -6,6 +6,7 @@ import {
   validateRepo,
   writeConfig,
 } from '@jib/config'
+import { SecretsManager } from '@jib/secrets'
 import { isInteractive, promptString } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
@@ -50,6 +51,7 @@ export default defineCommand({
       description:
         'host=<domain>[,port=<port>][,service=<name>][,ingress=direct|cloudflare-tunnel] (repeatable)',
     },
+    env: { type: 'string', description: 'KEY=VALUE secret (repeatable)' },
     health: { type: 'string', description: '/path:port (repeatable via comma)' },
     'config-only': { type: 'boolean', description: 'Write config without provisioning' },
   },
@@ -82,6 +84,7 @@ export default defineCommand({
 
     const ingressDefault = args.ingress ?? 'direct'
     const domainRaw = toArray(args.domain)
+    const envRaw = toArray(args.env)
     const healthRaw = toArray(args.health).flatMap((h) => h.split(','))
     const composeRaw = args.compose ? args.compose.split(',') : undefined
 
@@ -122,6 +125,19 @@ export default defineCommand({
     const nextCfg: Config = { ...cfg, apps: { ...cfg.apps, [args.app]: newApp } }
     await writeConfig(paths.configFile, nextCfg)
     consola.success(`added ${args.app} to ${paths.configFile}`)
+
+    if (envRaw.length > 0) {
+      const mgr = new SecretsManager(paths.secretsDir)
+      for (const pair of envRaw) {
+        const eq = pair.indexOf('=')
+        if (eq < 1) {
+          consola.error(`invalid --env "${pair}" — expected KEY=VALUE`)
+          process.exit(1)
+        }
+        await mgr.upsert(args.app, pair.slice(0, eq), pair.slice(eq + 1), newApp.env_file)
+      }
+      consola.success(`${envRaw.length} secret(s) set for ${args.app}`)
+    }
 
     if (args['config-only']) return
 
