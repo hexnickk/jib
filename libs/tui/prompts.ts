@@ -97,6 +97,26 @@ export function promptMultiSelect<T extends string>(opts: SelectOpts<T>): Promis
   return ask<T[]>(() => clack.multiselect<T>({ message: opts.message, options, required: false }))
 }
 
+/**
+ * Read a PEM block from stdin. Collects lines until one matches
+ * `-----END ... KEY-----`, then returns the full block. Uses raw
+ * readline so pasted multiline text works — clack has no multiline input.
+ */
+export async function promptPEM(opts: { message: string }): Promise<string> {
+  assertInteractive()
+  clack.log.info(`${opts.message} (paste full PEM block)`)
+  const rl = (await import('node:readline')).createInterface({ input: process.stdin })
+  const lines: string[] = []
+  for await (const line of rl) {
+    lines.push(line)
+    if (line.startsWith('-----END ') && line.endsWith('-----')) break
+  }
+  rl.close()
+  const pem = lines.join('\n')
+  if (!pem.includes('-----BEGIN ')) throw new ValidationError('invalid PEM: missing BEGIN marker')
+  return pem
+}
+
 export function promptConfirm(opts: ConfirmOpts): Promise<boolean> {
   return ask(() =>
     clack.confirm({

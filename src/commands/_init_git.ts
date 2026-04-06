@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import {
   addAppProvider,
@@ -9,7 +9,7 @@ import {
 } from '@jib-module/github'
 import { type Config, loadConfig } from '@jib/config'
 import type { ModuleContext } from '@jib/core'
-import { promptInt, promptSelect, promptString } from '@jib/tui'
+import { promptInt, promptPEM, promptSelect, promptString } from '@jib/tui'
 import { consola } from 'consola'
 
 /**
@@ -68,8 +68,7 @@ async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<void> {
     }
     consola.info('create the app at github.com → Settings → Developer settings → GitHub Apps')
     const appId = await promptInt({ message: 'GitHub App ID', min: 1 })
-    const pemFile = await promptString({ message: 'Path to private key PEM file' })
-    const pem = await readFile(pemFile, 'utf8')
+    const pem = await promptPEM({ message: 'Private key PEM' })
     const pemPath = appPemPath(ctx.paths, name)
     await mkdir(dirname(pemPath), { recursive: true, mode: 0o700 })
     await writeFile(pemPath, pem, { mode: 0o600 })

@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { loadConfig } from '@jib/config'
 import { getPaths, pathExists } from '@jib/core'
-import { isInteractive, promptInt, promptSelect, promptString } from '@jib/tui'
+import { isInteractive, promptInt, promptPEM, promptSelect } from '@jib/tui'
 import { type CommandDef, defineCommand } from 'citty'
 import { consola } from 'consola'
 import { appPemPath } from './auth.ts'
@@ -117,8 +117,9 @@ const appSetup = defineCommand({
     }
 
     const appId = flagAppId || (await promptInt({ message: 'GitHub App ID', min: 1 }))
-    const pemPath = flagPemPath || (await promptString({ message: 'Path to private key PEM file' }))
-    const pem = await readFile(pemPath, 'utf8')
+    const pem = flagPemPath
+      ? await readFile(flagPemPath, 'utf8')
+      : await promptPEM({ message: 'Private key PEM' })
     await savePem(paths, args.name, pem)
     await addAppProvider(paths.configFile, args.name, appId)
     consola.success(`provider "${args.name}" (app ${appId}) created`)
