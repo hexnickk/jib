@@ -6,7 +6,7 @@ import * as gitsitterMod from '@jib-module/gitsitter'
 import * as natsMod from '@jib-module/nats'
 import * as nginxMod from '@jib-module/nginx'
 import { type Config, loadConfig } from '@jib/config'
-import { type ModuleContext, createLogger, getPaths } from '@jib/core'
+import { type ModuleContext, type Paths, createLogger, getPaths } from '@jib/core'
 import { isInteractive, promptConfirm, promptSelect } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
@@ -28,8 +28,7 @@ poll_interval: 5m
 apps: {}
 `
 
-async function ensureDirs(): Promise<void> {
-  const p = getPaths()
+async function ensureDirs(p: Paths): Promise<void> {
   const dirs = [
     p.root,
     p.stateDir,
@@ -49,9 +48,8 @@ async function ensureDirs(): Promise<void> {
   log.info(`directories ready under ${p.root}`)
 }
 
-async function ensureConfig(): Promise<Config> {
+async function ensureConfig(p: Paths): Promise<Config> {
   const log = createLogger('init')
-  const p = getPaths()
   if (!existsSync(p.configFile)) {
     await writeFile(p.configFile, MINIMAL_CONFIG, { mode: 0o640 })
     consola.success(`wrote ${p.configFile}`)
@@ -75,9 +73,10 @@ export default defineCommand({
     const nonInteractive = Boolean(args['non-interactive']) || !isInteractive()
     const skipInstall = Boolean(args['skip-install'])
 
-    await ensureDirs()
-    const config = await ensureConfig()
-    await ensureGroup(getPaths())
+    const paths = getPaths()
+    await ensureDirs(paths)
+    const config = await ensureConfig(paths)
+    await ensureGroup(paths)
 
     const sudoUser = process.env.SUDO_USER
     if (sudoUser && !nonInteractive) {
@@ -96,7 +95,7 @@ export default defineCommand({
     const ctx: ModuleContext<Config> = {
       config,
       logger: createLogger('init'),
-      paths: getPaths(),
+      paths,
     }
 
     const mods: ModLike[] = [natsMod, deployerMod, gitsitterMod, nginxMod]

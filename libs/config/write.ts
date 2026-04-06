@@ -22,7 +22,7 @@ export async function writeConfig(filePath: string, config: Config): Promise<voi
       const info = await stat(filePath)
       await chmod(tmp, info.mode & 0o777)
     } catch {
-      // original doesn't exist; keep 0600
+      // original doesn't exist; keep 0640
     }
     await rename(tmp, filePath)
   } catch (err) {
