@@ -144,26 +144,21 @@ export default defineCommand({
       : await promptConfirm({ message: 'Install nginx reverse-proxy module?', initialValue: true })
     if (wantNginx) mods.push(nginxMod)
 
-    const wantCFD = nonInteractive
-      ? false
-      : await promptConfirm({ message: 'Install cloudflared tunnel daemon?', initialValue: false })
-    if (wantCFD && !wantNginx) {
-      // cloudflared tunnels to localhost:80 — that port is nginx's job. Without
-      // nginx the tunnel will land on nothing. Warn loudly but don't block;
-      // operators running a custom proxy on :80 may know what they're doing.
-      consola.warn(
-        'cloudflared without nginx: the tunnel will hit localhost:80 with no default handler',
-      )
-    }
-    if (wantCFD) mods.push(cloudflaredMod)
-
-    const wantCFOp = nonInteractive
+    const wantCloudflare = nonInteractive
       ? false
       : await promptConfirm({
-          message: 'Install cloudflare operator (DNS/ingress API)?',
+          message: 'Use Cloudflare Tunnels? (installs tunnel daemon + DNS operator)',
           initialValue: false,
         })
-    if (wantCFOp) mods.push(cloudflareMod)
+    if (wantCloudflare && !wantNginx) {
+      consola.warn(
+        'Cloudflare Tunnel without nginx: the tunnel routes to localhost:80 which has no handler',
+      )
+    }
+    if (wantCloudflare) {
+      mods.push(cloudflaredMod)
+      mods.push(cloudflareMod)
+    }
 
     try {
       await runInstallsTx(mods, ctx)
