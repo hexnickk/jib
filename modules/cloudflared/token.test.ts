@@ -26,4 +26,11 @@ describe('extractTunnelToken', () => {
     expect(extractTunnelToken('')).toBe('')
     expect(extractTunnelToken('   ')).toBe('')
   })
+
+  test('cloudflared command with no token returns empty', () => {
+    expect(extractTunnelToken('sudo cloudflared service install')).toBe('')
+    expect(extractTunnelToken('cloudflared service install')).toBe('')
+    expect(extractTunnelToken('cloudflared service install ')).toBe('')
+    expect(extractTunnelToken('cloudflared tunnel run --token')).toBe('')
+  })
 })

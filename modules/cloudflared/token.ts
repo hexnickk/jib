@@ -16,5 +16,7 @@ export function extractTunnelToken(raw: string): string {
   // `cloudflared tunnel run --token <token>`
   const run = /cloudflared\s+tunnel\s+run\s+--token\s+(.+)$/i.exec(trimmed)
   if (run?.[1]) return run[1].trim()
+  // If input looks like a cloudflared command (but has no token arg), return empty.
+  if (/^\s*(?:sudo\s+)?cloudflared\s/i.test(trimmed)) return ''
   return trimmed
 }

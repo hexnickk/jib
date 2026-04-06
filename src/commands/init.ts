@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { extractTunnelToken } from '@jib-module/cloudflared'
 import * as cloudflaredMod from '@jib-module/cloudflared'
 import * as deployerMod from '@jib-module/deployer'
 import * as gitsitterMod from '@jib-module/gitsitter'
@@ -8,9 +7,11 @@ import * as natsMod from '@jib-module/nats'
 import * as nginxMod from '@jib-module/nginx'
 import { type Config, loadConfig } from '@jib/config'
 import { type ModuleContext, createLogger, getPaths } from '@jib/core'
-import { isInteractive, promptPassword, promptSelect } from '@jib/tui'
+import { isInteractive, promptConfirm, promptSelect } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { promptGitAuth } from './_init_git.ts'
+import { promptTunnelToken } from './_init_tunnel.ts'
 
 /**
  * `jib init` — bootstrap a server. Creates the jib filesystem layout, a
@@ -55,51 +56,6 @@ async function ensureConfig(): Promise<Config> {
     log.info(`${p.configFile} exists, skipping`)
   }
   return loadConfig(p.configFile)
-}
-
-async function promptGitAuth(ctx: ModuleContext<Config>): Promise<void> {
-  const gitAuth = await promptSelect<'key' | 'app' | 'skip'>({
-    message: 'Set up a git auth provider? (needed for private repos)',
-    options: [
-      { value: 'key', label: 'SSH deploy key (simplest, per-repo)' },
-      { value: 'app', label: 'GitHub App (recommended for orgs)' },
-      { value: 'skip', label: 'Skip — public repos only or set up later' },
-    ],
-  })
-  if (gitAuth === 'key') {
-    try {
-      const { promptString } = await import('@jib/tui')
-      const name = await promptString({ message: 'Provider name (e.g. my-org-key)' })
-      const { addKeyProvider, deployKeyPaths, generateDeployKey } = await import(
-        '@jib-module/github'
-      )
-      const pubKey = await generateDeployKey(name, ctx.paths)
-      await addKeyProvider(ctx.paths.configFile, name)
-      const keyPaths = deployKeyPaths(ctx.paths, name)
-      consola.success(`SSH deploy key "${name}" generated`)
-      consola.box(
-        [
-          'Add this public key to your GitHub repo → Settings → Deploy Keys:',
-          '',
-          pubKey,
-          '',
-          `Private key: ${keyPaths.privateKey}`,
-        ].join('\n'),
-      )
-    } catch (err) {
-      consola.warn(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  } else if (gitAuth === 'app') {
-    consola.box(
-      [
-        'GitHub App setup requires a browser. Run:',
-        '',
-        '  jib github app setup <name>',
-        '',
-        'This opens a browser to register the app with GitHub.',
-      ].join('\n'),
-    )
-  }
 }
 
 export interface ModLike {
@@ -178,15 +134,8 @@ export default defineCommand({
       paths: getPaths(),
     }
 
-    // Collect the full module list BEFORE any install runs. This lets us
-    // prompt once (interactive mode) and install as a single transaction —
-    // on any failure mid-install we roll back the installed set cleanly.
-    // Order matters: nats must be up before the services that depend on it.
     const mods: ModLike[] = [natsMod, deployerMod, gitsitterMod, nginxMod]
 
-    // Ingress mode determines whether traffic reaches this server directly
-    // (public IP, DNS pointed at it) or via a Cloudflare Tunnel. The tunnel
-    // path installs cloudflared + prompts for a tunnel token; no API calls.
     const ingress = nonInteractive
       ? 'direct'
       : await promptSelect<'direct' | 'tunnel'>({
@@ -208,66 +157,21 @@ export default defineCommand({
       process.exit(1)
     }
 
-    // Cloudflare Tunnel token — check if one already exists on disk.
     if (ingress === 'tunnel' && !nonInteractive) {
-      const { dirname } = await import('node:path')
-      const { credsPath } = await import('@jib/core')
-      const tokenPath = credsPath(ctx.paths, 'cloudflare', 'tunnel.env')
-      const hasToken = existsSync(tokenPath)
-
-      let shouldPrompt = true
-      if (hasToken) {
-        const { promptConfirm } = await import('@jib/tui')
-        shouldPrompt = await promptConfirm({
-          message: 'Existing tunnel token found. Replace it?',
-          initialValue: false,
-        })
-        if (!shouldPrompt) {
-          consola.success('keeping existing tunnel token')
-          const { $ } = await import('bun')
-          await $`systemctl enable --now jib-cloudflared`.quiet().nothrow()
-        }
-      }
-
-      if (shouldPrompt) {
-        consola.info('Create a tunnel at dash.cloudflare.com → Zero Trust → Tunnels,')
-        consola.info('then paste the install command or just the token.')
-        try {
-          const raw = await promptPassword({
-            message: 'Tunnel token (or full "cloudflared service install <token>" command)',
-          })
-          const token = extractTunnelToken(raw)
-          if (token) {
-            await mkdir(dirname(tokenPath), { recursive: true, mode: 0o700 })
-            await writeFile(tokenPath, `TUNNEL_TOKEN=${token}\n`, { mode: 0o600 })
-            consola.success('tunnel token stored')
-            const { $ } = await import('bun')
-            await $`systemctl enable --now jib-cloudflared`.quiet().nothrow()
-            consola.success('cloudflared started')
-          }
-        } catch (err) {
-          consola.warn(
-            `tunnel token setup skipped: ${err instanceof Error ? err.message : String(err)}`,
-          )
-        }
-      }
+      await promptTunnelToken(ctx)
     }
 
-    // Git auth provider — check if any already exist in config.
     if (!nonInteractive) {
       const freshCfg = await loadConfig(ctx.paths.configFile)
       const existingProviders = Object.keys(freshCfg.github?.providers ?? {})
 
       if (existingProviders.length > 0) {
         consola.success(`existing git providers: ${existingProviders.join(', ')}`)
-        const { promptConfirm } = await import('@jib/tui')
         const addMore = await promptConfirm({
           message: 'Add another git auth provider?',
           initialValue: false,
         })
-        if (!addMore) {
-          // skip — existing providers are fine
-        } else {
+        if (addMore) {
           await promptGitAuth(ctx)
         }
       } else {
