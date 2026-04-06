@@ -94,16 +94,21 @@ const setToken = defineCommand({
     },
   },
   async run({ args }) {
+    const { extractTunnelToken } = await import('@jib-module/cloudflared')
     const paths = getPaths()
-    const token =
-      args.token ?? (await promptPassword({ message: 'Tunnel token (paste from CF dashboard)' }))
-    if (!token.trim()) {
+    const raw =
+      args.token ??
+      (await promptPassword({
+        message: 'Paste the tunnel token or the full install/run command from CF dashboard',
+      }))
+    const token = extractTunnelToken(raw)
+    if (!token) {
       consola.error('empty token')
       process.exit(1)
     }
     const tokenPath = credsPath(paths, 'cloudflare', 'tunnel.env')
     await mkdir(dirname(tokenPath), { recursive: true, mode: 0o700 })
-    await writeFile(tokenPath, `TUNNEL_TOKEN=${token.trim()}\n`, { mode: 0o600 })
+    await writeFile(tokenPath, `TUNNEL_TOKEN=${token}\n`, { mode: 0o600 })
     consola.success('tunnel token stored')
     const { $ } = await import('bun')
     await $`systemctl enable --now jib-cloudflared`.quiet().nothrow()

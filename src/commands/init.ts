@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
+import { extractTunnelToken } from '@jib-module/cloudflared'
 import * as cloudflaredMod from '@jib-module/cloudflared'
 import * as deployerMod from '@jib-module/deployer'
 import * as gitsitterMod from '@jib-module/gitsitter'
@@ -166,12 +167,14 @@ export default defineCommand({
     // right away. They create the tunnel in the CF dashboard and paste the
     // token here; cloudflared will connect with it on next start.
     if (ingress === 'tunnel' && !nonInteractive) {
-      consola.info('Cloudflare Tunnel setup')
       consola.info('Create a tunnel at dash.cloudflare.com → Zero Trust → Tunnels,')
-      consola.info('then copy the tunnel token from the install command.')
+      consola.info('then paste the install command or just the token.')
       try {
-        const token = await promptPassword({ message: 'Tunnel token' })
-        if (token.trim()) {
+        const raw = await promptPassword({
+          message: 'Tunnel token (or full "cloudflared service install <token>" command)',
+        })
+        const token = extractTunnelToken(raw)
+        if (token) {
           const { dirname } = await import('node:path')
           const { credsPath } = await import('@jib/core')
           const tokenPath = credsPath(ctx.paths, 'cloudflare', 'tunnel.env')
