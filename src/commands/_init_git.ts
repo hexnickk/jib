@@ -1,4 +1,13 @@
-import { addKeyProvider, deployKeyPaths, generateDeployKey } from '@jib-module/github'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
+import {
+  addAppProvider,
+  addKeyProvider,
+  appPemPath,
+  deployKeyPaths,
+  generateDeployKey,
+  runManifestFlow,
+} from '@jib-module/github'
 import { type Config, loadConfig } from '@jib/config'
 import type { ModuleContext } from '@jib/core'
 import { promptSelect, promptString } from '@jib/tui'
@@ -6,8 +15,7 @@ import { consola } from 'consola'
 
 /**
  * Prompt the user to set up a git auth provider (SSH deploy key or GitHub
- * App). On key setup, generates a deploy key and writes the provider entry;
- * on app setup, prints follow-up instructions.
+ * App). Both flows complete inline — no deferred commands.
  */
 export async function promptGitAuth(ctx: ModuleContext<Config>): Promise<void> {
   const gitAuth = await promptSelect<'key' | 'app' | 'skip'>({
@@ -19,38 +27,55 @@ export async function promptGitAuth(ctx: ModuleContext<Config>): Promise<void> {
     ],
   })
   if (gitAuth === 'key') {
-    try {
-      const name = await promptString({ message: 'Provider name (e.g. my-org-key)' })
-      const cfg = await loadConfig(ctx.paths.configFile)
-      if (cfg.github?.providers?.[name]) {
-        consola.warn(`provider "${name}" already exists — skipping`)
-        return
-      }
-      const pubKey = await generateDeployKey(name, ctx.paths)
-      await addKeyProvider(ctx.paths.configFile, name)
-      const keyPaths = deployKeyPaths(ctx.paths, name)
-      consola.success(`deploy key "${name}" added to config`)
-      consola.box(
-        [
-          'Add this public key to your GitHub repo → Settings → Deploy Keys:',
-          '',
-          pubKey,
-          '',
-          `Private key: ${keyPaths.privateKey}`,
-        ].join('\n'),
-      )
-    } catch (err) {
-      consola.warn(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
-    }
+    await setupDeployKey(ctx)
   } else if (gitAuth === 'app') {
+    await setupGitHubApp(ctx)
+  }
+}
+
+async function setupDeployKey(ctx: ModuleContext<Config>): Promise<void> {
+  try {
+    const name = await promptString({ message: 'Provider name (e.g. my-org-key)' })
+    const cfg = await loadConfig(ctx.paths.configFile)
+    if (cfg.github?.providers?.[name]) {
+      consola.warn(`provider "${name}" already exists — skipping`)
+      return
+    }
+    const pubKey = await generateDeployKey(name, ctx.paths)
+    await addKeyProvider(ctx.paths.configFile, name)
+    const keyPaths = deployKeyPaths(ctx.paths, name)
+    consola.success(`deploy key "${name}" added to config`)
     consola.box(
       [
-        'GitHub App setup requires a browser. Run:',
+        'Add this public key to your GitHub repo → Settings → Deploy Keys:',
         '',
-        '  jib github app setup <name>',
+        pubKey,
         '',
-        'This opens a browser to register the app with GitHub.',
+        `Private key: ${keyPaths.privateKey}`,
       ].join('\n'),
     )
+  } catch (err) {
+    consola.warn(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<void> {
+  try {
+    const name = await promptString({ message: 'Provider name (e.g. my-org)' })
+    const cfg = await loadConfig(ctx.paths.configFile)
+    if (cfg.github?.providers?.[name]) {
+      consola.warn(`provider "${name}" already exists — skipping`)
+      return
+    }
+    consola.info('opening browser to create GitHub App...')
+    const res = await runManifestFlow(name)
+    const pemPath = appPemPath(ctx.paths, name)
+    await mkdir(dirname(pemPath), { recursive: true, mode: 0o700 })
+    await writeFile(pemPath, res.pem, { mode: 0o600 })
+    await addAppProvider(ctx.paths.configFile, name, res.appId)
+    consola.success(`provider "${name}" (app ${res.appId}) created`)
+  } catch (err) {
+    consola.warn(`app setup failed: ${err instanceof Error ? err.message : String(err)}`)
+    consola.info('you can retry later: jib github app setup <name>')
   }
 }
