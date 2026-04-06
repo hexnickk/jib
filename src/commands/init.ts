@@ -194,11 +194,56 @@ export default defineCommand({
       }
     }
 
+    // Git auth provider — needed for private repos. SSH key is inline (just
+    // keygen); GitHub App requires a browser (manifest flow) so we punt to
+    // the dedicated command.
+    if (!nonInteractive) {
+      const gitAuth = await promptSelect<'key' | 'app' | 'skip'>({
+        message: 'Set up a git auth provider? (needed for private repos)',
+        options: [
+          { value: 'key', label: 'SSH deploy key (simplest, per-repo)' },
+          { value: 'app', label: 'GitHub App (recommended for orgs)' },
+          { value: 'skip', label: 'Skip — public repos only or set up later' },
+        ],
+      })
+      if (gitAuth === 'key') {
+        try {
+          const { promptString } = await import('@jib/tui')
+          const name = await promptString({ message: 'Provider name (e.g. my-org-key)' })
+          const { generateDeployKey, deployKeyPaths } = await import('@jib-module/github')
+          const { addKeyProvider } = await import('@jib-module/github')
+          const pubKey = await generateDeployKey(name, ctx.paths)
+          await addKeyProvider(ctx.paths.configFile, name)
+          const keyPaths = deployKeyPaths(ctx.paths, name)
+          consola.success(`SSH deploy key "${name}" generated`)
+          consola.box(
+            [
+              'Add this public key to your GitHub repo → Settings → Deploy Keys:',
+              '',
+              pubKey,
+              '',
+              `Private key: ${keyPaths.privateKey}`,
+            ].join('\n'),
+          )
+        } catch (err) {
+          consola.warn(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
+        }
+      } else if (gitAuth === 'app') {
+        consola.box(
+          [
+            'GitHub App setup requires a browser. Run:',
+            '',
+            '  jib github app setup <name>',
+            '',
+            'This opens a browser to register the app with GitHub.',
+          ].join('\n'),
+        )
+      }
+    }
+
     consola.box(
       [
         'jib initialized. Next:',
-        '  # (private repos) register a git auth provider:',
-        '  jib github app setup <name>   # or: jib github key setup <name>',
         '  jib add <app> --repo org/repo --domain example.com',
         '  jib deploy <app>',
       ].join('\n'),
