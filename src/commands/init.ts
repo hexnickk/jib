@@ -57,6 +57,51 @@ async function ensureConfig(): Promise<Config> {
   return loadConfig(p.configFile)
 }
 
+async function promptGitAuth(ctx: ModuleContext<Config>): Promise<void> {
+  const gitAuth = await promptSelect<'key' | 'app' | 'skip'>({
+    message: 'Set up a git auth provider? (needed for private repos)',
+    options: [
+      { value: 'key', label: 'SSH deploy key (simplest, per-repo)' },
+      { value: 'app', label: 'GitHub App (recommended for orgs)' },
+      { value: 'skip', label: 'Skip — public repos only or set up later' },
+    ],
+  })
+  if (gitAuth === 'key') {
+    try {
+      const { promptString } = await import('@jib/tui')
+      const name = await promptString({ message: 'Provider name (e.g. my-org-key)' })
+      const { addKeyProvider, deployKeyPaths, generateDeployKey } = await import(
+        '@jib-module/github'
+      )
+      const pubKey = await generateDeployKey(name, ctx.paths)
+      await addKeyProvider(ctx.paths.configFile, name)
+      const keyPaths = deployKeyPaths(ctx.paths, name)
+      consola.success(`SSH deploy key "${name}" generated`)
+      consola.box(
+        [
+          'Add this public key to your GitHub repo → Settings → Deploy Keys:',
+          '',
+          pubKey,
+          '',
+          `Private key: ${keyPaths.privateKey}`,
+        ].join('\n'),
+      )
+    } catch (err) {
+      consola.warn(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  } else if (gitAuth === 'app') {
+    consola.box(
+      [
+        'GitHub App setup requires a browser. Run:',
+        '',
+        '  jib github app setup <name>',
+        '',
+        'This opens a browser to register the app with GitHub.',
+      ].join('\n'),
+    )
+  }
+}
+
 export interface ModLike {
   manifest: { name: string }
   install?: (ctx: ModuleContext<Config>) => Promise<void>
@@ -163,81 +208,70 @@ export default defineCommand({
       process.exit(1)
     }
 
-    // If the user picked Cloudflare Tunnel, prompt for the tunnel token
-    // right away. They create the tunnel in the CF dashboard and paste the
-    // token here; cloudflared will connect with it on next start.
+    // Cloudflare Tunnel token — check if one already exists on disk.
     if (ingress === 'tunnel' && !nonInteractive) {
-      consola.info('Create a tunnel at dash.cloudflare.com → Zero Trust → Tunnels,')
-      consola.info('then paste the install command or just the token.')
-      try {
-        const raw = await promptPassword({
-          message: 'Tunnel token (or full "cloudflared service install <token>" command)',
+      const { dirname } = await import('node:path')
+      const { credsPath } = await import('@jib/core')
+      const tokenPath = credsPath(ctx.paths, 'cloudflare', 'tunnel.env')
+      const hasToken = existsSync(tokenPath)
+
+      let shouldPrompt = true
+      if (hasToken) {
+        const { promptConfirm } = await import('@jib/tui')
+        shouldPrompt = await promptConfirm({
+          message: 'Existing tunnel token found. Replace it?',
+          initialValue: false,
         })
-        const token = extractTunnelToken(raw)
-        if (token) {
-          const { dirname } = await import('node:path')
-          const { credsPath } = await import('@jib/core')
-          const tokenPath = credsPath(ctx.paths, 'cloudflare', 'tunnel.env')
-          await mkdir(dirname(tokenPath), { recursive: true, mode: 0o700 })
-          await writeFile(tokenPath, `TUNNEL_TOKEN=${token.trim()}\n`, { mode: 0o600 })
-          consola.success('tunnel token stored')
-          // Now enable + start cloudflared (install.ts deliberately skipped
-          // this because cloudflared can't run without a token).
+        if (!shouldPrompt) {
+          consola.success('keeping existing tunnel token')
           const { $ } = await import('bun')
           await $`systemctl enable --now jib-cloudflared`.quiet().nothrow()
-          consola.success('cloudflared started')
         }
-      } catch (err) {
-        consola.warn(
-          `tunnel token setup skipped: ${err instanceof Error ? err.message : String(err)}`,
-        )
+      }
+
+      if (shouldPrompt) {
+        consola.info('Create a tunnel at dash.cloudflare.com → Zero Trust → Tunnels,')
+        consola.info('then paste the install command or just the token.')
+        try {
+          const raw = await promptPassword({
+            message: 'Tunnel token (or full "cloudflared service install <token>" command)',
+          })
+          const token = extractTunnelToken(raw)
+          if (token) {
+            await mkdir(dirname(tokenPath), { recursive: true, mode: 0o700 })
+            await writeFile(tokenPath, `TUNNEL_TOKEN=${token}\n`, { mode: 0o600 })
+            consola.success('tunnel token stored')
+            const { $ } = await import('bun')
+            await $`systemctl enable --now jib-cloudflared`.quiet().nothrow()
+            consola.success('cloudflared started')
+          }
+        } catch (err) {
+          consola.warn(
+            `tunnel token setup skipped: ${err instanceof Error ? err.message : String(err)}`,
+          )
+        }
       }
     }
 
-    // Git auth provider — needed for private repos. SSH key is inline (just
-    // keygen); GitHub App requires a browser (manifest flow) so we punt to
-    // the dedicated command.
+    // Git auth provider — check if any already exist in config.
     if (!nonInteractive) {
-      const gitAuth = await promptSelect<'key' | 'app' | 'skip'>({
-        message: 'Set up a git auth provider? (needed for private repos)',
-        options: [
-          { value: 'key', label: 'SSH deploy key (simplest, per-repo)' },
-          { value: 'app', label: 'GitHub App (recommended for orgs)' },
-          { value: 'skip', label: 'Skip — public repos only or set up later' },
-        ],
-      })
-      if (gitAuth === 'key') {
-        try {
-          const { promptString } = await import('@jib/tui')
-          const name = await promptString({ message: 'Provider name (e.g. my-org-key)' })
-          const { generateDeployKey, deployKeyPaths } = await import('@jib-module/github')
-          const { addKeyProvider } = await import('@jib-module/github')
-          const pubKey = await generateDeployKey(name, ctx.paths)
-          await addKeyProvider(ctx.paths.configFile, name)
-          const keyPaths = deployKeyPaths(ctx.paths, name)
-          consola.success(`SSH deploy key "${name}" generated`)
-          consola.box(
-            [
-              'Add this public key to your GitHub repo → Settings → Deploy Keys:',
-              '',
-              pubKey,
-              '',
-              `Private key: ${keyPaths.privateKey}`,
-            ].join('\n'),
-          )
-        } catch (err) {
-          consola.warn(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
+      const freshCfg = await loadConfig(ctx.paths.configFile)
+      const existingProviders = Object.keys(freshCfg.github?.providers ?? {})
+
+      if (existingProviders.length > 0) {
+        consola.success(`existing git providers: ${existingProviders.join(', ')}`)
+        const { promptConfirm } = await import('@jib/tui')
+        const addMore = await promptConfirm({
+          message: 'Add another git auth provider?',
+          initialValue: false,
+        })
+        if (!addMore) {
+          // skip — existing providers are fine
+        } else {
+          await promptGitAuth(ctx)
         }
-      } else if (gitAuth === 'app') {
-        consola.box(
-          [
-            'GitHub App setup requires a browser. Run:',
-            '',
-            '  jib github app setup <name>',
-            '',
-            'This opens a browser to register the app with GitHub.',
-          ].join('\n'),
-        )
+      } else {
+        await promptGitAuth(ctx)
       }
     }
 
