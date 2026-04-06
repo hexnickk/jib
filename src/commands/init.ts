@@ -79,9 +79,8 @@ export async function runInstallsTx(mods: ModLike[], ctx: ModuleContext<Config>)
         consola.warn(`${m.manifest.name}: no install() — skipping`)
         continue
       }
-      consola.info(`installing ${m.manifest.name}`)
       await m.install(ctx)
-      consola.success(`${m.manifest.name} installed`)
+      consola.success(`${m.manifest.name}`)
       installed.push(m)
     }
   } catch (err) {
