@@ -6,11 +6,10 @@ import {
   appPemPath,
   deployKeyPaths,
   generateDeployKey,
-  runManifestFlow,
 } from '@jib-module/github'
 import { type Config, loadConfig } from '@jib/config'
 import type { ModuleContext } from '@jib/core'
-import { promptSelect, promptString } from '@jib/tui'
+import { promptInt, promptPEM, promptSelect, promptString } from '@jib/tui'
 import { consola } from 'consola'
 
 /**
@@ -67,13 +66,14 @@ async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<void> {
       consola.warn(`provider "${name}" already exists — skipping`)
       return
     }
-    consola.info('opening browser to create GitHub App...')
-    const res = await runManifestFlow(name)
+    consola.info('create the app at github.com → Settings → Developer settings → GitHub Apps')
+    const appId = await promptInt({ message: 'GitHub App ID', min: 1 })
+    const pem = await promptPEM({ message: 'Paste the private key PEM' })
     const pemPath = appPemPath(ctx.paths, name)
     await mkdir(dirname(pemPath), { recursive: true, mode: 0o700 })
-    await writeFile(pemPath, res.pem, { mode: 0o600 })
-    await addAppProvider(ctx.paths.configFile, name, res.appId)
-    consola.success(`provider "${name}" (app ${res.appId}) created`)
+    await writeFile(pemPath, pem, { mode: 0o600 })
+    await addAppProvider(ctx.paths.configFile, name, appId)
+    consola.success(`provider "${name}" (app ${appId}) created`)
   } catch (err) {
     consola.warn(`app setup failed: ${err instanceof Error ? err.message : String(err)}`)
     consola.info('you can retry later: jib github app setup <name>')

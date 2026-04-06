@@ -147,9 +147,7 @@ export default defineCommand({
             { value: 'direct', label: 'Direct — server has a public IP' },
             {
               value: 'tunnel',
-              label: hasTunnel
-                ? 'Cloudflare Tunnel — configured'
-                : 'Cloudflare Tunnel — server is behind NAT or uses CF',
+              label: `Cloudflare Tunnel — server is behind NAT or uses CF${hasTunnel ? ' [configured]' : ''}`,
             },
           ],
         })
