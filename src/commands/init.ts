@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
-import * as cloudflareMod from '@jib-module/cloudflare'
 import * as cloudflaredMod from '@jib-module/cloudflared'
 import * as deployerMod from '@jib-module/deployer'
 import * as gitsitterMod from '@jib-module/gitsitter'
@@ -8,7 +7,7 @@ import * as natsMod from '@jib-module/nats'
 import * as nginxMod from '@jib-module/nginx'
 import { type Config, loadConfig } from '@jib/config'
 import { type ModuleContext, createLogger, getPaths } from '@jib/core'
-import { isInteractive, promptConfirm } from '@jib/tui'
+import { isInteractive, promptPassword, promptSelect } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 
@@ -137,27 +136,23 @@ export default defineCommand({
     // prompt once (interactive mode) and install as a single transaction —
     // on any failure mid-install we roll back the installed set cleanly.
     // Order matters: nats must be up before the services that depend on it.
-    const mods: ModLike[] = [natsMod, deployerMod, gitsitterMod]
+    const mods: ModLike[] = [natsMod, deployerMod, gitsitterMod, nginxMod]
 
-    const wantNginx = nonInteractive
-      ? true
-      : await promptConfirm({ message: 'Install nginx reverse-proxy module?', initialValue: true })
-    if (wantNginx) mods.push(nginxMod)
-
-    const wantCloudflare = nonInteractive
-      ? false
-      : await promptConfirm({
-          message: 'Use Cloudflare Tunnels? (installs tunnel daemon + DNS operator)',
-          initialValue: false,
+    // Ingress mode determines whether traffic reaches this server directly
+    // (public IP, DNS pointed at it) or via a Cloudflare Tunnel. The tunnel
+    // path installs cloudflared + prompts for a tunnel token; no API calls.
+    const ingress = nonInteractive
+      ? 'direct'
+      : await promptSelect<'direct' | 'tunnel'>({
+          message: 'How does traffic reach this server?',
+          options: [
+            { value: 'direct', label: 'Direct — server has a public IP' },
+            { value: 'tunnel', label: 'Cloudflare Tunnel — server is behind NAT or uses CF' },
+          ],
         })
-    if (wantCloudflare && !wantNginx) {
-      consola.warn(
-        'Cloudflare Tunnel without nginx: the tunnel routes to localhost:80 which has no handler',
-      )
-    }
-    if (wantCloudflare) {
+
+    if (ingress === 'tunnel') {
       mods.push(cloudflaredMod)
-      mods.push(cloudflareMod)
     }
 
     try {
@@ -167,17 +162,31 @@ export default defineCommand({
       process.exit(1)
     }
 
-    // If cloudflare was installed, walk the user through tunnel setup
-    // (API token, create/pick tunnel, optional root domain) inline —
-    // don't make them run a separate `jib cloudflare setup` command.
-    if (wantCloudflare && !nonInteractive) {
-      consola.info('setting up Cloudflare Tunnel...')
+    // If the user picked Cloudflare Tunnel, prompt for the tunnel token
+    // right away. They create the tunnel in the CF dashboard and paste the
+    // token here; cloudflared will connect with it on next start.
+    if (ingress === 'tunnel' && !nonInteractive) {
+      consola.info('Cloudflare Tunnel setup')
+      consola.info('Create a tunnel at dash.cloudflare.com → Zero Trust → Tunnels,')
+      consola.info('then copy the tunnel token from the install command.')
       try {
-        const { runCloudflareSetup } = await import('@jib-module/cloudflare')
-        await runCloudflareSetup(ctx.paths)
+        const token = await promptPassword({ message: 'Tunnel token' })
+        if (token.trim()) {
+          const { mkdir, writeFile } = await import('node:fs/promises')
+          const { dirname } = await import('node:path')
+          const tokenPath = `${ctx.paths.secretsDir}/_jib/cloudflare/tunnel-token`
+          await mkdir(dirname(tokenPath), { recursive: true, mode: 0o700 })
+          await writeFile(tokenPath, token.trim(), { mode: 0o600 })
+          consola.success('tunnel token stored')
+          // Restart cloudflared so it picks up the token
+          const { $ } = await import('bun')
+          await $`systemctl restart jib-cloudflared`.quiet().nothrow()
+          consola.success('cloudflared restarted with tunnel token')
+        }
       } catch (err) {
-        consola.warn(`cloudflare setup failed: ${err instanceof Error ? err.message : String(err)}`)
-        consola.warn('run `jib cloudflare setup` later to retry')
+        consola.warn(
+          `tunnel token setup skipped: ${err instanceof Error ? err.message : String(err)}`,
+        )
       }
     }
 
