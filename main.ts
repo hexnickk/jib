@@ -3,10 +3,8 @@ import { defineCommand, runMain } from 'citty'
 import pkg from './package.json' with { type: 'json' }
 import {
   addCmd,
-  configCmd,
   deployCmd,
   downCmd,
-  editCmd,
   execCmd,
   initCmd,
   removeCmd,
@@ -36,8 +34,6 @@ const main = defineCommand({
     add: addCmd,
     remove: removeCmd,
     deploy: deployCmd,
-    config: configCmd,
-    edit: editCmd,
     up: upCmd,
     down: downCmd,
     restart: restartCmd,

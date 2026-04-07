@@ -14,10 +14,10 @@ export const uninstall: InstallFn = async (ctx) => {
   const log = ctx.logger
 
   log.info(`systemctl disable --now ${NGINX_SERVICE_NAME}`)
-  await $`systemctl disable --now ${NGINX_SERVICE_NAME}`.nothrow().quiet()
+  await $`sudo systemctl disable --now ${NGINX_SERVICE_NAME}`.nothrow().quiet()
   log.info(`removing ${NGINX_UNIT_PATH}`)
   await rm(NGINX_UNIT_PATH, { force: true })
-  await $`systemctl daemon-reload`.nothrow().quiet()
+  await $`sudo systemctl daemon-reload`.nothrow().quiet()
 
   log.info(`removing ${JIB_NGINX_INCLUDE_PATH}`)
   await rm(JIB_NGINX_INCLUDE_PATH, { force: true })

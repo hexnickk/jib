@@ -28,7 +28,7 @@ export const install: InstallFn = async (ctx) => {
   await writeFile(UNIT_PATH, systemdUnit(vars), { mode: 0o644 })
 
   log.info('systemctl daemon-reload')
-  await Bun.$`systemctl daemon-reload`.quiet()
+  await Bun.$`sudo systemctl daemon-reload`.quiet()
   log.info(`systemctl enable --now ${SERVICE_NAME}`)
-  await Bun.$`systemctl enable --now ${SERVICE_NAME}`.quiet()
+  await Bun.$`sudo systemctl enable --now ${SERVICE_NAME}`.quiet()
 }

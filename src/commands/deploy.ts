@@ -23,7 +23,6 @@ export default defineCommand({
   args: {
     app: { type: 'positional', required: true },
     ref: { type: 'string', description: 'Git ref (SHA, branch, tag)' },
-    'dry-run': { type: 'boolean', description: 'Prepare repo but skip actual deploy' },
     timeout: {
       type: 'string',
       description: 'Timeout in milliseconds',
@@ -55,11 +54,6 @@ export default defineCommand({
           },
         )
         s.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
-
-        if (args['dry-run']) {
-          consola.info(`[dry-run] prepared ${ready.workdir} @ ${ready.sha}`)
-          return
-        }
 
         const s2 = spinner()
         s2.start(`[2/2] deploying ${args.app}`)

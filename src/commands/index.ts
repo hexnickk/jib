@@ -5,10 +5,8 @@
  * own file.
  */
 export { default as addCmd } from './add.ts'
-export { default as configCmd } from './config.ts'
 export { downCmd, restartCmd, upCmd } from './containers.ts'
 export { default as deployCmd } from './deploy.ts'
-export { default as editCmd } from './edit.ts'
 export { default as initCmd } from './init.ts'
 export { default as removeCmd } from './remove.ts'
 export { default as secretsCmd } from './secrets.ts'

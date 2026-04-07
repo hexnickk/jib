@@ -75,7 +75,7 @@ async function removeAppDir(nginxDir: string, app: string): Promise<boolean> {
 async function reload(exec: ExecFn): Promise<{ ok: true } | { ok: false; error: string }> {
   const test = await exec(['nginx', '-t'])
   if (!test.ok) return { ok: false, error: `nginx -t failed: ${test.stderr.trim()}` }
-  const rel = await exec(['systemctl', 'reload', 'nginx'])
+  const rel = await exec(['sudo', 'systemctl', 'reload', 'nginx'])
   if (!rel.ok) return { ok: false, error: `systemctl reload nginx failed: ${rel.stderr.trim()}` }
   return { ok: true }
 }

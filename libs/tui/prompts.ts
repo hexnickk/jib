@@ -3,7 +3,7 @@ import * as clack from '@clack/prompts'
 import { ValidationError } from '@jib/core'
 import { assertInteractive } from './interactive.ts'
 
-export { intro, outro, spinner } from '@clack/prompts'
+export { intro, outro, spinner, log, note } from '@clack/prompts'
 
 type StrOpts = { message: string; placeholder?: string; initialValue?: string }
 type IntOpts = { message: string; initialValue?: number; min?: number; max?: number }

@@ -1,18 +1,18 @@
-import { cli as cloudflareCli } from '@jib-module/cloudflare'
+import { cli as cloudflaredCli } from '@jib-module/cloudflared'
 import { cli as githubCli } from '@jib-module/github'
 import type { CommandDef } from 'citty'
 
 /**
  * Statically aggregates `cli.ts` exports from every module that publishes a
  * user-facing CLI tree. Each module exports `CommandDef[]` — usually a single
- * top-level group (e.g. `github`, `cloudflare`). We flatten them into a
+ * top-level group (e.g. `github`, `cloudflared`). We flatten them into a
  * `{ name: CommandDef }` map keyed on each command's `meta.name` so
  * `main.ts` can plug them straight into citty's `subCommands`.
  *
  * Keeping this list static (rather than a glob/loader) is intentional:
  * `bun build --compile` needs every import visible at build time.
  */
-const MODULE_CLIS: readonly CommandDef[][] = [githubCli, cloudflareCli]
+const MODULE_CLIS: readonly CommandDef[][] = [githubCli, cloudflaredCli]
 
 export function moduleSubCommands(): Record<string, CommandDef> {
   const out: Record<string, CommandDef> = {}

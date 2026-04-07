@@ -9,8 +9,7 @@ import {
 } from '@jib-module/github'
 import { type Config, loadConfig } from '@jib/config'
 import type { ModuleContext } from '@jib/core'
-import { promptInt, promptPEM, promptSelect, promptString } from '@jib/tui'
-import { consola } from 'consola'
+import { log, note, promptInt, promptPEM, promptSelect, promptString } from '@jib/tui'
 
 /**
  * Prompt the user to set up a git auth provider (SSH deploy key or GitHub
@@ -37,14 +36,14 @@ async function setupDeployKey(ctx: ModuleContext<Config>): Promise<void> {
     const name = await promptString({ message: 'Provider name (e.g. my-org-key)' })
     const cfg = await loadConfig(ctx.paths.configFile)
     if (cfg.github?.providers?.[name]) {
-      consola.warn(`provider "${name}" already exists — skipping`)
+      log.warning(`provider "${name}" already exists — skipping`)
       return
     }
     const pubKey = await generateDeployKey(name, ctx.paths)
     await addKeyProvider(ctx.paths.configFile, name)
     const keyPaths = deployKeyPaths(ctx.paths, name)
-    consola.success(`deploy key "${name}" added to config`)
-    consola.box(
+    log.success(`deploy key "${name}" added to config`)
+    note(
       [
         'Add this public key to your GitHub repo → Settings → Deploy Keys:',
         '',
@@ -52,9 +51,10 @@ async function setupDeployKey(ctx: ModuleContext<Config>): Promise<void> {
         '',
         `Private key: ${keyPaths.privateKey}`,
       ].join('\n'),
+      'Deploy Key',
     )
   } catch (err) {
-    consola.warn(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
+    log.warning(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
@@ -63,19 +63,19 @@ async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<void> {
     const name = await promptString({ message: 'Provider name (e.g. my-org)' })
     const cfg = await loadConfig(ctx.paths.configFile)
     if (cfg.github?.providers?.[name]) {
-      consola.warn(`provider "${name}" already exists — skipping`)
+      log.warning(`provider "${name}" already exists — skipping`)
       return
     }
-    consola.info('create the app at github.com → Settings → Developer settings → GitHub Apps')
+    log.info('create the app at github.com → Settings → Developer settings → GitHub Apps')
     const appId = await promptInt({ message: 'GitHub App ID', min: 1 })
     const pem = await promptPEM({ message: 'Private key PEM' })
     const pemPath = appPemPath(ctx.paths, name)
     await mkdir(dirname(pemPath), { recursive: true, mode: 0o750 })
     await writeFile(pemPath, pem, { mode: 0o640 })
     await addAppProvider(ctx.paths.configFile, name, appId)
-    consola.success(`provider "${name}" (app ${appId}) created`)
+    log.success(`provider "${name}" (app ${appId}) created`)
   } catch (err) {
-    consola.warn(`app setup failed: ${err instanceof Error ? err.message : String(err)}`)
-    consola.info('you can retry later: jib github app setup <name>')
+    log.warning(`app setup failed: ${err instanceof Error ? err.message : String(err)}`)
+    log.info('you can retry later: jib github app setup <name>')
   }
 }

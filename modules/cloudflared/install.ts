@@ -26,7 +26,7 @@ export const install: InstallFn = async (ctx) => {
   await writeFile(UNIT_PATH, systemdUnit(vars), { mode: 0o644 })
 
   log.info('systemctl daemon-reload')
-  await Bun.$`systemctl daemon-reload`.quiet()
+  await Bun.$`sudo systemctl daemon-reload`.quiet()
   // NOT enabled — cloudflared can't run without a tunnel token. The token
   // is stored by `jib init` or `jib cloudflare set-token`, which also
   // enables + starts the service.

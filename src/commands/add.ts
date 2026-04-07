@@ -53,7 +53,6 @@ export default defineCommand({
     },
     env: { type: 'string', description: 'KEY=VALUE secret (repeatable)' },
     health: { type: 'string', description: '/path:port (repeatable via comma)' },
-    'config-only': { type: 'boolean', description: 'Write config without provisioning' },
   },
   async run({ args }) {
     if (!APP_NAME_RE.test(args.app)) {
@@ -141,8 +140,6 @@ export default defineCommand({
       }
       consola.success(`${envRaw.length} secret(s) set for ${args.app}`)
     }
-
-    if (args['config-only']) return
 
     let finalApp = newApp
     try {

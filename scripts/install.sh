@@ -85,4 +85,11 @@ else
 fi
 
 log "jib $tag installed"
-log "next: run \`jib init\` on your server to bootstrap"
+log "running jib init..."
+
+if [ "$(id -u)" = "0" ]; then
+  "$dest" init
+else
+  need sudo
+  sudo "$dest" init
+fi

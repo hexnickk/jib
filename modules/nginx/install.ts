@@ -77,9 +77,9 @@ async function installOperatorUnit(jibRoot: string, log: { info: (m: string) => 
   log.info(`writing ${NGINX_UNIT_PATH}`)
   await writeFile(NGINX_UNIT_PATH, unit, { mode: 0o644 })
   log.info('systemctl daemon-reload')
-  await $`systemctl daemon-reload`.quiet()
-  log.info(`systemctl enable --now ${NGINX_SERVICE_NAME}`)
-  await $`systemctl enable --now ${NGINX_SERVICE_NAME}`.quiet()
+  await $`sudo systemctl daemon-reload`.quiet()
+  log.info(`sudo systemctl enable --now ${NGINX_SERVICE_NAME}`)
+  await $`sudo systemctl enable --now ${NGINX_SERVICE_NAME}`.quiet()
 }
 
 export const JIB_NGINX_INCLUDE_PATH = JIB_INCLUDE_PATH

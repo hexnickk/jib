@@ -42,7 +42,7 @@ describe('nginx operator — release', () => {
     const files = await readdir(paths.nginxDir)
     expect(files).toEqual([])
     expect(ctx.calls[0]).toEqual(['nginx', '-t'])
-    expect(ctx.calls[1]).toEqual(['systemctl', 'reload', 'nginx'])
+    expect(ctx.calls[1]).toEqual(['sudo', 'systemctl', 'reload', 'nginx'])
   })
 
   test('is idempotent when no files exist', async () => {

@@ -31,7 +31,7 @@ describe('nginx operator — claim', () => {
     const files = await readdir(join(paths.nginxDir, 'web'))
     expect(files).toContain('web.example.com.conf')
     expect(ctx.calls[0]).toEqual(['nginx', '-t'])
-    expect(ctx.calls[1]).toEqual(['systemctl', 'reload', 'nginx'])
+    expect(ctx.calls[1]).toEqual(['sudo', 'systemctl', 'reload', 'nginx'])
   })
 
   test('rolls back when nginx -t fails', async () => {
@@ -58,7 +58,7 @@ describe('nginx operator — claim', () => {
     const { bus, paths } = setup(
       ctx,
       fakeExec(ctx, (c) =>
-        c === 'systemctl'
+        c === 'sudo'
           ? { ok: false, stdout: '', stderr: 'reload boom' }
           : { ok: true, stdout: '', stderr: '' },
       ),
