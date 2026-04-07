@@ -3,10 +3,14 @@ import {
   AppSchema,
   type Config,
   type Domain,
+  type ParsedDomain,
+  assignPorts,
+  parseDomain,
+  parseHealth,
+  toArray,
   validateRepo,
   writeConfig,
 } from '@jib/config'
-import { type ParsedDomain, assignPorts, parseDomain, parseHealth, toArray } from '@jib/config'
 import { resolveFromCompose } from '@jib/docker'
 import { SecretsManager } from '@jib/secrets'
 import { isInteractive, promptString } from '@jib/tui'
