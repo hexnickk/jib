@@ -16,3 +16,4 @@ export {
 } from './parse.ts'
 export { composeFor } from './compose-for.ts'
 export { resolveFromCompose } from './resolve.ts'
+export { type ExecParts, parseExecArgs, parseRunArgs, handleShell } from './shell.ts'

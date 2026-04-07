@@ -6,8 +6,8 @@ import * as natsMod from '@jib-module/nats'
 import * as nginxMod from '@jib-module/nginx'
 import { type Config, loadConfig } from '@jib/config'
 import { type ModuleContext, type Paths, createLogger } from '@jib/core'
+import { hasTunnelToken } from '@jib/state'
 import { log, note, outro, promptConfirm, promptSelect } from '@jib/tui'
-import { hasTunnelToken } from '../status-collect.ts'
 import { type ModLike, runInstallsTx } from './install.ts'
 
 /**

@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/core'
+import { collectServices, hasTunnelToken } from '@jib/state'
 import { $ } from 'bun'
-import { collectServices, hasTunnelToken } from '../status-collect.ts'
 
 export interface CheckResult {
   ok: boolean

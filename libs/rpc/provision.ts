@@ -1,8 +1,9 @@
 import { withBus } from '@jib/bus'
 import type { App } from '@jib/config'
-import { SUBJECTS, emitAndWait } from '@jib/rpc'
 import { spinner } from '@jib/tui'
 import { consola } from 'consola'
+import { emitAndWait } from './client.ts'
+import { SUBJECTS } from './subjects.ts'
 
 /**
  * Post-writeConfig provisioning chain for `jib add`, split into two phases

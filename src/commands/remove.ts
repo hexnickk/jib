@@ -1,11 +1,10 @@
 import { withBus } from '@jib/bus'
-import { writeConfig } from '@jib/config'
+import { loadAppOrExit, writeConfig } from '@jib/config'
 import { composeFor } from '@jib/docker'
 import { SUBJECTS, emitAndWait } from '@jib/rpc'
 import { promptConfirm } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { loadAppOrExit } from './ctx.ts'
 
 /**
  * `jib remove <app>` — reverse of add. Order matters:

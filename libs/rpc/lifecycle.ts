@@ -1,6 +1,7 @@
 import { withBus } from '@jib/bus'
-import { type CmdSubject, type EvtSubject, emitAndWait } from '@jib/rpc'
-import { loadAppOrExit } from './ctx.ts'
+import { loadAppOrExit } from '@jib/config'
+import { emitAndWait } from './client.ts'
+import type { CmdSubject, EvtSubject } from './subjects.ts'
 
 const DEFAULT_TIMEOUT_MS = 300_000 // 5 minutes — enough for slow `compose down`
 

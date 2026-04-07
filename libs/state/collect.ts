@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import type { Config } from '@jib/config'
 import { type Paths, credsPath, pathExists } from '@jib/core'
-import { Store } from '@jib/state'
 import { $ } from 'bun'
+import { Store } from './store.ts'
 
 export interface ServiceStatus {
   name: string

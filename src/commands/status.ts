@@ -1,6 +1,4 @@
-import { defineCommand } from 'citty'
-import { consola } from 'consola'
-import { loadAppConfig } from './ctx.ts'
+import { loadAppConfig } from '@jib/config'
 import {
   type AppStatus,
   type ProviderStatus,
@@ -9,7 +7,9 @@ import {
   collectProviders,
   collectServices,
   hasTunnelToken,
-} from './status-collect.ts'
+} from '@jib/state'
+import { defineCommand } from 'citty'
+import { consola } from 'consola'
 
 function timeAgo(iso: string): string {
   if (!iso) return ''

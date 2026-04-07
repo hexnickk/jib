@@ -1,7 +1,7 @@
+import { loadAppConfig } from '@jib/config'
 import { SecretsManager } from '@jib/secrets'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { loadAppConfig } from './ctx.ts'
 
 async function loadCtx() {
   const { cfg, paths } = await loadAppConfig()

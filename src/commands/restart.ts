@@ -1,7 +1,6 @@
-import { SUBJECTS } from '@jib/rpc'
+import { SUBJECTS, emitLifecycle } from '@jib/rpc'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { emitLifecycle } from './lifecycle.ts'
 
 export default defineCommand({
   meta: { name: 'restart', description: 'Restart containers without redeploying' },

@@ -1,9 +1,9 @@
 import { withBus } from '@jib/bus'
+import { loadAppOrExit } from '@jib/config'
 import { type EvtDeployProgress, type EvtRepoProgress, SUBJECTS, emitAndWait } from '@jib/rpc'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { loadAppOrExit } from './ctx.ts'
 
 /**
  * `jib deploy <app>` — the canonical two-step deploy flow. The CLI is the
