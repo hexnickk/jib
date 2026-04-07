@@ -6,12 +6,12 @@ import {
   validateRepo,
   writeConfig,
 } from '@jib/config'
+import { type ParsedDomain, assignPorts, parseDomain, parseHealth, toArray } from '@jib/config'
 import { resolveFromCompose } from '@jib/docker'
 import { SecretsManager } from '@jib/secrets'
 import { isInteractive, promptString } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { type ParsedDomain, assignPorts, parseDomain, parseHealth, toArray } from './add-parse.ts'
 import { loadAppConfig } from './ctx.ts'
 import { claimNginxRoutes, prepareAppRepo, rollbackRepo } from './provision.ts'
 
