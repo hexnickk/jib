@@ -1,6 +1,6 @@
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { loadAppConfig } from './_ctx.ts'
+import { loadAppConfig } from './ctx.ts'
 import {
   type AppStatus,
   type ProviderStatus,
@@ -9,7 +9,7 @@ import {
   collectProviders,
   collectServices,
   hasTunnelToken,
-} from './_status_collect.ts'
+} from './status-collect.ts'
 
 function timeAgo(iso: string): string {
   if (!iso) return ''

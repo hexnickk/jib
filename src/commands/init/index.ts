@@ -4,9 +4,9 @@ import { type Config, loadConfig } from '@jib/config'
 import { type Paths, getPaths } from '@jib/core'
 import { intro, log, outro, promptConfirm } from '@jib/tui'
 import { defineCommand } from 'citty'
-import { runHealthChecks } from './_init_check.ts'
-import { addUserToGroup, ensureGroup, needsRoot } from './_init_group.ts'
-import { runWizard } from './_init_wizard.ts'
+import { runHealthChecks } from './check.ts'
+import { addUserToGroup, ensureGroup, needsRoot } from './group.ts'
+import { runWizard } from './wizard.ts'
 
 /**
  * `jib init` — bootstrap or health-check a server.

@@ -3,7 +3,7 @@ import { type EvtDeployProgress, type EvtRepoProgress, SUBJECTS, emitAndWait } f
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { loadAppOrExit } from './_ctx.ts'
+import { loadAppOrExit } from './ctx.ts'
 
 /**
  * `jib deploy <app>` — the canonical two-step deploy flow. The CLI is the

@@ -7,8 +7,8 @@ import * as nginxMod from '@jib-module/nginx'
 import { type Config, loadConfig } from '@jib/config'
 import { type ModuleContext, type Paths, createLogger } from '@jib/core'
 import { log, note, outro, promptConfirm, promptSelect } from '@jib/tui'
-import { type ModLike, runInstallsTx } from './_init_install.ts'
-import { hasTunnelToken } from './_status_collect.ts'
+import { hasTunnelToken } from '../status-collect.ts'
+import { type ModLike, runInstallsTx } from './install.ts'
 
 /**
  * First-run interactive wizard. Prompts for ingress mode, installs core

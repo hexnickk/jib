@@ -2,7 +2,7 @@ import { withBus } from '@jib/bus'
 import { type CmdSubject, type EvtSubject, SUBJECTS, emitAndWait } from '@jib/rpc'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { loadAppOrExit } from './_ctx.ts'
+import { loadAppOrExit } from './ctx.ts'
 
 /**
  * `jib up|down|restart` — per-app container lifecycle. Emits a command on

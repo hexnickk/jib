@@ -10,10 +10,10 @@ import { SecretsManager } from '@jib/secrets'
 import { isInteractive, promptString } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { type ParsedDomain, assignPorts, parseDomain, parseHealth, toArray } from './_add_parse.ts'
-import { resolveFromCompose } from './_compose_resolve.ts'
-import { loadAppConfig } from './_ctx.ts'
-import { claimNginxRoutes, prepareAppRepo, rollbackRepo } from './_provision.ts'
+import { type ParsedDomain, assignPorts, parseDomain, parseHealth, toArray } from './add-parse.ts'
+import { resolveFromCompose } from './compose-resolve.ts'
+import { loadAppConfig } from './ctx.ts'
+import { claimNginxRoutes, prepareAppRepo, rollbackRepo } from './provision.ts'
 
 /**
  * `jib add <app>` — parse flags → allocate host ports → write config →

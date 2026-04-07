@@ -4,8 +4,8 @@ import { SUBJECTS, emitAndWait } from '@jib/rpc'
 import { promptConfirm } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { composeFor } from './_compose.ts'
-import { loadAppOrExit } from './_ctx.ts'
+import { composeFor } from './compose.ts'
+import { loadAppOrExit } from './ctx.ts'
 
 /**
  * `jib remove <app>` — reverse of add. Order matters:

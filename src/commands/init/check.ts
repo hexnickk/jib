@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/core'
 import { $ } from 'bun'
-import { collectServices, hasTunnelToken } from './_status_collect.ts'
+import { collectServices, hasTunnelToken } from '../status-collect.ts'
 
 export interface CheckResult {
   ok: boolean
