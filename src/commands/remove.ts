@@ -1,10 +1,10 @@
 import { withBus } from '@jib/bus'
 import { writeConfig } from '@jib/config'
+import { composeFor } from '@jib/docker'
 import { SUBJECTS, emitAndWait } from '@jib/rpc'
 import { promptConfirm } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { composeFor } from './compose.ts'
 import { loadAppOrExit } from './ctx.ts'
 
 /**

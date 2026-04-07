@@ -1,11 +1,11 @@
 import type { App, Domain } from '@jib/config'
+import { consola } from 'consola'
 import {
   type ComposeService,
   hasPublishedPorts,
   inferContainerPort,
   parseComposeServices,
-} from '@jib/docker'
-import { consola } from 'consola'
+} from './parse.ts'
 
 const FALLBACK_CONTAINER_PORT = 80
 

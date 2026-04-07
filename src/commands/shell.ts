@@ -1,9 +1,9 @@
 import type { App } from '@jib/config'
 import { type Paths, repoPath } from '@jib/core'
 import { parseComposeServices } from '@jib/docker'
+import { composeFor } from '@jib/docker'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { composeFor } from './compose.ts'
 import { loadAppOrExit } from './ctx.ts'
 
 /**

@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { type Paths, repoPath } from '@jib/core'
-import { Compose } from '@jib/docker'
-import { overridePath } from '@jib/docker'
+import { Compose } from './compose.ts'
+import { overridePath } from './override.ts'
 
 /**
  * Build a {@link Compose} handle for `app` from loaded config + resolved
