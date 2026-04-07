@@ -1,12 +1,12 @@
 import * as cloudflaredMod from '@jib-module/cloudflared'
 import * as deployerMod from '@jib-module/deployer'
+import * as githubMod from '@jib-module/github'
 import * as gitsitterMod from '@jib-module/gitsitter'
 import * as natsMod from '@jib-module/nats'
 import * as nginxMod from '@jib-module/nginx'
 import { type Config, loadConfig } from '@jib/config'
 import { type ModuleContext, type Paths, createLogger } from '@jib/core'
 import { log, note, outro, promptConfirm, promptSelect } from '@jib/tui'
-import { promptGitAuth } from './_init_git.ts'
 import { type ModLike, runInstallsTx } from './_init_install.ts'
 import { hasTunnelToken } from './_status_collect.ts'
 
@@ -61,10 +61,10 @@ export async function runWizard(paths: Paths, config: Config): Promise<void> {
       initialValue: false,
     })
     if (addMore) {
-      await promptGitAuth(ctx)
+      await githubMod.setup(ctx)
     }
   } else {
-    await promptGitAuth(ctx)
+    await githubMod.setup(ctx)
   }
 
   outro('jib initialized')
