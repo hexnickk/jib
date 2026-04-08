@@ -13,7 +13,7 @@ export interface ServiceStatus {
 export interface ProviderStatus {
   name: string
   type: 'key' | 'app'
-  appId?: number
+  appId?: number | undefined
   hasCredential: boolean
 }
 
@@ -29,7 +29,7 @@ export interface AppStatus {
   lastDeploy: string
   lastDeployStatus: string
   containers: ContainerStatus[]
-  domains: { host: string; port?: number }[]
+  domains: { host: string; port?: number | undefined }[]
 }
 
 const JIB_SERVICES = ['jib-bus', 'jib-deployer', 'jib-gitsitter', 'nginx']
