@@ -4,7 +4,6 @@ import type { ModuleContext } from './context.ts'
 /** Static metadata exported by every module's `manifest.ts`. */
 export interface ModuleManifest {
   name: string
-  deps?: string[]
   required?: boolean
   description?: string
 }
@@ -32,9 +31,4 @@ export interface Module<C = unknown> {
   start?: StartFn<C>
   cli?: CommandDef[]
   gitAuthProvider?: GitAuthProvider<C>
-}
-
-/** A module plus bookkeeping the loader attaches (e.g. source path). */
-export interface LoadedModule<C = unknown> extends Module<C> {
-  path: string
 }
