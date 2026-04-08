@@ -20,7 +20,7 @@ import { runManifestFlow } from './manifest-flow.ts'
 
 /**
  * `jib github key|app {setup,status,remove}`. Mounted under the root CLI via
- * `src/module-cli.ts` discovery. CLI-only concerns (prompts, printing) live
+ * `main.ts` subCommands wiring. CLI-only concerns (prompts, printing) live
  * here; every disk/network op delegates to a sibling helper.
  */
 

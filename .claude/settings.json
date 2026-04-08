@@ -1,6 +1,6 @@
 {
+  "includeCoAuthoredBy": false,
   "enabledPlugins": {
-    "gopls-lsp@claude-plugins-official": true
-  },
-  "includeCoAuthoredBy": false
+    "typescript-lsp@claude-plugins-official": true
+  }
 }

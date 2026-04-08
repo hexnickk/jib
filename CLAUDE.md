@@ -16,14 +16,6 @@ You are not just writing code. You are shaping the future of this project. The p
 
 Fight entropy. Leave the codebase better than you found it.
 
-## Project
-
-Jib is a lightweight CLI tool for deploying docker-compose apps on bare servers via SSH. It replaces Coolify.
-
-Stack: GitHub App auth → git polling → docker-compose deploy → Cloudflare tunnels + nginx reverse proxy.
-
-Target server runtime: **Docker Compose 2.24+** (required — jib's generated override file uses the `!override` YAML tag to replace the user's `ports:` list; older Compose merges silently and breaks port routing).
-
 ## Architecture
 
 Single-binary CLI built on Bun, compiled via `bun build --compile`.
@@ -39,7 +31,6 @@ Layout:
 - `modules/*` — feature workspaces: `deployer`, `gitsitter`, `nginx`,
   `cloudflare` (long-running NATS operators), plus `github`, `cloudflared`,
   `nats` (installers / helpers)
-- `tests/` — integration tests (`bun:test`)
 
 Each module under `modules/` can expose a systemd service installer and
 its own CLI subcommands, discovered via the module registry. Operators
