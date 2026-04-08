@@ -3,7 +3,7 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { type Config, loadConfig, writeConfig } from '@jib/config'
 import { type ModuleContext, createLogger, getPaths } from '@jib/core'
 import { collectServices, openDb } from '@jib/state'
-import { intro, log, outro } from '@jib/tui'
+import { intro, isInteractive, log, outro } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { parse } from 'yaml'
 import { migrations, runJibMigrations } from '../../migrations/index.ts'
@@ -91,7 +91,7 @@ export default defineCommand({
     // Prompt for any optional modules the user hasn't been asked about
     const config = await loadConfig(paths.configFile)
     const unseen = unseenOptionalModules(config)
-    if (unseen.length > 0) {
+    if (unseen.length > 0 && isInteractive()) {
       const { selected, declined } = await promptOptionalModules(unseen)
       const ctx: ModuleContext<Config> = { config, logger: createLogger('init'), paths }
 
