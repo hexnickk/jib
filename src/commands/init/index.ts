@@ -19,10 +19,11 @@ import {
 
 function ensureRoot(): void {
   if (process.getuid?.() === 0) return
-  // process.execPath returns a virtual /$bunfs/ path in compiled binaries.
-  // /proc/self/exe resolves to the real binary on disk.
+  // /proc/self/exe resolves to the real binary on disk (process.execPath
+  // returns a virtual /$bunfs/ path in compiled binaries). argv.slice(2)
+  // skips both the binary path and the Bun entry-point path.
   const bin = readlinkSync('/proc/self/exe')
-  const result = Bun.spawnSync(['sudo', bin, ...process.argv.slice(1)], {
+  const result = Bun.spawnSync(['sudo', bin, ...process.argv.slice(2)], {
     stdio: ['inherit', 'inherit', 'inherit'],
   })
   process.exit(result.exitCode)
