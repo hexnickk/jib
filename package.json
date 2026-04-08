@@ -17,10 +17,11 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/bun": "^1.2.0",
+    "drizzle-kit": "^0.31.10",
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@jib-module/cloudflare": "workspace:*",
+    "@clack/prompts": "^0.8.2",
     "@jib-module/cloudflared": "workspace:*",
     "@jib-module/deployer": "workspace:*",
     "@jib-module/github": "workspace:*",
@@ -35,9 +36,9 @@
     "@jib/secrets": "workspace:*",
     "@jib/state": "workspace:*",
     "@jib/tui": "workspace:*",
-    "@clack/prompts": "^0.8.2",
     "citty": "^0.1.6",
     "consola": "^3.2.3",
+    "drizzle-orm": "^0.45.2",
     "nats": "^2.29.3",
     "yaml": "^2.8.3",
     "zod": "^3.23.8"

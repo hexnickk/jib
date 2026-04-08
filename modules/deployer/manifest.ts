@@ -8,7 +8,7 @@ import type { ModuleManifest } from '@jib/core'
  */
 const manifest: ModuleManifest = {
   name: 'deployer',
-  requiresRoot: true,
+  required: true,
   description: 'Deploy orchestrator',
 }
 

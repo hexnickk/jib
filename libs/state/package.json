@@ -8,6 +8,7 @@
     ".": "./index.ts"
   },
   "dependencies": {
-    "@jib/core": "workspace:*"
+    "@jib/core": "workspace:*",
+    "drizzle-orm": "*"
   }
 }

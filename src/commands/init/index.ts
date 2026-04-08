@@ -1,109 +1,119 @@
 import { existsSync } from 'node:fs'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { type Config, loadConfig } from '@jib/config'
-import { type Paths, getPaths } from '@jib/core'
-import { intro, log, outro, promptConfirm } from '@jib/tui'
+import { mkdir } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
+import { type Config, loadConfig, writeConfig } from '@jib/config'
+import { type ModuleContext, createLogger, getPaths } from '@jib/core'
+import { collectServices, openDb } from '@jib/state'
+import { intro, log, outro } from '@jib/tui'
 import { defineCommand } from 'citty'
-import { runHealthChecks } from './check.ts'
-import { addUserToGroup, ensureGroup, needsRoot } from './group.ts'
-import { runWizard } from './wizard.ts'
+import { parse } from 'yaml'
+import { migrations, runJibMigrations } from '../../migrations/index.ts'
+import type { MigrationContext } from '../../migrations/types.ts'
+import { runInstallsTx } from './install.ts'
+import {
+  installedOptionalModules,
+  promptOptionalModules,
+  requiredModules,
+  resolveModules,
+  unseenOptionalModules,
+} from './registry.ts'
 
-/**
- * `jib init` — bootstrap or health-check a server.
- *
- * First run (no config / group missing): creates dirs, config, group,
- * sudoers drop-in, then runs the interactive wizard.
- *
- * Re-run: automated health checks. Only prompts if something is broken.
- */
+function ensureRoot(): void {
+  if (process.getuid?.() === 0) return
+  const result = Bun.spawnSync(['sudo', process.execPath, ...process.argv.slice(1)], {
+    stdio: ['inherit', 'inherit', 'inherit'],
+  })
+  process.exit(result.exitCode)
+}
 
-const MINIMAL_CONFIG = `config_version: 3
-poll_interval: 5m
-apps: {}
-`
+async function loadRawConfig(configFile: string): Promise<Record<string, unknown> | null> {
+  if (!existsSync(configFile)) return null
+  const raw = await readFile(configFile, 'utf8')
+  return (parse(raw) as Record<string, unknown>) ?? {}
+}
 
-async function ensureDirs(p: Paths): Promise<void> {
-  const dirs = [
-    p.root,
-    p.stateDir,
-    p.locksDir,
-    p.secretsDir,
-    p.overridesDir,
-    p.reposDir,
-    p.repoRoot,
-    p.nginxDir,
-    p.busDir,
-    p.cloudflaredDir,
-  ]
-  for (const d of dirs) {
-    await mkdir(d, { recursive: true, mode: 0o750 })
+async function reinstallModules(names: string[], ctx: ModuleContext<Config>): Promise<void> {
+  const mods = resolveModules(names)
+  for (const m of mods) {
+    if (!m.install) continue
+    await m.install(ctx)
   }
 }
 
-async function ensureConfig(p: Paths): Promise<Config> {
-  if (!existsSync(p.configFile)) {
-    await writeFile(p.configFile, MINIMAL_CONFIG, { mode: 0o640 })
+async function restartServices(config: Config): Promise<number> {
+  const hasTunnel = config.modules?.cloudflared === true
+  const services = await collectServices(hasTunnel)
+  let count = 0
+  for (const s of services) {
+    if (!s.active) continue
+    await Bun.$`sudo systemctl restart ${s.name}`.quiet().nothrow()
+    count++
   }
-  return loadConfig(p.configFile)
-}
-
-async function runRecheck(paths: Paths, config: Config): Promise<void> {
-  const results = await runHealthChecks(paths, config)
-  const broken = results.filter((r) => !r.ok)
-  let fixed = 0
-
-  for (const r of results) {
-    if (r.ok) {
-      log.success(r.label)
-    } else {
-      log.warning(`${r.label}: ${r.detail ?? 'unhealthy'}`)
-    }
-  }
-
-  for (const r of broken) {
-    if (r.fixable && r.fix) {
-      const shouldFix = await promptConfirm({
-        message: `${r.label} is not running. Restart it?`,
-        initialValue: true,
-      })
-      if (shouldFix) {
-        await r.fix()
-        log.success(`${r.label} restarted`)
-        fixed++
-      }
-    }
-  }
-
-  if (broken.length === 0) {
-    outro('all checks passed')
-  } else if (fixed > 0) {
-    outro(`all checks passed (${fixed} fixed)`)
-  }
+  return count
 }
 
 export default defineCommand({
-  meta: { name: 'init', description: 'Bootstrap or health-check the server' },
+  meta: { name: 'init', description: 'Bootstrap or update the server' },
   args: {},
   async run() {
+    ensureRoot()
     const paths = getPaths()
-    const firstRun = !existsSync(paths.configFile) || needsRoot(paths)
+    const configExisted = existsSync(paths.configFile)
 
-    if (firstRun) {
-      if (process.getuid?.() !== 0) {
-        log.error('first run: jib init must run as root (try: sudo jib init)')
-        process.exit(1)
-      }
-      intro('jib init')
-      await ensureDirs(paths)
-      const config = await ensureConfig(paths)
-      await ensureGroup(paths)
-      const sudoUser = process.env.SUDO_USER
-      if (sudoUser) await addUserToGroup(sudoUser)
-      await runWizard(paths, config)
-    } else {
-      intro('jib init — health check')
+    // Minimal bootstrap: stateDir must exist before we can open the DB
+    await mkdir(paths.stateDir, { recursive: true, mode: 0o750 })
+    // Also ensure root dir exists so DB perms work
+    await mkdir(paths.root, { recursive: true, mode: 0o750 })
+
+    const db = openDb(paths.stateDir)
+    const rawConfig = await loadRawConfig(paths.configFile)
+    const mctx: MigrationContext = { db, paths, rawConfig }
+
+    intro('jib init')
+
+    const applied = await runJibMigrations(mctx, migrations)
+
+    // On update (config existed), re-template units + restart services
+    if (applied.length > 0 && configExisted) {
       const config = await loadConfig(paths.configFile)
-      await runRecheck(paths, config)
+      const ctx: ModuleContext<Config> = { config, logger: createLogger('init'), paths }
+      const installed = [
+        ...requiredModules().map((m) => m.manifest.name),
+        ...installedOptionalModules(config).map((m) => m.manifest.name),
+      ]
+      await reinstallModules(installed, ctx)
+      const count = await restartServices(config)
+      log.success(`${count} service(s) restarted`)
+    }
+
+    // Prompt for any optional modules the user hasn't been asked about
+    const config = await loadConfig(paths.configFile)
+    const unseen = unseenOptionalModules(config)
+    if (unseen.length > 0) {
+      const { selected, declined } = await promptOptionalModules(unseen)
+      const ctx: ModuleContext<Config> = { config, logger: createLogger('init'), paths }
+
+      if (selected.length > 0) {
+        const toInstall = resolveModules(selected).filter((m) => m.install)
+        if (toInstall.length > 0) await runInstallsTx(toInstall, ctx)
+        for (const m of resolveModules(selected)) {
+          if (m.setup) await m.setup(ctx)
+        }
+      }
+
+      // Persist choices
+      const updated = { ...config, modules: { ...config.modules } }
+      for (const name of selected) updated.modules[name] = true
+      for (const name of declined) updated.modules[name] = false
+      await writeConfig(paths.configFile, updated)
+    }
+
+    if (applied.length > 0) {
+      outro(configExisted ? 'jib updated' : 'jib initialized')
+    } else if (unseen.length > 0) {
+      outro('modules configured')
+    } else {
+      outro('nothing to do')
     }
   },
 })

@@ -5,7 +5,7 @@ import type { ModuleContext } from './context.ts'
 export interface ModuleManifest {
   name: string
   deps?: string[]
-  requiresRoot?: boolean
+  required?: boolean
   description?: string
 }
 

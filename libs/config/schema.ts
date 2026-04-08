@@ -64,8 +64,9 @@ export const TunnelConfigSchema = z.object({
 })
 
 export const ConfigSchema = z.object({
-  config_version: z.literal(3),
+  config_version: z.number().int().positive(),
   poll_interval: z.string().default('5m'),
+  modules: z.record(z.string(), z.boolean()).optional().default({}),
   github: GitHubConfigSchema.optional(),
   apps: z.record(z.string(), AppSchema).default({}),
   tunnel: TunnelConfigSchema.optional(),

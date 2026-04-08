@@ -7,7 +7,7 @@ import type { ModuleManifest } from '@jib/core'
  */
 const manifest: ModuleManifest = {
   name: 'nginx',
-  requiresRoot: true,
+  required: true,
   description: 'Nginx reverse proxy',
 }
 

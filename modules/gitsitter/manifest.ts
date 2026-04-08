@@ -8,7 +8,7 @@ import type { ModuleManifest } from '@jib/core'
  */
 const manifest: ModuleManifest = {
   name: 'gitsitter',
-  requiresRoot: true,
+  required: true,
   description: 'Git polling + repo ops',
 }
 

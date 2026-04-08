@@ -20,8 +20,10 @@ describe('ConfigSchema', () => {
     expect(cfg.apps.web?.env_file).toBe('.env')
   })
 
-  test('rejects version != 3', () => {
-    expect(() => ConfigSchema.parse({ ...minimal, config_version: 2 })).toThrow()
+  test('rejects non-positive config_version', () => {
+    expect(() => ConfigSchema.parse({ ...minimal, config_version: 0 })).toThrow()
+    expect(() => ConfigSchema.parse({ ...minimal, config_version: -1 })).toThrow()
+    expect(() => ConfigSchema.parse({ ...minimal, config_version: 'abc' })).toThrow()
   })
 
   test('StringOrSlice normalizes string → string[]', () => {

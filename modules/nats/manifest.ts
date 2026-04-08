@@ -7,7 +7,7 @@ import type { ModuleManifest } from '@jib/core'
  */
 const manifest: ModuleManifest = {
   name: 'nats',
-  requiresRoot: true,
+  required: true,
   description: 'NATS message bus (required by all services)',
 }
 

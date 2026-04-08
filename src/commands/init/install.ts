@@ -1,12 +1,7 @@
 import type { Config } from '@jib/config'
 import type { ModuleContext } from '@jib/core'
 import { log } from '@jib/tui'
-
-export interface ModLike {
-  manifest: { name: string }
-  install?: (ctx: ModuleContext<Config>) => Promise<void>
-  uninstall?: (ctx: ModuleContext<Config>) => Promise<void>
-}
+import type { ModLike } from './registry.ts'
 
 /**
  * Install every module in `mods` in order. On the first failure, walk the
