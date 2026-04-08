@@ -19,6 +19,7 @@ async function mkWorkdir(): Promise<string> {
 const cfg: Config = {
   config_version: 3,
   poll_interval: '5m',
+  modules: {},
   apps: {
     demo: {
       repo: 'local',

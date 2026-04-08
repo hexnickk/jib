@@ -22,6 +22,7 @@ describe('loadConfig/writeConfig', () => {
       const cfg: Config = {
         config_version: 3,
         poll_interval: '2m',
+        modules: {},
         apps: {
           web: {
             repo: 'hexnickk/web',

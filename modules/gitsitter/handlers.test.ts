@@ -25,6 +25,7 @@ async function makeConfigAndPaths(upstream: string) {
   const cfg: Config = {
     config_version: 3,
     poll_interval: '5m',
+    modules: {},
     apps: {
       demo: {
         repo: upstream, // use path as "repo" — cloneURL will be overridden
