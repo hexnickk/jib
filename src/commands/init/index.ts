@@ -1,6 +1,5 @@
-import { existsSync } from 'node:fs'
-import { mkdir } from 'node:fs/promises'
-import { readFile } from 'node:fs/promises'
+import { existsSync, readlinkSync } from 'node:fs'
+import { mkdir, readFile } from 'node:fs/promises'
 import { type Config, loadConfig, writeConfig } from '@jib/config'
 import { type ModuleContext, createLogger, getPaths } from '@jib/core'
 import { collectServices, openDb } from '@jib/state'
@@ -20,7 +19,10 @@ import {
 
 function ensureRoot(): void {
   if (process.getuid?.() === 0) return
-  const result = Bun.spawnSync(['sudo', process.execPath, ...process.argv.slice(1)], {
+  // process.execPath returns a virtual /$bunfs/ path in compiled binaries.
+  // /proc/self/exe resolves to the real binary on disk.
+  const bin = readlinkSync('/proc/self/exe')
+  const result = Bun.spawnSync(['sudo', bin, ...process.argv.slice(1)], {
     stdio: ['inherit', 'inherit', 'inherit'],
   })
   process.exit(result.exitCode)
