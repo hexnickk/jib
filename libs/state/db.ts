@@ -1,28 +1,27 @@
 import { Database } from 'bun:sqlite'
 import { join } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import * as schema from './tables.ts'
 
 const DB_FILE = 'jib.db'
 
 /**
  * Open (or create) the jib SQLite database at `$JIB_ROOT/state/jib.db`.
- * Applies any pending Drizzle DB‑schema migrations on every call.
+ *
+ * Schema is applied via CREATE TABLE IF NOT EXISTS instead of Drizzle's
+ * file-based migrator because `bun build --compile` does not bundle the
+ * generated SQL files. Drizzle is used as a query builder only.
  */
 export function openDb(stateDir: string) {
   const dbPath = join(stateDir, DB_FILE)
   const sqlite = new Database(dbPath)
   sqlite.run('PRAGMA journal_mode = WAL')
+  sqlite.run(`CREATE TABLE IF NOT EXISTS jib_migrations (
+    id TEXT PRIMARY KEY NOT NULL,
+    at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`)
 
-  const db = drizzle(sqlite, { schema })
-
-  migrate(db, {
-    migrationsFolder: join(import.meta.dir, 'drizzle'),
-    migrationsTable: 'jib_db_migrations',
-  })
-
-  return db
+  return drizzle(sqlite, { schema })
 }
 
 export type JibDb = ReturnType<typeof openDb>
