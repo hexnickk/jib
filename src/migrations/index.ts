@@ -103,7 +103,9 @@ const m0003_ensure_group: JibMigration = {
   up: async (ctx) => {
     await Bun.$`groupadd --system ${GROUP} 2>/dev/null || true`.quiet()
     await Bun.$`chown -R root:${GROUP} ${ctx.paths.root}`.quiet().nothrow()
-    await Bun.$`chmod -R g+rwX ${ctx.paths.root}`.quiet().nothrow()
+    // setgid (g+s) ensures new files inherit the jib group, including
+    // temp files from atomic writes (writeConfig uses rename).
+    await Bun.$`chmod -R g+rwXs ${ctx.paths.root}`.quiet().nothrow()
     await Bun.$`chmod 640 ${ctx.paths.configFile}`.quiet().nothrow()
 
     const sudoUser = process.env.SUDO_USER
@@ -188,6 +190,15 @@ const m0009_install_sudoers: JibMigration = {
   },
 }
 
+const m0010_fix_setgid: JibMigration = {
+  id: '0010_fix_setgid',
+  description: 'Set setgid bit so new files inherit jib group',
+  up: async (ctx) => {
+    await Bun.$`chown -R root:${GROUP} ${ctx.paths.root}`.quiet().nothrow()
+    await Bun.$`chmod -R g+rwXs ${ctx.paths.root}`.quiet().nothrow()
+  },
+}
+
 // ---------------------------------------------------------------------------
 // Registry — ordered list of all migrations
 // ---------------------------------------------------------------------------
@@ -202,4 +213,5 @@ export const migrations: JibMigration[] = [
   m0007_install_gitsitter,
   m0008_install_nginx,
   m0009_install_sudoers,
+  m0010_fix_setgid,
 ]
