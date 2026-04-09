@@ -12,8 +12,26 @@ import pkg from './package.json' with { type: 'json' }
 import { commonCliArgs } from './src/commands/_cli.ts'
 import { moduleSubCommands as getModuleSubCommands } from './src/module-registry.ts'
 
+const ESC = String.fromCharCode(27)
+const ANSI_ESCAPE_RE = new RegExp(`${ESC}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`, 'g')
+
+function stripAnsi(value: string): string {
+  return value.replaceAll(ANSI_ESCAPE_RE, '')
+}
+
+function sanitizeJsonValue(value: unknown): unknown {
+  if (typeof value === 'string') return stripAnsi(value)
+  if (Array.isArray(value)) return value.map(sanitizeJsonValue)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, sanitizeJsonValue(entry)]),
+    )
+  }
+  return value
+}
+
 function printJson(stream: NodeJS.WriteStream, value: unknown): void {
-  stream.write(`${JSON.stringify(value, null, 2)}\n`)
+  stream.write(`${JSON.stringify(sanitizeJsonValue(value), null, 2)}\n`)
 }
 
 interface CommandNode {
