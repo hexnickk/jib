@@ -63,7 +63,8 @@ function parseTruthyEnv(value: string | undefined): boolean {
 }
 
 function parseStringFlag(rawArgs: string[], name: string): string | undefined {
-  for (let i = rawArgs.length - 1; i >= 0; i--) {
+  const boundary = runtimeArgBoundary(rawArgs)
+  for (let i = boundary - 1; i >= 0; i--) {
     const arg = rawArgs[i]
     if (!arg) continue
     if (arg === `--${name}` && i + 1 < rawArgs.length) return rawArgs[i + 1]
@@ -73,7 +74,8 @@ function parseStringFlag(rawArgs: string[], name: string): string | undefined {
 }
 
 function parseBooleanFlag(rawArgs: string[], name: string): boolean | undefined {
-  for (let i = rawArgs.length - 1; i >= 0; i--) {
+  const boundary = runtimeArgBoundary(rawArgs)
+  for (let i = boundary - 1; i >= 0; i--) {
     const arg = rawArgs[i]
     if (!arg) continue
     if (arg === `--${name}`) return true
@@ -85,6 +87,11 @@ function parseBooleanFlag(rawArgs: string[], name: string): boolean | undefined 
 
 function shouldConsumeNextValue(rawArgs: string[], index: number): boolean {
   return index + 1 < rawArgs.length && !rawArgs[index + 1]?.startsWith('-')
+}
+
+function runtimeArgBoundary(rawArgs: string[]): number {
+  const boundary = rawArgs.indexOf('--')
+  return boundary >= 0 ? boundary : rawArgs.length
 }
 
 export function parseInteractiveMode(value: string | undefined): InteractiveMode | undefined {
@@ -137,7 +144,8 @@ export function configureCliRuntime(rawArgs: string[]): CliRuntime {
 
 export function stripCliRuntimeArgs(rawArgs: string[]): string[] {
   const out: string[] = []
-  for (let i = 0; i < rawArgs.length; i++) {
+  const boundary = runtimeArgBoundary(rawArgs)
+  for (let i = 0; i < boundary; i++) {
     const arg = rawArgs[i]
     if (!arg) continue
     if (arg === '--interactive' || arg === '--output') {
@@ -155,6 +163,9 @@ export function stripCliRuntimeArgs(rawArgs: string[]): string[] {
       continue
     }
     out.push(arg)
+  }
+  if (boundary < rawArgs.length) {
+    out.push(...rawArgs.slice(boundary))
   }
   return out
 }

@@ -1,5 +1,6 @@
 import { withBus } from '@jib/bus'
 import type { App } from '@jib/config'
+import { isTextOutput } from '@jib/core'
 import { spinner } from '@jib/tui'
 import { consola } from 'consola'
 import { emitAndWait } from './client.ts'
@@ -22,17 +23,17 @@ import { SUBJECTS } from './subjects.ts'
  */
 export async function prepareAppRepo(app: string, timeoutMs: number): Promise<{ workdir: string }> {
   return await withBus(async (bus) => {
-    const s = spinner()
-    s.start(`preparing ${app}`)
+    const s = isTextOutput() ? spinner() : null
+    s?.start(`preparing ${app}`)
     const evt = await emitAndWait(
       bus,
       SUBJECTS.cmd.repoPrepare,
       { app },
       { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
       SUBJECTS.evt.repoProgress,
-      { source: 'cli', timeoutMs, onProgress: (p) => s.message(p.message) },
+      { source: 'cli', timeoutMs, onProgress: (p) => s?.message(p.message) },
     )
-    s.stop('repo ready')
+    s?.stop('repo ready')
     return { workdir: evt.workdir }
   })
 }
@@ -40,8 +41,8 @@ export async function prepareAppRepo(app: string, timeoutMs: number): Promise<{ 
 export async function claimNginxRoutes(app: string, appCfg: App, timeoutMs: number): Promise<void> {
   if (appCfg.domains.length === 0) return
   await withBus(async (bus) => {
-    const s2 = spinner()
-    s2.start(`claiming nginx routes for ${app}`)
+    const s2 = isTextOutput() ? spinner() : null
+    s2?.start(`claiming nginx routes for ${app}`)
     await emitAndWait(
       bus,
       SUBJECTS.cmd.nginxClaim,
@@ -57,9 +58,9 @@ export async function claimNginxRoutes(app: string, appCfg: App, timeoutMs: numb
       },
       { success: SUBJECTS.evt.nginxReady, failure: SUBJECTS.evt.nginxFailed },
       SUBJECTS.evt.nginxProgress,
-      { source: 'cli', timeoutMs, onProgress: (p) => s2.message(p.message) },
+      { source: 'cli', timeoutMs, onProgress: (p) => s2?.message(p.message) },
     )
-    s2.stop('nginx ready')
+    s2?.stop('nginx ready')
   })
 }
 
@@ -83,6 +84,8 @@ export async function rollbackRepo(app: string, timeoutMs: number): Promise<void
       )
     })
   } catch (err) {
-    consola.warn(`repo rollback: ${err instanceof Error ? err.message : String(err)}`)
+    if (isTextOutput()) {
+      consola.warn(`repo rollback: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 }

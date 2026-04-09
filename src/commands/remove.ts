@@ -51,29 +51,27 @@ export default defineCommand({
       }
     }
 
-    if (appCfg.domains.length > 0) {
-      try {
-        await withBus(async (bus) => {
-          await emitAndWait(
-            bus,
-            SUBJECTS.cmd.nginxRelease,
-            { app: args.app },
-            { success: SUBJECTS.evt.nginxReleased, failure: SUBJECTS.evt.nginxFailed },
-            SUBJECTS.evt.nginxProgress,
-            { source: 'cli', timeoutMs: DEFAULT_TIMEOUT_MS },
-          )
-          if (isTextOutput()) consola.info('nginx routes released')
-        })
-      } catch (err) {
-        if (isTextOutput()) {
-          consola.warn(`nginx release: ${err instanceof Error ? err.message : String(err)}`)
-        }
+    try {
+      await withBus(async (bus) => {
+        await emitAndWait(
+          bus,
+          SUBJECTS.cmd.nginxRelease,
+          { app: args.app },
+          { success: SUBJECTS.evt.nginxReleased, failure: SUBJECTS.evt.nginxFailed },
+          SUBJECTS.evt.nginxProgress,
+          { source: 'cli', timeoutMs: DEFAULT_TIMEOUT_MS },
+        )
+        if (isTextOutput()) consola.info('nginx routes released')
+      })
+    } catch (err) {
+      if (isTextOutput()) {
+        consola.warn(`nginx release: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
 
     try {
       const compose = composeFor(cfg, paths, args.app)
-      await compose.down(false)
+      await compose.down(false, { quiet: !isTextOutput() })
       if (isTextOutput()) consola.info('containers stopped')
     } catch (err) {
       if (isTextOutput()) {

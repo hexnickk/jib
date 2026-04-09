@@ -102,6 +102,23 @@ describe('stripCliRuntimeArgs', () => {
       ]),
     ).toEqual(['add', 'demo', '--repo', 'owner/name'])
   })
+
+  test('preserves args after -- for passthrough commands', () => {
+    expect(
+      stripCliRuntimeArgs([
+        'exec',
+        'demo',
+        '--output=json',
+        '--',
+        'node',
+        '-e',
+        'process.argv',
+        '--output',
+        'json',
+        '--debug',
+      ]),
+    ).toEqual(['exec', 'demo', '--', 'node', '-e', 'process.argv', '--output', 'json', '--debug'])
+  })
 })
 
 describe('normalizeCliError', () => {

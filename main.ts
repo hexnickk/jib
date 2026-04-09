@@ -40,6 +40,16 @@ function renderTextError(error: ReturnType<typeof normalizeCliError>): void {
   if (error.hint) consola.error(error.hint)
 }
 
+function printSuccess(value: unknown): void {
+  if (isJsonOutput()) {
+    printJson(process.stdout, { ok: true, data: value ?? null })
+    return
+  }
+  if (typeof value === 'string') {
+    consola.log(value)
+  }
+}
+
 const {
   addCmd,
   deployCmd,
@@ -89,15 +99,14 @@ try {
 
   if (sanitizedArgs.includes('--help') || sanitizedArgs.includes('-h')) {
     const { leaf, parent } = await resolveCommandInvocation(main as CommandNode, sanitizedArgs)
-    consola.log(`${await renderUsage(leaf as CommandDef, parent as CommandDef | undefined)}\n`)
+    const usage = `${await renderUsage(leaf as CommandDef, parent as CommandDef | undefined)}\n`
+    printSuccess(isJsonOutput() ? { usage } : usage)
   } else if (sanitizedArgs.length === 1 && sanitizedArgs[0] === '--version') {
-    consola.log(pkg.version)
+    printSuccess(isJsonOutput() ? { version: pkg.version } : pkg.version)
   } else {
     const { leaf, leafArgs } = await resolveCommandInvocation(main as CommandNode, sanitizedArgs)
     const { result } = await runCommand(leaf as CommandDef, { rawArgs: leafArgs })
-    if (isJsonOutput()) {
-      printJson(process.stdout, { ok: true, data: result ?? null })
-    }
+    printSuccess(result)
   }
 } catch (error) {
   const normalized = normalizeCliError(error)

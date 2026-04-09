@@ -15,6 +15,7 @@ export interface ComposeConfig {
 export interface UpOptions {
   services?: string[]
   buildArgs?: Record<string, string>
+  quiet?: boolean
 }
 
 /**
@@ -47,9 +48,12 @@ export class Compose {
     return this.cfg.envFile ? ['--env-file', this.cfg.envFile] : []
   }
 
-  async build(buildArgs: Record<string, string> = {}): Promise<void> {
+  async build(
+    buildArgs: Record<string, string> = {},
+    opts: { quiet?: boolean } = {},
+  ): Promise<void> {
     const args = ['docker', ...this.baseArgs(), ...this.envArgs(), 'build']
-    await this.runOrThrow(args, { env: buildArgs })
+    await this.runOrThrow(args, { env: buildArgs, capture: opts.quiet })
   }
 
   async up(opts: UpOptions = {}): Promise<void> {
@@ -63,17 +67,22 @@ export class Compose {
       '--remove-orphans',
       ...(opts.services ?? []),
     ]
-    await this.runOrThrow(args, opts.buildArgs ? { env: opts.buildArgs } : {})
+    await this.runOrThrow(args, {
+      ...(opts.buildArgs ? { env: opts.buildArgs } : {}),
+      capture: opts.quiet,
+    })
   }
 
-  async down(removeVolumes = false): Promise<void> {
+  async down(removeVolumes = false, opts: { quiet?: boolean } = {}): Promise<void> {
     const args = ['docker', ...this.baseArgs(), 'down']
     if (removeVolumes) args.push('-v')
-    await this.runOrThrow(args)
+    await this.runOrThrow(args, { capture: opts.quiet })
   }
 
-  async restart(services: string[] = []): Promise<void> {
-    await this.runOrThrow(['docker', ...this.baseArgs(), 'restart', ...services])
+  async restart(services: string[] = [], opts: { quiet?: boolean } = {}): Promise<void> {
+    await this.runOrThrow(['docker', ...this.baseArgs(), 'restart', ...services], {
+      capture: opts.quiet,
+    })
   }
 
   async exec(service: string, cmd: string[]): Promise<void> {
@@ -101,16 +110,18 @@ export class Compose {
 
   private async runOrThrow(
     args: string[],
-    opts: { env?: Record<string, string>; tty?: boolean } = {},
+    opts: { env?: Record<string, string>; tty?: boolean; capture?: boolean } = {},
   ): Promise<void> {
     const callOpts: Parameters<DockerExec>[1] = { cwd: this.cfg.dir }
     if (opts.env) callOpts.env = opts.env
     if (opts.tty) callOpts.tty = true
+    if (opts.capture) callOpts.capture = true
     const res = await this.runner(args, callOpts)
     if (res.exitCode !== 0) {
+      const detail = res.stderr || res.stdout
       throw new JibError(
         'docker',
-        `${args.slice(0, 4).join(' ')} exited ${res.exitCode}: ${res.stderr}`,
+        `${args.slice(0, 4).join(' ')} exited ${res.exitCode}: ${detail}`,
       )
     }
   }

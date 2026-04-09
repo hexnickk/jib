@@ -1,4 +1,5 @@
 import { loadAppConfig } from '@jib/config'
+import { isTextOutput } from '@jib/core'
 import {
   type AppStatus,
   type ProviderStatus,
@@ -78,8 +79,13 @@ export default defineCommand({
       collectApps(cfg, paths),
     ])
 
-    printServices(services)
-    printProviders(providers)
-    printApps(apps)
+    if (isTextOutput()) {
+      printServices(services)
+      printProviders(providers)
+      printApps(apps)
+      return
+    }
+
+    return { services, providers, apps }
   },
 })

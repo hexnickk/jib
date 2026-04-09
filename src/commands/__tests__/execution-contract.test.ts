@@ -65,6 +65,38 @@ describe('execution contract', () => {
     })
   })
 
+  test('help and version honor json output mode', async () => {
+    await withTmpRoot(async (root) => {
+      const version = await runCli(root, ['--output=json', '--version'])
+      expect(version.exitCode).toBe(0)
+      expect(version.stderr).toBe('')
+      expect(JSON.parse(version.stdout)).toEqual({
+        ok: true,
+        data: { version: '0.1.0' },
+      })
+
+      const help = await runCli(root, ['--output=json', '--help'])
+      expect(help.exitCode).toBe(0)
+      expect(help.stderr).toBe('')
+      const parsedHelp = JSON.parse(help.stdout)
+      expect(parsedHelp.ok).toBe(true)
+      expect(parsedHelp.data.usage).toContain('USAGE `jib')
+    })
+  })
+
+  test('status returns pure json payload in json mode', async () => {
+    await withTmpRoot(async (root) => {
+      const result = await runCli(root, ['--interactive=never', '--output=json', 'status'])
+      expect(result.exitCode).toBe(0)
+      expect(result.stderr).toBe('')
+      const parsed = JSON.parse(result.stdout)
+      expect(parsed.ok).toBe(true)
+      expect(Array.isArray(parsed.data.services)).toBe(true)
+      expect(Array.isArray(parsed.data.providers)).toBe(true)
+      expect(Array.isArray(parsed.data.apps)).toBe(true)
+    })
+  })
+
   test('invalid root runtime flag is normalized instead of crashing', async () => {
     await withTmpRoot(async (root) => {
       const result = await runCli(root, ['--output=xml', 'service', 'list'])

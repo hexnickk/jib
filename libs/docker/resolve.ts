@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { App, Domain } from '@jib/config'
+import { isTextOutput } from '@jib/core'
 import { consola } from 'consola'
 import {
   type ComposeService,
@@ -118,13 +119,16 @@ function resolveComposeFiles(workdir: string, composeFiles: string[]): string[] 
 function resolvePort(svc: ComposeService): number {
   const inferred = inferContainerPort(svc)
   if (inferred !== undefined) return inferred
-  consola.warn(
-    `could not infer container port for service "${svc.name}"; defaulting to ${FALLBACK_CONTAINER_PORT}`,
-  )
+  if (isTextOutput()) {
+    consola.warn(
+      `could not infer container port for service "${svc.name}"; defaulting to ${FALLBACK_CONTAINER_PORT}`,
+    )
+  }
   return FALLBACK_CONTAINER_PORT
 }
 
 function warnPublished(publishing: Map<string, ComposeService>, domains: Domain[]): void {
+  if (!isTextOutput()) return
   for (const [name, svc] of publishing) {
     const original = svc.ports.map((p) => JSON.stringify(p)).join(', ')
     const replacements = domains
