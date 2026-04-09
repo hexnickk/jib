@@ -4,10 +4,11 @@ import { isExternalRepoURL } from '@jib/core'
 
 /**
  * Resolves the clone URL for an app. External URLs pass through verbatim.
- * GitHub App providers use HTTPS; deploy-key providers use SSH.
+ * Anonymous GitHub slug clones use HTTPS, GitHub App providers use HTTPS,
+ * and deploy-key providers use SSH.
  */
 export function cloneURL(app: App, cfg: Config): string {
   if (isExternalRepoURL(app.repo)) return app.repo
   const providerType = app.provider ? cfg.github?.providers?.[app.provider]?.type : undefined
-  return providerType === 'app' ? httpsCloneURL(app.repo) : sshCloneURL(app.repo)
+  return providerType === 'key' ? sshCloneURL(app.repo) : httpsCloneURL(app.repo)
 }

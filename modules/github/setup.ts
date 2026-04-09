@@ -25,7 +25,7 @@ export async function setup(ctx: ModuleContext<Config>): Promise<void> {
   else if (choice === 'app') await setupGitHubApp(ctx)
 }
 
-export async function setupDeployKey(ctx: ModuleContext<Config>): Promise<void> {
+export async function setupDeployKey(ctx: ModuleContext<Config>): Promise<string | null> {
   try {
     const name = await promptString({ message: 'Provider name (e.g. my-org-key)' })
     const cfg = await loadConfig(ctx.paths.configFile)
@@ -44,13 +44,15 @@ export async function setupDeployKey(ctx: ModuleContext<Config>): Promise<void> 
       ].join('\n'),
       'Deploy Key',
     )
+    return name
   } catch (err) {
     log.warning(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
     log.info('you can retry later: jib github key setup <name>')
+    return null
   }
 }
 
-export async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<void> {
+export async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<string | null> {
   try {
     const name = await promptString({ message: 'Provider name (e.g. my-org)' })
     const cfg = await loadConfig(ctx.paths.configFile)
@@ -63,8 +65,10 @@ export async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<void> 
     await writeFile(pemPath, pem, { mode: 0o640 })
     await addAppProvider(ctx.paths.configFile, name, appId)
     log.success(`provider "${name}" (app ${appId}) created`)
+    return name
   } catch (err) {
     log.warning(`app setup failed: ${err instanceof Error ? err.message : String(err)}`)
     log.info('you can retry later: jib github app setup <name>')
+    return null
   }
 }

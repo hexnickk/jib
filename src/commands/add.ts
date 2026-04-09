@@ -35,7 +35,8 @@ import {
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { applyCliArgs, missingInput, withCliArgs } from './_cli.ts'
-import { type AddInputs, type EnvEntry, runAddFlow } from './add-flow.ts'
+import { type AddFlowResult, type AddInputs, type EnvEntry, runAddFlow } from './add-flow.ts'
+import { maybeRecoverGitHubProvider } from './add-github.ts'
 import {
   assignCliDomainsToServices,
   mergeGuidedServiceAnswers,
@@ -92,35 +93,61 @@ export default defineCommand({
 
     const inputs = await gatherAddInputs(args)
     const mgr = new SecretsManager(paths.secretsDir)
-    const { finalApp, secretsWritten } = await runAddFlow(
-      {
-        appName: args.app,
-        args,
-        cfg,
-        configFile: paths.configFile,
-        inputs,
-        draftApp: buildDraftApp(args, inputs),
-      },
-      {
-        prepareRepo: (appName, target) => prepareAppRepo(appName, DEFAULT_TIMEOUT_MS, target),
-        inspectCompose: inspectComposeWithPrompts,
-        collectGuidedInputs,
-        buildResolvedApp,
-        confirmPlan: confirmAddPlan,
-        writeConfig,
-        loadConfig,
-        upsertSecret: (appName, entry, envFile) =>
-          mgr.upsert(appName, entry.key, entry.value, envFile),
-        removeSecret: async (appName, key, envFile) => {
-          await mgr.remove(appName, key, envFile)
-        },
-        claimRoutes: (appName, finalApp) => claimNginxRoutes(appName, finalApp, DEFAULT_TIMEOUT_MS),
-        rollbackRepo: (appName, repo) => rollbackRepo(appName, DEFAULT_TIMEOUT_MS, repo),
-        warn: (message) => {
-          if (isTextOutput()) consola.warn(message)
-        },
-      },
-    )
+    const flowArgs: { 'git-provider'?: string } = {
+      ...(args['git-provider'] ? { 'git-provider': args['git-provider'] } : {}),
+    }
+    let currentCfg = cfg
+    let result: AddFlowResult | undefined
+
+    for (;;) {
+      try {
+        result = await runAddFlow(
+          {
+            appName: args.app,
+            args: flowArgs,
+            cfg: currentCfg,
+            configFile: paths.configFile,
+            inputs,
+            draftApp: buildDraftApp(flowArgs, inputs),
+          },
+          {
+            prepareRepo: (appName, target) => prepareAppRepo(appName, DEFAULT_TIMEOUT_MS, target),
+            inspectCompose: inspectComposeWithPrompts,
+            collectGuidedInputs,
+            buildResolvedApp,
+            confirmPlan: confirmAddPlan,
+            writeConfig,
+            loadConfig,
+            upsertSecret: (appName, entry, envFile) =>
+              mgr.upsert(appName, entry.key, entry.value, envFile),
+            removeSecret: async (appName, key, envFile) => {
+              await mgr.remove(appName, key, envFile)
+            },
+            claimRoutes: (appName, finalApp) =>
+              claimNginxRoutes(appName, finalApp, DEFAULT_TIMEOUT_MS),
+            rollbackRepo: (appName, repo) => rollbackRepo(appName, DEFAULT_TIMEOUT_MS, repo),
+            warn: (message) => {
+              if (isTextOutput()) consola.warn(message)
+            },
+          },
+        )
+        break
+      } catch (error) {
+        const nextProvider = await maybeRecoverGitHubProvider(
+          currentCfg,
+          paths,
+          inputs.repo,
+          error,
+          flowArgs['git-provider'],
+        )
+        if (!nextProvider) throw error
+        flowArgs['git-provider'] = nextProvider
+        currentCfg = await loadConfig(paths.configFile)
+      }
+    }
+
+    if (!result) throw new Error('add flow did not complete')
+    const { finalApp, secretsWritten } = result
 
     if (secretsWritten > 0 && isTextOutput()) {
       consola.success(`${secretsWritten} secret(s) set for ${args.app}`)
