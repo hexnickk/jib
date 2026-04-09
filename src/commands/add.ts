@@ -7,13 +7,14 @@ import {
   type ParsedDomain,
   assignPorts,
   loadAppConfig,
+  loadConfig,
   parseDomain,
   parseHealth,
   toArray,
   validateRepo,
   writeConfig,
 } from '@jib/config'
-import { CliError, JibError, ValidationError, isDebugEnabled, isTextOutput } from '@jib/core'
+import { CliError, ValidationError, isDebugEnabled, isTextOutput } from '@jib/core'
 import {
   type ComposeInspection,
   ComposeInspectionError,
@@ -34,6 +35,7 @@ import {
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { applyCliArgs, missingInput, withCliArgs } from './_cli.ts'
+import { type AddInputs, type EnvEntry, runAddFlow } from './add-flow.ts'
 import {
   assignCliDomainsToServices,
   mergeGuidedServiceAnswers,
@@ -45,20 +47,6 @@ import {
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
-
-interface EnvEntry {
-  key: string
-  value: string
-}
-
-interface AddInputs {
-  repo: string
-  ingressDefault: string
-  composeRaw?: string[]
-  parsedDomains: ParsedDomain[]
-  envEntries: EnvEntry[]
-  healthChecks: HealthCheck[]
-}
 
 /**
  * `jib add <app>` — gather repo / compose hints → prepare repo →
@@ -103,87 +91,64 @@ export default defineCommand({
     }
 
     const inputs = await gatherAddInputs(args)
-    let preparedRepo = false
-    let configWritten = false
-    let finalEnvFile = '.env'
-    const writtenSecretKeys: string[] = []
-    try {
-      const { workdir } = await prepareAppRepo(args.app, DEFAULT_TIMEOUT_MS, {
-        repo: inputs.repo,
-        branch: 'main',
-        ...(args['git-provider'] ? { provider: args['git-provider'] } : {}),
-      })
-      preparedRepo = true
-
-      const inspection = await inspectComposeWithPrompts(buildDraftApp(args, inputs), workdir)
-      const guided = await collectGuidedInputs(inputs, inspection.services)
-      const finalApp = await buildResolvedApp(
-        cfg,
-        args.app,
-        workdir,
+    const mgr = new SecretsManager(paths.secretsDir)
+    const { finalApp, secretsWritten } = await runAddFlow(
+      {
+        appName: args.app,
         args,
-        inputs,
-        inspection,
-        guided,
-      )
-
-      await confirmAddPlan(args.app, inspection, finalApp, guided.secretKeys)
-
-      const finalCfg: Config = { ...cfg, apps: { ...cfg.apps, [args.app]: finalApp } }
-      await writeConfig(paths.configFile, finalCfg)
-      configWritten = true
-      finalEnvFile = finalApp.env_file
-
-      if (guided.envEntries.length > 0) {
-        const mgr = new SecretsManager(paths.secretsDir)
-        for (const entry of guided.envEntries) {
-          await mgr.upsert(args.app, entry.key, entry.value, finalApp.env_file)
-          writtenSecretKeys.push(entry.key)
-        }
-        if (isTextOutput()) {
-          consola.success(`${guided.envEntries.length} secret(s) set for ${args.app}`)
-        }
-      }
-
-      await claimNginxRoutes(args.app, finalApp, DEFAULT_TIMEOUT_MS)
-
-      if (isTextOutput()) {
-        const ingress =
-          finalApp.domains.length > 0
-            ? finalApp.domains.map((d) => `${d.host} -> 127.0.0.1:${d.port}`).join('\n    ')
-            : 'none'
-        consola.box(
-          `app "${args.app}" ready\n  ingress:\n    ${ingress}\n  next:   jib deploy ${args.app}`,
-        )
-      }
-
-      return {
-        app: args.app,
-        repo: inputs.repo,
-        composeFiles: finalApp.compose ?? [],
-        services: finalApp.services ?? [],
-        routes: finalApp.domains.map((d) => ({
-          host: d.host,
-          port: d.port ?? null,
-          containerPort: d.container_port ?? null,
-          service: d.service ?? null,
-          ingress: d.ingress ?? 'direct',
-        })),
-        secretsWritten: guided.envEntries.length,
-      }
-    } catch (err) {
-      await cleanupFailedAdd(
-        args.app,
         cfg,
-        paths.configFile,
-        preparedRepo,
-        configWritten,
-        paths.secretsDir,
-        finalEnvFile,
-        writtenSecretKeys,
-        inputs.repo,
+        configFile: paths.configFile,
+        inputs,
+        draftApp: buildDraftApp(args, inputs),
+      },
+      {
+        prepareRepo: (appName, target) => prepareAppRepo(appName, DEFAULT_TIMEOUT_MS, target),
+        inspectCompose: inspectComposeWithPrompts,
+        collectGuidedInputs,
+        buildResolvedApp,
+        confirmPlan: confirmAddPlan,
+        writeConfig,
+        loadConfig,
+        upsertSecret: (appName, entry, envFile) =>
+          mgr.upsert(appName, entry.key, entry.value, envFile),
+        removeSecret: async (appName, key, envFile) => {
+          await mgr.remove(appName, key, envFile)
+        },
+        claimRoutes: (appName, finalApp) => claimNginxRoutes(appName, finalApp, DEFAULT_TIMEOUT_MS),
+        rollbackRepo: (appName, repo) => rollbackRepo(appName, DEFAULT_TIMEOUT_MS, repo),
+        warn: (message) => {
+          if (isTextOutput()) consola.warn(message)
+        },
+      },
+    )
+
+    if (secretsWritten > 0 && isTextOutput()) {
+      consola.success(`${secretsWritten} secret(s) set for ${args.app}`)
+    }
+
+    if (isTextOutput()) {
+      const ingress =
+        finalApp.domains.length > 0
+          ? finalApp.domains.map((d) => `${d.host} -> 127.0.0.1:${d.port}`).join('\n    ')
+          : 'none'
+      consola.box(
+        `app "${args.app}" ready\n  ingress:\n    ${ingress}\n  next:   jib deploy ${args.app}`,
       )
-      throw normalizeAddError(err, args.app, paths.configFile)
+    }
+
+    return {
+      app: args.app,
+      repo: inputs.repo,
+      composeFiles: finalApp.compose ?? [],
+      services: finalApp.services ?? [],
+      routes: finalApp.domains.map((d) => ({
+        host: d.host,
+        port: d.port ?? null,
+        containerPort: d.container_port ?? null,
+        service: d.service ?? null,
+        ingress: d.ingress ?? 'direct',
+      })),
+      secretsWritten,
     }
   },
 })
@@ -472,65 +437,3 @@ function parseEnvEntries(rawEntries: string[]): EnvEntry[] {
   }
   return entries
 }
-
-async function cleanupFailedAdd(
-  appName: string,
-  cfg: Config,
-  configFile: string,
-  preparedRepo: boolean,
-  configWritten: boolean,
-  secretsDir?: string,
-  envFile = '.env',
-  writtenSecrets: string[] = [],
-  repo?: string,
-): Promise<void> {
-  if (preparedRepo) {
-    await rollbackRepo(appName, DEFAULT_TIMEOUT_MS, repo)
-  }
-  for (const key of writtenSecrets) {
-    try {
-      if (!secretsDir) break
-      const mgr = new SecretsManager(secretsDir)
-      await mgr.remove(appName, key, envFile)
-    } catch (error) {
-      if (isTextOutput()) {
-        consola.warn(
-          `secret cleanup (${key}): ${error instanceof Error ? error.message : String(error)}`,
-        )
-      }
-    }
-  }
-  if (!configWritten) return
-  try {
-    const rollbackApps = { ...cfg.apps }
-    delete rollbackApps[appName]
-    await writeConfig(configFile, { ...cfg, apps: rollbackApps })
-  } catch (error) {
-    if (isTextOutput()) {
-      consola.warn(`config cleanup: ${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
-}
-
-function normalizeAddError(error: unknown, appName: string, configFile: string): Error {
-  if (error instanceof CliError || error instanceof ValidationError) {
-    return error
-  }
-  if (error instanceof ComposeInspectionError) {
-    return new CliError('compose_inspection_failed', error.message)
-  }
-  if (
-    error instanceof JibError &&
-    error.code === 'rpc.failure' &&
-    error.message === `app "${appName}" not found in config`
-  ) {
-    return new CliError('add_failed', error.message, {
-      hint: 'running jib-gitsitter is older than this CLI; rebuild/install the current jib binary and restart jib-gitsitter, then retry `jib add ...`',
-    })
-  }
-  return new CliError('add_failed', error instanceof Error ? error.message : String(error), {
-    hint: `rolled back ${appName} from ${configFile}; safe to retry: jib add ...`,
-  })
-}
-
-export const __test__normalizeAddError = normalizeAddError
