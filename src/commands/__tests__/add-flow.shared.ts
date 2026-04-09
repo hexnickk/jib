@@ -70,6 +70,7 @@ export function makeDeps(
     | 'claimRoutes',
   injectConcurrentConfigChange = false,
   failLoadConfig = false,
+  failRollbackRepo = false,
 ) {
   const calls: string[] = []
   const states: AddFlowState[] = []
@@ -138,6 +139,7 @@ export function makeDeps(
     },
     rollbackRepo: async () => {
       calls.push('rollbackRepo')
+      if (failRollbackRepo) throw new Error('rollbackRepo failed')
     },
     onStateChange: (state) => {
       states.push(state)

@@ -1,6 +1,6 @@
 import type { App, Config, HealthCheck, ParsedDomain } from '@jib/config'
 import { CliError, JibError, ValidationError } from '@jib/core'
-import type { ComposeInspection, ComposeInspectionError, ComposeService } from '@jib/docker'
+import { type ComposeInspection, ComposeInspectionError, type ComposeService } from '@jib/docker'
 
 export type EnvEntry = { key: string; value: string }
 
@@ -143,7 +143,11 @@ async function cleanupFailedAdd(
   state: CleanupState,
 ): Promise<void> {
   if (state.preparedRepo) {
-    await deps.rollbackRepo(params.appName, params.inputs.repo)
+    try {
+      await deps.rollbackRepo(params.appName, params.inputs.repo)
+    } catch (error) {
+      deps.warn?.(`repo rollback: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
   for (const key of state.writtenSecretKeys) {
     try {
@@ -175,8 +179,8 @@ export function normalizeAddError(error: unknown, appName: string, configFile: s
   if (error instanceof CliError || error instanceof ValidationError) {
     return error
   }
-  if ((error as ComposeInspectionError | undefined)?.name === 'ComposeInspectionError') {
-    return new CliError('compose_inspection_failed', (error as Error).message)
+  if (error instanceof ComposeInspectionError) {
+    return new CliError('compose_inspection_failed', error.message)
   }
   if (
     error instanceof JibError &&

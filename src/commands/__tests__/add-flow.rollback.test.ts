@@ -31,4 +31,17 @@ describe('add flow rollback', () => {
     expect(writtenConfigs.at(-1)?.apps.blog).toBeUndefined()
     expect(writtenConfigs.at(-1)?.apps.existing).toBeDefined()
   })
+
+  test('cleanup keeps going when repo rollback itself fails', async () => {
+    const { deps, calls, warnings, writtenConfigs } = makeDeps('claimRoutes', true, false, true)
+
+    await expect(runAddFlow(makeParams(), deps)).rejects.toThrow('claimRoutes failed')
+    expect(calls).toContain('rollbackRepo')
+    expect(calls).toContain('loadConfig')
+    expect(calls).toContain('removeSecret:APP_KEY')
+    expect(calls).toContain('removeSecret:TOKEN')
+    expect(warnings).toContain('repo rollback: rollbackRepo failed')
+    expect(writtenConfigs.at(-1)?.apps.blog).toBeUndefined()
+    expect(writtenConfigs.at(-1)?.apps.worker).toBeDefined()
+  })
 })
