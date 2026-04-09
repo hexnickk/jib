@@ -35,6 +35,7 @@ export function isGitHubAuthFailure(error: unknown): boolean {
     'Authentication failed',
     'Repository not found',
     'could not read Username',
+    'not found in config',
   ].some((snippet) => message.includes(snippet))
 }
 
@@ -67,11 +68,17 @@ export async function maybeRecoverGitHubProvider(
 ): Promise<string | null> {
   const interactive = deps.isInteractive ?? isInteractive
   if (!interactive() || !isGitHubSlugRepo(repo) || !isGitHubAuthFailure(error)) return null
+  const hasCurrentProvider = currentProvider
+    ? cfg.github?.providers?.[currentProvider] !== undefined
+    : false
 
   const choice = await (deps.promptSelect ?? promptSelect<ProviderChoice>)({
-    message: 'GitHub repo access failed. If this repo is private, choose a provider to retry.',
+    message:
+      'GitHub repo access failed. If this repo is private, choose a provider to retry; otherwise verify the repo slug.',
     options: buildGitHubProviderChoices(cfg),
-    ...(currentProvider ? { initialValue: `existing:${currentProvider}` as ProviderChoice } : {}),
+    ...(hasCurrentProvider
+      ? { initialValue: `existing:${currentProvider}` as ProviderChoice }
+      : {}),
   })
 
   if (choice.startsWith('existing:')) {

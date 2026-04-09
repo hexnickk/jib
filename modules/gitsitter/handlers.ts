@@ -42,18 +42,43 @@ export async function prepareRepo(
   const app = resolveApp(cfg, target)
   const workdir = repoPath(paths, target.app, app.repo)
   const fetchRef = ref ?? app.branch
+  const url = cloneURL(app, cfg)
 
   const external = isExternalRepoURL(app.repo)
   const auth = !external && app.provider ? await refreshAuth(app.provider, cfg, app, paths) : {}
   const env = auth.sshKeyPath ? git.configureSSHKey(auth.sshKeyPath) : {}
-  if (!(await pathExists(workdir))) {
-    await git.clone(cloneURL(app, cfg), workdir, { branch: app.branch, env })
-  }
+  await ensureCheckout(workdir, url, app.branch, env)
   if (!external) await applyAuth(auth, workdir, app.repo)
   await git.fetch(workdir, fetchRef, env)
   const sha = await git.remoteSHA(workdir, fetchRef)
   await git.checkout(workdir, sha)
   return { workdir, sha }
+}
+
+async function ensureCheckout(
+  workdir: string,
+  url: string,
+  branch: string,
+  env: git.GitEnv,
+): Promise<void> {
+  if (await pathExists(workdir)) {
+    const [repoReady, hasRemote] = await Promise.all([git.isRepo(workdir), git.hasRemote(workdir)])
+    if (!repoReady || !hasRemote) {
+      await rm(workdir, { recursive: true, force: true })
+    }
+  }
+
+  if (!(await pathExists(workdir))) {
+    try {
+      await git.clone(url, workdir, { branch, env })
+    } catch (error) {
+      await rm(workdir, { recursive: true, force: true })
+      throw error
+    }
+    return
+  }
+
+  await git.setRemoteURL(workdir, url)
 }
 
 /**

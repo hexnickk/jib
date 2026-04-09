@@ -86,4 +86,27 @@ describe('GitHub provider recovery', () => {
     expect(provider).toBeNull()
     expect(isGitHubAuthFailure(new Error('compose file missing'))).toBe(false)
   })
+
+  test('missing provider config can still recover via the chooser', async () => {
+    const prompts: string[] = []
+
+    const provider = await maybeRecoverGitHubProvider(
+      cfg,
+      paths,
+      'acme/private',
+      new Error('provider "ghost" not found in config'),
+      'ghost',
+      {
+        isInteractive: () => true,
+        promptSelect: async (opts) => {
+          prompts.push(opts.message)
+          expect(opts.initialValue).toBeUndefined()
+          return 'existing:appy'
+        },
+      },
+    )
+
+    expect(provider).toBe('appy')
+    expect(prompts).toHaveLength(1)
+  })
 })
