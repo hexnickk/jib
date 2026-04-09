@@ -9,7 +9,7 @@ import {
   getPaths,
   isTextOutput,
 } from '@jib/core'
-import { collectServices, openDb } from '@jib/state'
+import { openDb } from '@jib/state'
 import { intro, log, note, outro } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { parse } from 'yaml'
@@ -17,9 +17,9 @@ import { migrations, runJibMigrations } from '../../migrations/index.ts'
 import type { MigrationContext } from '../../migrations/types.ts'
 import { applyCliArgs, missingInput, withCliArgs } from '../_cli.ts'
 import { runInstallsTx } from './install.ts'
+import { refreshExistingInstall } from './refresh.ts'
 import {
   describeModules,
-  installedOptionalModules,
   promptOptionalModules,
   requiredModules,
   resolveModules,
@@ -49,26 +49,6 @@ async function loadRawConfig(configFile: string): Promise<Record<string, unknown
   return (parse(raw) as Record<string, unknown>) ?? {}
 }
 
-async function reinstallModules(names: string[], ctx: ModuleContext<Config>): Promise<void> {
-  const mods = resolveModules(names)
-  for (const m of mods) {
-    if (!m.install) continue
-    await m.install(ctx)
-  }
-}
-
-async function restartServices(config: Config): Promise<number> {
-  const hasTunnel = config.modules?.cloudflared === true
-  const services = await collectServices(hasTunnel)
-  let count = 0
-  for (const s of services) {
-    if (!s.active) continue
-    await Bun.$`sudo systemctl restart ${s.name}`.quiet().nothrow()
-    count++
-  }
-  return count
-}
-
 export default defineCommand({
   meta: { name: 'init', description: 'Bootstrap or update the server' },
   args: withCliArgs({}),
@@ -90,22 +70,21 @@ export default defineCommand({
     if (isTextOutput()) intro('jib init')
 
     const applied = await runJibMigrations(mctx, migrations)
+    const config = await loadConfig(paths.configFile)
+    let restartedServices = 0
 
-    // On update (config existed), re-template units + restart services
-    if (applied.length > 0 && configExisted) {
-      const config = await loadConfig(paths.configFile)
-      const ctx: ModuleContext<Config> = { config, logger: createLogger('init'), paths }
-      const installed = [
-        ...requiredModules().map((m) => m.manifest.name),
-        ...installedOptionalModules(config).map((m) => m.manifest.name),
-      ]
-      await reinstallModules(installed, ctx)
-      const count = await restartServices(config)
-      if (isTextOutput()) log.success(`${count} service(s) restarted`)
+    // Existing installs should always refresh long-lived daemons so they pick
+    // up a new `jib` binary. Unit re-install remains tied to migrations.
+    if (configExisted) {
+      restartedServices = await refreshExistingInstall(config, paths, {
+        reinstallUnits: applied.length > 0,
+      })
+      if (isTextOutput() && restartedServices > 0) {
+        log.success(`${restartedServices} service(s) restarted`)
+      }
     }
 
     // Prompt for any optional modules the user hasn't been asked about
-    const config = await loadConfig(paths.configFile)
     const unseen = unseenOptionalModules(config)
     if (isTextOutput()) {
       const required = describeModules(requiredModules())
@@ -155,6 +134,8 @@ export default defineCommand({
       if (isTextOutput()) outro(configExisted ? 'jib updated' : 'jib initialized')
     } else if (unseen.length > 0) {
       if (isTextOutput()) outro('modules configured')
+    } else if (restartedServices > 0) {
+      if (isTextOutput()) outro('services restarted')
     } else {
       if (isTextOutput()) outro('nothing to do')
     }
@@ -171,6 +152,7 @@ export default defineCommand({
     return {
       appliedMigrations: applied,
       configExisted,
+      restartedServices,
       optionalModulesPending: unseenOptionalModules(finalConfig).map((mod) => mod.manifest.name),
     }
   },
