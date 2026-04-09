@@ -53,7 +53,10 @@ export class Compose {
     opts: { quiet?: boolean } = {},
   ): Promise<void> {
     const args = ['docker', ...this.baseArgs(), ...this.envArgs(), 'build']
-    await this.runOrThrow(args, { env: buildArgs, capture: opts.quiet })
+    await this.runOrThrow(args, {
+      env: buildArgs,
+      ...(opts.quiet ? { capture: true } : {}),
+    })
   }
 
   async up(opts: UpOptions = {}): Promise<void> {
@@ -69,20 +72,21 @@ export class Compose {
     ]
     await this.runOrThrow(args, {
       ...(opts.buildArgs ? { env: opts.buildArgs } : {}),
-      capture: opts.quiet,
+      ...(opts.quiet ? { capture: true } : {}),
     })
   }
 
   async down(removeVolumes = false, opts: { quiet?: boolean } = {}): Promise<void> {
     const args = ['docker', ...this.baseArgs(), 'down']
     if (removeVolumes) args.push('-v')
-    await this.runOrThrow(args, { capture: opts.quiet })
+    await this.runOrThrow(args, opts.quiet ? { capture: true } : {})
   }
 
   async restart(services: string[] = [], opts: { quiet?: boolean } = {}): Promise<void> {
-    await this.runOrThrow(['docker', ...this.baseArgs(), 'restart', ...services], {
-      capture: opts.quiet,
-    })
+    await this.runOrThrow(
+      ['docker', ...this.baseArgs(), 'restart', ...services],
+      opts.quiet ? { capture: true } : {},
+    )
   }
 
   async exec(service: string, cmd: string[]): Promise<void> {

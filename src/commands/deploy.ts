@@ -1,6 +1,6 @@
 import { withBus } from '@jib/bus'
 import { loadAppOrExit } from '@jib/config'
-import { CliError, isJsonOutput, isTextOutput } from '@jib/core'
+import { CliError, isTextOutput } from '@jib/core'
 import { type EvtDeployProgress, type EvtRepoProgress, SUBJECTS, emitAndWait } from '@jib/rpc'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'

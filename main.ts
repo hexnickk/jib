@@ -65,7 +65,7 @@ const {
   upCmd,
 } = await import('./src/commands/index.ts')
 
-function createMain(): CommandDef {
+function createMain() {
   return defineCommand({
     meta: {
       name: 'jib',

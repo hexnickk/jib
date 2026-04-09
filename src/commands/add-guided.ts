@@ -23,11 +23,14 @@ export function splitCommaValues(raw: string): string[] {
 }
 
 export function summarizeComposeServices(services: ComposeService[]): AddServiceSummary[] {
-  return services.map((service) => ({
-    name: service.name,
-    inferredContainerPort: inferContainerPort(service),
-    publishesPorts: hasPublishedPorts(service),
-  }))
+  return services.map((service) => {
+    const inferredContainerPort = inferContainerPort(service)
+    return {
+      name: service.name,
+      ...(inferredContainerPort !== undefined ? { inferredContainerPort } : {}),
+      publishesPorts: hasPublishedPorts(service),
+    }
+  })
 }
 
 export function assignCliDomainsToServices(
@@ -95,7 +98,7 @@ export function renderAddPlanSummary(input: {
   app: string
   composeFiles: string[]
   services: AddServiceSummary[]
-  domains: ParsedDomain[]
+  domains: { host: string; service?: string | undefined }[]
   secretKeys: string[]
   envFile: string
 }): string {

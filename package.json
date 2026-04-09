@@ -10,6 +10,7 @@
   "scripts": {
     "build": "bun build --compile main.ts --outfile dist/jib",
     "test": "bun test",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "fmt": "biome format --write .",
     "dev": "bun run main.ts"

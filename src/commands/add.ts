@@ -230,7 +230,7 @@ async function gatherAddInputs(args: {
   return {
     repo,
     ingressDefault,
-    composeRaw,
+    ...(composeRaw ? { composeRaw } : {}),
     parsedDomains,
     envEntries,
     healthChecks,
