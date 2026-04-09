@@ -68,6 +68,16 @@ describe('validate', () => {
     expect(() => validate(base())).not.toThrow()
   })
 
+  test('accepts zero-domain app', () => {
+    const cfg = ConfigSchema.parse({
+      config_version: 3,
+      apps: {
+        worker: { repo: 'hexnickk/worker' },
+      },
+    })
+    expect(() => validate(cfg)).not.toThrow()
+  })
+
   test('rejects invalid poll_interval', () => {
     expect(() => validate(base({ poll_interval: 'forever' }))).toThrow(ConfigError)
   })

@@ -40,23 +40,16 @@ async function runCli(root: string, args: string[]) {
 }
 
 describe('execution contract', () => {
-  test('non-interactive add failure returns structured JSON', async () => {
+  test('non-interactive add without repo returns structured JSON', async () => {
     await withTmpRoot(async (root) => {
-      const result = await runCli(root, [
-        '--interactive=never',
-        '--output=json',
-        'add',
-        'demo',
-        '--repo',
-        'owner/name',
-      ])
+      const result = await runCli(root, ['--interactive=never', '--output=json', 'add', 'demo'])
       expect(result.exitCode).toBe(1)
       expect(result.stdout).toBe('')
       const parsed = JSON.parse(result.stderr)
       expect(parsed.ok).toBe(false)
       expect(parsed.error.code).toBe('missing_input')
       expect(parsed.error.issues).toEqual([
-        { field: 'domain', message: 'provide at least one --domain host=...' },
+        { field: 'repo', message: 'provide --repo or rerun with interactive prompts enabled' },
       ])
     })
   })
@@ -92,7 +85,7 @@ describe('execution contract', () => {
         apps: {
           demo: {
             repo: 'owner/name',
-            domains: [{ host: 'demo.local', port: 20000 }],
+            domains: [],
           },
         },
       } satisfies Config)

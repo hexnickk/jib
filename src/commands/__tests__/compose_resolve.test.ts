@@ -78,6 +78,20 @@ describe('resolveFromCompose', () => {
     expect(() => resolveFromCompose(app, dir)).toThrow(/no service "ghost"/)
   })
 
+  test('worker-only app with no domains only validates compose', () => {
+    const dir = fixture('services:\n  worker:\n    image: busybox\n')
+    const app = mkApp({})
+    const out = resolveFromCompose(app, dir)
+    expect(out).toEqual(app)
+  })
+
+  test('multi-service compose without domains is valid', () => {
+    const dir = fixture('services:\n  web:\n    image: nginx\n  worker:\n    image: busybox\n')
+    const app = mkApp({})
+    const out = resolveFromCompose(app, dir)
+    expect(out).toEqual(app)
+  })
+
   test('missing compose file produces a clean error', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
     const app = mkApp({ domains: [{ host: 'demo.example.com', port: 20000 }] })

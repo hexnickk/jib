@@ -57,11 +57,12 @@ export function toArray(value: string | string[] | undefined): string[] {
 }
 
 /**
- * Assigns a host port to every domain that lacks one. Each allocation
- * re-reads the partially-filled config so two fresh domains in the same
- * `add` never collide.
+ * Assigns a host port to every ingress mapping that lacks one. Each
+ * allocation re-reads the partially-filled config so two fresh domains in
+ * the same `add` never collide.
  */
 export async function assignPorts(cfg: Config, app: string, domains: Domain[]): Promise<Domain[]> {
+  if (domains.length === 0) return []
   const out: Domain[] = []
   const base = (cfg.apps[app] ?? { domains: [] as Domain[] }) as App
   const scratch: Config = {

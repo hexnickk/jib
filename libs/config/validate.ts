@@ -49,7 +49,7 @@ export function parseDuration(s: string): number | null {
   return matched === s.length && matched > 0 ? total : null
 }
 
-/** Runs domain-level checks that zod can't express. Throws `ConfigError`. */
+/** Runs config-level checks that zod can't express. Throws `ConfigError`. */
 export function validate(cfg: Config): void {
   const errs: string[] = []
 

@@ -80,12 +80,19 @@ describe('ConfigSchema', () => {
     expect(cfg.apps.web?.domains[0]?.host).toBe('example.com')
   })
 
-  test('rejects missing required domains', () => {
-    expect(() =>
-      ConfigSchema.parse({
-        config_version: 3,
-        apps: { web: { repo: 'x', domains: [] } },
-      }),
-    ).toThrow()
+  test('accepts app with explicit zero-domain ingress', () => {
+    const cfg = ConfigSchema.parse({
+      config_version: 3,
+      apps: { worker: { repo: 'x', domains: [] } },
+    })
+    expect(cfg.apps.worker?.domains).toEqual([])
+  })
+
+  test('defaults missing domains to empty list', () => {
+    const cfg = ConfigSchema.parse({
+      config_version: 3,
+      apps: { worker: { repo: 'x' } },
+    })
+    expect(cfg.apps.worker?.domains).toEqual([])
   })
 })

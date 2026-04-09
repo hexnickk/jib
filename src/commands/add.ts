@@ -23,10 +23,11 @@ import { consola } from 'consola'
 import { applyCliArgs, missingInput, withCliArgs } from './_cli.ts'
 
 /**
- * `jib add <app>` — parse flags → allocate host ports → write config →
- * `cmd.repo.prepare` → infer container ports from compose → rewrite config
- * → `cmd.nginx.claim`. On any failure after writeConfig the app entry is
- * rolled back so the file never points at a half-baked app.
+ * `jib add <app>` — parse flags → allocate host ports for ingress →
+ * write config → `cmd.repo.prepare` → infer service/container ports from
+ * compose → rewrite config → optionally `cmd.nginx.claim`. On any failure
+ * after writeConfig the app entry is rolled back so the file never points
+ * at a half-baked app.
  *
  * Domain syntax (key-value, repeatable):
  *   `--domain host=<domain>[,port=<n>][,service=<name>][,ingress=direct|cloudflare-tunnel]`
@@ -39,7 +40,7 @@ const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
 
 export default defineCommand({
-  meta: { name: 'add', description: 'Register a new app (config + repo + nginx claim)' },
+  meta: { name: 'add', description: 'Register a new app (config + repo + optional ingress)' },
   args: withCliArgs({
     app: { type: 'positional', required: true },
     repo: {
@@ -95,11 +96,6 @@ export default defineCommand({
     const envRaw = toArray(args.env)
     const healthRaw = toArray(args.health).flatMap((h) => h.split(','))
     const composeRaw = args.compose ? args.compose.split(',') : undefined
-
-    if (domainRaw.length === 0)
-      missingInput('missing required input for jib add', [
-        { field: 'domain', message: 'provide at least one --domain host=...' },
-      ])
 
     for (const pair of envRaw) {
       if (pair.indexOf('=') < 1) {
@@ -165,9 +161,12 @@ export default defineCommand({
     }
 
     if (isTextOutput()) {
-      const routes = finalApp.domains.map((d) => `${d.host} -> 127.0.0.1:${d.port}`).join('\n    ')
+      const ingress =
+        finalApp.domains.length > 0
+          ? finalApp.domains.map((d) => `${d.host} -> 127.0.0.1:${d.port}`).join('\n    ')
+          : 'none'
       consola.box(
-        `app "${args.app}" ready\n  routes:\n    ${routes}\n  next:   jib deploy ${args.app}`,
+        `app "${args.app}" ready\n  ingress:\n    ${ingress}\n  next:   jib deploy ${args.app}`,
       )
     }
 

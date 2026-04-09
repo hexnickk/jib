@@ -54,13 +54,14 @@ function printApps(apps: AppStatus[]): void {
     const icon = running ? '●' : '○'
     const sha = app.sha ? app.sha.slice(0, 7) : 'never deployed'
     const ago = timeAgo(app.lastDeploy)
-    const deployInfo = app.lastDeploy ? `${sha}  ${ago}` : sha
+    const deployState = app.lastDeployStatus || 'unknown'
+    const deployInfo = app.lastDeploy ? `${deployState}  ${sha}  ${ago}` : `${deployState}  ${sha}`
     consola.log(`  ${icon} ${app.name.padEnd(18)} ${deployInfo}`)
     for (const c of app.containers) {
       consola.log(`    ${c.service.padEnd(16)} ${c.state}  ${c.status}`)
     }
-    if (app.containers.length === 0 && app.domains.length > 0) {
-      for (const d of app.domains) consola.log(`    ${d.host} → :${d.port ?? '?'}`)
+    if (app.domains.length > 0) {
+      for (const d of app.domains) consola.log(`    ingress ${d.host} → :${d.port ?? '?'}`)
     }
   }
 }

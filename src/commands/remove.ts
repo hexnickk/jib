@@ -40,8 +40,10 @@ export default defineCommand({
           { field: 'force', message: 'rerun with --force or enable interactive prompts' },
         ])
       }
+      const ingressSummary =
+        appCfg.domains.length > 0 ? ` (${appCfg.domains.map((d) => d.host).join(', ')})` : ''
       const ok = await promptConfirm({
-        message: `Remove app "${args.app}" (${appCfg.domains.map((d) => d.host).join(', ')})?`,
+        message: `Remove app "${args.app}"${ingressSummary}?`,
         initialValue: false,
       })
       if (!ok) {
@@ -49,21 +51,23 @@ export default defineCommand({
       }
     }
 
-    try {
-      await withBus(async (bus) => {
-        await emitAndWait(
-          bus,
-          SUBJECTS.cmd.nginxRelease,
-          { app: args.app },
-          { success: SUBJECTS.evt.nginxReleased, failure: SUBJECTS.evt.nginxFailed },
-          SUBJECTS.evt.nginxProgress,
-          { source: 'cli', timeoutMs: DEFAULT_TIMEOUT_MS },
-        )
-        if (isTextOutput()) consola.info('nginx routes released')
-      })
-    } catch (err) {
-      if (isTextOutput()) {
-        consola.warn(`nginx release: ${err instanceof Error ? err.message : String(err)}`)
+    if (appCfg.domains.length > 0) {
+      try {
+        await withBus(async (bus) => {
+          await emitAndWait(
+            bus,
+            SUBJECTS.cmd.nginxRelease,
+            { app: args.app },
+            { success: SUBJECTS.evt.nginxReleased, failure: SUBJECTS.evt.nginxFailed },
+            SUBJECTS.evt.nginxProgress,
+            { source: 'cli', timeoutMs: DEFAULT_TIMEOUT_MS },
+          )
+          if (isTextOutput()) consola.info('nginx routes released')
+        })
+      } catch (err) {
+        if (isTextOutput()) {
+          consola.warn(`nginx release: ${err instanceof Error ? err.message : String(err)}`)
+        }
       }
     }
 

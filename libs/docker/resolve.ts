@@ -10,10 +10,10 @@ import {
 const FALLBACK_CONTAINER_PORT = 80
 
 /**
- * Parse the compose file from the prepared workdir, resolve each domain's
- * `service` + `container_port`, and warn loudly if the user's compose
- * already publishes ports (jib will replace that list via `!override` at
- * deploy time). Pure aside from the consola warnings — no disk writes.
+ * Parse the compose file from the prepared workdir, resolve each ingress
+ * mapping's `service` + `container_port`, and warn loudly if the user's
+ * compose already publishes ports that jib will later replace via
+ * `!override`. Pure aside from the consola warnings — no disk writes.
  */
 export function resolveFromCompose(appCfg: App, workdir: string): App {
   let parsed: ComposeService[]
@@ -23,6 +23,7 @@ export function resolveFromCompose(appCfg: App, workdir: string): App {
     throw new Error(`failed to parse compose file: ${err instanceof Error ? err.message : err}`)
   }
   if (parsed.length === 0) throw new Error('compose file has no services')
+  if (appCfg.domains.length === 0) return appCfg
   const byName = new Map(parsed.map((s) => [s.name, s]))
   const single = parsed.length === 1 ? parsed[0]?.name : undefined
   const publishing = new Map<string, ComposeService>()

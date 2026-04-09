@@ -14,7 +14,8 @@ import { SUBJECTS } from './subjects.ts'
  *      that path to populate `container_port` / `service` on each domain
  *      before rewriting config.
  *   2. `claimNginxRoutes` — asks the nginx operator to materialise
- *      server blocks for the now-fully-resolved domains.
+ *      server blocks for the now-fully-resolved domains, when the app has
+ *      ingress configured at all.
  *
  * Both use clack spinners for progress and throw on failure so the caller
  * can roll back the config entry.
@@ -37,6 +38,7 @@ export async function prepareAppRepo(app: string, timeoutMs: number): Promise<{ 
 }
 
 export async function claimNginxRoutes(app: string, appCfg: App, timeoutMs: number): Promise<void> {
+  if (appCfg.domains.length === 0) return
   await withBus(async (bus) => {
     const s2 = spinner()
     s2.start(`claiming nginx routes for ${app}`)

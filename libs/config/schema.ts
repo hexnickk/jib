@@ -14,15 +14,11 @@ export const GitHubConfigSchema = z.object({
   providers: z.record(z.string(), GitHubProviderSchema).optional(),
 })
 
-// NOTE: `port` is the *host* port jib proxies to, and is optional at parse
-// time because `jib add` populates it via `allocatePort` before the first
-// `writeConfig`. `container_port` is the port exposed *inside* the container
-// (passed through to `cmd.nginx.claim` for completeness and future use by
-// the deployer — currently nginx only needs `port`). Both are optional on
-// input; the CLI fills them in before writing. Every code path that loads a
-// config *after* jib has written it (operators, the deployer, the CLI on
-// subsequent runs) will see a populated `port` — treat an undefined one as
-// unreachable.
+// NOTE: `port` is the *host* port jib proxies to, and is only needed when a
+// service has ingress. It is optional at parse time because `jib add`
+// populates it via `allocatePort` before the first `writeConfig`.
+// `container_port` is the port exposed *inside* the container. Both are
+// optional on input; the CLI fills them in only for ingress-backed routes.
 export const DomainSchema = z.object({
   host: z.string().min(1),
   port: z.number().int().min(1).max(65535).optional(),
@@ -52,7 +48,7 @@ export const AppSchema = z.object({
   health: z.array(HealthCheckSchema).optional(),
   pre_deploy: z.array(PreDeployHookSchema).optional(),
   build_args: z.record(z.string(), z.string()).optional(),
-  domains: z.array(DomainSchema).min(1),
+  domains: z.array(DomainSchema).default([]),
   env_file: z.string().default('.env'),
   services: z.array(z.string()).optional(),
 })

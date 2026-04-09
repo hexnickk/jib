@@ -74,6 +74,18 @@ export class Engine {
   }
 
   /**
+   * Keep the generated override file aligned with the current config before
+   * any compose invocation. This prevents stale port publications from
+   * lingering when an app drops ingress and later runs `up`/`restart`
+   * without a full deploy first.
+   */
+  private async syncOverride(app: string, appCfg: App, workdir: string): Promise<void> {
+    const parsed = parseComposeServices(workdir, appCfg.compose ?? [])
+    const services = buildOverrideServices(parsed, appCfg.domains)
+    await writeOverride(this.deps.paths.overridesDir, app, services)
+  }
+
+  /**
    * Link `<secretsDir>/<app>/<env_file>` → `<workdir>/<env_file>` so the
    * user's compose `env_file:` directive (relative to the compose file)
    * resolves against jib's managed secrets. Silently skips if no secrets
@@ -118,9 +130,7 @@ export class Engine {
 
       const prevState = await this.deps.store.load(cmd.app)
 
-      const parsed = parseComposeServices(cmd.workdir, appCfg.compose ?? [])
-      const services = buildOverrideServices(parsed, appCfg.domains)
-      await writeOverride(this.deps.paths.overridesDir, cmd.app, services)
+      await this.syncOverride(cmd.app, appCfg, cmd.workdir)
 
       // Link the jib-managed secrets file into the workdir so the user's
       // compose `env_file: .env` (service-level) resolves against it.
@@ -179,6 +189,7 @@ export class Engine {
     const appCfg = this.deps.config.apps[appName]
     if (!appCfg) throw new JibError('deploy', `app "${appName}" not found in config`)
     const workdir = repoPath(this.deps.paths, appName, appCfg.repo)
+    await this.syncOverride(appName, appCfg, workdir)
     await this.linkSecrets(appName, appCfg, workdir)
     return { compose: this.newCompose(appName, appCfg, workdir), appCfg }
   }
@@ -203,11 +214,10 @@ export class Engine {
 }
 
 /**
- * Group domains by target compose service and build the `OverrideService[]`
- * list the deployer passes to `writeOverride`. Every discovered compose
- * service gets an entry so the override file can stamp jib labels and log
- * rotation onto all of them; only services targeted by a domain pick up a
- * `!override` `ports:` block.
+ * Group ingress mappings by target compose service and build the
+ * `OverrideService[]` list the deployer passes to `writeOverride`. Only
+ * services targeted by ingress receive a jib-managed `ports:` replacement;
+ * internal-only services keep the user's compose file untouched.
  */
 export function buildOverrideServices(
   parsed: { name: string }[],

@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
-import { createLogger, getPaths } from '@jib/core'
+import { createLogger, getPaths, repoPath } from '@jib/core'
 import type { DockerExec, ExecResult } from '@jib/docker'
 import { Store } from '@jib/state'
 import { Engine } from './engine.ts'
@@ -123,5 +123,75 @@ describe('Engine.deploy', () => {
     const state = await store.load('demo')
     expect(state.last_deploy_status).toBe('failure')
     expect(state.last_deploy_error).toContain('boom')
+  })
+
+  test('zero-domain app deploys without managed ports override', async () => {
+    const { paths, store, log } = await mkEnv()
+    const workdir = await mkWorkdir()
+    const calls: Call[] = []
+    const cfg = mkCfg()
+    cfg.apps.demo = {
+      repo: 'local',
+      branch: 'main',
+      domains: [],
+      env_file: '.env',
+    }
+    const engine = new Engine({
+      config: cfg,
+      paths,
+      store,
+      log,
+      diskFree: async () => 10 * 1024 * 1024 * 1024,
+      dockerExec: fakeExec(calls),
+    })
+
+    await engine.deploy({ app: 'demo', workdir, sha: 'worker1', trigger: 'manual' }, noProgress)
+
+    const override = await readFile(join(paths.overridesDir, 'demo.yml'), 'utf8')
+    expect(override).not.toContain('ports:')
+    expect(calls.some((c) => c.args.includes('up'))).toBe(true)
+  })
+
+  test('up refreshes stale override when app has no domains', async () => {
+    const { paths, store, log } = await mkEnv()
+    const cfg = mkCfg()
+    cfg.apps.demo = {
+      repo: 'local',
+      branch: 'main',
+      domains: [],
+      env_file: '.env',
+    }
+    const workdir = repoPath(paths, 'demo', cfg.apps.demo.repo)
+    await mkdir(workdir, { recursive: true })
+    await writeFile(
+      join(workdir, 'docker-compose.yml'),
+      `services:
+  worker:
+    image: busybox
+`,
+    )
+    await mkdir(paths.overridesDir, { recursive: true })
+    await writeFile(
+      join(paths.overridesDir, 'demo.yml'),
+      `services:
+  worker:
+    ports:
+      - "20000:80"
+`,
+    )
+    const calls: Call[] = []
+    const engine = new Engine({
+      config: cfg,
+      paths,
+      store,
+      log,
+      dockerExec: fakeExec(calls),
+    })
+
+    await engine.up('demo')
+
+    const override = await readFile(join(paths.overridesDir, 'demo.yml'), 'utf8')
+    expect(override).not.toContain('ports:')
+    expect(calls.some((c) => c.args.includes('up'))).toBe(true)
   })
 })
