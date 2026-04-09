@@ -1,42 +1,17 @@
-import * as cloudflaredMod from '@jib-module/cloudflared'
-import * as deployerMod from '@jib-module/deployer'
-import * as githubMod from '@jib-module/github'
-import * as gitsitterMod from '@jib-module/gitsitter'
-import * as natsMod from '@jib-module/nats'
-import * as nginxMod from '@jib-module/nginx'
 import type { Config } from '@jib/config'
-import type { ModuleContext, ModuleManifest } from '@jib/core'
 import { promptConfirm } from '@jib/tui'
+import {
+  type FirstPartyModule,
+  allModules,
+  optionalModules,
+  requiredModules,
+  resolveModules,
+} from '../../module-registry.ts'
 
-export interface ModLike {
-  manifest: ModuleManifest
-  install?: (ctx: ModuleContext<Config>) => Promise<void>
-  uninstall?: (ctx: ModuleContext<Config>) => Promise<void>
-  setup?: (ctx: ModuleContext<Config>) => Promise<void>
-}
+export type ModLike = FirstPartyModule
 
-/** All modules in dependency order. Static imports for bun build --compile. */
-export const ALL_MODULES: ModLike[] = [
-  natsMod,
-  deployerMod,
-  gitsitterMod,
-  nginxMod,
-  cloudflaredMod,
-  githubMod,
-]
-
-export function requiredModules(): ModLike[] {
-  return ALL_MODULES.filter((m) => m.manifest.required)
-}
-
-export function optionalModules(): ModLike[] {
-  return ALL_MODULES.filter((m) => !m.manifest.required)
-}
-
-export function resolveModules(names: string[]): ModLike[] {
-  const set = new Set(names)
-  return ALL_MODULES.filter((m) => set.has(m.manifest.name))
-}
+export const ALL_MODULES: readonly ModLike[] = allModules()
+export { optionalModules, requiredModules, resolveModules }
 
 /** Optional modules where config.modules[name] === true. */
 export function installedOptionalModules(config: Config): ModLike[] {

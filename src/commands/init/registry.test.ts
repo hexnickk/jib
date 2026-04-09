@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
+import { moduleSubCommands, runnableModuleNames } from '../../module-registry.ts'
 import {
   ALL_MODULES,
   installedOptionalModules,
@@ -17,16 +18,23 @@ function configWith(modules: Record<string, boolean>): Config {
 }
 
 describe('module registry', () => {
-  test('ALL_MODULES has 6 entries', () => {
-    expect(ALL_MODULES).toHaveLength(6)
+  test('all first-party modules are present in dependency order', () => {
+    expect(ALL_MODULES.map((mod) => mod.manifest.name)).toEqual([
+      'nats',
+      'deployer',
+      'gitsitter',
+      'nginx',
+      'cloudflared',
+      'github',
+    ])
   })
 
-  test('requiredModules returns exactly the 4 core modules', () => {
+  test('requiredModules returns the core install set', () => {
     const names = requiredModules().map((m) => m.manifest.name)
     expect(names).toEqual(REQUIRED_NAMES)
   })
 
-  test('optionalModules returns the 2 optional modules', () => {
+  test('optionalModules returns the opt-in module set', () => {
     const names = optionalModules().map((m) => m.manifest.name)
     expect(names).toEqual(OPTIONAL_NAMES)
   })
@@ -39,6 +47,14 @@ describe('module registry', () => {
   test('resolveModules ignores unknown names', () => {
     const mods = resolveModules(['nginx', 'nonexistent'])
     expect(mods.map((m) => m.manifest.name)).toEqual(['nginx'])
+  })
+
+  test('module CLI commands are derived from the shared registry', () => {
+    expect(Object.keys(moduleSubCommands())).toEqual(['cloudflared', 'github'])
+  })
+
+  test('runnable services are derived from the shared registry', () => {
+    expect(runnableModuleNames()).toEqual(['deployer', 'gitsitter', 'nginx'])
   })
 
   test('installedOptionalModules returns modules with true', () => {

@@ -10,6 +10,7 @@ import { type CommandDef, defineCommand, renderUsage, runCommand } from 'citty'
 import { consola } from 'consola'
 import pkg from './package.json' with { type: 'json' }
 import { commonCliArgs } from './src/commands/_cli.ts'
+import { moduleSubCommands as getModuleSubCommands } from './src/module-registry.ts'
 
 function printJson(stream: NodeJS.WriteStream, value: unknown): void {
   stream.write(`${JSON.stringify(value, null, 2)}\n`)
@@ -39,52 +40,52 @@ function renderTextError(error: ReturnType<typeof normalizeCliError>): void {
   if (error.hint) consola.error(error.hint)
 }
 
-const [
-  {
-    addCmd,
-    deployCmd,
-    downCmd,
-    execCmd,
-    initCmd,
-    removeCmd,
-    restartCmd,
-    runCmd,
-    secretsCmd,
-    serviceCmd,
-    statusCmd,
-    upCmd,
-  },
-  { moduleSubCommands },
-] = await Promise.all([import('./src/commands/index.ts'), import('./src/module-cli.ts')])
+const {
+  addCmd,
+  deployCmd,
+  downCmd,
+  execCmd,
+  initCmd,
+  removeCmd,
+  restartCmd,
+  runCmd,
+  secretsCmd,
+  serviceCmd,
+  statusCmd,
+  upCmd,
+} = await import('./src/commands/index.ts')
 
-const main = defineCommand({
-  meta: {
-    name: 'jib',
-    version: pkg.version,
-    description: 'Lightweight deploy tool for docker-compose apps over SSH',
-  },
-  args: commonCliArgs,
-  subCommands: {
-    init: initCmd,
-    add: addCmd,
-    remove: removeCmd,
-    deploy: deployCmd,
-    up: upCmd,
-    down: downCmd,
-    restart: restartCmd,
-    exec: execCmd,
-    run: runCmd,
-    secrets: secretsCmd,
-    service: serviceCmd,
-    status: statusCmd,
-    ...moduleSubCommands(),
-  },
-})
+function createMain(): CommandDef {
+  return defineCommand({
+    meta: {
+      name: 'jib',
+      version: pkg.version,
+      description: 'Lightweight deploy tool for docker-compose apps over SSH',
+    },
+    args: commonCliArgs,
+    subCommands: {
+      init: initCmd,
+      add: addCmd,
+      remove: removeCmd,
+      deploy: deployCmd,
+      up: upCmd,
+      down: downCmd,
+      restart: restartCmd,
+      exec: execCmd,
+      run: runCmd,
+      secrets: secretsCmd,
+      service: serviceCmd,
+      status: statusCmd,
+      ...getModuleSubCommands(),
+    },
+  })
+}
 
 try {
   const rawArgs = process.argv.slice(2)
   configureCliRuntime(rawArgs)
   const sanitizedArgs = stripCliRuntimeArgs(rawArgs)
+  const main = createMain()
 
   if (sanitizedArgs.includes('--help') || sanitizedArgs.includes('-h')) {
     const { leaf, parent } = await resolveCommandInvocation(main as CommandNode, sanitizedArgs)

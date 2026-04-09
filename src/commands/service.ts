@@ -8,6 +8,7 @@ import {
 } from '@jib/core'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { resolveRunnableModule, runnableModuleNames } from '../module-registry.ts'
 import { applyCliArgs, withCliArgs } from './_cli.ts'
 
 /**
@@ -18,34 +19,19 @@ import { applyCliArgs, withCliArgs } from './_cli.ts'
  * unit. A human running it directly will bypass systemd supervision and
  * block the terminal.
  *
- * The registry is a plain object (not `import()` on a computed name) so
- * `bun build --compile` can see every dependency at build time.
+ * Runnable services are derived from the static first-party module registry so
+ * `init`, module CLIs, and operator launching all stay in sync.
  */
-const RUNNABLE = {
-  deployer: () => import('@jib-module/deployer'),
-  gitsitter: () => import('@jib-module/gitsitter'),
-  nginx: () => import('@jib-module/nginx'),
-} as const
-
-type RunnableName = keyof typeof RUNNABLE
-
-function isRunnable(name: string): name is RunnableName {
-  return Object.hasOwn(RUNNABLE, name)
-}
-
 async function startService(name: string): Promise<void> {
-  if (!isRunnable(name)) {
+  const mod = resolveRunnableModule(name)
+  if (!mod) {
     throw new ValidationError(
-      `unknown service "${name}" (expected: ${Object.keys(RUNNABLE).join(', ')})`,
+      `unknown service "${name}" (expected: ${runnableModuleNames().join(', ')})`,
     )
   }
   const paths = getPaths()
   const config = await loadConfig(paths.configFile)
   const ctx: ModuleContext<Config> = { config, logger: createLogger(name), paths }
-  const mod = await RUNNABLE[name]()
-  if (typeof mod.start !== 'function') {
-    throw new ValidationError(`service "${name}" has no start() export`)
-  }
   await mod.start(ctx)
 }
 
@@ -67,7 +53,7 @@ const list = defineCommand({
   args: withCliArgs({}),
   run({ args }) {
     applyCliArgs(args)
-    const services = Object.keys(RUNNABLE)
+    const services = runnableModuleNames()
     if (isTextOutput()) {
       for (const name of services) consola.log(name)
     }

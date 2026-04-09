@@ -9,6 +9,7 @@ export interface ModuleManifest {
 }
 
 export type InstallFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>
+export type SetupFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>
 export type StartFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>
 
 /** Contract implemented by modules that provide git credentials to gitsitter. */
@@ -28,7 +29,8 @@ export interface Module<C = unknown> {
   manifest: ModuleManifest
   install?: InstallFn<C>
   uninstall?: InstallFn<C>
+  setup?: SetupFn<C>
   start?: StartFn<C>
-  cli?: CommandDef[]
+  cli?: readonly CommandDef[]
   gitAuthProvider?: GitAuthProvider<C>
 }
