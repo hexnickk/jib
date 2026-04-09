@@ -1,18 +1,21 @@
-import { ValidationError } from '@jib/core'
+import { ValidationError, assertCanPrompt, canPrompt, promptBlockReason } from '@jib/core'
 
 /**
  * A jib process is considered interactive iff both std streams are TTYs and
- * `JIB_NON_INTERACTIVE` is unset. Automated callers should set the env var to
- * force the non-interactive code paths.
+ * the CLI runtime allows prompting and both std streams are TTYs.
  */
 export function isInteractive(): boolean {
-  if (process.env.JIB_NON_INTERACTIVE) return false
-  return Boolean(process.stdin.isTTY && process.stdout.isTTY)
+  return canPrompt()
 }
 
 /** Throws `ValidationError` if the process can't prompt the user. */
 export function assertInteractive(): void {
-  if (!isInteractive()) {
-    throw new ValidationError('non-interactive mode: cannot prompt for input')
+  try {
+    assertCanPrompt()
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw new ValidationError(promptBlockReason() ?? error.message, { cause: error })
+    }
+    throw error
   }
 }

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { ValidationError } from '@jib/core'
+import { configureCliRuntime } from '@jib/core'
 import { assertInteractive, isInteractive } from './interactive.ts'
 
 // `isTTY` is a writable boolean on the real streams; the Node types mark it
@@ -25,23 +26,27 @@ describe('isInteractive', () => {
     process.env.JIB_NON_INTERACTIVE = '1'
     stdin.isTTY = true
     stdout.isTTY = true
+    configureCliRuntime([])
     expect(isInteractive()).toBe(false)
   })
 
   test('false when stdin not a TTY', () => {
     stdin.isTTY = false
     stdout.isTTY = true
+    configureCliRuntime([])
     expect(isInteractive()).toBe(false)
   })
 
   test('true when both TTYs and env unset', () => {
     stdin.isTTY = true
     stdout.isTTY = true
+    configureCliRuntime([])
     expect(isInteractive()).toBe(true)
   })
 
   test('assertInteractive throws ValidationError in non-interactive mode', () => {
     process.env.JIB_NON_INTERACTIVE = '1'
+    configureCliRuntime([])
     expect(() => assertInteractive()).toThrow(ValidationError)
   })
 })

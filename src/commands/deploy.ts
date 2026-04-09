@@ -1,9 +1,11 @@
 import { withBus } from '@jib/bus'
 import { loadAppOrExit } from '@jib/config'
+import { CliError, isJsonOutput, isTextOutput } from '@jib/core'
 import { type EvtDeployProgress, type EvtRepoProgress, SUBJECTS, emitAndWait } from '@jib/rpc'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { applyCliArgs, withCliArgs } from './_cli.ts'
 
 /**
  * `jib deploy <app>` — the canonical two-step deploy flow. The CLI is the
@@ -20,7 +22,7 @@ function currentUser(): string {
 
 export default defineCommand({
   meta: { name: 'deploy', description: 'Build and deploy an app' },
-  args: {
+  args: withCliArgs({
     app: { type: 'positional', required: true },
     ref: { type: 'string', description: 'Git ref (SHA, branch, tag)' },
     timeout: {
@@ -28,15 +30,17 @@ export default defineCommand({
       description: 'Timeout in milliseconds',
       default: String(DEFAULT_TIMEOUT_MS),
     },
-  },
+  }),
   async run({ args }) {
+    applyCliArgs(args)
     await loadAppOrExit(args.app)
     const timeoutMs = Number(args.timeout) || DEFAULT_TIMEOUT_MS
 
     try {
-      await withBus(async (bus) => {
-        const s = spinner()
-        s.start(`[1/2] preparing ${args.app}`)
+      const result = await withBus(async (bus) => {
+        const showProgress = isTextOutput()
+        const s = showProgress ? spinner() : null
+        s?.start(`[1/2] preparing ${args.app}`)
 
         const prepBody: { app: string; ref?: string } = { app: args.app }
         if (args.ref) prepBody.ref = args.ref
@@ -50,13 +54,13 @@ export default defineCommand({
           {
             source: 'cli',
             timeoutMs,
-            onProgress: (p: EvtRepoProgress) => s.message(p.message),
+            onProgress: (p: EvtRepoProgress) => s?.message(p.message),
           },
         )
-        s.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
+        s?.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
 
-        const s2 = spinner()
-        s2.start(`[2/2] deploying ${args.app}`)
+        const s2 = showProgress ? spinner() : null
+        s2?.start(`[2/2] deploying ${args.app}`)
         const result = await emitAndWait(
           bus,
           SUBJECTS.cmd.deploy,
@@ -72,15 +76,26 @@ export default defineCommand({
           {
             source: 'cli',
             timeoutMs,
-            onProgress: (p: EvtDeployProgress) => s2.message(`${p.step}: ${p.message}`),
+            onProgress: (p: EvtDeployProgress) => s2?.message(`${p.step}: ${p.message}`),
           },
         )
-        s2.stop(`[2/2] ${args.app} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
+        s2?.stop(`[2/2] ${args.app} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
+        return {
+          app: args.app,
+          workdir: ready.workdir,
+          preparedSha: ready.sha,
+          sha: result.sha,
+          durationMs: result.durationMs,
+        }
       })
+      if (isTextOutput()) {
+        consola.success(`${args.app} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
+      }
+      return result
     } catch (err) {
-      consola.error(err instanceof Error ? err.message : String(err))
-      consola.info('check logs: journalctl -u jib-deployer -u jib-gitsitter --since "5m ago"')
-      process.exit(1)
+      throw new CliError('deploy_failed', err instanceof Error ? err.message : String(err), {
+        hint: 'check logs: journalctl -u jib-deployer -u jib-gitsitter --since "5m ago"',
+      })
     }
   },
 })

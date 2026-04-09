@@ -1,4 +1,5 @@
 export * from './context.ts'
+export * from './cli.ts'
 export * from './errors.ts'
 export * from './logger.ts' // includes JIB_DEBUG flag
 export * from './module.ts'

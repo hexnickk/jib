@@ -1,13 +1,21 @@
 import { existsSync, readlinkSync } from 'node:fs'
 import { mkdir, readFile } from 'node:fs/promises'
 import { type Config, loadConfig, writeConfig } from '@jib/config'
-import { type ModuleContext, createLogger, getPaths } from '@jib/core'
+import {
+  CliError,
+  type ModuleContext,
+  canPrompt,
+  createLogger,
+  getPaths,
+  isTextOutput,
+} from '@jib/core'
 import { collectServices, openDb } from '@jib/state'
 import { intro, log, outro } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { parse } from 'yaml'
 import { migrations, runJibMigrations } from '../../migrations/index.ts'
 import type { MigrationContext } from '../../migrations/types.ts'
+import { applyCliArgs, missingInput, withCliArgs } from '../_cli.ts'
 import { runInstallsTx } from './install.ts'
 import {
   installedOptionalModules,
@@ -19,6 +27,11 @@ import {
 
 function ensureRoot(): void {
   if (process.getuid?.() === 0) return
+  if (!canPrompt()) {
+    throw new CliError('root_required', 'jib init must run as root on the target machine', {
+      hint: 'rerun with sudo or from an interactive root shell',
+    })
+  }
   // /proc/self/exe resolves to the real binary on disk (process.execPath
   // returns a virtual /$bunfs/ path in compiled binaries). argv.slice(2)
   // skips both the binary path and the Bun entry-point path.
@@ -57,8 +70,9 @@ async function restartServices(config: Config): Promise<number> {
 
 export default defineCommand({
   meta: { name: 'init', description: 'Bootstrap or update the server' },
-  args: {},
-  async run() {
+  args: withCliArgs({}),
+  async run({ args }) {
+    applyCliArgs(args)
     ensureRoot()
     const paths = getPaths()
     const configExisted = existsSync(paths.configFile)
@@ -72,7 +86,7 @@ export default defineCommand({
     const rawConfig = await loadRawConfig(paths.configFile)
     const mctx: MigrationContext = { db, paths, rawConfig }
 
-    intro('jib init')
+    if (isTextOutput()) intro('jib init')
 
     const applied = await runJibMigrations(mctx, migrations)
 
@@ -86,13 +100,22 @@ export default defineCommand({
       ]
       await reinstallModules(installed, ctx)
       const count = await restartServices(config)
-      log.success(`${count} service(s) restarted`)
+      if (isTextOutput()) log.success(`${count} service(s) restarted`)
     }
 
     // Prompt for any optional modules the user hasn't been asked about
     const config = await loadConfig(paths.configFile)
     const unseen = unseenOptionalModules(config)
     if (unseen.length > 0) {
+      if (!canPrompt()) {
+        missingInput(
+          'missing optional module choices for jib init',
+          unseen.map((mod) => ({
+            field: `modules.${mod.manifest.name}`,
+            message: 'set this module to true or false in config, or rerun interactively',
+          })),
+        )
+      }
       const { selected, declined } = await promptOptionalModules(unseen)
       const ctx: ModuleContext<Config> = { config, logger: createLogger('init'), paths }
 
@@ -112,11 +135,18 @@ export default defineCommand({
     }
 
     if (applied.length > 0) {
-      outro(configExisted ? 'jib updated' : 'jib initialized')
+      if (isTextOutput()) outro(configExisted ? 'jib updated' : 'jib initialized')
     } else if (unseen.length > 0) {
-      outro('modules configured')
+      if (isTextOutput()) outro('modules configured')
     } else {
-      outro('nothing to do')
+      if (isTextOutput()) outro('nothing to do')
+    }
+
+    const finalConfig = await loadConfig(paths.configFile)
+    return {
+      appliedMigrations: applied,
+      configExisted,
+      optionalModulesPending: unseenOptionalModules(finalConfig).map((mod) => mod.manifest.name),
     }
   },
 })

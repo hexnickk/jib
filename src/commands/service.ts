@@ -1,7 +1,14 @@
 import { type Config, loadConfig } from '@jib/config'
-import { type ModuleContext, createLogger, getPaths } from '@jib/core'
+import {
+  type ModuleContext,
+  ValidationError,
+  createLogger,
+  getPaths,
+  isTextOutput,
+} from '@jib/core'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { applyCliArgs, withCliArgs } from './_cli.ts'
 
 /**
  * `jib service` — inspect and (internally) launch the long-running jib
@@ -26,21 +33,20 @@ function isRunnable(name: string): name is RunnableName {
   return Object.hasOwn(RUNNABLE, name)
 }
 
-async function startService(name: string): Promise<never> {
+async function startService(name: string): Promise<void> {
   if (!isRunnable(name)) {
-    consola.error(`unknown service "${name}" (expected: ${Object.keys(RUNNABLE).join(', ')})`)
-    process.exit(1)
+    throw new ValidationError(
+      `unknown service "${name}" (expected: ${Object.keys(RUNNABLE).join(', ')})`,
+    )
   }
   const paths = getPaths()
   const config = await loadConfig(paths.configFile)
   const ctx: ModuleContext<Config> = { config, logger: createLogger(name), paths }
   const mod = await RUNNABLE[name]()
   if (typeof mod.start !== 'function') {
-    consola.error(`service "${name}" has no start() export`)
-    process.exit(1)
+    throw new ValidationError(`service "${name}" has no start() export`)
   }
   await mod.start(ctx)
-  process.exit(0)
 }
 
 const start = defineCommand({
@@ -49,16 +55,23 @@ const start = defineCommand({
     description:
       '[systemd only] Run a jib operator in the foreground. Invoked by jib-<name>.service units; not for direct use.',
   },
-  args: { name: { type: 'positional', required: true } },
+  args: withCliArgs({ name: { type: 'positional', required: true } }),
   async run({ args }) {
+    applyCliArgs(args)
     await startService(args.name)
   },
 })
 
 const list = defineCommand({
   meta: { name: 'list', description: 'List runnable jib operators' },
-  run() {
-    for (const name of Object.keys(RUNNABLE)) consola.log(name)
+  args: withCliArgs({}),
+  run({ args }) {
+    applyCliArgs(args)
+    const services = Object.keys(RUNNABLE)
+    if (isTextOutput()) {
+      for (const name of services) consola.log(name)
+    }
+    return { services }
   },
 })
 

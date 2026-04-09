@@ -3,6 +3,7 @@ import {
   AppSchema,
   type Config,
   type Domain,
+  type HealthCheck,
   type ParsedDomain,
   assignPorts,
   loadAppConfig,
@@ -12,12 +13,14 @@ import {
   validateRepo,
   writeConfig,
 } from '@jib/config'
+import { CliError, ValidationError, isTextOutput } from '@jib/core'
 import { resolveFromCompose } from '@jib/docker'
 import { claimNginxRoutes, prepareAppRepo, rollbackRepo } from '@jib/rpc'
 import { SecretsManager } from '@jib/secrets'
 import { isInteractive, promptString } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { applyCliArgs, missingInput, withCliArgs } from './_cli.ts'
 
 /**
  * `jib add <app>` — parse flags → allocate host ports → write config →
@@ -37,7 +40,7 @@ const DEFAULT_TIMEOUT_MS = 5 * 60_000
 
 export default defineCommand({
   meta: { name: 'add', description: 'Register a new app (config + repo + nginx claim)' },
-  args: {
+  args: withCliArgs({
     app: { type: 'positional', required: true },
     repo: {
       type: 'string',
@@ -57,32 +60,34 @@ export default defineCommand({
     },
     env: { type: 'string', description: 'KEY=VALUE secret (repeatable)' },
     health: { type: 'string', description: '/path:port (repeatable via comma)' },
-  },
+  }),
   async run({ args }) {
+    applyCliArgs(args)
+
     if (!APP_NAME_RE.test(args.app)) {
-      consola.error(`app name "${args.app}" must match ${APP_NAME_RE}`)
-      process.exit(1)
+      throw new ValidationError(`app name "${args.app}" must match ${APP_NAME_RE}`)
     }
 
     const { cfg, paths } = await loadAppConfig()
     if (cfg.apps[args.app]) {
-      consola.error(`app "${args.app}" already exists in config`)
-      process.exit(1)
+      throw new ValidationError(`app "${args.app}" already exists in config`)
     }
 
     let repo = args.repo
     if (!repo) {
       if (!isInteractive()) {
-        consola.error('--repo required in non-interactive mode')
-        process.exit(1)
+        missingInput('missing required input for jib add', [
+          { field: 'repo', message: 'provide --repo or rerun with interactive prompts enabled' },
+        ])
       }
-      repo = await promptString({ message: 'GitHub repo (org/name, or "local")' })
+      repo = await promptString({
+        message: 'Git repo (owner/name, "local", URL, or absolute path)',
+      })
     }
 
     const repoErr = validateRepo(repo)
     if (repoErr) {
-      consola.error(`--repo "${repo}" ${repoErr}`)
-      process.exit(1)
+      throw new ValidationError(`--repo "${repo}" ${repoErr}`)
     }
 
     const ingressDefault = args.ingress ?? 'direct'
@@ -91,27 +96,19 @@ export default defineCommand({
     const healthRaw = toArray(args.health).flatMap((h) => h.split(','))
     const composeRaw = args.compose ? args.compose.split(',') : undefined
 
-    if (domainRaw.length === 0) {
-      consola.error('at least one --domain host is required')
-      process.exit(1)
-    }
+    if (domainRaw.length === 0)
+      missingInput('missing required input for jib add', [
+        { field: 'domain', message: 'provide at least one --domain host=...' },
+      ])
 
     for (const pair of envRaw) {
       if (pair.indexOf('=') < 1) {
-        consola.error(`invalid --env "${pair}" — expected KEY=VALUE`)
-        process.exit(1)
+        throw new ValidationError(`invalid --env "${pair}" - expected KEY=VALUE`)
       }
     }
 
-    let parsedDomains: ParsedDomain[]
-    let healthChecks: { path: string; port: number }[]
-    try {
-      parsedDomains = domainRaw.map((d) => parseDomain(d, ingressDefault))
-      healthChecks = healthRaw.map(parseHealth)
-    } catch (err) {
-      consola.error(err instanceof Error ? err.message : String(err))
-      process.exit(1)
-    }
+    const parsedDomains: ParsedDomain[] = domainRaw.map((d) => parseDomain(d, ingressDefault))
+    const healthChecks: HealthCheck[] = healthRaw.map(parseHealth)
 
     const domainsWithPorts = await assignPorts(cfg, args.app, parsedDomains as Domain[])
 
@@ -127,14 +124,15 @@ export default defineCommand({
 
     const parsed = AppSchema.safeParse(appObj)
     if (!parsed.success) {
-      consola.error(`invalid app config: ${parsed.error.message}`)
-      process.exit(1)
+      throw new ValidationError(`invalid app config: ${parsed.error.message}`)
     }
     const newApp: App = parsed.data
 
     const nextCfg: Config = { ...cfg, apps: { ...cfg.apps, [args.app]: newApp } }
     await writeConfig(paths.configFile, nextCfg)
-    consola.success(`added ${args.app} to ${paths.configFile}`)
+    if (isTextOutput()) {
+      consola.success(`added ${args.app} to ${paths.configFile}`)
+    }
 
     if (envRaw.length > 0) {
       const mgr = new SecretsManager(paths.secretsDir)
@@ -142,7 +140,9 @@ export default defineCommand({
         const eq = pair.indexOf('=')
         await mgr.upsert(args.app, pair.slice(0, eq), pair.slice(eq + 1), newApp.env_file)
       }
-      consola.success(`${envRaw.length} secret(s) set for ${args.app}`)
+      if (isTextOutput()) {
+        consola.success(`${envRaw.length} secret(s) set for ${args.app}`)
+      }
     }
 
     let finalApp = newApp
@@ -159,15 +159,29 @@ export default defineCommand({
       const rollbackApps = { ...nextCfg.apps }
       delete rollbackApps[args.app]
       await writeConfig(paths.configFile, { ...nextCfg, apps: rollbackApps })
-      consola.error(err instanceof Error ? err.message : String(err))
-      consola.warn(`rolled back ${args.app} from ${paths.configFile}`)
-      consola.info('safe to retry: jib add ...')
-      process.exit(1)
+      throw new CliError('add_failed', err instanceof Error ? err.message : String(err), {
+        hint: `rolled back ${args.app} from ${paths.configFile}; safe to retry: jib add ...`,
+      })
     }
 
-    const routes = finalApp.domains.map((d) => `${d.host} → 127.0.0.1:${d.port}`).join('\n    ')
-    consola.box(
-      `app "${args.app}" ready\n  routes:\n    ${routes}\n  next:   jib deploy ${args.app}`,
-    )
+    if (isTextOutput()) {
+      const routes = finalApp.domains.map((d) => `${d.host} -> 127.0.0.1:${d.port}`).join('\n    ')
+      consola.box(
+        `app "${args.app}" ready\n  routes:\n    ${routes}\n  next:   jib deploy ${args.app}`,
+      )
+    }
+
+    return {
+      app: args.app,
+      repo,
+      routes: finalApp.domains.map((d) => ({
+        host: d.host,
+        port: d.port ?? null,
+        containerPort: d.container_port ?? null,
+        service: d.service ?? null,
+        ingress: d.ingress ?? 'direct',
+      })),
+      secretsWritten: envRaw.length,
+    }
   },
 })

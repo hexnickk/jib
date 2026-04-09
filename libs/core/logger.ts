@@ -1,7 +1,9 @@
 import { type ConsolaInstance, LogLevels, consola } from 'consola'
 
 /** True when the user wants verbose output. Check this before any expensive debug work. */
-export const JIB_DEBUG = !!process.env.JIB_DEBUG
+export function isJibDebugEnabled(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes((process.env.JIB_DEBUG ?? '').toLowerCase())
+}
 
 /** Root logger — always shows info+success for user-facing milestones. */
 export const rootLogger: ConsolaInstance = consola
@@ -13,7 +15,7 @@ export const rootLogger: ConsolaInstance = consola
  */
 export function createLogger(tag: string): ConsolaInstance {
   const child = consola.withTag(tag)
-  if (!JIB_DEBUG) child.level = LogLevels.warn
+  if (!isJibDebugEnabled()) child.level = LogLevels.warn
   return child
 }
 
