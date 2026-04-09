@@ -15,7 +15,7 @@ export const rootLogger: ConsolaInstance = consola
  */
 export function createLogger(tag: string): ConsolaInstance {
   const child = consola.withTag(tag)
-  if (!isJibDebugEnabled()) child.level = LogLevels.warn
+  child.level = isJibDebugEnabled() ? LogLevels.debug : LogLevels.warn
   return child
 }
 
