@@ -1,11 +1,31 @@
 import { rm } from 'node:fs/promises'
 import { applyAuth, refreshAuth } from '@jib-module/github'
 import type { Bus } from '@jib/bus'
-import type { Config } from '@jib/config'
+import type { App, Config } from '@jib/config'
 import { type Paths, isExternalRepoURL, pathExists, repoPath } from '@jib/core'
 import { SUBJECTS, handleCmd } from '@jib/rpc'
 import { cloneURL } from './src/clone-url.ts'
 import * as git from './src/git.ts'
+
+interface RepoTarget {
+  app: string
+  repo?: string | undefined
+  branch?: string | undefined
+  provider?: string | undefined
+}
+
+function resolveApp(cfg: Config, cmd: RepoTarget): App {
+  const existing = cfg.apps[cmd.app]
+  if (existing) return existing
+  if (!cmd.repo) throw new Error(`app "${cmd.app}" not found in config`)
+  return {
+    repo: cmd.repo,
+    branch: cmd.branch ?? 'main',
+    domains: [],
+    env_file: '.env',
+    ...(cmd.provider ? { provider: cmd.provider } : {}),
+  }
+}
 
 /**
  * Ensures a repo exists on disk at the expected workdir, authenticates via
@@ -16,13 +36,12 @@ import * as git from './src/git.ts'
 export async function prepareRepo(
   cfg: Config,
   paths: Paths,
-  appName: string,
+  target: RepoTarget,
   ref?: string,
 ): Promise<{ workdir: string; sha: string }> {
-  const app = cfg.apps[appName]
-  if (!app) throw new Error(`app "${appName}" not found in config`)
-  const workdir = repoPath(paths, appName, app.repo)
-  const target = ref ?? app.branch
+  const app = resolveApp(cfg, target)
+  const workdir = repoPath(paths, target.app, app.repo)
+  const fetchRef = ref ?? app.branch
 
   const external = isExternalRepoURL(app.repo)
   const auth = !external && app.provider ? await refreshAuth(app.provider, cfg, app, paths) : {}
@@ -31,8 +50,8 @@ export async function prepareRepo(
     await git.clone(cloneURL(app, cfg), workdir, { branch: app.branch, env })
   }
   if (!external) await applyAuth(auth, workdir, app.repo)
-  await git.fetch(workdir, target, env)
-  const sha = await git.remoteSHA(workdir, target)
+  await git.fetch(workdir, fetchRef, env)
+  const sha = await git.remoteSHA(workdir, fetchRef)
   await git.checkout(workdir, sha)
   return { workdir, sha }
 }
@@ -60,7 +79,7 @@ export function registerHandlers(
     SUBJECTS.evt.repoFailed,
     async (cmd) => {
       const cfg = await getConfig()
-      const { workdir, sha } = await prepareRepo(cfg, paths, cmd.app, cmd.ref)
+      const { workdir, sha } = await prepareRepo(cfg, paths, cmd, cmd.ref)
       return { success: { subject: SUBJECTS.evt.repoReady, body: { app: cmd.app, workdir, sha } } }
     },
   )
@@ -75,8 +94,9 @@ export function registerHandlers(
     async (cmd) => {
       const cfg = await getConfig()
       const app = cfg.apps[cmd.app]
-      if (!app) throw new Error(`app "${cmd.app}" not in config`)
-      const workdir = repoPath(paths, cmd.app, app.repo)
+      const repo = app?.repo ?? cmd.repo
+      if (!repo) throw new Error(`app "${cmd.app}" not in config`)
+      const workdir = repoPath(paths, cmd.app, repo)
       await rm(workdir, { recursive: true, force: true })
       return { success: { subject: SUBJECTS.evt.repoRemoved, body: { app: cmd.app } } }
     },

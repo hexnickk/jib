@@ -25,9 +25,15 @@ describe('schemas', () => {
       ts: '2024-01-01T00:00:00Z',
       source: 'cli',
       app: 'demo',
+      repo: 'owner/name',
+      branch: 'main',
+      provider: 'prod',
       ref: 'main',
     })
     expect(v.app).toBe('demo')
+    expect(v.repo).toBe('owner/name')
+    expect(v.branch).toBe('main')
+    expect(v.provider).toBe('prod')
     expect(v.ref).toBe('main')
   })
 

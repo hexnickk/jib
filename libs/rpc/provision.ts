@@ -6,9 +6,16 @@ import { consola } from 'consola'
 import { emitAndWait } from './client.ts'
 import { SUBJECTS } from './subjects.ts'
 
+interface RepoTarget {
+  repo: string
+  branch: string
+  provider?: string
+}
+
 /**
- * Post-writeConfig provisioning chain for `jib add`, split into two phases
- * so the caller can slot compose-file inspection between them:
+ * Repo + ingress provisioning helpers for `jib add`, split into two phases
+ * so the caller can inspect compose and write config only after the repo is
+ * ready and the app shape is fully resolved:
  *
  *   1. `prepareAppRepo` — asks gitsitter to clone/checkout the repo and
  *      returns the workdir path. The caller parses the compose file at
@@ -19,16 +26,24 @@ import { SUBJECTS } from './subjects.ts'
  *      ingress configured at all.
  *
  * Both use clack spinners for progress and throw on failure so the caller
- * can roll back the config entry.
+ * can clean up the repo checkout and, if needed, the final config entry.
  */
-export async function prepareAppRepo(app: string, timeoutMs: number): Promise<{ workdir: string }> {
+export async function prepareAppRepo(
+  app: string,
+  timeoutMs: number,
+  target?: RepoTarget,
+): Promise<{ workdir: string }> {
   return await withBus(async (bus) => {
     const s = isTextOutput() ? spinner() : null
     s?.start(`preparing ${app}`)
     const evt = await emitAndWait(
       bus,
       SUBJECTS.cmd.repoPrepare,
-      { app },
+      {
+        app,
+        ...(target ? { repo: target.repo, branch: target.branch } : {}),
+        ...(target?.provider ? { provider: target.provider } : {}),
+      },
       { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
       SUBJECTS.evt.repoProgress,
       { source: 'cli', timeoutMs, onProgress: (p) => s?.message(p.message) },
@@ -66,18 +81,18 @@ export async function claimNginxRoutes(app: string, appCfg: App, timeoutMs: numb
 
 /**
  * Best-effort cleanup of gitsitter's workdir when `jib add` fails after
- * `cmd.repo.prepare` succeeded. Must be called *before* the caller removes
- * the app from config — the gitsitter handler reads the config to locate
- * the workdir. Any failure (repo never prepared, bus down, handler throws)
- * is logged and swallowed so the caller can still drop the config entry.
+ * `cmd.repo.prepare` succeeded. When the app was never written to config,
+ * the caller can pass `repo` so gitsitter can still resolve the checkout
+ * path. Any failure (repo never prepared, bus down, handler throws) is
+ * logged and swallowed so the caller can still drop the config entry.
  */
-export async function rollbackRepo(app: string, timeoutMs: number): Promise<void> {
+export async function rollbackRepo(app: string, timeoutMs: number, repo?: string): Promise<void> {
   try {
     await withBus(async (bus) => {
       await emitAndWait(
         bus,
         SUBJECTS.cmd.repoRemove,
-        { app },
+        { app, ...(repo ? { repo } : {}) },
         { success: SUBJECTS.evt.repoRemoved, failure: SUBJECTS.evt.repoFailed },
         undefined,
         { source: 'cli', timeoutMs },

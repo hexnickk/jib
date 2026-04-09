@@ -63,9 +63,9 @@ interface AddInputs {
 /**
  * `jib add <app>` — gather repo / compose hints → prepare repo →
  * inspect compose → ask only missing questions → write config + secrets →
- * optionally claim nginx routes. Remote repos still need a temporary app
- * entry before repo preparation because gitsitter resolves workdirs from
- * config; any failure after that point rolls the entry back.
+ * optionally claim nginx routes. Repo prep now accepts inline repo metadata,
+ * so the config is only written once the app shape is fully resolved; any
+ * later failure rolls back the checkout, secrets, and final config entry.
  */
 export default defineCommand({
   meta: { name: 'add', description: 'Register a new app (config + repo + optional ingress)' },
@@ -103,18 +103,19 @@ export default defineCommand({
     }
 
     const inputs = await gatherAddInputs(args)
-    const draftApp = buildDraftApp(args, inputs)
-    const draftCfg: Config = { ...cfg, apps: { ...cfg.apps, [args.app]: draftApp } }
-    await writeConfig(paths.configFile, draftCfg)
-
     let preparedRepo = false
+    let configWritten = false
     let finalEnvFile = '.env'
     const writtenSecretKeys: string[] = []
     try {
-      const { workdir } = await prepareAppRepo(args.app, DEFAULT_TIMEOUT_MS)
+      const { workdir } = await prepareAppRepo(args.app, DEFAULT_TIMEOUT_MS, {
+        repo: inputs.repo,
+        branch: 'main',
+        ...(args['git-provider'] ? { provider: args['git-provider'] } : {}),
+      })
       preparedRepo = true
 
-      const inspection = await inspectComposeWithPrompts(draftApp, workdir)
+      const inspection = await inspectComposeWithPrompts(buildDraftApp(args, inputs), workdir)
       const guided = await collectGuidedInputs(inputs, inspection.services)
       const finalApp = await buildResolvedApp(
         cfg,
@@ -130,6 +131,7 @@ export default defineCommand({
 
       const finalCfg: Config = { ...cfg, apps: { ...cfg.apps, [args.app]: finalApp } }
       await writeConfig(paths.configFile, finalCfg)
+      configWritten = true
       finalEnvFile = finalApp.env_file
 
       if (guided.envEntries.length > 0) {
@@ -175,9 +177,11 @@ export default defineCommand({
         cfg,
         paths.configFile,
         preparedRepo,
+        configWritten,
         paths.secretsDir,
         finalEnvFile,
         writtenSecretKeys,
+        inputs.repo,
       )
       throw normalizeAddError(err, args.app, paths.configFile)
     }
@@ -474,12 +478,14 @@ async function cleanupFailedAdd(
   cfg: Config,
   configFile: string,
   preparedRepo: boolean,
+  configWritten: boolean,
   secretsDir?: string,
   envFile = '.env',
   writtenSecrets: string[] = [],
+  repo?: string,
 ): Promise<void> {
   if (preparedRepo) {
-    await rollbackRepo(appName, DEFAULT_TIMEOUT_MS)
+    await rollbackRepo(appName, DEFAULT_TIMEOUT_MS, repo)
   }
   for (const key of writtenSecrets) {
     try {
@@ -494,6 +500,7 @@ async function cleanupFailedAdd(
       }
     }
   }
+  if (!configWritten) return
   try {
     const rollbackApps = { ...cfg.apps }
     delete rollbackApps[appName]

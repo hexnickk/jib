@@ -17,9 +17,15 @@ const app = z.string().min(1)
 
 export const CmdRepoPrepareSchema = EnvelopeSchema.extend({
   app,
+  repo: z.string().min(1).optional(),
+  branch: z.string().min(1).optional(),
+  provider: z.string().min(1).optional(),
   ref: z.string().min(1).optional(),
 })
-export const CmdRepoRemoveSchema = EnvelopeSchema.extend({ app })
+export const CmdRepoRemoveSchema = EnvelopeSchema.extend({
+  app,
+  repo: z.string().min(1).optional(),
+})
 export const CmdDeploySchema = EnvelopeSchema.extend({
   app,
   workdir: z.string().min(1),

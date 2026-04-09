@@ -42,6 +42,20 @@ async function makeConfigAndPaths(upstream: string) {
   return { paths, cfg }
 }
 
+async function makeEmptyConfigAndPaths() {
+  const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+  const paths = getPaths(root)
+  const cfg: Config = {
+    config_version: 3,
+    poll_interval: '5m',
+    modules: {},
+    apps: {},
+  }
+  await mkdir(root, { recursive: true })
+  await writeConfig(paths.configFile, cfg)
+  return { paths, cfg }
+}
+
 describe('gitsitter handlers', () => {
   test('cmd.repo.prepare clones and emits evt.repo.ready', async () => {
     const upstream = await makeUpstream()
@@ -105,5 +119,31 @@ describe('gitsitter handlers', () => {
     })
     for (let i = 0; i < 5; i++) await flush()
     expect(failures).toHaveLength(1)
+  })
+
+  test('cmd.repo.prepare can clone from inline target without config entry', async () => {
+    const upstream = await makeUpstream()
+    const { paths, cfg } = await makeEmptyConfigAndPaths()
+    const bus = new FakeBus()
+    const ready: unknown[] = []
+    bus.subscribe(SUBJECTS.evt.repoReady, (p) => {
+      ready.push(p)
+    })
+
+    registerHandlers(bus.asBus(), paths, () => cfg)
+
+    bus.publish(SUBJECTS.cmd.repoPrepare, {
+      corrId: 'c3',
+      ts: new Date().toISOString(),
+      source: 'test',
+      app: 'demo',
+      repo: upstream,
+      branch: 'main',
+    })
+    for (let i = 0; i < 30; i++) {
+      await flush()
+      await new Promise((r) => setTimeout(r, 10))
+    }
+    expect(ready).toHaveLength(1)
   })
 })
