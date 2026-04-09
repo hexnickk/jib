@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { App, Domain } from '@jib/config'
 import { consola } from 'consola'
 import {
@@ -8,6 +10,59 @@ import {
 } from './parse.ts'
 
 const FALLBACK_CONTAINER_PORT = 80
+const DEFAULT_COMPOSE_FILES = [
+  'docker-compose.yml',
+  'docker-compose.yaml',
+  'compose.yml',
+  'compose.yaml',
+]
+
+export type ComposeInspectionCode = 'compose_not_found' | 'compose_parse'
+
+export class ComposeInspectionError extends Error {
+  constructor(
+    readonly code: ComposeInspectionCode,
+    message: string,
+    readonly details: { composeFiles?: string[]; availableFiles?: string[] } = {},
+  ) {
+    super(message)
+    this.name = 'ComposeInspectionError'
+  }
+}
+
+export interface ComposeInspection {
+  composeFiles: string[]
+  services: ComposeService[]
+}
+
+export function discoverComposeFiles(workdir: string): string[] {
+  return DEFAULT_COMPOSE_FILES.filter((file) => existsSync(join(workdir, file)))
+}
+
+export function inspectComposeApp(
+  appCfg: Pick<App, 'compose'>,
+  workdir: string,
+): ComposeInspection {
+  const composeFiles = resolveComposeFiles(workdir, appCfg.compose ?? [])
+  let services: ComposeService[]
+  try {
+    services = parseComposeServices(workdir, composeFiles)
+  } catch (err) {
+    throw new ComposeInspectionError(
+      'compose_parse',
+      `failed to parse compose file: ${err instanceof Error ? err.message : err}`,
+      { composeFiles },
+    )
+  }
+  if (services.length === 0) {
+    throw new ComposeInspectionError(
+      'compose_parse',
+      `compose file ${composeFiles.join(', ')} has no services`,
+      { composeFiles },
+    )
+  }
+  return { composeFiles, services }
+}
 
 /**
  * Parse the compose file from the prepared workdir, resolve each ingress
@@ -16,13 +71,8 @@ const FALLBACK_CONTAINER_PORT = 80
  * `!override`. Pure aside from the consola warnings — no disk writes.
  */
 export function resolveFromCompose(appCfg: App, workdir: string): App {
-  let parsed: ComposeService[]
-  try {
-    parsed = parseComposeServices(workdir, appCfg.compose ?? [])
-  } catch (err) {
-    throw new Error(`failed to parse compose file: ${err instanceof Error ? err.message : err}`)
-  }
-  if (parsed.length === 0) throw new Error('compose file has no services')
+  const inspection = inspectComposeApp(appCfg, workdir)
+  const parsed = inspection.services
   if (appCfg.domains.length === 0) return appCfg
   const byName = new Map(parsed.map((s) => [s.name, s]))
   const single = parsed.length === 1 ? parsed[0]?.name : undefined
@@ -44,6 +94,25 @@ export function resolveFromCompose(appCfg: App, workdir: string): App {
 
   if (publishing.size > 0) warnPublished(publishing, nextDomains)
   return { ...appCfg, domains: nextDomains }
+}
+
+function resolveComposeFiles(workdir: string, composeFiles: string[]): string[] {
+  if (composeFiles.length > 0) {
+    const missing = composeFiles.filter((file) => !existsSync(join(workdir, file)))
+    if (missing.length > 0) {
+      throw new ComposeInspectionError(
+        'compose_not_found',
+        `compose file not found: ${missing.join(', ')}`,
+        { composeFiles: missing },
+      )
+    }
+    return composeFiles
+  }
+  const discovered = discoverComposeFiles(workdir)
+  if (discovered.length > 0) return [discovered[0] as string]
+  throw new ComposeInspectionError('compose_not_found', 'no compose file found in the repo root', {
+    availableFiles: discovered,
+  })
 }
 
 function resolvePort(svc: ComposeService): number {

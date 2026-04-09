@@ -10,7 +10,7 @@ import {
   isTextOutput,
 } from '@jib/core'
 import { collectServices, openDb } from '@jib/state'
-import { intro, log, outro } from '@jib/tui'
+import { intro, log, note, outro } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { parse } from 'yaml'
 import { migrations, runJibMigrations } from '../../migrations/index.ts'
@@ -18,6 +18,7 @@ import type { MigrationContext } from '../../migrations/types.ts'
 import { applyCliArgs, missingInput, withCliArgs } from '../_cli.ts'
 import { runInstallsTx } from './install.ts'
 import {
+  describeModules,
   installedOptionalModules,
   promptOptionalModules,
   requiredModules,
@@ -106,13 +107,29 @@ export default defineCommand({
     // Prompt for any optional modules the user hasn't been asked about
     const config = await loadConfig(paths.configFile)
     const unseen = unseenOptionalModules(config)
+    if (isTextOutput()) {
+      const required = describeModules(requiredModules())
+      if (required.length > 0) {
+        note(
+          required.join('\n'),
+          configExisted ? 'Required modules' : 'Installing required modules',
+        )
+      }
+      if (unseen.length > 0) {
+        note(
+          `Choose which optional pieces you want Jib to manage now.\n${describeModules(unseen).join('\n')}`,
+          'Optional modules',
+        )
+      }
+    }
     if (unseen.length > 0) {
       if (!canPrompt()) {
         missingInput(
           'missing optional module choices for jib init',
           unseen.map((mod) => ({
             field: `modules.${mod.manifest.name}`,
-            message: 'set this module to true or false in config, or rerun interactively',
+            message:
+              'set this module to true or false in config, or rerun with interactive prompts enabled',
           })),
         )
       }
@@ -143,6 +160,14 @@ export default defineCommand({
     }
 
     const finalConfig = await loadConfig(paths.configFile)
+    if (isTextOutput()) {
+      note(
+        configExisted
+          ? 'Next: run `jib status` to confirm services are healthy.'
+          : 'Next: run `jib add myapp --repo owner/name` to register your first app.',
+        'Next steps',
+      )
+    }
     return {
       appliedMigrations: applied,
       configExisted,

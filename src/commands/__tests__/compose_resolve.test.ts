@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { App } from '@jib/config'
-import { resolveFromCompose } from '@jib/docker'
+import { inspectComposeApp, resolveFromCompose } from '@jib/docker'
 
 function fixture(yaml: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
@@ -95,7 +95,7 @@ describe('resolveFromCompose', () => {
   test('missing compose file produces a clean error', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
     const app = mkApp({ domains: [{ host: 'demo.example.com', port: 20000 }] })
-    expect(() => resolveFromCompose(app, dir)).toThrow(/failed to parse compose/)
+    expect(() => resolveFromCompose(app, dir)).toThrow(/no compose file found/)
   })
 
   test('no container_port inferable falls back to 80', () => {
@@ -103,5 +103,23 @@ describe('resolveFromCompose', () => {
     const app = mkApp({ domains: [{ host: 'demo.example.com', port: 20000 }] })
     const out = resolveFromCompose(app, dir)
     expect(out.domains[0]?.container_port).toBe(80)
+  })
+
+  test('inspectComposeApp discovers compose.yml when compose is omitted', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
+    writeFileSync(join(dir, 'compose.yml'), 'services:\n  web:\n    image: nginx\n')
+
+    const inspection = inspectComposeApp({ compose: undefined }, dir)
+
+    expect(inspection.composeFiles).toEqual(['compose.yml'])
+    expect(inspection.services.map((service) => service.name)).toEqual(['web'])
+  })
+
+  test('inspectComposeApp reports an explicit missing compose path clearly', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
+
+    expect(() => inspectComposeApp({ compose: ['docker-compose.yml'] }, dir)).toThrow(
+      /compose file not found: docker-compose.yml/,
+    )
   })
 })
