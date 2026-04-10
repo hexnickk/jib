@@ -48,6 +48,16 @@ describe('Store', () => {
     })
   })
 
+  test('remove deletes the app state file', async () => {
+    await withStore(async (s) => {
+      await s.save('web', emptyState('web'))
+      await s.remove('web')
+      const st = await s.load('web')
+      expect(st.app).toBe('web')
+      expect(st.deployed_sha).toBe('')
+    })
+  })
+
   test('load rejects corrupt JSON', async () => {
     await withStore(async (s, dir) => {
       await Bun.write(join(dir, 'web.json'), '{not json')

@@ -31,6 +31,16 @@ describe('RemoveService', () => {
         calls.push('removeCheckout')
         throw new Error('cleanup failed')
       },
+      removeSecrets: async () => {
+        calls.push('removeSecrets')
+        throw new Error('secret cleanup failed')
+      },
+      removeState: async () => {
+        calls.push('removeState')
+      },
+      removeOverride: async () => {
+        calls.push('removeOverride')
+      },
       writeConfig: async (_configFile, nextCfg) => {
         calls.push('writeConfig')
         written = nextCfg
@@ -47,8 +57,19 @@ describe('RemoveService', () => {
     })
 
     expect(result).toEqual({ app: 'demo', removed: true })
-    expect(calls).toEqual(['stopApp', 'removeCheckout', 'writeConfig'])
-    expect(warnings).toEqual(['compose down: down failed', 'repo cleanup: cleanup failed'])
+    expect(calls).toEqual([
+      'stopApp',
+      'writeConfig',
+      'removeCheckout',
+      'removeSecrets',
+      'removeState',
+      'removeOverride',
+    ])
+    expect(warnings).toEqual([
+      'compose down: down failed',
+      'repo cleanup: cleanup failed',
+      'secrets cleanup: secret cleanup failed',
+    ])
     expect(written?.apps.demo).toBeUndefined()
   })
 })

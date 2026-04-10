@@ -1,21 +1,29 @@
 import { loadAppConfig } from '@jib/config'
 import type { App } from '@jib/config'
-import { type Paths, ValidationError, isTextOutput } from '@jib/core'
-import { type AddFlowResult, AddService, DefaultAddSupport } from '@jib/flows'
+import { CliError, type Paths, ValidationError, isTextOutput } from '@jib/core'
+import { AddService, DefaultAddSupport } from '@jib/flows'
 import { claimIngress } from '@jib/ingress'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { createIngressOperator } from '../ingress-operator.ts'
 import { applyCliArgs, withCliArgs } from './_cli.ts'
+import {
+  normalizeAddDeployError,
+  renderAddResult,
+  rollbackAddedApp,
+  trapInterrupt,
+} from './add-runtime.ts'
+import { RolledBackAddError, runAddSequence } from './add-sequence.ts'
 import { buildDraftApp, gatherAddInputs } from './add/inputs.ts'
 import { createAddPlanner } from './add/planner.ts'
+import { DEFAULT_TIMEOUT_MS, runDeploy } from './deploy-run.ts'
 import { preflightSourceSelection } from './sources-flow.ts'
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 
 export default defineCommand({
-  meta: { name: 'add', description: 'Register a new app (config + repo + optional ingress)' },
+  meta: { name: 'add', description: 'Register and deploy a new app' },
   args: withCliArgs({
     app: { type: 'positional', required: true },
     repo: {
@@ -51,6 +59,7 @@ export default defineCommand({
 
     const inputs = await gatherAddInputs(args)
     const planner = createAddPlanner()
+    const interrupt = trapInterrupt()
     const preflight = await preflightSourceSelection(
       args.app,
       cfg,
@@ -70,51 +79,51 @@ export default defineCommand({
       }),
       planner,
       {
+        onStateChange: () => {
+          if (interrupt.interrupted) throw new ValidationError('cancelled')
+        },
         warn: (message) => {
           if (isTextOutput()) consola.warn(message)
         },
       },
     )
 
-    const result: AddFlowResult = await addService.run({
-      appName: args.app,
-      args: flowArgs,
-      cfg: preflight.cfg,
-      configFile: paths.configFile,
-      inputs,
-      draftApp: buildDraftApp(flowArgs, inputs),
-    })
-    return renderResult(args.app, inputs.repo, result)
+    try {
+      const { addResult, deployResult } = await runAddSequence(
+        () =>
+          addService.run({
+            appName: args.app,
+            args: flowArgs,
+            cfg: preflight.cfg,
+            configFile: paths.configFile,
+            inputs,
+            draftApp: buildDraftApp(flowArgs, inputs),
+          }),
+        (result) =>
+          runDeploy(
+            { ...preflight.cfg, apps: { ...preflight.cfg.apps, [args.app]: result.finalApp } },
+            paths,
+            args.app,
+            undefined,
+            DEFAULT_TIMEOUT_MS,
+          ),
+        (result) => rollbackAddedApp(paths, args.app, preflight.cfg, result.finalApp),
+        interrupt,
+      )
+      return renderAddResult(args.app, inputs.repo, addResult, deployResult)
+    } catch (error) {
+      if (error instanceof RolledBackAddError) {
+        const original = interrupt.interrupted
+          ? new CliError('cancelled', 'add cancelled')
+          : error.original
+        throw normalizeAddDeployError(original, args.app, paths.configFile)
+      }
+      throw error
+    } finally {
+      interrupt.dispose()
+    }
   },
 })
-
-function renderResult(app: string, repo: string, result: AddFlowResult) {
-  const { finalApp, secretsWritten } = result
-  if (secretsWritten > 0 && isTextOutput()) {
-    consola.success(`${secretsWritten} secret(s) set for ${app}`)
-  }
-  if (isTextOutput()) {
-    const ingress =
-      finalApp.domains.length > 0
-        ? finalApp.domains.map((d) => `${d.host} -> 127.0.0.1:${d.port}`).join('\n    ')
-        : 'none'
-    consola.box(`app "${app}" ready\n  ingress:\n    ${ingress}\n  next:   jib deploy ${app}`)
-  }
-  return {
-    app,
-    repo,
-    composeFiles: finalApp.compose ?? [],
-    services: finalApp.services ?? [],
-    routes: finalApp.domains.map((d) => ({
-      host: d.host,
-      port: d.port ?? null,
-      containerPort: d.container_port ?? null,
-      service: d.service ?? null,
-      ingress: d.ingress ?? 'direct',
-    })),
-    secretsWritten,
-  }
-}
 
 async function claimIngressForAdd(paths: Paths, app: string, appCfg: App): Promise<void> {
   const s = isTextOutput() ? spinner() : null

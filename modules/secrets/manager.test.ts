@@ -62,6 +62,15 @@ describe('SecretsManager', () => {
     })
   })
 
+  test('removeApp deletes the whole app secrets dir', async () => {
+    await withMgr(async (mgr, dir) => {
+      await mgr.upsert('web', 'A', '1')
+      await mgr.removeApp('web')
+      expect((await mgr.check('web')).exists).toBe(false)
+      expect(await Bun.file(join(dir, 'web', '.env')).exists()).toBe(false)
+    })
+  })
+
   test('check reports existence', async () => {
     await withMgr(async (mgr) => {
       await mgr.upsert('web', 'A', '1')

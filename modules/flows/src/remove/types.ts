@@ -20,5 +20,8 @@ export interface RemoveSupport {
   releaseIngress(appName: string): Promise<void>
   stopApp(cfg: Config, appName: string, quiet: boolean): Promise<void>
   removeCheckout(appName: string, repo: string): Promise<void>
+  removeSecrets(appName: string): Promise<void>
+  removeState(appName: string): Promise<void>
+  removeOverride(appName: string): Promise<void>
   writeConfig(configFile: string, cfg: Config): Promise<void>
 }

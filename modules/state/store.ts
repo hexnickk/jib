@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { StateError } from '@jib/core'
 import { ZodError } from 'zod'
@@ -52,6 +52,10 @@ export class Store {
       await unlink(tmp).catch(() => undefined)
       throw new StateError(`writing state ${target}: ${(err as Error).message}`, { cause: err })
     }
+  }
+
+  async remove(app: string): Promise<void> {
+    await rm(this.path(app), { force: true })
   }
 
   /**

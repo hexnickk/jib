@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export interface AppSecretStatus {
@@ -93,6 +93,10 @@ export class SecretsManager {
     lines.splice(idx, 1)
     await this.writeSecure(path, lines.join('\n'))
     return true
+  }
+
+  async removeApp(app: string): Promise<void> {
+    await rm(join(this.dir, app), { recursive: true, force: true })
   }
 
   async check(app: string, envFile?: string): Promise<AppSecretStatus> {

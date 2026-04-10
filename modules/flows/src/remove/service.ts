@@ -19,13 +19,16 @@ export class RemoveService {
     await this.runBestEffort('compose down', () =>
       this.support.stopApp(params.cfg, params.appName, params.quiet),
     )
-    await this.runBestEffort('repo cleanup', () =>
-      this.support.removeCheckout(params.appName, appCfg.repo),
-    )
-
     const nextApps = { ...params.cfg.apps }
     delete nextApps[params.appName]
     await this.support.writeConfig(params.configFile, { ...params.cfg, apps: nextApps })
+
+    await this.runBestEffort('repo cleanup', () =>
+      this.support.removeCheckout(params.appName, appCfg.repo),
+    )
+    await this.runBestEffort('secrets cleanup', () => this.support.removeSecrets(params.appName))
+    await this.runBestEffort('state cleanup', () => this.support.removeState(params.appName))
+    await this.runBestEffort('override cleanup', () => this.support.removeOverride(params.appName))
     return { app: params.appName, removed: true }
   }
 
