@@ -1,31 +1,8 @@
-import { rm } from 'node:fs/promises'
-import { applyAuth, refreshAuth } from '@jib-module/github'
 import type { Bus } from '@jib/bus'
-import type { App, Config } from '@jib/config'
-import { type Paths, isExternalRepoURL, pathExists, repoPath } from '@jib/core'
+import type { Config } from '@jib/config'
+import type { Paths } from '@jib/core'
 import { SUBJECTS, handleCmd } from '@jib/rpc'
-import { cloneURL } from './src/clone-url.ts'
-import * as git from './src/git.ts'
-
-interface RepoTarget {
-  app: string
-  repo?: string | undefined
-  branch?: string | undefined
-  provider?: string | undefined
-}
-
-function resolveApp(cfg: Config, cmd: RepoTarget): App {
-  const existing = cfg.apps[cmd.app]
-  if (existing) return existing
-  if (!cmd.repo) throw new Error(`app "${cmd.app}" not found in config`)
-  return {
-    repo: cmd.repo,
-    branch: cmd.branch ?? 'main',
-    domains: [],
-    env_file: '.env',
-    ...(cmd.provider ? { provider: cmd.provider } : {}),
-  }
-}
+import { type SourceTarget, prepareSource, removeSource } from '@jib/sources'
 
 /**
  * Ensures a repo exists on disk at the expected workdir, authenticates via
@@ -36,49 +13,10 @@ function resolveApp(cfg: Config, cmd: RepoTarget): App {
 export async function prepareRepo(
   cfg: Config,
   paths: Paths,
-  target: RepoTarget,
+  target: SourceTarget,
   ref?: string,
 ): Promise<{ workdir: string; sha: string }> {
-  const app = resolveApp(cfg, target)
-  const workdir = repoPath(paths, target.app, app.repo)
-  const fetchRef = ref ?? app.branch
-  const url = cloneURL(app, cfg)
-
-  const external = isExternalRepoURL(app.repo)
-  const auth = !external && app.provider ? await refreshAuth(app.provider, cfg, app, paths) : {}
-  const env = auth.sshKeyPath ? git.configureSSHKey(auth.sshKeyPath) : {}
-  await ensureCheckout(workdir, url, app.branch, env)
-  if (!external) await applyAuth(auth, workdir, app.repo)
-  await git.fetch(workdir, fetchRef, env)
-  const sha = await git.remoteSHA(workdir, fetchRef)
-  await git.checkout(workdir, sha)
-  return { workdir, sha }
-}
-
-async function ensureCheckout(
-  workdir: string,
-  url: string,
-  branch: string,
-  env: git.GitEnv,
-): Promise<void> {
-  if (await pathExists(workdir)) {
-    const [repoReady, hasRemote] = await Promise.all([git.isRepo(workdir), git.hasRemote(workdir)])
-    if (!repoReady || !hasRemote) {
-      await rm(workdir, { recursive: true, force: true })
-    }
-  }
-
-  if (!(await pathExists(workdir))) {
-    try {
-      await git.clone(url, workdir, { branch, env })
-    } catch (error) {
-      await rm(workdir, { recursive: true, force: true })
-      throw error
-    }
-    return
-  }
-
-  await git.setRemoteURL(workdir, url)
+  return prepareSource(cfg, paths, target, ref)
 }
 
 /**
@@ -104,8 +42,17 @@ export function registerHandlers(
     SUBJECTS.evt.repoFailed,
     async (cmd) => {
       const cfg = await getConfig()
-      const { workdir, sha } = await prepareRepo(cfg, paths, cmd, cmd.ref)
-      return { success: { subject: SUBJECTS.evt.repoReady, body: { app: cmd.app, workdir, sha } } }
+      if (!cmd.app) throw new Error('repo.prepare missing app')
+      const target: SourceTarget = {
+        app: cmd.app,
+        ...(cmd.repo ? { repo: cmd.repo } : {}),
+        ...(cmd.branch ? { branch: cmd.branch } : {}),
+        ...(cmd.provider ? { provider: cmd.provider } : {}),
+      }
+      const { workdir, sha } = await prepareRepo(cfg, paths, target, cmd.ref)
+      return {
+        success: { subject: SUBJECTS.evt.repoReady, body: { app: target.app, workdir, sha } },
+      }
     },
   )
 
@@ -118,11 +65,11 @@ export function registerHandlers(
     SUBJECTS.evt.repoFailed,
     async (cmd) => {
       const cfg = await getConfig()
+      if (!cmd.app) throw new Error('repo.remove missing app')
       const app = cfg.apps[cmd.app]
       const repo = app?.repo ?? cmd.repo
       if (!repo) throw new Error(`app "${cmd.app}" not in config`)
-      const workdir = repoPath(paths, cmd.app, repo)
-      await rm(workdir, { recursive: true, force: true })
+      await removeSource(paths, cmd.app, repo)
       return { success: { subject: SUBJECTS.evt.repoRemoved, body: { app: cmd.app } } }
     },
   )

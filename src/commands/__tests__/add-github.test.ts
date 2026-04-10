@@ -11,6 +11,7 @@ const paths = getPaths('/tmp/jib-add-github-test')
 const cfg = {
   config_version: 3,
   poll_interval: '5m',
+  modules: {},
   apps: {},
   github: {
     providers: {

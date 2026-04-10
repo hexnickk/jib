@@ -16,7 +16,7 @@ async function makeUpstream(): Promise<string> {
   return dir
 }
 
-describe('git (smoke)', () => {
+describe('sources git (smoke)', () => {
   test('clone + currentSHA round-trip', async () => {
     const upstream = await makeUpstream()
     const work = await mkdtemp(join(tmpdir(), 'jib-clone-'))
@@ -32,7 +32,6 @@ describe('git (smoke)', () => {
     const repo = join(work, 'repo')
     await git.clone(upstream, repo, { branch: 'main' })
 
-    // Add a second commit upstream.
     await writeFile(join(upstream, 'NEW'), 'x\n')
     await $`git -C ${upstream} add NEW`.quiet()
     await $`git -C ${upstream} commit -m second`.quiet()

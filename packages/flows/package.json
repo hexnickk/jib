@@ -1,5 +1,5 @@
 {
-  "name": "@jib-module/gitsitter",
+  "name": "@jib/flows",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,14 +7,9 @@
   "exports": {
     ".": "./index.ts"
   },
-  "jib": {
-    "module": true
-  },
   "dependencies": {
-    "@jib/bus": "workspace:*",
     "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",
-    "@jib/rpc": "workspace:*",
-    "@jib/sources": "workspace:*"
+    "@jib/docker": "workspace:*"
   }
 }

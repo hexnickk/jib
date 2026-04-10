@@ -48,7 +48,9 @@ describe('module registry projections', () => {
     expect(modulesWithCli(registry).map((mod) => mod.manifest.name)).toEqual(['cli-only'])
     expect(Object.keys(moduleSubCommands(registry))).toEqual(['fake-cli'])
     expect(runnableModuleNames(registry)).toEqual(['service-only'])
-    expect(resolveRunnableModule('service-only', registry)).toBe(serviceOnly)
+    expect(resolveRunnableModule('service-only', registry)?.manifest.name).toBe(
+      serviceOnly.manifest.name,
+    )
     expect(
       resolveModules(['setup-module', 'service-only'], registry).map((mod) => mod.manifest.name),
     ).toEqual(['service-only', 'setup-module'])

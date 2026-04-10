@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { JibError, normalizeCliError } from '@jib/core'
-import { normalizeAddError } from '../add-flow.ts'
+import { normalizeAddError } from '@jib/flows'
 
 describe('add command error normalization', () => {
   test('legacy repo-prepare mismatch hint is preserved by CLI normalization', () => {

@@ -3,6 +3,7 @@ import { loadAppOrExit, writeConfig } from '@jib/config'
 import { canPrompt, isTextOutput } from '@jib/core'
 import { composeFor } from '@jib/docker'
 import { SUBJECTS, emitAndWait } from '@jib/rpc'
+import { removeSource } from '@jib/sources'
 import { promptConfirm } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
@@ -80,16 +81,7 @@ export default defineCommand({
     }
 
     try {
-      await withBus(async (bus) => {
-        await emitAndWait(
-          bus,
-          SUBJECTS.cmd.repoRemove,
-          { app: args.app },
-          { success: SUBJECTS.evt.repoRemoved, failure: SUBJECTS.evt.repoFailed },
-          undefined,
-          { source: 'cli', timeoutMs: DEFAULT_TIMEOUT_MS },
-        )
-      })
+      await removeSource(paths, args.app, appCfg.repo)
     } catch (err) {
       if (isTextOutput()) {
         consola.warn(`repo cleanup: ${err instanceof Error ? err.message : String(err)}`)

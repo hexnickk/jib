@@ -22,7 +22,15 @@ async function withTmpRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
 }
 
 async function runCli(root: string, args: string[]) {
-  const proc = Bun.spawn([process.execPath, 'run', join(process.cwd(), 'main.ts'), ...args], {
+  return runEntry(root, 'apps/jib/main.ts', args)
+}
+
+async function runDaemon(root: string, args: string[]) {
+  return runEntry(root, 'apps/jib-daemon/main.ts', args)
+}
+
+async function runEntry(root: string, entrypoint: string, args: string[]) {
+  const proc = Bun.spawn([process.execPath, 'run', join(process.cwd(), entrypoint), ...args], {
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -57,6 +65,17 @@ describe('execution contract', () => {
   test('service list returns structured JSON success', async () => {
     await withTmpRoot(async (root) => {
       const result = await runCli(root, ['--output=json', 'service', 'list'])
+      expect(result.exitCode).toBe(0)
+      expect(result.stderr).toBe('')
+      const parsed = JSON.parse(result.stdout)
+      expect(parsed.ok).toBe(true)
+      expect(parsed.data.services).toEqual(['deployer', 'gitsitter', 'nginx'])
+    })
+  })
+
+  test('daemon list returns structured JSON success', async () => {
+    await withTmpRoot(async (root) => {
+      const result = await runDaemon(root, ['--output=json', 'list'])
       expect(result.exitCode).toBe(0)
       expect(result.stderr).toBe('')
       const parsed = JSON.parse(result.stdout)
@@ -117,7 +136,9 @@ describe('execution contract', () => {
         apps: {
           demo: {
             repo: 'owner/name',
+            branch: 'main',
             domains: [],
+            env_file: '.env',
           },
         },
       } satisfies Config)

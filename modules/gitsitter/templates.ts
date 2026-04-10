@@ -1,7 +1,7 @@
 /**
  * Systemd unit template for gitsitter. Templated so `$JIB_ROOT` and the
- * install path for the compiled binary can be threaded through without
- * hardcoding `/opt/jib` or `/usr/local/bin/jib`.
+ * install path for the daemon binary can be threaded through without
+ * hardcoding `/opt/jib` or `/usr/local/bin/jib-daemon`.
  */
 export interface GitsitterTemplateVars {
   jibRoot: string
@@ -17,7 +17,7 @@ Requires=jib-bus.service
 [Service]
 Type=simple
 Environment=JIB_ROOT=${vars.jibRoot}
-ExecStart=${vars.binPath} service start gitsitter
+ExecStart=${vars.binPath} start gitsitter
 Restart=on-failure
 RestartSec=5
 

@@ -73,7 +73,7 @@ export const install: InstallFn = async (ctx) => {
  * short-circuits when the service is already active.
  */
 async function installOperatorUnit(jibRoot: string, log: { info: (m: string) => void }) {
-  const unit = renderSystemdUnit({ jibRoot, binPath: '/usr/local/bin/jib' })
+  const unit = renderSystemdUnit({ jibRoot, binPath: '/usr/local/bin/jib-daemon' })
   log.info(`writing ${NGINX_UNIT_PATH}`)
   await writeFile(NGINX_UNIT_PATH, unit, { mode: 0o644 })
   log.info('systemctl daemon-reload')

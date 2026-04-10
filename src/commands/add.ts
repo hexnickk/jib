@@ -22,8 +22,16 @@ import {
   inspectComposeApp,
   resolveFromCompose,
 } from '@jib/docker'
-import { claimNginxRoutes, prepareAppRepo, rollbackRepo } from '@jib/rpc'
+import {
+  AddFlow,
+  type AddFlowResult,
+  type AddInputs,
+  type AddPlanner,
+  type EnvEntry,
+} from '@jib/flows'
+import { claimNginxRoutes } from '@jib/rpc'
 import { SecretsManager } from '@jib/secrets'
+import { prepareSource, removeSource } from '@jib/sources'
 import {
   isInteractive,
   promptConfirm,
@@ -35,7 +43,6 @@ import {
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { applyCliArgs, missingInput, withCliArgs } from './_cli.ts'
-import { type AddFlowResult, type AddInputs, type EnvEntry, runAddFlow } from './add-flow.ts'
 import { maybeRecoverGitHubProvider } from './add-github.ts'
 import {
   assignCliDomainsToServices,
@@ -98,39 +105,46 @@ export default defineCommand({
     }
     let currentCfg = cfg
     let result: AddFlowResult | undefined
+    const planner: AddPlanner = {
+      inspectCompose: inspectComposeWithPrompts,
+      collectGuidedInputs,
+      buildResolvedApp,
+      confirmPlan: confirmAddPlan,
+    }
+    const addFlow = new AddFlow({
+      repo: {
+        prepare: (appName, target) => prepareSource(currentCfg, paths, { app: appName, ...target }),
+        rollback: (appName, repo) => removeSource(paths, appName, repo),
+      },
+      planner,
+      config: {
+        write: writeConfig,
+        load: loadConfig,
+      },
+      secrets: {
+        upsert: (appName, entry, envFile) => mgr.upsert(appName, entry.key, entry.value, envFile),
+        remove: async (appName, key, envFile) => {
+          await mgr.remove(appName, key, envFile)
+        },
+      },
+      ingress: {
+        claim: (appName, finalApp) => claimNginxRoutes(appName, finalApp, DEFAULT_TIMEOUT_MS),
+      },
+      warn: (message) => {
+        if (isTextOutput()) consola.warn(message)
+      },
+    })
 
     for (;;) {
       try {
-        result = await runAddFlow(
-          {
-            appName: args.app,
-            args: flowArgs,
-            cfg: currentCfg,
-            configFile: paths.configFile,
-            inputs,
-            draftApp: buildDraftApp(flowArgs, inputs),
-          },
-          {
-            prepareRepo: (appName, target) => prepareAppRepo(appName, DEFAULT_TIMEOUT_MS, target),
-            inspectCompose: inspectComposeWithPrompts,
-            collectGuidedInputs,
-            buildResolvedApp,
-            confirmPlan: confirmAddPlan,
-            writeConfig,
-            loadConfig,
-            upsertSecret: (appName, entry, envFile) =>
-              mgr.upsert(appName, entry.key, entry.value, envFile),
-            removeSecret: async (appName, key, envFile) => {
-              await mgr.remove(appName, key, envFile)
-            },
-            claimRoutes: (appName, finalApp) =>
-              claimNginxRoutes(appName, finalApp, DEFAULT_TIMEOUT_MS),
-            rollbackRepo: (appName, repo) => rollbackRepo(appName, DEFAULT_TIMEOUT_MS, repo),
-            warn: (message) => {
-              if (isTextOutput()) consola.warn(message)
-            },
-          },
-        )
+        result = await addFlow.run({
+          appName: args.app,
+          args: flowArgs,
+          cfg: currentCfg,
+          configFile: paths.configFile,
+          inputs,
+          draftApp: buildDraftApp(flowArgs, inputs),
+        })
         break
       } catch (error) {
         const nextProvider = await maybeRecoverGitHubProvider(

@@ -16,8 +16,10 @@
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
         "@jib/docker": "workspace:*",
+        "@jib/flows": "workspace:*",
         "@jib/rpc": "workspace:*",
         "@jib/secrets": "workspace:*",
+        "@jib/sources": "workspace:*",
         "@jib/state": "workspace:*",
         "@jib/tui": "workspace:*",
         "citty": "^0.1.6",
@@ -83,6 +85,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@jib/core": "workspace:*",
+        "drizzle-orm": "*",
       },
     },
     "libs/tui": {
@@ -127,11 +130,11 @@
       "name": "@jib-module/gitsitter",
       "version": "0.0.0",
       "dependencies": {
-        "@jib-module/github": "workspace:*",
         "@jib/bus": "workspace:*",
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
         "@jib/rpc": "workspace:*",
+        "@jib/sources": "workspace:*",
       },
     },
     "modules/nats": {
@@ -149,6 +152,24 @@
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
         "@jib/rpc": "workspace:*",
+      },
+    },
+    "packages/flows": {
+      "name": "@jib/flows",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+        "@jib/docker": "workspace:*",
+      },
+    },
+    "packages/sources": {
+      "name": "@jib/sources",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib-module/github": "workspace:*",
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
       },
     },
   },
@@ -253,9 +274,13 @@
 
     "@jib/docker": ["@jib/docker@workspace:libs/docker"],
 
+    "@jib/flows": ["@jib/flows@workspace:packages/flows"],
+
     "@jib/rpc": ["@jib/rpc@workspace:libs/rpc"],
 
     "@jib/secrets": ["@jib/secrets@workspace:libs/secrets"],
+
+    "@jib/sources": ["@jib/sources@workspace:packages/sources"],
 
     "@jib/state": ["@jib/state@workspace:libs/state"],
 

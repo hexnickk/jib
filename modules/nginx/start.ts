@@ -4,7 +4,7 @@ import type { ModuleContext, StartFn } from '@jib/core'
 import { registerNginxHandlers } from './handlers.ts'
 
 /**
- * Entry point for `jib service start nginx`. Connects to NATS, registers the
+ * Entry point for `jib-daemon start nginx`. Connects to NATS, registers the
  * `cmd.nginx.*` handlers, and blocks until SIGTERM/SIGINT. Unlike the
  * deployer/gitsitter/cloudflare operators, nginx handlers read no config —
  * they only touch filesystem state under `$JIB_ROOT/nginx/` — so there's no

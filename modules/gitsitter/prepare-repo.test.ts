@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { getPaths, repoPath } from '@jib/core'
+import * as git from '@jib/sources'
 import { $ } from 'bun'
 import { prepareRepo } from './handlers.ts'
-import * as git from './src/git.ts'
 
 async function makeUpstream(name: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), `${name}-`))

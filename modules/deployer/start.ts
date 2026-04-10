@@ -6,7 +6,7 @@ import { Engine } from './engine.ts'
 import { registerDeployerHandlers } from './handlers.ts'
 
 /**
- * Entry point for `jib service start deployer`. Connects to NATS, registers
+ * Entry point for `jib-daemon start deployer`. Connects to NATS, registers
  * the three command handlers with a factory that re-reads config on every
  * command (so the CLI's `writeConfig` is always observed without a
  * round-trip through `cmd.config.reload`). Blocks until SIGTERM/SIGINT.

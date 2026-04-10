@@ -2,8 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { createLogger, getPaths } from '@jib/core'
 import { FakeBus, SUBJECTS, flush } from '@jib/rpc'
-import { parsePollInterval, pollApp } from './poller.ts'
-import type * as git from './src/git.ts'
+import { type PollAppDeps, parsePollInterval, pollApp } from './poller.ts'
 
 function mkCfg(overrides: Partial<Config> = {}): Config {
   return {
@@ -44,7 +43,8 @@ describe('pollApp', () => {
       deploys.push(p)
     })
 
-    const lsRemote: typeof git.lsRemote = async () => 'abc123abc123abc123abc123abc123abc123abc1'
+    const lsRemote: NonNullable<PollAppDeps['lsRemote']> = async () =>
+      'abc123abc123abc123abc123abc123abc123abc1'
 
     await pollApp(bus.asBus(), cfg, paths, 'demo', seen, log, { lsRemote })
     await flush()

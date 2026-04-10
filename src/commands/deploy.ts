@@ -1,17 +1,17 @@
 import { withBus } from '@jib/bus'
 import { loadAppOrExit } from '@jib/config'
 import { CliError, isTextOutput } from '@jib/core'
-import { type EvtDeployProgress, type EvtRepoProgress, SUBJECTS, emitAndWait } from '@jib/rpc'
+import { type EvtDeployProgress, SUBJECTS, emitAndWait } from '@jib/rpc'
+import { prepareSource } from '@jib/sources'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { applyCliArgs, withCliArgs } from './_cli.ts'
 
 /**
- * `jib deploy <app>` — the canonical two-step deploy flow. The CLI is the
- * orchestrator: first asks gitsitter to prepare the workdir, then hands the
- * resolved sha+path to the deployer. A clack spinner renders progress
- * events for the operator while each stage runs.
+ * `jib deploy <app>` — prepare the repo locally through the shared sources
+ * package, then hand the resolved sha+path to the deployer over the bus.
+ * A clack spinner renders progress for each stage.
  */
 
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
@@ -33,32 +33,21 @@ export default defineCommand({
   }),
   async run({ args }) {
     applyCliArgs(args)
-    await loadAppOrExit(args.app)
+    const { cfg, paths } = await loadAppOrExit(args.app)
     const timeoutMs = Number(args.timeout) || DEFAULT_TIMEOUT_MS
+    const showProgress = isTextOutput()
+    const s = showProgress ? spinner() : null
 
     try {
+      s?.start(`[1/2] preparing ${args.app}`)
+      const ready = await prepareSource(cfg, paths, { app: args.app }, args.ref).catch((err) => {
+        throw new CliError('deploy_failed', err instanceof Error ? err.message : String(err), {
+          hint: 'fix repo access or ref selection, then retry `jib deploy ...`',
+        })
+      })
+      s?.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
+
       const result = await withBus(async (bus) => {
-        const showProgress = isTextOutput()
-        const s = showProgress ? spinner() : null
-        s?.start(`[1/2] preparing ${args.app}`)
-
-        const prepBody: { app: string; ref?: string } = { app: args.app }
-        if (args.ref) prepBody.ref = args.ref
-
-        const ready = await emitAndWait(
-          bus,
-          SUBJECTS.cmd.repoPrepare,
-          prepBody,
-          { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
-          SUBJECTS.evt.repoProgress,
-          {
-            source: 'cli',
-            timeoutMs,
-            onProgress: (p: EvtRepoProgress) => s?.message(p.message),
-          },
-        )
-        s?.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
-
         const s2 = showProgress ? spinner() : null
         s2?.start(`[2/2] deploying ${args.app}`)
         const result = await emitAndWait(
@@ -93,8 +82,9 @@ export default defineCommand({
       }
       return result
     } catch (err) {
+      if (err instanceof CliError) throw err
       throw new CliError('deploy_failed', err instanceof Error ? err.message : String(err), {
-        hint: 'check logs: journalctl -u jib-deployer -u jib-gitsitter --since "5m ago"',
+        hint: 'check logs: journalctl -u jib-deployer --since "5m ago"',
       })
     }
   },

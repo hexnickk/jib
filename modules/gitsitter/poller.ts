@@ -1,10 +1,8 @@
-import { refreshAuth } from '@jib-module/github'
 import type { Bus } from '@jib/bus'
 import type { Config } from '@jib/config'
-import { type Logger, type Paths, isExternalRepoURL, repoPath } from '@jib/core'
+import type { Logger, Paths } from '@jib/core'
 import { SUBJECTS } from '@jib/rpc'
-import { cloneURL } from './src/clone-url.ts'
-import * as git from './src/git.ts'
+import { type ProbeSourceDeps, probeSource } from '@jib/sources'
 
 /**
  * Parses jib's `poll_interval` ("5m", "30s", ...). Accepts the same subset Go
@@ -26,8 +24,8 @@ export function parsePollInterval(raw: string): number {
  * directly. gitsitter owns the CLI-bypass autodeploy path per Stage 4.
  */
 export interface PollAppDeps {
-  /** Injected for tests; defaults to the real `git.lsRemote`. */
-  lsRemote?: typeof git.lsRemote
+  /** Injected for tests; defaults to the real `sources.lsRemote`. */
+  lsRemote?: ProbeSourceDeps['lsRemote']
 }
 
 export async function pollApp(
@@ -41,17 +39,18 @@ export async function pollApp(
 ): Promise<void> {
   const app = cfg.apps[appName]
   if (!app || !app.repo || app.repo === 'local') return
-  const external = isExternalRepoURL(app.repo)
-  const lsRemote = deps.lsRemote ?? git.lsRemote
   try {
-    const auth = !external && app.provider ? await refreshAuth(app.provider, cfg, app, paths) : {}
-    const env = auth.sshKeyPath ? git.configureSSHKey(auth.sshKeyPath) : {}
-    const sha = await lsRemote(cloneURL(app, cfg), app.branch, env)
-    if (!sha) return
+    const source = await probeSource(
+      cfg,
+      paths,
+      { app: appName },
+      deps.lsRemote ? { lsRemote: deps.lsRemote } : {},
+    )
+    if (!source) return
+    const { sha, workdir } = source
     const prev = lastSeen.get(appName) ?? ''
     if (sha === prev) return
     lastSeen.set(appName, sha)
-    const workdir = repoPath(paths, appName, app.repo)
     log.info(`${appName}: new sha ${sha.slice(0, 7)} (was ${prev.slice(0, 7) || 'none'})`)
     bus.publish(SUBJECTS.cmd.deploy, {
       corrId: crypto.randomUUID(),

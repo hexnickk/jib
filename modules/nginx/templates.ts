@@ -119,7 +119,7 @@ After=jib-bus.service
 [Service]
 Type=simple
 Environment=JIB_ROOT=${vars.jibRoot}
-ExecStart=${vars.binPath} service start nginx
+ExecStart=${vars.binPath} start nginx
 Restart=always
 RestartSec=5
 

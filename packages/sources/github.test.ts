@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { App, Config } from '@jib/config'
-import { cloneURL } from './clone-url.ts'
+import { cloneURL } from './github.ts'
 
 const cfg = {
   config_version: 3,
@@ -25,7 +25,7 @@ function app(provider?: string): App {
   }
 }
 
-describe('cloneURL', () => {
+describe('GitHub source driver', () => {
   test('public GitHub slugs default to anonymous HTTPS', () => {
     expect(cloneURL(app(), cfg)).toBe('https://github.com/acme/site.git')
   })

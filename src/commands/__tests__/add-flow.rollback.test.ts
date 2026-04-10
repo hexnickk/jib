@@ -1,13 +1,12 @@
 import { describe, expect, test } from 'bun:test'
-import { runAddFlow } from '../add-flow.ts'
 import { makeDeps, makeParams } from './add-flow.shared.ts'
 
 describe('add flow rollback', () => {
   test('post-config failures roll back repo, secrets, and remove only the failed app', async () => {
     for (const failAt of ['writeSecondSecret', 'claimRoutes'] as const) {
-      const { deps, calls, warnings, writtenConfigs } = makeDeps(failAt, true)
+      const { calls, flow, warnings, writtenConfigs } = makeDeps(failAt, true)
 
-      await expect(runAddFlow(makeParams(), deps)).rejects.toThrow(`${failAt} failed`)
+      await expect(flow.run(makeParams())).rejects.toThrow(`${failAt} failed`)
       expect(calls).toContain('rollbackRepo')
       expect(calls).toContain('loadConfig')
       expect(calls).toContain('removeSecret:APP_KEY')
@@ -22,9 +21,9 @@ describe('add flow rollback', () => {
   })
 
   test('cleanup falls back to the original snapshot when reloading config fails', async () => {
-    const { deps, warnings, writtenConfigs } = makeDeps('claimRoutes', false, true)
+    const { flow, warnings, writtenConfigs } = makeDeps('claimRoutes', false, true)
 
-    await expect(runAddFlow(makeParams(), deps)).rejects.toThrow('claimRoutes failed')
+    await expect(flow.run(makeParams())).rejects.toThrow('claimRoutes failed')
     expect(
       warnings.some((warning) => warning.includes('config cleanup load: loadConfig failed')),
     ).toBe(true)
@@ -33,9 +32,9 @@ describe('add flow rollback', () => {
   })
 
   test('cleanup keeps going when repo rollback itself fails', async () => {
-    const { deps, calls, warnings, writtenConfigs } = makeDeps('claimRoutes', true, false, true)
+    const { calls, flow, warnings, writtenConfigs } = makeDeps('claimRoutes', true, false, true)
 
-    await expect(runAddFlow(makeParams(), deps)).rejects.toThrow('claimRoutes failed')
+    await expect(flow.run(makeParams())).rejects.toThrow('claimRoutes failed')
     expect(calls).toContain('rollbackRepo')
     expect(calls).toContain('loadConfig')
     expect(calls).toContain('removeSecret:APP_KEY')

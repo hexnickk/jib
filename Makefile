@@ -1,6 +1,7 @@
-.PHONY: build test lint fmt dev install-all clean
+.PHONY: build test lint fmt dev dev-daemon install-all clean
 
-BIN := dist/jib
+CLI_BIN := dist/jib
+DAEMON_BIN := dist/jib-daemon
 PREFIX ?= /usr/local/bin
 
 # `bun build --compile` rewrites the output file in place, which fails on
@@ -9,8 +10,10 @@ PREFIX ?= /usr/local/bin
 build:
 	@mkdir -p dist
 	@tmp="$$(mktemp -d)" && \
-		bun build --compile main.ts --outfile "$$tmp/jib" && \
-		install -m 0755 "$$tmp/jib" $(BIN) && \
+		bun build --compile apps/jib/main.ts --outfile "$$tmp/jib" && \
+		bun build --compile apps/jib-daemon/main.ts --outfile "$$tmp/jib-daemon" && \
+		install -m 0755 "$$tmp/jib" $(CLI_BIN) && \
+		install -m 0755 "$$tmp/jib-daemon" $(DAEMON_BIN) && \
 		rm -rf "$$tmp"
 
 test:
@@ -23,10 +26,14 @@ fmt:
 	bun x biome format --write .
 
 dev:
-	bun run main.ts
+	bun run apps/jib/main.ts
+
+dev-daemon:
+	bun run apps/jib-daemon/main.ts
 
 install-all: build
-	sudo install -m 0755 $(BIN) $(PREFIX)/jib
+	sudo install -m 0755 $(CLI_BIN) $(PREFIX)/jib
+	sudo install -m 0755 $(DAEMON_BIN) $(PREFIX)/jib-daemon
 
 clean:
 	rm -rf dist

@@ -3,17 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": ["modules/*", "libs/*"],
+  "workspaces": ["modules/*", "libs/*", "packages/*"],
   "engines": {
     "bun": "1.3.11"
   },
   "scripts": {
-    "build": "bun build --compile main.ts --outfile dist/jib",
+    "build": "bun run build:jib && bun run build:daemon",
+    "build:jib": "bun build --compile apps/jib/main.ts --outfile dist/jib",
+    "build:daemon": "bun build --compile apps/jib-daemon/main.ts --outfile dist/jib-daemon",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "fmt": "biome format --write .",
-    "dev": "bun run main.ts"
+    "dev": "bun run apps/jib/main.ts",
+    "dev:daemon": "bun run apps/jib-daemon/main.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -37,6 +40,8 @@
     "@jib/secrets": "workspace:*",
     "@jib/state": "workspace:*",
     "@jib/tui": "workspace:*",
+    "@jib/flows": "workspace:*",
+    "@jib/sources": "workspace:*",
     "citty": "^0.1.6",
     "consola": "^3.2.3",
     "drizzle-orm": "^0.45.2",

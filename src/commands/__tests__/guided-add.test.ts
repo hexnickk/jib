@@ -83,7 +83,7 @@ describe('guided add helpers', () => {
         { name: 'web', inferredContainerPort: 80, publishesPorts: true },
         { name: 'worker', publishesPorts: false },
       ],
-      domains: [{ host: 'demo.example.com', service: 'web', port: 20000 }],
+      domains: [{ host: 'demo.example.com', service: 'web' }],
       secretKeys: ['APP_KEY'],
       envFile: '.env',
     })
