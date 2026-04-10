@@ -1,14 +1,5 @@
+export { collectSourceStatuses } from './recovery.ts'
 export {
-  availableSourceSetupChoices,
-  collectSourceStatuses,
-  configuredSourceOptions,
-  isSourceAuthFailure,
-  repoSupportsSourceRecovery,
-  runSourceSetup,
-} from './recovery.ts'
-export {
-  buildSourceChoices,
-  maybeRecoverSource,
   preflightSourceSelection,
   setupSourceRef,
 } from './flow.ts'

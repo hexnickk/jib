@@ -14,6 +14,7 @@
     "@jib/secrets": "workspace:*",
     "@jib/state": "workspace:*",
     "@jib/sources": "workspace:*",
-    "@jib/tui": "workspace:*"
+    "@jib/tui": "workspace:*",
+    "consola": "^3.2.3"
   }
 }

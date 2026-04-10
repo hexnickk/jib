@@ -1,19 +1,5 @@
 export { normalizeAddError } from './errors.ts'
-export {
-  assignCliDomainsToServices,
-  buildAdditionalSecretPromptMessage,
-  buildManualSecretPromptLines,
-  buildSecretPromptMessage,
-  mergeGuidedServiceAnswers,
-  parseEnvEntry,
-  renderAddPlanSummary,
-  secretPromptPlaceholder,
-  shouldDefaultExposeService,
-  splitCommaValues,
-  summarizeComposeServices,
-  validateEnvEntry,
-} from './guided.ts'
-export { buildDraftApp, gatherAddInputs, parseApp } from './inputs.ts'
+export { buildDraftApp, gatherAddInputs } from './inputs.ts'
 export { createAddPlanner } from './planner.ts'
 export { AddService } from './service.ts'
 export { RolledBackAddError, runAddSequence } from './sequence.ts'
