@@ -1,12 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 import {
   assignCliDomainsToServices,
+  buildManualSecretPromptLines,
   buildSecretPromptMessage,
   mergeGuidedServiceAnswers,
+  parseEnvEntry,
   renderAddPlanSummary,
   secretPromptPlaceholder,
   shouldDefaultExposeService,
   summarizeComposeServices,
+  validateEnvEntry,
 } from '../add-guided.ts'
 
 describe('guided add helpers', () => {
@@ -30,13 +33,15 @@ describe('guided add helpers', () => {
           expose: true,
           domainHosts: ['demo.example.com'],
           secretKeys: ['APP_KEY'],
+          envEntries: [{ key: 'DATABASE_URL', value: 'postgres://db' }],
         },
       ],
       'direct',
     )
 
     expect(merged.domains).toEqual([{ host: 'demo.example.com', service: 'web' }])
-    expect(merged.secretKeys).toEqual(['APP_KEY'])
+    expect(merged.envEntries).toEqual([{ key: 'DATABASE_URL', value: 'postgres://db' }])
+    expect(merged.secretKeys.sort()).toEqual(['APP_KEY', 'DATABASE_URL'])
   })
 
   test('multi-service app keeps public and internal services separate', () => {
@@ -99,12 +104,20 @@ describe('guided add helpers', () => {
   })
 
   test('secret prompt copy explains that jib will prompt for key values next', () => {
-    expect(buildSecretPromptMessage('blog', [])).toContain(
-      'Which secret keys should Jib prompt for now for "blog"?',
-    )
     expect(buildSecretPromptMessage('blog', ['DATABASE_URL'])).toContain(
-      'detected in compose: DATABASE_URL',
+      'detected in docker-compose',
     )
+    expect(buildSecretPromptMessage('blog', ['DATABASE_URL'])).toContain('values prompted next')
     expect(secretPromptPlaceholder()).toBe('DATABASE_URL, API_KEY')
+    expect(buildManualSecretPromptLines()).toContain(
+      'Jib could not detect any required secrets from docker-compose.',
+    )
+    expect(buildManualSecretPromptLines()).toContain('SECRET_KEY=VALUE')
+  })
+
+  test('env entry parser accepts KEY=VALUE format and rejects missing equals', () => {
+    expect(parseEnvEntry('API_KEY=secret')).toEqual({ key: 'API_KEY', value: 'secret' })
+    expect(validateEnvEntry('API_KEY=secret')).toBeUndefined()
+    expect(validateEnvEntry('API_KEY')).toContain('expected KEY=VALUE')
   })
 })

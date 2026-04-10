@@ -3,6 +3,7 @@ import type { ComposeService } from '@jib/docker'
 import {
   isInteractive,
   promptConfirm,
+  promptLines,
   promptSelect,
   promptString,
   promptStringOptional,
@@ -10,11 +11,14 @@ import {
 import { missingInput } from '../_cli.ts'
 import {
   assignCliDomainsToServices,
+  buildManualSecretPromptLines,
   buildSecretPromptMessage,
+  parseEnvEntry,
   secretPromptPlaceholder,
   shouldDefaultExposeService,
   splitCommaValues,
   summarizeComposeServices,
+  validateEnvEntry,
 } from '../add-guided.ts'
 
 export async function collectDomains(
@@ -51,7 +55,8 @@ export async function promptForServices(
   return await Promise.all(
     summaries.map(async (service) => {
       const existingDomains = domains.filter((domain) => domain.service === service.name)
-      const suggestedKeys = (service.envRefs ?? []).filter((key) => !secretValues.has(key))
+      const detectedKeys = service.envRefs ?? []
+      const suggestedKeys = detectedKeys.filter((key) => !secretValues.has(key))
       const expose =
         existingDomains.length > 0 ||
         (isInteractive() &&
@@ -68,15 +73,29 @@ export async function promptForServices(
               }),
             )
           : []
-      const rawSecrets = isInteractive()
-        ? await promptStringOptional({
-            message: buildSecretPromptMessage(service.name, suggestedKeys),
-            placeholder: secretPromptPlaceholder(),
-            ...(suggestedKeys.length > 0 ? { initialValue: suggestedKeys.join(',') } : {}),
-          })
-        : ''
+      const rawSecrets =
+        isInteractive() && suggestedKeys.length > 0
+          ? await promptStringOptional({
+              message: buildSecretPromptMessage(service.name, suggestedKeys),
+              placeholder: secretPromptPlaceholder(),
+              initialValue: suggestedKeys.join(','),
+            })
+          : ''
       const secretKeys = splitCommaValues(rawSecrets).filter((key) => !secretValues.has(key))
-      return { service: service.name, expose, domainHosts, secretKeys }
+      const envEntries =
+        isInteractive() && suggestedKeys.length === 0 && detectedKeys.length === 0
+          ? (
+              await promptLines({
+                title: `Secrets for "${service.name}"`,
+                lines: buildManualSecretPromptLines(),
+                promptLabel: 'secret',
+                validateLine: validateEnvEntry,
+              })
+            )
+              .map(parseEnvEntry)
+              .filter((entry) => !secretValues.has(entry.key))
+          : []
+      return { service: service.name, expose, domainHosts, secretKeys, envEntries }
     }),
   )
 }

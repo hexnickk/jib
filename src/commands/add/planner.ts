@@ -84,6 +84,9 @@ async function collectGuidedInputs(
   const secretValues = new Map(inputs.envEntries.map((entry) => [entry.key, entry.value]))
   const answers = await promptForServices(domains, composeServices, secretValues)
   const merged = mergeGuidedServiceAnswers(domains, serviceNames, answers, inputs.ingressDefault)
+  for (const entry of merged.envEntries) {
+    secretValues.set(entry.key, entry.value)
+  }
   for (const key of merged.secretKeys) {
     if (secretValues.has(key)) continue
     secretValues.set(key, await promptPassword({ message: `Value for ${key}` }))

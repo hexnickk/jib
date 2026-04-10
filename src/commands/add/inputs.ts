@@ -13,7 +13,7 @@ import { ValidationError } from '@jib/core'
 import type { AddInputs, EnvEntry } from '@jib/flows'
 import { isInteractive, promptString } from '@jib/tui'
 import { missingInput } from '../_cli.ts'
-import { splitCommaValues } from '../add-guided.ts'
+import { parseEnvEntry, splitCommaValues } from '../add-guided.ts'
 
 export async function gatherAddInputs(args: {
   repo?: string
@@ -88,8 +88,10 @@ function parseChecks(rawHealth: string[]): HealthCheck[] {
 
 function parseEnvEntries(rawEntries: string[]): EnvEntry[] {
   return rawEntries.map((pair) => {
-    const eq = pair.indexOf('=')
-    if (eq < 1) throw new ValidationError(`invalid --env "${pair}" - expected KEY=VALUE`)
-    return { key: pair.slice(0, eq), value: pair.slice(eq + 1) }
+    try {
+      return parseEnvEntry(pair)
+    } catch {
+      throw new ValidationError(`invalid --env "${pair}" - expected KEY=VALUE`)
+    }
   })
 }

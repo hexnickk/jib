@@ -14,6 +14,13 @@ type SelectOpts<T extends string> = {
   initialValue?: T
 }
 type ConfirmOpts = { message: string; initialValue?: boolean }
+type LinesOpts = {
+  title: string
+  lines: string[]
+  promptLabel?: string
+  validateLine?: (line: string) => string | undefined
+  maxLines?: number
+}
 
 /**
  * Runs `fn` (a thin clack call) under interactive-mode guard and unwraps
@@ -60,6 +67,42 @@ export function promptStringOptional(opts: StrOpts): Promise<string> {
       ...(opts.initialValue !== undefined && { initialValue: opts.initialValue }),
     }),
   )
+}
+
+async function readLine(rl: ReturnType<typeof createInterface>, prompt: string): Promise<string> {
+  return await new Promise<string>((resolve, reject) => {
+    const onSigInt = () => {
+      rl.removeListener('SIGINT', onSigInt)
+      reject(new ValidationError('cancelled'))
+    }
+    rl.once('SIGINT', onSigInt)
+    rl.question(prompt, (answer) => {
+      rl.removeListener('SIGINT', onSigInt)
+      resolve(answer)
+    })
+  })
+}
+
+export async function promptLines(opts: LinesOpts): Promise<string[]> {
+  assertInteractive()
+  clack.note(opts.lines.join('\n'), opts.title)
+  const rl = createInterface({ input: process.stdin, output: process.stdout })
+  const out: string[] = []
+  try {
+    while (out.length < (opts.maxLines ?? 100)) {
+      const line = (await readLine(rl, `${opts.promptLabel ?? 'entry'} ${out.length + 1}> `)).trim()
+      if (line.length === 0) return out
+      const error = opts.validateLine?.(line)
+      if (error) {
+        clack.log.warning(error)
+        continue
+      }
+      out.push(line)
+    }
+  } finally {
+    rl.close()
+  }
+  throw new ValidationError(`too many lines (max ${opts.maxLines ?? 100})`)
 }
 
 export async function promptInt(opts: IntOpts): Promise<number> {

@@ -1,6 +1,7 @@
 import type { ParsedDomain } from '@jib/config'
-import type { CliIssue } from '@jib/core'
+import { type CliIssue, ValidationError } from '@jib/core'
 import { type ComposeService, hasPublishedPorts, inferContainerPort } from '@jib/docker'
+import type { EnvEntry } from '@jib/flows'
 
 export interface AddServiceSummary {
   name: string
@@ -14,6 +15,7 @@ export interface GuidedServiceAnswer {
   expose?: boolean
   domainHosts?: string[]
   secretKeys?: string[]
+  envEntries?: EnvEntry[]
 }
 
 export function splitCommaValues(raw: string): string[] {
@@ -24,14 +26,33 @@ export function splitCommaValues(raw: string): string[] {
 }
 
 export function buildSecretPromptMessage(serviceName: string, suggestedKeys: string[]): string {
-  if (suggestedKeys.length > 0) {
-    return `Which secret keys should Jib prompt for now for "${serviceName}"? (detected in compose: ${suggestedKeys.join(', ')})`
-  }
-  return `Which secret keys should Jib prompt for now for "${serviceName}"? (comma-separated names, blank to skip)`
+  return `Secret keys for "${serviceName}" (detected in docker-compose; edit if needed, comma-separated; values prompted next): ${suggestedKeys.join(', ')}`
 }
 
 export function secretPromptPlaceholder(): string {
   return 'DATABASE_URL, API_KEY'
+}
+
+export function buildManualSecretPromptLines(): string[] {
+  return [
+    'Jib could not detect any required secrets from docker-compose.',
+    'Enter secrets as KEY=VALUE, one per line.',
+    'Examples:',
+    'SECRET_KEY=VALUE',
+    'API_KEY=VALUE',
+    'Press Enter on a blank line when finished.',
+  ]
+}
+
+export function validateEnvEntry(raw: string): string | undefined {
+  return raw.indexOf('=') < 1 ? 'expected KEY=VALUE (example: SECRET_KEY=VALUE)' : undefined
+}
+
+export function parseEnvEntry(raw: string): EnvEntry {
+  const line = raw.trim()
+  const eq = line.indexOf('=')
+  if (eq < 1) throw new ValidationError(`invalid env entry "${raw}" - expected KEY=VALUE`)
+  return { key: line.slice(0, eq), value: line.slice(eq + 1) }
 }
 
 export function summarizeComposeServices(services: ComposeService[]): AddServiceSummary[] {
@@ -78,9 +99,10 @@ export function mergeGuidedServiceAnswers(
   serviceNames: string[],
   answers: GuidedServiceAnswer[],
   ingressDefault: string,
-): { domains: ParsedDomain[]; secretKeys: string[] } {
+): { domains: ParsedDomain[]; envEntries: EnvEntry[]; secretKeys: string[] } {
   const knownServices = new Set(serviceNames)
   const domains: ParsedDomain[] = [...existingDomains]
+  const envEntries: EnvEntry[] = []
   const secretKeys = new Set<string>()
   const servicesWithDomains = new Set(
     existingDomains.flatMap((domain) => (domain.service ? [domain.service] : [])),
@@ -88,6 +110,10 @@ export function mergeGuidedServiceAnswers(
 
   for (const answer of answers) {
     if (!knownServices.has(answer.service)) continue
+    for (const entry of answer.envEntries ?? []) {
+      envEntries.push(entry)
+      secretKeys.add(entry.key)
+    }
     for (const key of answer.secretKeys ?? []) {
       secretKeys.add(key)
     }
@@ -104,7 +130,7 @@ export function mergeGuidedServiceAnswers(
     }
   }
 
-  return { domains, secretKeys: [...secretKeys] }
+  return { domains, envEntries, secretKeys: [...secretKeys] }
 }
 
 export function renderAddPlanSummary(input: {
