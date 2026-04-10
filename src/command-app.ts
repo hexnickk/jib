@@ -70,7 +70,9 @@ function printSuccess(value: unknown): void {
     printJson(process.stdout, { ok: true, data: value ?? null })
     return
   }
-  if (typeof value === 'string') consola.log(value)
+  if (typeof value === 'string') {
+    process.stdout.write(value.endsWith('\n') ? value : `${value}\n`)
+  }
 }
 
 function hasSubCommands(cmd: CommandNode): boolean {
