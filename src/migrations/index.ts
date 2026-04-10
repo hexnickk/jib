@@ -37,20 +37,36 @@ export async function runJibMigrations(
 const GROUP = 'jib'
 
 const SUDOERS_PATH = '/etc/sudoers.d/jib'
-const SUDOERS_CONTENT = `# jib: allow jib group to manage jib-* systemd services without password
+export function buildSudoersContent(): string {
+  return `# jib: allow jib group to manage jib-owned services without password
 %jib ALL=(root) NOPASSWD: /usr/bin/systemctl start jib-*, \\
   /usr/bin/systemctl stop jib-*, \\
   /usr/bin/systemctl restart jib-*, \\
   /usr/bin/systemctl enable jib-*, \\
   /usr/bin/systemctl disable jib-*, \\
-  /usr/bin/systemctl daemon-reload
+  /usr/bin/systemctl daemon-reload, \\
+  /usr/bin/systemctl reload nginx, \\
+  /usr/sbin/nginx -t
 `
+}
 
 const MINIMAL_CONFIG = `config_version: 3
 poll_interval: 5m
 modules: {}
 apps: {}
 `
+
+async function writeValidatedSudoers(path: string, content: string): Promise<void> {
+  const tmp = `${path}.tmp-${process.pid}`
+  await writeFile(tmp, content, { mode: 0o440 })
+  const check = Bun.spawnSync(['visudo', '-cf', tmp])
+  if (check.exitCode !== 0) {
+    await Bun.$`rm -f ${tmp}`.quiet().nothrow()
+    return
+  }
+  await Bun.$`mv ${tmp} ${path}`.quiet()
+  await Bun.$`chown root:root ${path}`.quiet()
+}
 
 // ---------------------------------------------------------------------------
 // Migrations
@@ -128,15 +144,15 @@ const m0009_install_sudoers: JibMigration = {
   id: '0009_install_sudoers',
   description: 'Write /etc/sudoers.d/jib drop-in',
   up: async () => {
-    const tmp = `${SUDOERS_PATH}.tmp-${process.pid}`
-    await writeFile(tmp, SUDOERS_CONTENT, { mode: 0o440 })
-    const check = Bun.spawnSync(['visudo', '-cf', tmp])
-    if (check.exitCode !== 0) {
-      await Bun.$`rm -f ${tmp}`.quiet().nothrow()
-      return
-    }
-    await Bun.$`mv ${tmp} ${SUDOERS_PATH}`.quiet()
-    await Bun.$`chown root:root ${SUDOERS_PATH}`.quiet()
+    await writeValidatedSudoers(SUDOERS_PATH, buildSudoersContent())
+  },
+}
+
+const m0010_expand_sudoers_for_nginx: JibMigration = {
+  id: '0010_expand_sudoers_for_nginx',
+  description: 'Allow jib group to validate and reload nginx without password',
+  up: async () => {
+    await writeValidatedSudoers(SUDOERS_PATH, buildSudoersContent())
   },
 }
 
@@ -151,4 +167,5 @@ export const migrations: JibMigration[] = [
   m0007_install_watcher,
   m0008_install_nginx,
   m0009_install_sudoers,
+  m0010_expand_sudoers_for_nginx,
 ]

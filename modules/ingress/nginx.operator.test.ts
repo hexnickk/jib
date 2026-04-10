@@ -20,10 +20,10 @@ afterEach(async () => {
   await rm(ctx.nginxDir, { recursive: true, force: true })
 })
 
-function fakeExec(run: (cmd: string) => ExecResult): ExecFn {
+function fakeExec(run: (argv: string[]) => ExecResult): ExecFn {
   return async (argv) => {
     ctx.calls.push(argv)
-    return run(argv[0] ?? '')
+    return run(argv)
   }
 }
 
@@ -44,14 +44,14 @@ describe('createNginxIngressOperator', () => {
 
     const files = await readdir(join(ctx.nginxDir, 'web'))
     expect(files).toContain('web.example.com.conf')
-    expect(ctx.calls[0]).toEqual(['nginx', '-t'])
+    expect(ctx.calls[0]).toEqual(['sudo', 'nginx', '-t'])
     expect(ctx.calls[1]).toEqual(['sudo', 'systemctl', 'reload', 'nginx'])
   })
 
   test('claim rolls back when reload fails', async () => {
     const ingress = operator(
-      fakeExec((cmd) =>
-        cmd === 'sudo'
+      fakeExec((argv) =>
+        argv[1] === 'systemctl'
           ? { ok: false, stdout: '', stderr: 'reload boom' }
           : { ok: true, stdout: '', stderr: '' },
       ),
@@ -105,7 +105,7 @@ describe('createNginxIngressOperator', () => {
     const fooBar = await stat(join(ctx.nginxDir, 'foo-bar')).catch(() => null)
     expect(foo).toBeNull()
     expect(fooBar?.isDirectory()).toBe(true)
-    expect(ctx.calls[0]).toEqual(['nginx', '-t'])
+    expect(ctx.calls[0]).toEqual(['sudo', 'nginx', '-t'])
     expect(ctx.calls[1]).toEqual(['sudo', 'systemctl', 'reload', 'nginx'])
   })
 })
