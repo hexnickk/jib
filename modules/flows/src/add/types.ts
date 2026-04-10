@@ -1,5 +1,6 @@
 import type { App, Config, HealthCheck, ParsedDomain } from '@jib/config'
 import type { ComposeInspection, ComposeService } from '@jib/docker'
+import type { InspectionCheckout } from '@jib/sources'
 
 export type EnvEntry = { key: string; value: string }
 
@@ -40,14 +41,6 @@ export interface AddFlowParams {
 
 export type AddFlowResult = { finalApp: App; secretsWritten: number }
 
-export interface AddRepoService {
-  prepare(
-    appName: string,
-    target: { repo: string; branch: string; source?: string },
-  ): Promise<{ workdir: string }>
-  rollback(appName: string, repo: string): Promise<void>
-}
-
 export interface AddPlanner {
   inspectCompose(draftApp: App, workdir: string): Promise<ComposeInspection>
   collectGuidedInputs(inputs: AddInputs, services: ComposeService[]): Promise<GuidedInputs>
@@ -68,31 +61,23 @@ export interface AddPlanner {
   ): Promise<void>
 }
 
-export interface AddConfigStore {
-  write(configFile: string, cfg: Config): Promise<void>
-  load(configFile: string): Promise<Config>
-}
-
-export interface AddSecretStore {
-  upsert(appName: string, entry: EnvEntry, envFile: string): Promise<void>
-  remove(appName: string, key: string, envFile: string): Promise<void>
-}
-
-export interface AddIngressService {
-  claim(appName: string, finalApp: App): Promise<void>
-}
-
 export interface AddFlowObserver {
   onStateChange?(state: AddFlowState): void
   warn?(message: string): void
 }
 
-export interface AddFlowServices extends AddFlowObserver {
-  repo: AddRepoService
-  planner: AddPlanner
-  config: AddConfigStore
-  secrets: AddSecretStore
-  ingress: AddIngressService
+export interface AddSupport {
+  cloneForInspection(
+    cfg: Config,
+    appName: string,
+    target: { repo: string; branch: string; source?: string },
+  ): Promise<InspectionCheckout>
+  removeCheckout(appName: string, repo: string): Promise<void>
+  loadConfig(configFile: string): Promise<Config>
+  writeConfig(configFile: string, cfg: Config): Promise<void>
+  upsertSecret(appName: string, entry: EnvEntry, envFile: string): Promise<void>
+  removeSecret(appName: string, key: string, envFile: string): Promise<void>
+  claimIngress(appName: string, finalApp: App): Promise<void>
 }
 
 export interface CleanupState {

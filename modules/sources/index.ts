@@ -1,3 +1,15 @@
-export * from './service.ts'
 export * from './recovery.ts'
-export * from './types.ts'
+export type {
+  DriverSourceStatus,
+  InspectionCheckout,
+  PreparedSource,
+  ProbeSourceDeps,
+  ResolvedSource,
+  SourceDriver,
+  SourceProbe,
+  SourceSelectOption,
+  SourceSetupChoice,
+  SourceStatus,
+  SourceTarget,
+} from './types.ts'
+export { cloneForInspection, probe, removeCheckout, resolve, syncApp } from './service.ts'

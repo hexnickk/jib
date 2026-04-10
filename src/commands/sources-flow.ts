@@ -1,9 +1,11 @@
+import { loadConfig } from '@jib/config'
 import type { Config } from '@jib/config'
 import { CliError, type Paths } from '@jib/core'
 import {
   availableSourceSetupChoices,
   configuredSourceOptions,
   isSourceAuthFailure as isSourceAuthFailureForRepo,
+  probe,
   repoSupportsSourceRecovery,
   runSourceSetup,
 } from '@jib/sources'
@@ -13,6 +15,8 @@ type SourceChoice = `existing:${string}` | `setup:${string}`
 
 export interface SourceRecoveryDeps {
   isInteractive?: () => boolean
+  loadConfig?: (configFile: string) => Promise<Config>
+  probe?: typeof probe
   promptSelect?: (opts: {
     message: string
     options: { value: SourceChoice; label: string; hint?: string }[]
@@ -73,6 +77,35 @@ export async function setupSourceRef(
     )
   }
   return null
+}
+
+export async function preflightSourceSelection(
+  appName: string,
+  cfg: Config,
+  paths: Paths,
+  repo: string,
+  currentSource?: string,
+  deps: SourceRecoveryDeps = {},
+): Promise<{ cfg: Config; source?: string }> {
+  let resolvedCfg = cfg
+  let source = currentSource
+  const probeSource = deps.probe ?? probe
+  for (;;) {
+    try {
+      await probeSource(resolvedCfg, paths, {
+        app: appName,
+        repo,
+        branch: 'main',
+        ...(source ? { source } : {}),
+      })
+      return source ? { cfg: resolvedCfg, source } : { cfg: resolvedCfg }
+    } catch (error) {
+      const nextSource = await maybeRecoverSource(resolvedCfg, paths, repo, error, source, deps)
+      if (!nextSource) throw error
+      source = nextSource
+      resolvedCfg = await (deps.loadConfig ?? loadConfig)(paths.configFile)
+    }
+  }
 }
 
 export async function maybeRecoverSource(

@@ -1,18 +1,16 @@
 import { withBus } from '@jib/bus'
-import { loadAppConfig, loadConfig, writeConfig } from '@jib/config'
+import { loadAppConfig } from '@jib/config'
 import type { App } from '@jib/config'
 import { ValidationError, isTextOutput } from '@jib/core'
-import { AddFlow, type AddFlowResult } from '@jib/flows'
+import { type AddFlowResult, AddService, DefaultAddSupport } from '@jib/flows'
 import { claimIngress, createBusIngressOperator } from '@jib/ingress'
-import { SecretsManager } from '@jib/secrets'
-import { prepareSource, removeSource } from '@jib/sources'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { applyCliArgs, withCliArgs } from './_cli.ts'
 import { buildDraftApp, gatherAddInputs } from './add/inputs.ts'
 import { createAddPlanner } from './add/planner.ts'
-import { maybeRecoverSource } from './sources-flow.ts'
+import { preflightSourceSelection } from './sources-flow.ts'
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
@@ -52,58 +50,30 @@ export default defineCommand({
     }
 
     const inputs = await gatherAddInputs(args)
-    const mgr = new SecretsManager(paths.secretsDir)
     const planner = createAddPlanner()
-    const flowArgs: { source?: string } = args.source ? { source: args.source } : {}
-    let currentCfg = cfg
-    let result: AddFlowResult | undefined
-    const addFlow = new AddFlow({
-      repo: {
-        prepare: (appName, target) => prepareSource(currentCfg, paths, { app: appName, ...target }),
-        rollback: (appName, repo) => removeSource(paths, appName, repo),
-      },
+    const preflight = await preflightSourceSelection(args.app, cfg, paths, inputs.repo, args.source)
+    const flowArgs: { source?: string } = preflight.source ? { source: preflight.source } : {}
+    const addService = new AddService(
+      new DefaultAddSupport({
+        paths,
+        claimIngress: (appName, finalApp) => claimIngressForAdd(appName, finalApp),
+      }),
       planner,
-      config: { write: writeConfig, load: loadConfig },
-      secrets: {
-        upsert: (appName, entry, envFile) => mgr.upsert(appName, entry.key, entry.value, envFile),
-        remove: async (appName, key, envFile) => {
-          await mgr.remove(appName, key, envFile)
+      {
+        warn: (message) => {
+          if (isTextOutput()) consola.warn(message)
         },
       },
-      ingress: {
-        claim: (appName, finalApp) => claimIngressForAdd(appName, finalApp),
-      },
-      warn: (message) => {
-        if (isTextOutput()) consola.warn(message)
-      },
+    )
+
+    const result: AddFlowResult = await addService.run({
+      appName: args.app,
+      args: flowArgs,
+      cfg: preflight.cfg,
+      configFile: paths.configFile,
+      inputs,
+      draftApp: buildDraftApp(flowArgs, inputs),
     })
-
-    for (;;) {
-      try {
-        result = await addFlow.run({
-          appName: args.app,
-          args: flowArgs,
-          cfg: currentCfg,
-          configFile: paths.configFile,
-          inputs,
-          draftApp: buildDraftApp(flowArgs, inputs),
-        })
-        break
-      } catch (error) {
-        const nextSource = await maybeRecoverSource(
-          currentCfg,
-          paths,
-          inputs.repo,
-          error,
-          flowArgs.source,
-        )
-        if (!nextSource) throw error
-        flowArgs.source = nextSource
-        currentCfg = await loadConfig(paths.configFile)
-      }
-    }
-
-    if (!result) throw new Error('add flow did not complete')
     return renderResult(args.app, inputs.repo, result)
   },
 })

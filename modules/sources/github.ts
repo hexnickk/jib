@@ -46,7 +46,6 @@ export async function resolveGitHubSource(
           if (auth) await applyAuth(auth, workdir, app.repo)
         },
     env,
-    external,
     url,
   }
 }

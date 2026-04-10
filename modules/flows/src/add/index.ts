@@ -1,17 +1,14 @@
 export { normalizeAddError } from './errors.ts'
-export { AddFlow } from './service.ts'
+export { AddService } from './service.ts'
+export { DefaultAddSupport, type DefaultAddSupportOptions } from './support.ts'
 export type {
-  AddConfigStore,
   AddFlowObserver,
   AddFlowParams,
   AddFlowResult,
-  AddFlowServices,
   AddFlowState,
-  AddIngressService,
   AddInputs,
   AddPlanner,
-  AddRepoService,
-  AddSecretStore,
+  AddSupport,
   EnvEntry,
   GuidedInputs,
 } from './types.ts'

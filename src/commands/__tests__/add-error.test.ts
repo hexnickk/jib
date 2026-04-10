@@ -1,18 +1,14 @@
 import { describe, expect, test } from 'bun:test'
-import { JibError, normalizeCliError } from '@jib/core'
+import { normalizeCliError } from '@jib/core'
 import { normalizeAddError } from '@jib/flows'
 
 describe('add command error normalization', () => {
-  test('legacy repo-prepare mismatch hint is preserved by CLI normalization', () => {
+  test('unexpected add failures keep the retry-safe rollback hint', () => {
     const normalized = normalizeCliError(
-      normalizeAddError(
-        new JibError('rpc.failure', 'app "blog" not found in config'),
-        'blog',
-        '/opt/jib/config.yml',
-      ),
+      normalizeAddError(new Error('clone failed'), 'blog', '/opt/jib/config.yml'),
     )
 
-    expect(normalized.message).toBe('app "blog" not found in config')
-    expect(normalized.hint).toContain('running jib-gitsitter is older than this CLI')
+    expect(normalized.message).toBe('clone failed')
+    expect(normalized.hint).toContain('rolled back blog from /opt/jib/config.yml')
   })
 })

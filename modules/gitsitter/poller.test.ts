@@ -48,17 +48,17 @@ describe('pollApp', () => {
 
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
     const lsRemote: NonNullable<PollAppDeps['lsRemote']> = async () => sha
-    const prepareSource: NonNullable<PollAppDeps['prepareSource']> = async () => ({
+    const syncApp: NonNullable<PollAppDeps['syncApp']> = async () => ({
       workdir: '/tmp/prepared-demo',
       sha,
     })
 
-    await pollApp(bus.asBus(), cfg, paths, 'demo', seen, log, { lsRemote, prepareSource })
+    await pollApp(bus.asBus(), cfg, paths, 'demo', seen, log, { lsRemote, syncApp })
     await flush()
     expect(deploys).toHaveLength(1)
     expect(deploys[0]).toMatchObject({ app: 'demo', workdir: '/tmp/prepared-demo', sha })
 
-    await pollApp(bus.asBus(), cfg, paths, 'demo', seen, log, { lsRemote, prepareSource })
+    await pollApp(bus.asBus(), cfg, paths, 'demo', seen, log, { lsRemote, syncApp })
     await flush()
     expect(deploys).toHaveLength(1) // unchanged
   })

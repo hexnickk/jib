@@ -10,6 +10,8 @@
   "dependencies": {
     "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",
-    "@jib/docker": "workspace:*"
+    "@jib/docker": "workspace:*",
+    "@jib/secrets": "workspace:*",
+    "@jib/sources": "workspace:*"
   }
 }

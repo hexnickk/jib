@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { getPaths } from '@jib/core'
-import { buildSourceChoices, isSourceAuthFailure, maybeRecoverSource } from '../sources-flow.ts'
+import {
+  buildSourceChoices,
+  isSourceAuthFailure,
+  maybeRecoverSource,
+  preflightSourceSelection,
+} from '../sources-flow.ts'
 
 const paths = getPaths('/tmp/jib-add-github-test')
 const cfg = {
@@ -107,5 +112,27 @@ describe('source recovery', () => {
 
     expect(source).toBe('appy')
     expect(prompts).toHaveLength(1)
+  })
+
+  test('preflightSourceSelection retries probe after choosing a new source', async () => {
+    const loads: string[] = []
+    const probed: string[] = []
+    const result = await preflightSourceSelection('demo', cfg, paths, 'acme/private', undefined, {
+      isInteractive: () => true,
+      promptSelect: async () => 'existing:keyy',
+      probe: async (_cfg, _paths, target) => {
+        probed.push(target.source ?? 'none')
+        if (!target.source) throw new Error('git clone: Repository not found')
+        return { workdir: '/tmp/demo', sha: 'abc123abc123abc123abc123abc123abc123abc1' }
+      },
+      loadConfig: async (configFile) => {
+        loads.push(configFile)
+        return cfg
+      },
+    })
+
+    expect(result).toEqual({ cfg, source: 'keyy' })
+    expect(loads).toEqual([paths.configFile])
+    expect(probed).toEqual(['none', 'keyy'])
   })
 })

@@ -2,7 +2,7 @@ import type { Bus } from '@jib/bus'
 import { type Config, parseDuration } from '@jib/config'
 import type { Logger, Paths } from '@jib/core'
 import { SUBJECTS } from '@jib/rpc'
-import { type ProbeSourceDeps, prepareSource, probeSource } from '@jib/sources'
+import { type ProbeSourceDeps, probe, syncApp } from '@jib/sources'
 
 /**
  * Parses jib's `poll_interval` using the same duration grammar the config
@@ -21,7 +21,7 @@ export interface PollAppDeps {
   /** Injected for tests; defaults to the real `sources.lsRemote`. */
   lsRemote?: ProbeSourceDeps['lsRemote']
   /** Injected for tests; defaults to the shared sources sync path. */
-  prepareSource?: typeof prepareSource
+  syncApp?: typeof syncApp
 }
 
 export async function pollApp(
@@ -36,7 +36,7 @@ export async function pollApp(
   const app = cfg.apps[appName]
   if (!app || !app.repo || app.repo === 'local') return
   try {
-    const source = await probeSource(
+    const source = await probe(
       cfg,
       paths,
       { app: appName },
@@ -46,7 +46,7 @@ export async function pollApp(
     const prev = lastSeen.get(appName) ?? ''
     if (source.sha === prev) return
 
-    const sync = deps.prepareSource ?? prepareSource
+    const sync = deps.syncApp ?? syncApp
     const prepared = await sync(cfg, paths, { app: appName })
     lastSeen.set(appName, prepared.sha)
     log.info(`${appName}: new sha ${prepared.sha.slice(0, 7)} (was ${prev.slice(0, 7) || 'none'})`)

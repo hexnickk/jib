@@ -1,23 +1,24 @@
-import type { AddFlowParams, AddFlowServices, CleanupState } from './types.ts'
+import type { AddFlowObserver, AddFlowParams, AddSupport, CleanupState } from './types.ts'
 
 export async function cleanupFailedAdd(
   params: AddFlowParams,
-  services: AddFlowServices,
+  support: AddSupport,
+  observer: AddFlowObserver,
   state: CleanupState,
 ): Promise<void> {
   if (state.preparedRepo) {
     try {
-      await services.repo.rollback(params.appName, params.inputs.repo)
+      await support.removeCheckout(params.appName, params.inputs.repo)
     } catch (error) {
-      services.warn?.(`repo rollback: ${error instanceof Error ? error.message : String(error)}`)
+      observer.warn?.(`repo rollback: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
   for (const key of state.writtenSecretKeys) {
     try {
-      await services.secrets.remove(params.appName, key, state.finalEnvFile)
+      await support.removeSecret(params.appName, key, state.finalEnvFile)
     } catch (error) {
-      services.warn?.(
+      observer.warn?.(
         `secret cleanup (${key}): ${error instanceof Error ? error.message : String(error)}`,
       )
     }
@@ -26,16 +27,16 @@ export async function cleanupFailedAdd(
   if (!state.configWritten) return
 
   try {
-    const current = await services.config.load(params.configFile).catch((error) => {
-      services.warn?.(
+    const current = await support.loadConfig(params.configFile).catch((error) => {
+      observer.warn?.(
         `config cleanup load: ${error instanceof Error ? error.message : String(error)}; falling back to original snapshot`,
       )
       return params.cfg
     })
     const rollbackApps = { ...current.apps }
     delete rollbackApps[params.appName]
-    await services.config.write(params.configFile, { ...current, apps: rollbackApps })
+    await support.writeConfig(params.configFile, { ...current, apps: rollbackApps })
   } catch (error) {
-    services.warn?.(`config cleanup: ${error instanceof Error ? error.message : String(error)}`)
+    observer.warn?.(`config cleanup: ${error instanceof Error ? error.message : String(error)}`)
   }
 }

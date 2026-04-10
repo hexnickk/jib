@@ -4,6 +4,7 @@ import { JibError, type Paths, pathExists, repoPath } from '@jib/core'
 import * as git from './git.ts'
 import { resolveSourceDriver } from './registry.ts'
 import type {
+  InspectionCheckout,
   PreparedSource,
   ProbeSourceDeps,
   ResolvedSource,
@@ -24,7 +25,7 @@ function resolveApp(cfg: Config, target: SourceTarget): App {
   }
 }
 
-export async function resolveSource(
+export async function resolve(
   cfg: Config,
   paths: Paths,
   target: SourceTarget,
@@ -47,7 +48,7 @@ export async function resolveSource(
   }
 }
 
-export async function prepareSource(
+export async function syncApp(
   cfg: Config,
   paths: Paths,
   target: SourceTarget,
@@ -63,7 +64,7 @@ export async function prepareSource(
     return { workdir, sha: await git.currentSHA(workdir) }
   }
 
-  const source = await resolveSource(cfg, paths, target, ref)
+  const source = await resolve(cfg, paths, target, ref)
   await ensureCheckout(source.workdir, source.url, source.branch, source.env)
   await source.applyAuth(source.workdir)
   await git.fetch(source.workdir, source.ref, source.env)
@@ -72,7 +73,16 @@ export async function prepareSource(
   return { workdir: source.workdir, sha }
 }
 
-export async function probeSource(
+export async function cloneForInspection(
+  cfg: Config,
+  paths: Paths,
+  target: SourceTarget,
+): Promise<InspectionCheckout> {
+  const prepared = await syncApp(cfg, paths, target)
+  return { workdir: prepared.workdir }
+}
+
+export async function probe(
   cfg: Config,
   paths: Paths,
   target: SourceTarget,
@@ -80,13 +90,13 @@ export async function probeSource(
 ): Promise<SourceProbe | null> {
   const app = resolveApp(cfg, target)
   if (app.repo === 'local') return null
-  const source = await resolveSource(cfg, paths, target)
+  const source = await resolve(cfg, paths, target)
   const lsRemote = deps.lsRemote ?? git.lsRemote
   const sha = await lsRemote(source.url, source.ref, source.env)
   return sha ? { workdir: source.workdir, sha } : null
 }
 
-export async function removeSource(paths: Paths, app: string, repo: string): Promise<void> {
+export async function removeCheckout(paths: Paths, app: string, repo: string): Promise<void> {
   const workdir = repoPath(paths, app, repo)
   await rm(workdir, { recursive: true, force: true })
 }

@@ -2,7 +2,7 @@ import { withBus } from '@jib/bus'
 import { loadAppOrExit } from '@jib/config'
 import { CliError, isTextOutput } from '@jib/core'
 import { type EvtDeployProgress, SUBJECTS, emitAndWait } from '@jib/rpc'
-import { prepareSource } from '@jib/sources'
+import { syncApp } from '@jib/sources'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
@@ -40,7 +40,7 @@ export default defineCommand({
 
     try {
       s?.start(`[1/2] preparing ${args.app}`)
-      const ready = await prepareSource(cfg, paths, { app: args.app }, args.ref).catch((err) => {
+      const ready = await syncApp(cfg, paths, { app: args.app }, args.ref).catch((err) => {
         throw new CliError('deploy_failed', err instanceof Error ? err.message : String(err), {
           hint: 'fix repo access or ref selection, then retry `jib deploy ...`',
         })

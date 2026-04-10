@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { getPaths, pathExists, repoPath } from '@jib/core'
 import { $ } from 'bun'
-import { prepareSource, probeSource, removeSource } from './index.ts'
+import { cloneForInspection, probe, removeCheckout, syncApp } from './index.ts'
 
 async function makeUpstream(name: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), `${name}-`))
@@ -36,27 +36,29 @@ function configFor(repo: string): Config {
 }
 
 describe('sources service', () => {
-  test('probeSource returns the remote sha without requiring a checkout', async () => {
+  test('probe returns the remote sha without requiring a checkout', async () => {
     const upstream = await makeUpstream('jib-probe')
     const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
     const paths = getPaths(root)
-    const probe = await probeSource(configFor(upstream), paths, { app: 'demo' })
+    const result = await probe(configFor(upstream), paths, { app: 'demo' })
 
-    expect(probe?.sha).toMatch(/^[0-9a-f]{40}$/)
-    expect(probe?.workdir).toBe(repoPath(paths, 'demo', upstream))
+    expect(result?.sha).toMatch(/^[0-9a-f]{40}$/)
+    expect(result?.workdir).toBe(repoPath(paths, 'demo', upstream))
   })
 
-  test('prepareSource creates a checkout that removeSource can clean up', async () => {
+  test('cloneForInspection and syncApp share the checkout lifecycle', async () => {
     const upstream = await makeUpstream('jib-roundtrip')
     const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
     const paths = getPaths(root)
     const workdir = repoPath(paths, 'demo', upstream)
 
-    const prepared = await prepareSource(configFor(upstream), paths, { app: 'demo' }, 'main')
+    const checkout = await cloneForInspection(configFor(upstream), paths, { app: 'demo' })
+    expect(checkout.workdir).toBe(workdir)
+    const prepared = await syncApp(configFor(upstream), paths, { app: 'demo' }, 'main')
     expect(prepared.workdir).toBe(workdir)
     expect(await pathExists(workdir)).toBe(true)
 
-    await removeSource(paths, 'demo', upstream)
+    await removeCheckout(paths, 'demo', upstream)
     expect(await pathExists(workdir)).toBe(false)
   })
 })

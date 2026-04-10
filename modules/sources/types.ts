@@ -14,6 +14,10 @@ export interface PreparedSource {
   sha: string
 }
 
+export interface InspectionCheckout {
+  workdir: string
+}
+
 export interface SourceProbe {
   workdir: string
   sha: string
@@ -23,7 +27,6 @@ export interface ResolvedSource {
   app: App
   branch: string
   env: GitEnv
-  external: boolean
   ref: string
   url: string
   workdir: string
@@ -32,7 +35,6 @@ export interface ResolvedSource {
 
 export interface ResolvedDriverSource {
   env: GitEnv
-  external: boolean
   url: string
   applyAuth: (workdir: string) => Promise<void>
 }

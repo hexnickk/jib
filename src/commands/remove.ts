@@ -1,25 +1,14 @@
 import { withBus } from '@jib/bus'
-import { loadAppOrExit, writeConfig } from '@jib/config'
+import { loadAppOrExit } from '@jib/config'
 import { canPrompt, isTextOutput } from '@jib/core'
-import { composeFor } from '@jib/docker'
+import { DefaultRemoveSupport, RemoveService } from '@jib/flows'
 import { createBusIngressOperator, releaseIngress } from '@jib/ingress'
-import { removeSource } from '@jib/sources'
 import { promptConfirm, spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { applyCliArgs, missingInput, withCliArgs } from './_cli.ts'
 
-/**
- * `jib remove <app>` — reverse of add. Order matters:
- *   1. ingress release — stop accepting traffic first
- *   2. `docker compose down` — stop the app itself
- *   3. repo cleanup — remove the cached checkout
- *   4. drop the config entry
- *
- * Every step is best-effort: if one fails we log and continue so the
- * operator can finish teardown by hand rather than being left with a
- * half-removed app.
- */
+/** `jib remove <app>` — prompt in the CLI, then delegate teardown to flows. */
 
 const DEFAULT_TIMEOUT_MS = 2 * 60_000
 
@@ -52,38 +41,23 @@ export default defineCommand({
       }
     }
 
-    if (appCfg.domains.length > 0) {
-      try {
-        await releaseIngressForRemove(args.app)
-        if (isTextOutput()) consola.info('ingress released')
-      } catch (err) {
-        if (isTextOutput()) {
-          consola.warn(`ingress release: ${err instanceof Error ? err.message : String(err)}`)
-        }
-      }
-    }
-
-    try {
-      const compose = composeFor(cfg, paths, args.app)
-      await compose.down(false, { quiet: !isTextOutput() })
-      if (isTextOutput()) consola.info('containers stopped')
-    } catch (err) {
-      if (isTextOutput()) {
-        consola.warn(`compose down: ${err instanceof Error ? err.message : String(err)}`)
-      }
-    }
-
-    try {
-      await removeSource(paths, args.app, appCfg.repo)
-    } catch (err) {
-      if (isTextOutput()) {
-        consola.warn(`repo cleanup: ${err instanceof Error ? err.message : String(err)}`)
-      }
-    }
-
-    const nextApps = { ...cfg.apps }
-    delete nextApps[args.app]
-    await writeConfig(paths.configFile, { ...cfg, apps: nextApps })
+    const service = new RemoveService(
+      new DefaultRemoveSupport({
+        paths,
+        releaseIngress: (appName) => releaseIngressForRemove(appName),
+      }),
+      {
+        warn: (message) => {
+          if (isTextOutput()) consola.warn(message)
+        },
+      },
+    )
+    await service.run({
+      appName: args.app,
+      cfg,
+      configFile: paths.configFile,
+      quiet: !isTextOutput(),
+    })
     if (isTextOutput()) consola.success(`removed ${args.app}`)
     return { app: args.app, removed: true }
   },
