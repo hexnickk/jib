@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import type { InstallFn } from '@jib/core'
 import { getExec } from '@jib/ingress'
 
@@ -30,9 +30,6 @@ include ${nginxDir}/*/*.conf;
 export const install: InstallFn = async (ctx) => {
   const log = ctx.logger
   const exec = getExec()
-
-  await exec(['sudo', 'systemctl', 'disable', '--now', 'jib-nginx.service'])
-  await rm('/etc/systemd/system/jib-nginx.service', { force: true })
 
   const which = await exec(['which', 'nginx'])
   if (!which.ok) {

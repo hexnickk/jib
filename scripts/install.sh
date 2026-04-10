@@ -76,15 +76,12 @@ if command -v file >/dev/null 2>&1; then
 fi
 
 cli_dest="$PREFIX/jib"
-legacy_daemon_dest="$PREFIX/jib-daemon"
 log "installing $cli_dest (version $tag)"
 if [ -w "$PREFIX" ] || [ "$(id -u)" = "0" ]; then
   install -m 0755 "$tmp/jib" "$cli_dest"
-  rm -f "$legacy_daemon_dest"
 else
   need sudo
   sudo install -m 0755 "$tmp/jib" "$cli_dest"
-  sudo rm -f "$legacy_daemon_dest"
 fi
 
 log "jib $tag installed"

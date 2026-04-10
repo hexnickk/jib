@@ -27,7 +27,6 @@ dev:
 
 install-all: build
 	sudo install -m 0755 $(CLI_BIN) $(PREFIX)/jib
-	sudo rm -f $(PREFIX)/jib-daemon
 
 clean:
 	rm -rf dist

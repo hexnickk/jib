@@ -1,4 +1,4 @@
-import { rm, writeFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import type { InstallFn } from '@jib/core'
 import { $ } from 'bun'
 import { SERVICE_NAME, UNIT_PATH, systemdUnit } from './templates.ts'
@@ -8,9 +8,6 @@ import { SERVICE_NAME, UNIT_PATH, systemdUnit } from './templates.ts'
  * `jib` binary directly, so there is no separate daemon artifact to ship.
  */
 export const install: InstallFn = async (ctx) => {
-  await $`sudo systemctl disable --now jib-gitsitter.service`.quiet().nothrow()
-  await rm('/etc/systemd/system/jib-gitsitter.service', { force: true })
-
   const vars = { jibRoot: ctx.paths.root, binPath: '/usr/local/bin/jib' }
   ctx.logger.info(`writing ${UNIT_PATH}`)
   await writeFile(UNIT_PATH, systemdUnit(vars), { mode: 0o644 })
