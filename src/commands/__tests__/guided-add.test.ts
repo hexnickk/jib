@@ -8,6 +8,7 @@ import {
   renderAddPlanSummary,
   secretPromptPlaceholder,
   shouldDefaultExposeService,
+  splitCommaValues,
   summarizeComposeServices,
   validateEnvEntry,
 } from '../add-guided.ts'
@@ -119,5 +120,10 @@ describe('guided add helpers', () => {
     expect(parseEnvEntry('API_KEY=secret')).toEqual({ key: 'API_KEY', value: 'secret' })
     expect(validateEnvEntry('API_KEY=secret')).toBeUndefined()
     expect(validateEnvEntry('API_KEY')).toContain('expected KEY=VALUE')
+  })
+
+  test('comma splitter treats missing optional prompt input as empty', () => {
+    expect(splitCommaValues(undefined)).toEqual([])
+    expect(splitCommaValues(null)).toEqual([])
   })
 })

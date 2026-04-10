@@ -18,8 +18,8 @@ export interface GuidedServiceAnswer {
   envEntries?: EnvEntry[]
 }
 
-export function splitCommaValues(raw: string): string[] {
-  return raw
+export function splitCommaValues(raw?: string | null): string[] {
+  return (raw ?? '')
     .split(',')
     .map((value) => value.trim())
     .filter((value) => value.length > 0)

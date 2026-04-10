@@ -60,13 +60,13 @@ export function promptString(opts: StrOpts): Promise<string> {
 }
 
 export function promptStringOptional(opts: StrOpts): Promise<string> {
-  return ask(() =>
+  return ask<string | undefined>(() =>
     clack.text({
       message: opts.message,
       ...(opts.placeholder !== undefined && { placeholder: opts.placeholder }),
       ...(opts.initialValue !== undefined && { initialValue: opts.initialValue }),
     }),
-  )
+  ).then((value) => value ?? '')
 }
 
 async function readLine(rl: ReturnType<typeof createInterface>, prompt: string): Promise<string> {
