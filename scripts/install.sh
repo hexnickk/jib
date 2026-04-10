@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# jib installer. Downloads the prebuilt binary for the current OS/arch from
-# a GitHub release and installs it to /usr/local/bin/jib.
+# jib installer. Downloads the prebuilt binaries for the current OS/arch from
+# a GitHub release and installs them to /usr/local/bin/{jib,jib-daemon}.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/main/scripts/install.sh | bash
@@ -61,27 +61,37 @@ else
   [ -n "$tag" ] && [ "$tag" != "null" ] || fail "could not determine latest release tag"
 fi
 
-asset="jib-${target}"
-url="https://github.com/${REPO}/releases/download/${tag}/${asset}"
+cli_asset="jib-${target}"
+daemon_asset="jib-daemon-${target}"
+cli_url="https://github.com/${REPO}/releases/download/${tag}/${cli_asset}"
+daemon_url="https://github.com/${REPO}/releases/download/${tag}/${daemon_asset}"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-log "downloading $url"
-curl -fsSL "$url" -o "$tmp/jib" || fail "download failed"
+log "downloading $cli_url"
+curl -fsSL "$cli_url" -o "$tmp/jib" || fail "download failed"
+
+log "downloading $daemon_url"
+curl -fsSL "$daemon_url" -o "$tmp/jib-daemon" || fail "download failed"
 
 chmod +x "$tmp/jib"
+chmod +x "$tmp/jib-daemon"
 if command -v file >/dev/null 2>&1; then
   file "$tmp/jib" | grep -qiE 'executable|Mach-O' || fail "downloaded file is not an executable"
+  file "$tmp/jib-daemon" | grep -qiE 'executable|Mach-O' || fail "downloaded daemon file is not an executable"
 fi
 
-dest="$PREFIX/jib"
-log "installing $dest (version $tag)"
+cli_dest="$PREFIX/jib"
+daemon_dest="$PREFIX/jib-daemon"
+log "installing $cli_dest and $daemon_dest (version $tag)"
 if [ -w "$PREFIX" ] || [ "$(id -u)" = "0" ]; then
-  install -m 0755 "$tmp/jib" "$dest"
+  install -m 0755 "$tmp/jib" "$cli_dest"
+  install -m 0755 "$tmp/jib-daemon" "$daemon_dest"
 else
   need sudo
-  sudo install -m 0755 "$tmp/jib" "$dest"
+  sudo install -m 0755 "$tmp/jib" "$cli_dest"
+  sudo install -m 0755 "$tmp/jib-daemon" "$daemon_dest"
 fi
 
 log "jib $tag installed"
