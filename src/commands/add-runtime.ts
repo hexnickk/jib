@@ -53,17 +53,20 @@ export function renderAddResult(
 }
 
 export function normalizeAddDeployError(error: unknown, app: string, configFile: string): Error {
+  const rollbackHint = `rolled back ${app} from ${configFile}; safe to retry: jib add ...`
   const message =
     error instanceof CliError && error.code === 'cancelled'
       ? 'add cancelled'
       : error instanceof Error
         ? error.message
         : String(error)
+  const hint =
+    error instanceof CliError && error.hint ? `${error.hint}\n${rollbackHint}` : rollbackHint
   return new CliError(
     error instanceof CliError && error.code === 'cancelled' ? 'cancelled' : 'add_failed',
     message,
     {
-      hint: `rolled back ${app} from ${configFile}; safe to retry: jib add ...`,
+      hint,
     },
   )
 }

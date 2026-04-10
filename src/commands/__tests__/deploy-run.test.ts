@@ -60,4 +60,22 @@ describe('runDeploy', () => {
       message: 'git clone failed',
     })
   })
+
+  test('permission failures hint to rerun sudo jib init', async () => {
+    setCliRuntime({ output: 'json' })
+    await expect(
+      runDeploy(cfg, paths, 'demo', undefined, 1000, {
+        sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
+        createEngine: () =>
+          ({
+            deploy: async () => {
+              throw new Error("EACCES: permission denied, open '/opt/jib/overrides/demo.yml'")
+            },
+          }) as never,
+      }),
+    ).rejects.toMatchObject({
+      code: 'deploy_failed',
+      hint: 'rerun `sudo jib init` to repair /opt/jib permissions, then retry `jib deploy ...`',
+    })
+  })
 })

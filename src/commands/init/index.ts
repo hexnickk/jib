@@ -9,6 +9,7 @@ import { migrations, runJibMigrations } from '../../migrations/index.ts'
 import type { MigrationContext } from '../../migrations/types.ts'
 import { applyCliArgs, missingInput, withCliArgs } from '../_cli.ts'
 import { configureOptionalModules } from './optional.ts'
+import { repairManagedTreePermissions } from './permissions.ts'
 import { reconcileOptionalModules } from './reconcile.ts'
 import { refreshExistingInstall } from './refresh.ts'
 import { describeModules, requiredModules, unseenOptionalModules } from './registry.ts'
@@ -50,6 +51,7 @@ export default defineCommand({
     if (isTextOutput()) intro('jib init')
 
     const applied = await runJibMigrations(mctx, migrations)
+    await repairManagedTreePermissions(paths)
     let config = await loadConfig(paths.configFile)
     config = await reconcileOptionalModules(config, paths)
     let restartedServices = 0

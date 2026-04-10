@@ -70,9 +70,17 @@ export async function runDeploy(
   } catch (err) {
     if (err instanceof CliError) throw err
     throw new CliError('deploy_failed', err instanceof Error ? err.message : String(err), {
-      hint: 'check docker compose output, then retry `jib deploy ...`',
+      hint: deployFailureHint(err),
     })
   }
+}
+
+function deployFailureHint(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  if (message.includes('EACCES') && message.includes('/opt/jib/')) {
+    return 'rerun `sudo jib init` to repair /opt/jib permissions, then retry `jib deploy ...`'
+  }
+  return 'check docker compose output, then retry `jib deploy ...`'
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
