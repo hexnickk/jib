@@ -78,6 +78,35 @@ describe('execution contract', () => {
     })
   })
 
+  test('bare command groups render usage in interactive text mode', async () => {
+    await withTmpRoot(async (root) => {
+      const topLevel = await runCli(root, ['--interactive=always'])
+      expect(topLevel.exitCode).toBe(0)
+      expect(topLevel.stderr).toBe('')
+      expect(topLevel.stdout).toContain('USAGE `jib')
+
+      const cloudflared = await runCli(root, ['--interactive=always', 'cloudflared'])
+      expect(cloudflared.exitCode).toBe(0)
+      expect(cloudflared.stderr).toBe('')
+      expect(cloudflared.stdout).toContain('Manage Cloudflare Tunnel')
+      expect(cloudflared.stdout).toContain('status')
+    })
+  })
+
+  test('bare command groups still fail in non-interactive text mode', async () => {
+    await withTmpRoot(async (root) => {
+      const topLevel = await runCli(root, [])
+      expect(topLevel.exitCode).toBe(1)
+      expect(topLevel.stdout).toBe('')
+      expect(topLevel.stderr).toContain('No command specified.')
+
+      const cloudflared = await runCli(root, ['cloudflared'])
+      expect(cloudflared.exitCode).toBe(1)
+      expect(cloudflared.stdout).toBe('')
+      expect(cloudflared.stderr).toContain('No command specified.')
+    })
+  })
+
   test('status returns pure json payload in json mode', async () => {
     await withTmpRoot(async (root) => {
       const result = await runCli(root, ['--interactive=never', '--output=json', 'status'])

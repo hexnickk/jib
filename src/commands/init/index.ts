@@ -1,29 +1,16 @@
 import { existsSync, readlinkSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { type Config, loadConfig, writeConfig } from '@jib/config'
-import {
-  CliError,
-  type ModuleContext,
-  canPrompt,
-  createLogger,
-  getPaths,
-  isTextOutput,
-} from '@jib/core'
+import { loadConfig } from '@jib/config'
+import { CliError, canPrompt, getPaths, isTextOutput } from '@jib/core'
 import { openDb } from '@jib/state'
 import { intro, log, note, outro } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { migrations, runJibMigrations } from '../../migrations/index.ts'
 import type { MigrationContext } from '../../migrations/types.ts'
 import { applyCliArgs, missingInput, withCliArgs } from '../_cli.ts'
-import { runInstallsTx } from './install.ts'
+import { configureOptionalModules } from './optional.ts'
 import { refreshExistingInstall } from './refresh.ts'
-import {
-  describeModules,
-  promptOptionalModules,
-  requiredModules,
-  resolveModules,
-  unseenOptionalModules,
-} from './registry.ts'
+import { describeModules, requiredModules, unseenOptionalModules } from './registry.ts'
 
 function ensureRoot(): void {
   if (process.getuid?.() === 0) return
@@ -104,22 +91,7 @@ export default defineCommand({
           })),
         )
       }
-      const { selected, declined } = await promptOptionalModules(unseen)
-      const ctx: ModuleContext<Config> = { config, logger: createLogger('init'), paths }
-
-      if (selected.length > 0) {
-        const toInstall = resolveModules(selected).filter((m) => m.install)
-        if (toInstall.length > 0) await runInstallsTx(toInstall, ctx)
-        for (const m of resolveModules(selected)) {
-          if (m.setup) await m.setup(ctx)
-        }
-      }
-
-      // Persist choices
-      const updated = { ...config, modules: { ...config.modules } }
-      for (const name of selected) updated.modules[name] = true
-      for (const name of declined) updated.modules[name] = false
-      await writeConfig(paths.configFile, updated)
+      await configureOptionalModules(config, paths, unseen)
     }
 
     if (applied.length > 0) {

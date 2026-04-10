@@ -2,6 +2,7 @@ import { createInterface } from 'node:readline'
 import * as clack from '@clack/prompts'
 import { ValidationError } from '@jib/core'
 import { assertInteractive } from './interactive.ts'
+import { readPemBlock } from './pem.ts'
 
 export { intro, outro, spinner, log, note } from '@clack/prompts'
 
@@ -105,20 +106,26 @@ export function promptMultiSelect<T extends string>(opts: SelectOpts<T>): Promis
  */
 export async function promptPEM(opts: { message: string }): Promise<string> {
   assertInteractive()
-  clack.log.info(`${opts.message} (paste full PEM block)`)
-  const rl = createInterface({ input: process.stdin })
-  const lines: string[] = []
-  const MAX_LINES = 200
-  for await (const line of rl) {
-    lines.push(line)
-    if (line.startsWith('-----END ') && line.endsWith('-----')) break
-    if (lines.length >= MAX_LINES) break
+  while (true) {
+    clack.log.info(`${opts.message} (paste full PEM block)`)
+    const rl = createInterface({ input: process.stdin })
+    let readError: unknown = null
+    try {
+      return await readPemBlock(rl)
+    } catch (error) {
+      readError = error
+    } finally {
+      rl.close()
+    }
+
+    if (!(readError instanceof ValidationError)) throw readError
+    clack.log.warning(readError.message)
+    const retry = await promptConfirm({
+      message: 'Try pasting the PEM again?',
+      initialValue: true,
+    })
+    if (!retry) throw readError
   }
-  rl.close()
-  const pem = lines.join('\n')
-  if (!pem.includes('-----BEGIN ')) throw new ValidationError('invalid PEM: missing BEGIN marker')
-  if (!pem.includes('-----END ')) throw new ValidationError('invalid PEM: missing END marker')
-  return pem
 }
 
 export function promptConfirm(opts: ConfirmOpts): Promise<boolean> {

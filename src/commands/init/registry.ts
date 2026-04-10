@@ -30,24 +30,11 @@ export function describeModules(modules: ModLike[]): string[] {
   )
 }
 
-/** Prompt user to select from a list of optional modules. */
-export async function promptOptionalModules(
-  candidates: ModLike[],
-): Promise<{ selected: string[]; declined: string[] }> {
-  if (candidates.length === 0) return { selected: [], declined: [] }
-
-  const selected: string[] = []
-  const declined: string[] = []
-
-  for (const mod of candidates) {
-    const enabled = await promptConfirm({
-      message:
-        `Enable optional module "${mod.manifest.name}"? ${mod.manifest.description ?? ''}`.trim(),
-      initialValue: false,
-    })
-    if (enabled) selected.push(mod.manifest.name)
-    else declined.push(mod.manifest.name)
-  }
-
-  return { selected, declined }
+/** Prompt for a single optional module so init can configure them one by one. */
+export function promptOptionalModule(mod: ModLike): Promise<boolean> {
+  return promptConfirm({
+    message:
+      `Enable optional module "${mod.manifest.name}"? ${mod.manifest.description ?? ''}`.trim(),
+    initialValue: false,
+  })
 }

@@ -1,6 +1,8 @@
 import {
   type CliIssue,
+  canPrompt,
   configureCliRuntime,
+  getCliRuntime,
   isJsonOutput,
   normalizeCliError,
   stripCliRuntimeArgs,
@@ -71,6 +73,17 @@ function printSuccess(value: unknown): void {
   if (typeof value === 'string') consola.log(value)
 }
 
+function hasSubCommands(cmd: CommandNode): boolean {
+  return Object.keys(cmd.subCommands ?? {}).length > 0
+}
+
+function shouldRenderBareCommandUsage(cmd: CommandNode, leafArgs: string[]): boolean {
+  if (isJsonOutput()) return false
+  const runtime = getCliRuntime()
+  if (runtime.interactive !== 'always' && !canPrompt()) return false
+  return leafArgs.length === 0 && hasSubCommands(cmd)
+}
+
 export async function runCommandApp(options: CommandAppOptions): Promise<void> {
   const mainDef: CommandDef<ArgsDef> = {
     meta: {
@@ -100,7 +113,15 @@ export async function runCommandApp(options: CommandAppOptions): Promise<void> {
       return
     }
 
-    const { leaf, leafArgs } = await resolveCommandInvocation(main as CommandNode, sanitizedArgs)
+    const { leaf, leafArgs, parent } = await resolveCommandInvocation(
+      main as CommandNode,
+      sanitizedArgs,
+    )
+    if (shouldRenderBareCommandUsage(leaf, leafArgs)) {
+      const usage = `${await renderUsage(leaf as CommandDef, parent as CommandDef | undefined)}\n`
+      printSuccess(usage)
+      return
+    }
     const { result } = await runCommand(leaf as CommandDef, { rawArgs: leafArgs })
     printSuccess(result)
   } catch (error) {
