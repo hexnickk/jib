@@ -1,5 +1,4 @@
 import {
-  type CliIssue,
   canPrompt,
   configureCliRuntime,
   getCliRuntime,
@@ -9,7 +8,6 @@ import {
 } from '@jib/core'
 import type { ArgsDef, CommandDef, Resolvable, SubCommandsDef } from 'citty'
 import { defineCommand, renderUsage, runCommand } from 'citty'
-import { consola } from 'consola'
 
 const ESC = String.fromCharCode(27)
 const ANSI_ESCAPE_RE = new RegExp(`${ESC}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`, 'g')
@@ -28,6 +26,11 @@ export interface CommandAppOptions {
 
 function stripAnsi(value: string): string {
   return value.replaceAll(ANSI_ESCAPE_RE, '')
+}
+
+function writeText(stream: NodeJS.WriteStream, value: string): void {
+  const text = stream.isTTY ? value : stripAnsi(value)
+  stream.write(text.endsWith('\n') ? text : `${text}\n`)
 }
 
 function sanitizeJsonValue(value: unknown): unknown {
@@ -58,11 +61,11 @@ async function resolveCommandInvocation(
 }
 
 function renderTextError(error: ReturnType<typeof normalizeCliError>): void {
-  consola.error(error.message)
-  for (const issue of error.issues ?? ([] as CliIssue[])) {
-    consola.error(`${issue.field}: ${issue.message}`)
+  writeText(process.stderr, error.message)
+  for (const issue of error.issues ?? []) {
+    writeText(process.stderr, `${issue.field}: ${issue.message}`)
   }
-  if (error.hint) consola.error(error.hint)
+  if (error.hint) writeText(process.stderr, error.hint)
 }
 
 function printSuccess(value: unknown): void {
@@ -70,10 +73,7 @@ function printSuccess(value: unknown): void {
     printJson(process.stdout, { ok: true, data: value ?? null })
     return
   }
-  if (typeof value === 'string') {
-    const text = process.stdout.isTTY ? value : stripAnsi(value)
-    process.stdout.write(text.endsWith('\n') ? text : `${text}\n`)
-  }
+  if (typeof value === 'string') writeText(process.stdout, value)
 }
 
 function hasSubCommands(cmd: CommandNode): boolean {

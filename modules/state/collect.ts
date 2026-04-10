@@ -36,9 +36,17 @@ export async function collectServices(hasCloudflared: boolean): Promise<ServiceS
   return Promise.all(managedServiceNames(hasCloudflared).map(checkUnit))
 }
 
+export function normalizeUnitStatus(output: string, exitCode: number): string {
+  const raw = output.trim()
+  if (!raw) return exitCode === 0 ? 'unknown' : 'unavailable'
+  const firstLine = raw.split('\n', 1)[0]?.trim() ?? ''
+  return /^[a-z-]+$/.test(firstLine) ? firstLine : 'unavailable'
+}
+
 async function checkUnit(name: string): Promise<ServiceStatus> {
   const res = await $`systemctl is-active ${name}`.quiet().nothrow()
-  const status = res.stdout.toString().trim() || 'unknown'
+  const output = res.stdout.toString() || res.stderr.toString()
+  const status = normalizeUnitStatus(output, res.exitCode)
   return { name, active: status === 'active', status }
 }
 

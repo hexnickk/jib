@@ -120,12 +120,25 @@ describe('execution contract', () => {
     })
   })
 
+  test('status text mode prints plain sections without logger prefixes', async () => {
+    await withTmpRoot(async (root) => {
+      const result = await runCli(root, ['status'])
+      expect(result.exitCode).toBe(0)
+      expect(result.stderr).toBe('')
+      expect(result.stdout).toContain('services')
+      expect(result.stdout).toContain('sources')
+      expect(result.stdout).toContain('apps')
+      expect(result.stdout).not.toContain('[log]')
+    })
+  })
+
   test('invalid root runtime flag is normalized instead of crashing', async () => {
     await withTmpRoot(async (root) => {
       const result = await runCli(root, ['--output=xml', 'status'])
       expect(result.exitCode).toBe(1)
       expect(result.stdout).toBe('')
       expect(result.stderr).toContain('invalid --output value "xml"')
+      expect(result.stderr).not.toContain('[error]')
       expect(result.stderr).not.toContain('error:')
       expect(result.stderr).not.toContain('stack')
     })

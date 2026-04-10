@@ -9,7 +9,6 @@ import {
   collectSources,
 } from '@jib/state'
 import { defineCommand } from 'citty'
-import { consola } from 'consola'
 
 function timeAgo(iso: string): string {
   if (!iso) return ''
@@ -22,32 +21,40 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`
 }
 
+function printLine(line = ''): void {
+  process.stdout.write(`${line}\n`)
+}
+
 function printServices(services: ServiceStatus[]): void {
-  consola.log('services')
+  printLine('services')
   for (const s of services) {
     const icon = s.active ? '●' : '○'
-    consola.log(`  ${icon} ${s.name.padEnd(18)} ${s.status}`)
+    printLine(`  ${icon} ${s.name.padEnd(18)} ${s.status}`)
   }
 }
 
 function printSources(sources: SourceStatus[]): void {
   if (sources.length === 0) {
-    consola.log('\nsources  (none)')
+    printLine()
+    printLine('sources  (none)')
     return
   }
-  consola.log('\nsources')
+  printLine()
+  printLine('sources')
   for (const source of sources) {
     const warn = source.hasCredential ? '' : '  ⚠ credential missing'
-    consola.log(`  ${source.name.padEnd(18)} ${source.detail}${warn}`)
+    printLine(`  ${source.name.padEnd(18)} ${source.detail}${warn}`)
   }
 }
 
 function printApps(apps: AppStatus[]): void {
   if (apps.length === 0) {
-    consola.log('\napps  (none)')
+    printLine()
+    printLine('apps  (none)')
     return
   }
-  consola.log('\napps')
+  printLine()
+  printLine('apps')
   for (const app of apps) {
     const running = app.containers.some((c) => c.state === 'running')
     const icon = running ? '●' : '○'
@@ -55,12 +62,12 @@ function printApps(apps: AppStatus[]): void {
     const ago = timeAgo(app.lastDeploy)
     const deployState = app.lastDeployStatus || 'unknown'
     const deployInfo = app.lastDeploy ? `${deployState}  ${sha}  ${ago}` : `${deployState}  ${sha}`
-    consola.log(`  ${icon} ${app.name.padEnd(18)} ${deployInfo}`)
+    printLine(`  ${icon} ${app.name.padEnd(18)} ${deployInfo}`)
     for (const c of app.containers) {
-      consola.log(`    ${c.service.padEnd(16)} ${c.state}  ${c.status}`)
+      printLine(`    ${c.service.padEnd(16)} ${c.state}  ${c.status}`)
     }
     if (app.domains.length > 0) {
-      for (const d of app.domains) consola.log(`    ingress ${d.host} → :${d.port ?? '?'}`)
+      for (const d of app.domains) printLine(`    ingress ${d.host} → :${d.port ?? '?'}`)
     }
   }
 }
