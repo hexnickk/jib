@@ -1,7 +1,7 @@
 import { createLogger, getPaths } from '@jib/core'
+import type { CertExistsFn, ExecFn, ExecResult } from '@jib/ingress'
 import { FakeBus, flush } from '@jib/rpc'
-import { type CertExistsFn, registerNginxHandlers } from './handlers.ts'
-import type { ExecFn, ExecResult } from './shell.ts'
+import { registerNginxHandlers } from './handlers.ts'
 
 /**
  * Shared test helpers for the nginx operator handler suites.

@@ -23,16 +23,16 @@ describe('nginx operator — release', () => {
     )
     const ready: unknown[] = []
     const released: unknown[] = []
-    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressReady, (p) => {
       ready.push(p)
     })
-    bus.subscribe(SUBJECTS.evt.nginxReleased, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressReleased, (p) => {
       released.push(p)
     })
-    bus.publish(SUBJECTS.cmd.nginxClaim, claim('web'))
+    bus.publish(SUBJECTS.cmd.ingressClaim, claim('web'))
     await waitFor(() => (ready.length ? ready : undefined))
     ctx.calls = []
-    bus.publish(SUBJECTS.cmd.nginxRelease, {
+    bus.publish(SUBJECTS.cmd.ingressRelease, {
       corrId: 'r1',
       ts: new Date().toISOString(),
       source: 'test',
@@ -51,10 +51,10 @@ describe('nginx operator — release', () => {
       fakeExec(ctx, () => ({ ok: true, stdout: '', stderr: '' })),
     )
     const released: unknown[] = []
-    bus.subscribe(SUBJECTS.evt.nginxReleased, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressReleased, (p) => {
       released.push(p)
     })
-    bus.publish(SUBJECTS.cmd.nginxRelease, {
+    bus.publish(SUBJECTS.cmd.ingressRelease, {
       corrId: 'r2',
       ts: new Date().toISOString(),
       source: 'test',
@@ -64,6 +64,39 @@ describe('nginx operator — release', () => {
     expect(ctx.calls).toEqual([])
   })
 
+  test('restores prior config when release reload fails', async () => {
+    let failReload = false
+    const { bus, paths } = setup(
+      ctx,
+      fakeExec(ctx, (c) =>
+        c === 'sudo' && failReload
+          ? { ok: false, stdout: '', stderr: 'reload boom' }
+          : { ok: true, stdout: '', stderr: '' },
+      ),
+    )
+    const ready: unknown[] = []
+    const failed: Array<{ error: string }> = []
+    bus.subscribe(SUBJECTS.evt.ingressReady, (p) => {
+      ready.push(p)
+    })
+    bus.subscribe(SUBJECTS.evt.ingressFailed, (p) => {
+      failed.push(p as { error: string })
+    })
+    bus.publish(SUBJECTS.cmd.ingressClaim, claim('web'))
+    await waitFor(() => (ready.length ? ready : undefined))
+    failReload = true
+    bus.publish(SUBJECTS.cmd.ingressRelease, {
+      corrId: 'r-fail',
+      ts: new Date().toISOString(),
+      source: 'test',
+      app: 'web',
+    })
+    await waitFor(() => (failed.length ? failed : undefined))
+    const files = await readdir(join(paths.nginxDir, 'web'))
+    expect(failed[0]?.error).toContain('reload boom')
+    expect(files).toContain('web.example.com.conf')
+  })
+
   test('release for `foo` leaves `foo-bar` untouched (no prefix collision)', async () => {
     const { bus, paths } = setup(
       ctx,
@@ -71,17 +104,17 @@ describe('nginx operator — release', () => {
     )
     const ready: unknown[] = []
     const released: unknown[] = []
-    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressReady, (p) => {
       ready.push(p)
     })
-    bus.subscribe(SUBJECTS.evt.nginxReleased, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressReleased, (p) => {
       released.push(p)
     })
-    bus.publish(SUBJECTS.cmd.nginxClaim, claim('foo'))
+    bus.publish(SUBJECTS.cmd.ingressClaim, claim('foo'))
     await waitFor(() => ready.length >= 1 || undefined)
-    bus.publish(SUBJECTS.cmd.nginxClaim, claim('foo-bar'))
+    bus.publish(SUBJECTS.cmd.ingressClaim, claim('foo-bar'))
     await waitFor(() => ready.length >= 2 || undefined)
-    bus.publish(SUBJECTS.cmd.nginxRelease, {
+    bus.publish(SUBJECTS.cmd.ingressRelease, {
       corrId: 'r-foo',
       ts: new Date().toISOString(),
       source: 'test',

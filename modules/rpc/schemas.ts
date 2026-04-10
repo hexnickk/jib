@@ -54,12 +54,12 @@ export const EvtAppRestartSuccessSchema = EnvelopeSchema.extend({ app })
 export const EvtAppRestartFailureSchema = EnvelopeSchema.extend({ app, error: z.string() })
 
 const port = z.number().int().min(1).max(65535)
-export const CmdNginxClaimSchema = EnvelopeSchema.extend({
+export const CmdIngressClaimSchema = EnvelopeSchema.extend({
   app,
   // `hasSSL` intentionally absent: whether a host has a TLS cert is a
   // filesystem property of the server, not something the CLI can know or
-  // care about. The nginx operator probes `/etc/letsencrypt/live/<host>/`
-  // at render time. `isTunnel` stays because it's a user-declared intent.
+  // care about. The ingress adapter probes the host at render time.
+  // `isTunnel` stays because it's a user-declared intent.
   domains: z
     .array(
       z.object({
@@ -70,12 +70,12 @@ export const CmdNginxClaimSchema = EnvelopeSchema.extend({
     )
     .min(1),
 })
-export const CmdNginxReleaseSchema = EnvelopeSchema.extend({ app })
+export const CmdIngressReleaseSchema = EnvelopeSchema.extend({ app })
 
-export const EvtNginxReadySchema = EnvelopeSchema.extend({ app })
-export const EvtNginxReleasedSchema = EnvelopeSchema.extend({ app })
-export const EvtNginxFailedSchema = EnvelopeSchema.extend({ app, error: z.string() })
-export const EvtNginxProgressSchema = EnvelopeSchema.extend({ app, message: z.string() })
+export const EvtIngressReadySchema = EnvelopeSchema.extend({ app })
+export const EvtIngressReleasedSchema = EnvelopeSchema.extend({ app })
+export const EvtIngressFailedSchema = EnvelopeSchema.extend({ app, error: z.string() })
+export const EvtIngressProgressSchema = EnvelopeSchema.extend({ app, message: z.string() })
 
 export type CmdDeploy = z.infer<typeof CmdDeploySchema>
 export type CmdAppUp = z.infer<typeof CmdAppUpSchema>
@@ -93,13 +93,13 @@ export type EvtAppDownFailure = z.infer<typeof EvtAppDownFailureSchema>
 export type EvtAppRestartSuccess = z.infer<typeof EvtAppRestartSuccessSchema>
 export type EvtAppRestartFailure = z.infer<typeof EvtAppRestartFailureSchema>
 
-export type CmdNginxClaim = z.infer<typeof CmdNginxClaimSchema>
-export type CmdNginxRelease = z.infer<typeof CmdNginxReleaseSchema>
+export type CmdIngressClaim = z.infer<typeof CmdIngressClaimSchema>
+export type CmdIngressRelease = z.infer<typeof CmdIngressReleaseSchema>
 
-export type EvtNginxReady = z.infer<typeof EvtNginxReadySchema>
-export type EvtNginxReleased = z.infer<typeof EvtNginxReleasedSchema>
-export type EvtNginxFailed = z.infer<typeof EvtNginxFailedSchema>
-export type EvtNginxProgress = z.infer<typeof EvtNginxProgressSchema>
+export type EvtIngressReady = z.infer<typeof EvtIngressReadySchema>
+export type EvtIngressReleased = z.infer<typeof EvtIngressReleasedSchema>
+export type EvtIngressFailed = z.infer<typeof EvtIngressFailedSchema>
+export type EvtIngressProgress = z.infer<typeof EvtIngressProgressSchema>
 
 /**
  * Lookup table from subject to schema. Used by `emitAndWait`/`handleCmd` to
@@ -120,10 +120,10 @@ export const SCHEMAS = {
   [SUBJECTS.evt.appDownFailure]: EvtAppDownFailureSchema,
   [SUBJECTS.evt.appRestartSuccess]: EvtAppRestartSuccessSchema,
   [SUBJECTS.evt.appRestartFailure]: EvtAppRestartFailureSchema,
-  [SUBJECTS.cmd.nginxClaim]: CmdNginxClaimSchema,
-  [SUBJECTS.cmd.nginxRelease]: CmdNginxReleaseSchema,
-  [SUBJECTS.evt.nginxReady]: EvtNginxReadySchema,
-  [SUBJECTS.evt.nginxReleased]: EvtNginxReleasedSchema,
-  [SUBJECTS.evt.nginxFailed]: EvtNginxFailedSchema,
-  [SUBJECTS.evt.nginxProgress]: EvtNginxProgressSchema,
+  [SUBJECTS.cmd.ingressClaim]: CmdIngressClaimSchema,
+  [SUBJECTS.cmd.ingressRelease]: CmdIngressReleaseSchema,
+  [SUBJECTS.evt.ingressReady]: EvtIngressReadySchema,
+  [SUBJECTS.evt.ingressReleased]: EvtIngressReleasedSchema,
+  [SUBJECTS.evt.ingressFailed]: EvtIngressFailedSchema,
+  [SUBJECTS.evt.ingressProgress]: EvtIngressProgressSchema,
 } as const satisfies Record<string, z.ZodTypeAny>

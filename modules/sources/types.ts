@@ -1,5 +1,5 @@
-import type { App, Config } from '@jib/config'
-import type { Paths } from '@jib/core'
+import type { App, Config, Source } from '@jib/config'
+import type { ModuleContext, Paths } from '@jib/core'
 import type { GitEnv, lsRemote } from './git.ts'
 
 export interface SourceTarget {
@@ -37,9 +37,38 @@ export interface ResolvedDriverSource {
   applyAuth: (workdir: string) => Promise<void>
 }
 
+export interface SourceSetupChoice {
+  value: string
+  label: string
+  run(ctx: ModuleContext<Config>): Promise<string | null>
+}
+
+export interface SourceSelectOption {
+  value: string
+  label: string
+  hint?: string
+}
+
+export interface SourceStatus {
+  name: string
+  driver: string
+  detail: string
+  hasCredential: boolean
+}
+
+export interface DriverSourceStatus {
+  detail: string
+  hasCredential: boolean
+}
+
 export interface SourceDriver {
   name: string
   resolve(cfg: Config, app: App, paths: Paths): Promise<ResolvedDriverSource>
+  supportsRepo(repo: string): boolean
+  isAuthFailure(error: unknown): boolean
+  describe(source: Source): string
+  describeStatus(sourceName: string, source: Source, paths: Paths): Promise<DriverSourceStatus>
+  setupChoices(): readonly SourceSetupChoice[]
 }
 
 export interface ProbeSourceDeps {

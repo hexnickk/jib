@@ -23,10 +23,10 @@ describe('nginx operator — claim', () => {
       fakeExec(ctx, () => ({ ok: true, stdout: '', stderr: '' })),
     )
     const ready: unknown[] = []
-    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressReady, (p) => {
       ready.push(p)
     })
-    bus.publish(SUBJECTS.cmd.nginxClaim, claim('web'))
+    bus.publish(SUBJECTS.cmd.ingressClaim, claim('web'))
     await waitFor(() => (ready.length ? ready : undefined))
     const files = await readdir(join(paths.nginxDir, 'web'))
     expect(files).toContain('web.example.com.conf')
@@ -44,10 +44,10 @@ describe('nginx operator — claim', () => {
       ),
     )
     const failed: Array<{ error: string }> = []
-    bus.subscribe(SUBJECTS.evt.nginxFailed, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressFailed, (p) => {
       failed.push(p as { error: string })
     })
-    bus.publish(SUBJECTS.cmd.nginxClaim, claim('web'))
+    bus.publish(SUBJECTS.cmd.ingressClaim, claim('web'))
     await waitFor(() => (failed.length ? failed : undefined))
     expect(failed[0]?.error).toContain('bad config')
     const files = await readdir(paths.nginxDir).catch(() => [])
@@ -64,14 +64,45 @@ describe('nginx operator — claim', () => {
       ),
     )
     const failed: Array<{ error: string }> = []
-    bus.subscribe(SUBJECTS.evt.nginxFailed, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressFailed, (p) => {
       failed.push(p as { error: string })
     })
-    bus.publish(SUBJECTS.cmd.nginxClaim, claim('web'))
+    bus.publish(SUBJECTS.cmd.ingressClaim, claim('web'))
     await waitFor(() => (failed.length ? failed : undefined))
     expect(failed[0]?.error).toContain('reload boom')
     const files = await readdir(paths.nginxDir).catch(() => [])
     expect(files).toEqual([])
+  })
+
+  test('restores prior config when updating an app and reload fails', async () => {
+    let failReload = false
+    const { bus, paths } = setup(
+      ctx,
+      fakeExec(ctx, (c) =>
+        c === 'sudo' && failReload
+          ? { ok: false, stdout: '', stderr: 'reload boom' }
+          : { ok: true, stdout: '', stderr: '' },
+      ),
+    )
+    const ready: unknown[] = []
+    const failed: Array<{ error: string }> = []
+    bus.subscribe(SUBJECTS.evt.ingressReady, (p) => {
+      ready.push(p)
+    })
+    bus.subscribe(SUBJECTS.evt.ingressFailed, (p) => {
+      failed.push(p as { error: string })
+    })
+    bus.publish(SUBJECTS.cmd.ingressClaim, claim('web'))
+    await waitFor(() => (ready.length ? ready : undefined))
+    failReload = true
+    bus.publish(SUBJECTS.cmd.ingressClaim, {
+      ...claim('web'),
+      domains: [{ host: 'web.example.com', port: 9090 }],
+    })
+    await waitFor(() => (failed.length ? failed : undefined))
+    const body = await readFile(join(paths.nginxDir, 'web', 'web.example.com.conf'), 'utf8')
+    expect(failed[0]?.error).toContain('reload boom')
+    expect(body).toContain('proxy_pass http://127.0.0.1:8080')
   })
 
   test('only touches files owned by its app', async () => {
@@ -80,12 +111,12 @@ describe('nginx operator — claim', () => {
       fakeExec(ctx, () => ({ ok: true, stdout: '', stderr: '' })),
     )
     const ready: unknown[] = []
-    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressReady, (p) => {
       ready.push(p)
     })
-    bus.publish(SUBJECTS.cmd.nginxClaim, claim('web'))
+    bus.publish(SUBJECTS.cmd.ingressClaim, claim('web'))
     await waitFor(() => ready.length >= 1 || undefined)
-    bus.publish(SUBJECTS.cmd.nginxClaim, claim('api'))
+    bus.publish(SUBJECTS.cmd.ingressClaim, claim('api'))
     await waitFor(() => ready.length >= 2 || undefined)
     const dirs = (await readdir(paths.nginxDir)).sort()
     expect(dirs).toEqual(['api', 'web'])
@@ -97,10 +128,10 @@ describe('nginx operator — claim', () => {
       fakeExec(ctx, () => ({ ok: true, stdout: '', stderr: '' })),
     )
     const ready: unknown[] = []
-    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressReady, (p) => {
       ready.push(p)
     })
-    bus.publish(SUBJECTS.cmd.nginxClaim, {
+    bus.publish(SUBJECTS.cmd.ingressClaim, {
       corrId: 'c-tun',
       ts: new Date().toISOString(),
       source: 'test',
@@ -125,10 +156,10 @@ describe('nginx operator — claim', () => {
       certExists,
     )
     const ready: unknown[] = []
-    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressReady, (p) => {
       ready.push(p)
     })
-    bus.publish(SUBJECTS.cmd.nginxClaim, {
+    bus.publish(SUBJECTS.cmd.ingressClaim, {
       corrId: 'c-ssl',
       ts: new Date().toISOString(),
       source: 'test',
@@ -155,10 +186,10 @@ describe('nginx operator — claim', () => {
       certExists,
     )
     const ready: unknown[] = []
-    bus.subscribe(SUBJECTS.evt.nginxReady, (p) => {
+    bus.subscribe(SUBJECTS.evt.ingressReady, (p) => {
       ready.push(p)
     })
-    bus.publish(SUBJECTS.cmd.nginxClaim, {
+    bus.publish(SUBJECTS.cmd.ingressClaim, {
       corrId: 'c-tun2',
       ts: new Date().toISOString(),
       source: 'test',

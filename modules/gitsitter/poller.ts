@@ -2,7 +2,7 @@ import type { Bus } from '@jib/bus'
 import { type Config, parseDuration } from '@jib/config'
 import type { Logger, Paths } from '@jib/core'
 import { SUBJECTS } from '@jib/rpc'
-import { type ProbeSourceDeps, probeSource } from '@jib/sources'
+import { type ProbeSourceDeps, prepareSource, probeSource } from '@jib/sources'
 
 /**
  * Parses jib's `poll_interval` using the same duration grammar the config
@@ -20,6 +20,8 @@ export function parsePollInterval(raw: string): number {
 export interface PollAppDeps {
   /** Injected for tests; defaults to the real `sources.lsRemote`. */
   lsRemote?: ProbeSourceDeps['lsRemote']
+  /** Injected for tests; defaults to the shared sources sync path. */
+  prepareSource?: typeof prepareSource
 }
 
 export async function pollApp(
@@ -41,18 +43,20 @@ export async function pollApp(
       deps.lsRemote ? { lsRemote: deps.lsRemote } : {},
     )
     if (!source) return
-    const { sha, workdir } = source
     const prev = lastSeen.get(appName) ?? ''
-    if (sha === prev) return
-    lastSeen.set(appName, sha)
-    log.info(`${appName}: new sha ${sha.slice(0, 7)} (was ${prev.slice(0, 7) || 'none'})`)
+    if (source.sha === prev) return
+
+    const sync = deps.prepareSource ?? prepareSource
+    const prepared = await sync(cfg, paths, { app: appName })
+    lastSeen.set(appName, prepared.sha)
+    log.info(`${appName}: new sha ${prepared.sha.slice(0, 7)} (was ${prev.slice(0, 7) || 'none'})`)
     bus.publish(SUBJECTS.cmd.deploy, {
       corrId: crypto.randomUUID(),
       ts: new Date().toISOString(),
       source: 'gitsitter',
       app: appName,
-      workdir,
-      sha,
+      workdir: prepared.workdir,
+      sha: prepared.sha,
       trigger: 'auto' as const,
     })
   } catch (err) {

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import type { Config } from '@jib/config'
-import { type Paths, credsPath, pathExists } from '@jib/core'
+import { type Paths, credsPath } from '@jib/core'
+import { type SourceStatus, collectSourceStatuses } from '@jib/sources'
 import { $ } from 'bun'
 import { Store } from './store.ts'
 
@@ -8,14 +9,6 @@ export interface ServiceStatus {
   name: string
   active: boolean
   status: string
-}
-
-export interface SourceStatus {
-  name: string
-  driver: string
-  type: 'key' | 'app'
-  appId?: number | undefined
-  hasCredential: boolean
 }
 
 export interface ContainerStatus {
@@ -47,21 +40,7 @@ async function checkUnit(name: string): Promise<ServiceStatus> {
 }
 
 export async function collectSources(cfg: Config, paths: Paths): Promise<SourceStatus[]> {
-  const results: SourceStatus[] = []
-  for (const [name, source] of Object.entries(cfg.sources)) {
-    const credPath =
-      source.driver === 'github' && source.type === 'app'
-        ? credsPath(paths, 'github-app', `${name}.pem`)
-        : credsPath(paths, 'github-key', name)
-    results.push({
-      name,
-      driver: source.driver,
-      type: source.type,
-      appId: source.type === 'app' ? source.app_id : undefined,
-      hasCredential: await pathExists(credPath),
-    })
-  }
-  return results
+  return collectSourceStatuses(cfg, paths)
 }
 
 export async function collectApps(cfg: Config, paths: Paths): Promise<AppStatus[]> {

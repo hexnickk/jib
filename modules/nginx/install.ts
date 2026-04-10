@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import type { InstallFn } from '@jib/core'
+import { getExec } from '@jib/ingress'
 import { $ } from 'bun'
-import { getExec } from './shell.ts'
 import { NGINX_SERVICE_NAME, NGINX_UNIT_PATH, renderSystemdUnit } from './templates.ts'
 
 /**

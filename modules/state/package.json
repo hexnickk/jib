@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@jib/core": "workspace:*",
+    "@jib/sources": "workspace:*",
     "drizzle-orm": "*"
   }
 }

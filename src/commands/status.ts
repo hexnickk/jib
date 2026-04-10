@@ -38,12 +38,8 @@ function printSources(sources: SourceStatus[]): void {
   }
   consola.log('\nsources')
   for (const source of sources) {
-    const detail =
-      source.type === 'app'
-        ? `${source.driver} app (id ${source.appId})`
-        : `${source.driver} deploy-key`
     const warn = source.hasCredential ? '' : '  ⚠ credential missing'
-    consola.log(`  ${source.name.padEnd(18)} ${detail}${warn}`)
+    consola.log(`  ${source.name.padEnd(18)} ${source.detail}${warn}`)
   }
 }
 

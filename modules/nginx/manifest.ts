@@ -1,9 +1,8 @@
 import type { ModuleManifest } from '@jib/core'
 
 /**
- * Nginx reverse-proxy module. A long-running NATS operator that owns
- * `<app>/<host>.conf` files under `$JIB_ROOT/nginx/` and reloads nginx in
- * response to `cmd.nginx.claim` / `cmd.nginx.release`.
+ * Nginx reverse-proxy module. A long-running bus operator that wraps the
+ * ingress-owned nginx adapter and applies claims/releases on the host.
  */
 const manifest: ModuleManifest = {
   name: 'nginx',

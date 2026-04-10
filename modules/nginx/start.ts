@@ -5,11 +5,10 @@ import { registerNginxHandlers } from './handlers.ts'
 
 /**
  * Entry point for `jib-daemon start nginx`. Connects to NATS, registers the
- * `cmd.nginx.*` handlers, and blocks until SIGTERM/SIGINT. Unlike the
- * deployer/gitsitter/cloudflare operators, nginx handlers read no config —
- * they only touch filesystem state under `$JIB_ROOT/nginx/` — so there's no
- * `config.reload` subscription to refresh. Add one if that invariant ever
- * changes.
+ * generic ingress handlers backed by the nginx adapter, and blocks until
+ * SIGTERM/SIGINT. Unlike the deployer/gitsitter/cloudflare operators, the
+ * nginx wrapper reads no config — it only touches filesystem state under
+ * `$JIB_ROOT/nginx/` — so there's no `config.reload` subscription to refresh.
  */
 export const start: StartFn<Config> = async (ctx: ModuleContext<Config>) => {
   const log = ctx.logger

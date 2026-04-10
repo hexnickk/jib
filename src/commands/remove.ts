@@ -1,9 +1,10 @@
+import { withBus } from '@jib/bus'
 import { loadAppOrExit, writeConfig } from '@jib/config'
 import { canPrompt, isTextOutput } from '@jib/core'
 import { composeFor } from '@jib/docker'
-import { releaseIngress } from '@jib/ingress'
+import { createBusIngressOperator, releaseIngress } from '@jib/ingress'
 import { removeSource } from '@jib/sources'
-import { promptConfirm } from '@jib/tui'
+import { promptConfirm, spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { applyCliArgs, missingInput, withCliArgs } from './_cli.ts'
@@ -53,7 +54,7 @@ export default defineCommand({
 
     if (appCfg.domains.length > 0) {
       try {
-        await releaseIngress(args.app, DEFAULT_TIMEOUT_MS)
+        await releaseIngressForRemove(args.app)
         if (isTextOutput()) consola.info('ingress released')
       } catch (err) {
         if (isTextOutput()) {
@@ -87,3 +88,19 @@ export default defineCommand({
     return { app: args.app, removed: true }
   },
 })
+
+async function releaseIngressForRemove(app: string): Promise<void> {
+  await withBus(async (bus) => {
+    const s = isTextOutput() ? spinner() : null
+    s?.start(`releasing ingress for ${app}`)
+    try {
+      await releaseIngress(createBusIngressOperator(bus, DEFAULT_TIMEOUT_MS), app, (progress) =>
+        s?.message(progress.message),
+      )
+      s?.stop('ingress released')
+    } catch (error) {
+      s?.stop('ingress release failed')
+      throw error
+    }
+  })
+}

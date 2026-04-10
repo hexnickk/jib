@@ -35,7 +35,7 @@ describe('parsePollInterval', () => {
 })
 
 describe('pollApp', () => {
-  test('new sha publishes cmd.deploy; same sha is a no-op', async () => {
+  test('new sha publishes cmd.deploy from the prepared checkout; same sha is a no-op', async () => {
     const bus = new FakeBus()
     const cfg = mkCfg()
     const paths = getPaths('/tmp/jib-root-test')
@@ -46,14 +46,19 @@ describe('pollApp', () => {
       deploys.push(p)
     })
 
-    const lsRemote: NonNullable<PollAppDeps['lsRemote']> = async () =>
-      'abc123abc123abc123abc123abc123abc123abc1'
+    const sha = 'abc123abc123abc123abc123abc123abc123abc1'
+    const lsRemote: NonNullable<PollAppDeps['lsRemote']> = async () => sha
+    const prepareSource: NonNullable<PollAppDeps['prepareSource']> = async () => ({
+      workdir: '/tmp/prepared-demo',
+      sha,
+    })
 
-    await pollApp(bus.asBus(), cfg, paths, 'demo', seen, log, { lsRemote })
+    await pollApp(bus.asBus(), cfg, paths, 'demo', seen, log, { lsRemote, prepareSource })
     await flush()
     expect(deploys).toHaveLength(1)
+    expect(deploys[0]).toMatchObject({ app: 'demo', workdir: '/tmp/prepared-demo', sha })
 
-    await pollApp(bus.asBus(), cfg, paths, 'demo', seen, log, { lsRemote })
+    await pollApp(bus.asBus(), cfg, paths, 'demo', seen, log, { lsRemote, prepareSource })
     await flush()
     expect(deploys).toHaveLength(1) // unchanged
   })

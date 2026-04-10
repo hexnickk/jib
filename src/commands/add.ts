@@ -1,9 +1,12 @@
+import { withBus } from '@jib/bus'
 import { loadAppConfig, loadConfig, writeConfig } from '@jib/config'
+import type { App } from '@jib/config'
 import { ValidationError, isTextOutput } from '@jib/core'
 import { AddFlow, type AddFlowResult } from '@jib/flows'
-import { claimIngress } from '@jib/ingress'
+import { claimIngress, createBusIngressOperator } from '@jib/ingress'
 import { SecretsManager } from '@jib/secrets'
 import { prepareSource, removeSource } from '@jib/sources'
+import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { applyCliArgs, withCliArgs } from './_cli.ts'
@@ -68,7 +71,7 @@ export default defineCommand({
         },
       },
       ingress: {
-        claim: (appName, finalApp) => claimIngress(appName, finalApp, DEFAULT_TIMEOUT_MS),
+        claim: (appName, finalApp) => claimIngressForAdd(appName, finalApp),
       },
       warn: (message) => {
         if (isTextOutput()) consola.warn(message)
@@ -131,4 +134,23 @@ function renderResult(app: string, repo: string, result: AddFlowResult) {
     })),
     secretsWritten,
   }
+}
+
+async function claimIngressForAdd(app: string, appCfg: App): Promise<void> {
+  await withBus(async (bus) => {
+    const s = isTextOutput() ? spinner() : null
+    s?.start(`claiming ingress for ${app}`)
+    try {
+      await claimIngress(
+        createBusIngressOperator(bus, DEFAULT_TIMEOUT_MS),
+        app,
+        appCfg,
+        (progress) => s?.message(progress.message),
+      )
+      s?.stop('ingress ready')
+    } catch (error) {
+      s?.stop('ingress failed')
+      throw error
+    }
+  })
 }

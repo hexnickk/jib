@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import {
   CmdDeploySchema,
-  CmdNginxClaimSchema,
+  CmdIngressClaimSchema,
   EnvelopeSchema,
   EvtDeploySuccessSchema,
-  EvtNginxProgressSchema,
-  EvtNginxReadySchema,
+  EvtIngressProgressSchema,
+  EvtIngressReadySchema,
   SCHEMAS,
 } from './schemas.ts'
 import { SUBJECTS } from './subjects.ts'
@@ -59,8 +59,8 @@ describe('schemas', () => {
     expect(ok.success).toBe(true)
   })
 
-  test('CmdNginxClaim round-trips with domain list', () => {
-    const v = CmdNginxClaimSchema.parse({
+  test('CmdIngressClaim round-trips with domain list', () => {
+    const v = CmdIngressClaimSchema.parse({
       corrId: 'c',
       ts: '2024-01-01T00:00:00Z',
       source: 'cli',
@@ -76,9 +76,9 @@ describe('schemas', () => {
     expect(v.domains[1]?.isTunnel).toBe(true)
   })
 
-  test('CmdNginxClaim rejects empty domains list', () => {
+  test('CmdIngressClaim rejects empty domains list', () => {
     expect(
-      CmdNginxClaimSchema.safeParse({
+      CmdIngressClaimSchema.safeParse({
         corrId: 'c',
         ts: '2024-01-01T00:00:00Z',
         source: 'cli',
@@ -88,25 +88,25 @@ describe('schemas', () => {
     ).toBe(false)
   })
 
-  test('EvtNginxReady round-trips', () => {
-    const v = EvtNginxReadySchema.parse({
+  test('EvtIngressReady round-trips', () => {
+    const v = EvtIngressReadySchema.parse({
       corrId: 'c',
       ts: '2024-01-01T00:00:00Z',
-      source: 'nginx',
+      source: 'ingress',
       app: 'web',
     })
     expect(v.app).toBe('web')
   })
 
-  test('EvtNginxProgress round-trips', () => {
-    const v = EvtNginxProgressSchema.parse({
+  test('EvtIngressProgress round-trips', () => {
+    const v = EvtIngressProgressSchema.parse({
       corrId: 'c',
       ts: '2024-01-01T00:00:00Z',
-      source: 'nginx',
+      source: 'ingress',
       app: 'web',
-      message: 'reloading nginx',
+      message: 'reloading ingress',
     })
-    expect(v.message).toBe('reloading nginx')
+    expect(v.message).toBe('reloading ingress')
   })
 
   test('SCHEMAS table covers every subject in SUBJECTS', () => {

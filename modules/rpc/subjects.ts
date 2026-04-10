@@ -13,8 +13,8 @@ export const SUBJECTS = {
     appDown: 'jib.cmd.app.down',
     appRestart: 'jib.cmd.app.restart',
     configReload: 'jib.cmd.config.reload',
-    nginxClaim: 'jib.cmd.nginx.claim',
-    nginxRelease: 'jib.cmd.nginx.release',
+    ingressClaim: 'jib.cmd.ingress.claim',
+    ingressRelease: 'jib.cmd.ingress.release',
   },
   evt: {
     deploySuccess: 'jib.evt.deploy.success',
@@ -26,10 +26,10 @@ export const SUBJECTS = {
     appDownFailure: 'jib.evt.app.down.failure',
     appRestartSuccess: 'jib.evt.app.restart.success',
     appRestartFailure: 'jib.evt.app.restart.failure',
-    nginxReady: 'jib.evt.nginx.ready',
-    nginxReleased: 'jib.evt.nginx.released',
-    nginxFailed: 'jib.evt.nginx.failed',
-    nginxProgress: 'jib.evt.nginx.progress',
+    ingressReady: 'jib.evt.ingress.ready',
+    ingressReleased: 'jib.evt.ingress.released',
+    ingressFailed: 'jib.evt.ingress.failed',
+    ingressProgress: 'jib.evt.ingress.progress',
   },
 } as const
 

@@ -20,8 +20,8 @@ describe('source recovery', () => {
     expect(buildSourceChoices(cfg)).toEqual([
       { value: 'existing:appy', label: 'appy', hint: 'GitHub App' },
       { value: 'existing:keyy', label: 'keyy', hint: 'GitHub deployment key' },
-      { value: 'setup:key', label: 'Set up new GitHub deploy key' },
-      { value: 'setup:app', label: 'Set up new GitHub app' },
+      { value: 'setup:github:key', label: 'Set up new GitHub deploy key' },
+      { value: 'setup:github:app', label: 'Set up new GitHub app' },
     ])
   })
 
@@ -52,9 +52,10 @@ describe('source recovery', () => {
       undefined,
       {
         isInteractive: () => true,
-        promptSelect: async () => 'setup:key',
-        setupDeployKey: async () => {
-          calls.push('setup:key')
+        promptSelect: async () => 'setup:github:key',
+        runSetup: async (_cfg, _paths, value) => {
+          calls.push(`setup:${value}`)
+          expect(value).toBe('github:key')
           return 'fresh-key'
         },
         promptConfirm: async () => {
@@ -65,7 +66,7 @@ describe('source recovery', () => {
     )
 
     expect(source).toBe('fresh-key')
-    expect(calls).toEqual(['setup:key', 'confirm'])
+    expect(calls).toEqual(['setup:github:key', 'confirm'])
   })
 
   test('non-auth failures do not trigger source recovery', async () => {
@@ -79,7 +80,7 @@ describe('source recovery', () => {
     )
 
     expect(source).toBeNull()
-    expect(isSourceAuthFailure(new Error('compose file missing'))).toBe(false)
+    expect(isSourceAuthFailure('acme/private', new Error('compose file missing'))).toBe(false)
   })
 
   test('missing source config can still recover via the chooser', async () => {
@@ -95,7 +96,7 @@ describe('source recovery', () => {
         isInteractive: () => true,
         promptSelect: async (opts: {
           message: string
-          initialValue?: `existing:${string}` | 'setup:key' | 'setup:app'
+          initialValue?: `existing:${string}` | `setup:${string}`
         }) => {
           prompts.push(opts.message)
           expect(opts.initialValue).toBeUndefined()
