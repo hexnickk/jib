@@ -71,7 +71,8 @@ function printSuccess(value: unknown): void {
     return
   }
   if (typeof value === 'string') {
-    process.stdout.write(value.endsWith('\n') ? value : `${value}\n`)
+    const text = process.stdout.isTTY ? value : stripAnsi(value)
+    process.stdout.write(text.endsWith('\n') ? text : `${text}\n`)
   }
 }
 
