@@ -1,5 +1,5 @@
 import { type App, type Config, type Domain, type ParsedDomain, assignPorts } from '@jib/config'
-import { CliError, isDebugEnabled, isTextOutput } from '@jib/core'
+import { CliError, MissingInputError, isDebugEnabled, isTextOutput } from '@jib/core'
 import {
   type ComposeInspection,
   ComposeInspectionError,
@@ -7,18 +7,17 @@ import {
   inspectComposeApp,
   resolveFromCompose,
 } from '@jib/docker'
-import type { AddInputs, AddPlanner, EnvEntry } from '@jib/flows'
 import { isInteractive, promptConfirm, promptPassword, promptString } from '@jib/tui'
 import { consola } from 'consola'
-import { missingInput } from '../_cli.ts'
 import {
   mergeGuidedServiceAnswers,
   renderAddPlanSummary,
   splitCommaValues,
   summarizeComposeServices,
-} from '../add-guided.ts'
-import { collectDomains, promptForServices } from './guided.ts'
+} from './guided.ts'
 import { parseApp } from './inputs.ts'
+import { collectDomains, promptForServices } from './prompting.ts'
+import type { AddInputs, AddPlanner, EnvEntry } from './types.ts'
 
 export function createAddPlanner(): AddPlanner {
   return {
@@ -58,7 +57,7 @@ async function inspectComposeWithPrompts(
       }
       if (error instanceof ComposeInspectionError && error.code === 'compose_not_found') {
         if (!compose || compose.length === 0) {
-          missingInput('missing required input for jib add', [
+          throw new MissingInputError('missing required input for jib add', [
             {
               field: 'compose',
               message:

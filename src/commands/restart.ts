@@ -1,8 +1,8 @@
 import { loadAppOrExit } from '@jib/config'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { applyCliArgs, withCliArgs } from '../cli-runtime.ts'
 import { createDeployEngine } from '../deploy-engine.ts'
-import { applyCliArgs, withCliArgs } from './_cli.ts'
 
 export default defineCommand({
   meta: { name: 'restart', description: 'Restart containers without redeploying' },

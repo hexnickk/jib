@@ -9,11 +9,10 @@ import {
   toArray,
   validateRepo,
 } from '@jib/config'
-import { ValidationError } from '@jib/core'
-import type { AddInputs, EnvEntry } from '@jib/flows'
+import { MissingInputError, ValidationError } from '@jib/core'
 import { isInteractive, promptString } from '@jib/tui'
-import { missingInput } from '../_cli.ts'
-import { parseEnvEntry, splitCommaValues } from '../add-guided.ts'
+import { parseEnvEntry, splitCommaValues } from './guided.ts'
+import type { AddInputs, EnvEntry } from './types.ts'
 
 export async function gatherAddInputs(args: {
   repo?: string
@@ -26,7 +25,7 @@ export async function gatherAddInputs(args: {
   let repo = args.repo
   if (!repo) {
     if (!isInteractive()) {
-      missingInput('missing required input for jib add', [
+      throw new MissingInputError('missing required input for jib add', [
         { field: 'repo', message: 'provide --repo or rerun with interactive prompts enabled' },
       ])
     }

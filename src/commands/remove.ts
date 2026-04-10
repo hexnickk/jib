@@ -5,8 +5,8 @@ import { releaseIngress } from '@jib/ingress'
 import { promptConfirm, spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { applyCliArgs, missingInput, withCliArgs } from '../cli-runtime.ts'
 import { createIngressOperator } from '../ingress-operator.ts'
-import { applyCliArgs, missingInput, withCliArgs } from './_cli.ts'
 
 /** `jib remove <app>` — prompt in the CLI, then delegate teardown to flows. */
 

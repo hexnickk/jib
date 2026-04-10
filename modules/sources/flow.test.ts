@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { getPaths } from '@jib/core'
+import { type Paths, getPaths } from '@jib/core'
 import {
   buildSourceChoices,
   isSourceAuthFailure,
   maybeRecoverSource,
   preflightSourceSelection,
-} from '../sources-flow.ts'
+} from './flow.ts'
+import type { SourceTarget } from './types.ts'
 
 const paths = getPaths('/tmp/jib-add-github-test')
 const cfg = {
@@ -127,7 +128,7 @@ describe('source recovery', () => {
       {
         isInteractive: () => true,
         promptSelect: async () => 'existing:keyy',
-        probe: async (_cfg, _paths, target) => {
+        probe: async (_cfg: Config, _paths: Paths, target: SourceTarget) => {
           probed.push(target.source ?? 'none')
           if (!target.source) throw new Error('git clone: Repository not found')
           return {

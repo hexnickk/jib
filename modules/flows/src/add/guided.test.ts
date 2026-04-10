@@ -12,7 +12,7 @@ import {
   splitCommaValues,
   summarizeComposeServices,
   validateEnvEntry,
-} from '../add-guided.ts'
+} from './guided.ts'
 
 describe('guided add helpers', () => {
   test('single-service web app can collect a domain and app secret', () => {

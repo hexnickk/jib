@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import pkg from '../../package.json' with { type: 'json' }
+import { commonCliArgs } from '../../src/cli-runtime.ts'
 import { runCommandApp } from '../../src/command-app.ts'
-import { commonCliArgs } from '../../src/commands/_cli.ts'
 import {
   addCmd,
   deployCmd,

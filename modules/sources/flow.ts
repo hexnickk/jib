@@ -1,15 +1,15 @@
 import { loadConfig } from '@jib/config'
 import type { Config } from '@jib/config'
 import { CliError, type Paths } from '@jib/core'
+import { isInteractive, promptConfirm, promptSelect } from '@jib/tui'
 import {
   availableSourceSetupChoices,
   configuredSourceOptions,
   isSourceAuthFailure as isSourceAuthFailureForRepo,
-  probe,
   repoSupportsSourceRecovery,
   runSourceSetup,
-} from '@jib/sources'
-import { isInteractive, promptConfirm, promptSelect } from '@jib/tui'
+} from './recovery.ts'
+import { probe } from './service.ts'
 
 type SourceChoice = `existing:${string}` | `setup:${string}`
 

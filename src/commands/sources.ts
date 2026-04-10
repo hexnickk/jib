@@ -1,7 +1,7 @@
 import { loadConfig } from '@jib/config'
 import { getPaths } from '@jib/core'
+import { setupSourceRef } from '@jib/sources'
 import { defineCommand } from 'citty'
-import { setupSourceRef } from './sources-flow.ts'
 
 const setupCmd = defineCommand({
   meta: { name: 'setup', description: 'Set up a git source ref' },

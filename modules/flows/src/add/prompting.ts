@@ -1,4 +1,5 @@
 import type { ParsedDomain } from '@jib/config'
+import { MissingInputError } from '@jib/core'
 import type { ComposeService } from '@jib/docker'
 import {
   isInteractive,
@@ -8,7 +9,6 @@ import {
   promptString,
   promptStringOptional,
 } from '@jib/tui'
-import { missingInput } from '../_cli.ts'
 import {
   assignCliDomainsToServices,
   buildAdditionalSecretPromptMessage,
@@ -20,7 +20,7 @@ import {
   splitCommaValues,
   summarizeComposeServices,
   validateEnvEntry,
-} from '../add-guided.ts'
+} from './guided.ts'
 
 export async function collectDomains(
   domains: ParsedDomain[],
@@ -28,8 +28,9 @@ export async function collectDomains(
 ): Promise<ParsedDomain[]> {
   if (serviceNames.length <= 1 || !isInteractive()) {
     const assigned = assignCliDomainsToServices(domains, serviceNames)
-    if (assigned.issues.length > 0)
-      missingInput('missing required input for jib add', assigned.issues)
+    if (assigned.issues.length > 0) {
+      throw new MissingInputError('missing required input for jib add', assigned.issues)
+    }
     return assigned.domains
   }
   return await Promise.all(

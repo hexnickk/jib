@@ -13,6 +13,7 @@
     "@jib/docker": "workspace:*",
     "@jib/secrets": "workspace:*",
     "@jib/state": "workspace:*",
-    "@jib/sources": "workspace:*"
+    "@jib/sources": "workspace:*",
+    "@jib/tui": "workspace:*"
   }
 }

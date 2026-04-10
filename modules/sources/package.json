@@ -10,6 +10,7 @@
   "dependencies": {
     "@jib-module/github": "workspace:*",
     "@jib/config": "workspace:*",
-    "@jib/core": "workspace:*"
+    "@jib/core": "workspace:*",
+    "@jib/tui": "workspace:*"
   }
 }
