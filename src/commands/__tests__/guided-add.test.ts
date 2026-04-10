@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
   assignCliDomainsToServices,
+  buildSecretPromptMessage,
   mergeGuidedServiceAnswers,
   renderAddPlanSummary,
+  secretPromptPlaceholder,
   shouldDefaultExposeService,
   summarizeComposeServices,
 } from '../add-guided.ts'
@@ -94,5 +96,15 @@ describe('guided add helpers', () => {
     expect(summary).toContain('web: demo.example.com')
     expect(summary).toContain('worker: internal only')
     expect(summary).toContain('secrets file: .env')
+  })
+
+  test('secret prompt copy explains that jib will prompt for key values next', () => {
+    expect(buildSecretPromptMessage('blog', [])).toContain(
+      'Which secret keys should Jib prompt for now for "blog"?',
+    )
+    expect(buildSecretPromptMessage('blog', ['DATABASE_URL'])).toContain(
+      'detected in compose: DATABASE_URL',
+    )
+    expect(secretPromptPlaceholder()).toBe('DATABASE_URL, API_KEY')
   })
 })

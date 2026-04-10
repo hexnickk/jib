@@ -10,6 +10,8 @@ import {
 import { missingInput } from '../_cli.ts'
 import {
   assignCliDomainsToServices,
+  buildSecretPromptMessage,
+  secretPromptPlaceholder,
   shouldDefaultExposeService,
   splitCommaValues,
   summarizeComposeServices,
@@ -68,10 +70,8 @@ export async function promptForServices(
           : []
       const rawSecrets = isInteractive()
         ? await promptStringOptional({
-            message:
-              suggestedKeys.length > 0
-                ? `Secrets to collect now for "${service.name}" (detected: ${suggestedKeys.join(', ')})`
-                : `Secrets to collect now for "${service.name}" (comma-separated keys, blank to skip)`,
+            message: buildSecretPromptMessage(service.name, suggestedKeys),
+            placeholder: secretPromptPlaceholder(),
             ...(suggestedKeys.length > 0 ? { initialValue: suggestedKeys.join(',') } : {}),
           })
         : ''

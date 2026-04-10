@@ -23,6 +23,17 @@ export function splitCommaValues(raw: string): string[] {
     .filter((value) => value.length > 0)
 }
 
+export function buildSecretPromptMessage(serviceName: string, suggestedKeys: string[]): string {
+  if (suggestedKeys.length > 0) {
+    return `Which secret keys should Jib prompt for now for "${serviceName}"? (detected in compose: ${suggestedKeys.join(', ')})`
+  }
+  return `Which secret keys should Jib prompt for now for "${serviceName}"? (comma-separated names, blank to skip)`
+}
+
+export function secretPromptPlaceholder(): string {
+  return 'DATABASE_URL, API_KEY'
+}
+
 export function summarizeComposeServices(services: ComposeService[]): AddServiceSummary[] {
   return services.map((service) => {
     const inferredContainerPort = inferContainerPort(service)
