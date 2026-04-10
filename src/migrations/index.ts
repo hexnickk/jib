@@ -62,7 +62,8 @@ async function writeValidatedSudoers(path: string, content: string): Promise<voi
   const check = Bun.spawnSync(['visudo', '-cf', tmp])
   if (check.exitCode !== 0) {
     await Bun.$`rm -f ${tmp}`.quiet().nothrow()
-    return
+    const stderr = check.stderr.toString().trim()
+    throw new Error(stderr || `visudo rejected ${path}`)
   }
   await Bun.$`mv ${tmp} ${path}`.quiet()
   await Bun.$`chown root:root ${path}`.quiet()

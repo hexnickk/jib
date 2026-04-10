@@ -7,6 +7,7 @@ import type { IngressClaim, IngressOperator } from './types.ts'
 export type CertExistsFn = (host: string) => Promise<boolean>
 
 const LETSENCRYPT_LIVE = '/etc/letsencrypt/live'
+const NGINX_BIN = '/usr/sbin/nginx'
 
 const defaultCertExists: CertExistsFn = async (host) => {
   try {
@@ -109,7 +110,7 @@ async function discardStagedAppDir(staged: StagedAppDir): Promise<void> {
 }
 
 async function reloadNginx(exec: ExecFn): Promise<{ ok: true } | { ok: false; error: string }> {
-  const test = await exec(['sudo', 'nginx', '-t'])
+  const test = await exec(['sudo', NGINX_BIN, '-t'])
   if (!test.ok) return { ok: false, error: `nginx -t failed: ${test.stderr.trim()}` }
   const reload = await exec(['sudo', 'systemctl', 'reload', 'nginx'])
   if (!reload.ok) {

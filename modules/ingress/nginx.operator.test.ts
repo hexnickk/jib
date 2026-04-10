@@ -44,7 +44,7 @@ describe('createNginxIngressOperator', () => {
 
     const files = await readdir(join(ctx.nginxDir, 'web'))
     expect(files).toContain('web.example.com.conf')
-    expect(ctx.calls[0]).toEqual(['sudo', 'nginx', '-t'])
+    expect(ctx.calls[0]).toEqual(['sudo', '/usr/sbin/nginx', '-t'])
     expect(ctx.calls[1]).toEqual(['sudo', 'systemctl', 'reload', 'nginx'])
   })
 
@@ -105,7 +105,7 @@ describe('createNginxIngressOperator', () => {
     const fooBar = await stat(join(ctx.nginxDir, 'foo-bar')).catch(() => null)
     expect(foo).toBeNull()
     expect(fooBar?.isDirectory()).toBe(true)
-    expect(ctx.calls[0]).toEqual(['sudo', 'nginx', '-t'])
+    expect(ctx.calls[0]).toEqual(['sudo', '/usr/sbin/nginx', '-t'])
     expect(ctx.calls[1]).toEqual(['sudo', 'systemctl', 'reload', 'nginx'])
   })
 })
