@@ -16,7 +16,7 @@ beforeEach(() => {
   rmSync(TMP, { recursive: true, force: true })
   mkdirSync(`${TMP}/state`, { recursive: true })
   db = openDb(`${TMP}/state`)
-  ctx = { db, paths: getPaths(TMP), rawConfig: null }
+  ctx = { db, paths: getPaths(TMP) }
 })
 
 afterEach(() => {

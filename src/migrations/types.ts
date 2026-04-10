@@ -7,7 +7,6 @@ import type { JibDb } from '@jib/state'
 export interface MigrationContext {
   db: JibDb
   paths: Paths
-  rawConfig: Record<string, unknown> | null
 }
 
 export interface JibMigration {

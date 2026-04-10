@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { jibMigrations } from '@jib/state'
-import { parse, stringify } from 'yaml'
 import { type JibMigration, type MigrationContext, moduleCtx } from './types.ts'
 
 // ---------------------------------------------------------------------------
@@ -49,18 +48,9 @@ const SUDOERS_CONTENT = `# jib: allow jib group to manage jib-* systemd services
 
 const MINIMAL_CONFIG = `config_version: 3
 poll_interval: 5m
+modules: {}
 apps: {}
 `
-
-async function loadRawYaml(configFile: string): Promise<Record<string, unknown>> {
-  const raw = await readFile(configFile, 'utf8')
-  return (parse(raw) as Record<string, unknown>) ?? {}
-}
-
-async function writeRawYaml(configFile: string, doc: Record<string, unknown>): Promise<void> {
-  const yaml = stringify(doc)
-  await writeFile(configFile, yaml, { mode: 0o640 })
-}
 
 // ---------------------------------------------------------------------------
 // Migrations
@@ -112,25 +102,6 @@ const m0003_ensure_group: JibMigration = {
     if (sudoUser) {
       await Bun.$`usermod -aG ${GROUP} ${sudoUser}`.quiet().nothrow()
     }
-  },
-}
-
-const m0004_config_add_modules: JibMigration = {
-  id: '0004_config_add_modules',
-  description: 'Add modules: section to config, detect existing setups',
-  up: async (ctx) => {
-    if (!existsSync(ctx.paths.configFile)) return
-    const doc = await loadRawYaml(ctx.paths.configFile)
-    if (doc.modules) return // already has modules section
-
-    const modules: Record<string, boolean> = {}
-    // Pre-populate from existing config sections so legacy installs
-    // don't get re-prompted for already-configured modules.
-    if (doc.tunnel) modules.cloudflared = true
-    if (doc.github) modules.github = true
-
-    doc.modules = modules
-    await writeRawYaml(ctx.paths.configFile, doc)
   },
 }
 
@@ -190,15 +161,6 @@ const m0009_install_sudoers: JibMigration = {
   },
 }
 
-const m0010_fix_setgid: JibMigration = {
-  id: '0010_fix_setgid',
-  description: 'Set setgid bit so new files inherit jib group',
-  up: async (ctx) => {
-    await Bun.$`chown -R root:${GROUP} ${ctx.paths.root}`.quiet().nothrow()
-    await Bun.$`chmod -R g+rwXs ${ctx.paths.root}`.quiet().nothrow()
-  },
-}
-
 // ---------------------------------------------------------------------------
 // Registry — ordered list of all migrations
 // ---------------------------------------------------------------------------
@@ -207,11 +169,9 @@ export const migrations: JibMigration[] = [
   m0001_ensure_dirs,
   m0002_ensure_config,
   m0003_ensure_group,
-  m0004_config_add_modules,
   m0005_install_nats,
   m0006_install_deployer,
   m0007_install_gitsitter,
   m0008_install_nginx,
   m0009_install_sudoers,
-  m0010_fix_setgid,
 ]

@@ -1,5 +1,5 @@
 import { existsSync, readlinkSync } from 'node:fs'
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { type Config, loadConfig, writeConfig } from '@jib/config'
 import {
   CliError,
@@ -12,7 +12,6 @@ import {
 import { openDb } from '@jib/state'
 import { intro, log, note, outro } from '@jib/tui'
 import { defineCommand } from 'citty'
-import { parse } from 'yaml'
 import { migrations, runJibMigrations } from '../../migrations/index.ts'
 import type { MigrationContext } from '../../migrations/types.ts'
 import { applyCliArgs, missingInput, withCliArgs } from '../_cli.ts'
@@ -43,12 +42,6 @@ function ensureRoot(): void {
   process.exit(result.exitCode)
 }
 
-async function loadRawConfig(configFile: string): Promise<Record<string, unknown> | null> {
-  if (!existsSync(configFile)) return null
-  const raw = await readFile(configFile, 'utf8')
-  return (parse(raw) as Record<string, unknown>) ?? {}
-}
-
 export default defineCommand({
   meta: { name: 'init', description: 'Bootstrap or update the server' },
   args: withCliArgs({}),
@@ -64,8 +57,7 @@ export default defineCommand({
     await mkdir(paths.root, { recursive: true, mode: 0o750 })
 
     const db = openDb(paths.stateDir)
-    const rawConfig = await loadRawConfig(paths.configFile)
-    const mctx: MigrationContext = { db, paths, rawConfig }
+    const mctx: MigrationContext = { db, paths }
 
     if (isTextOutput()) intro('jib init')
 
