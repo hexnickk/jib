@@ -29,6 +29,13 @@ export function buildSecretPromptMessage(serviceName: string, suggestedKeys: str
   return `Secret keys for "${serviceName}" (detected in docker-compose; edit if needed, comma-separated; values prompted next): ${suggestedKeys.join(', ')}`
 }
 
+export function buildAdditionalSecretPromptMessage(
+  serviceName: string,
+  detectedKeys: string[],
+): string {
+  return `Additional secret keys for "${serviceName}"? (docker-compose already detected: ${detectedKeys.join(', ')}; comma-separated, blank to skip)`
+}
+
 export function secretPromptPlaceholder(): string {
   return 'DATABASE_URL, API_KEY'
 }

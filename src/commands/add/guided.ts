@@ -11,6 +11,7 @@ import {
 import { missingInput } from '../_cli.ts'
 import {
   assignCliDomainsToServices,
+  buildAdditionalSecretPromptMessage,
   buildManualSecretPromptLines,
   buildSecretPromptMessage,
   parseEnvEntry,
@@ -74,11 +75,14 @@ export async function promptForServices(
             )
           : []
       const rawSecrets =
-        isInteractive() && suggestedKeys.length > 0
+        isInteractive() && detectedKeys.length > 0
           ? await promptStringOptional({
-              message: buildSecretPromptMessage(service.name, suggestedKeys),
+              message:
+                suggestedKeys.length > 0
+                  ? buildSecretPromptMessage(service.name, suggestedKeys)
+                  : buildAdditionalSecretPromptMessage(service.name, detectedKeys),
               placeholder: secretPromptPlaceholder(),
-              initialValue: suggestedKeys.join(','),
+              ...(suggestedKeys.length > 0 ? { initialValue: suggestedKeys.join(',') } : {}),
             })
           : ''
       const secretKeys = splitCommaValues(rawSecrets).filter((key) => !secretValues.has(key))

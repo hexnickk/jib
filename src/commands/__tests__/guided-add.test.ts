@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   assignCliDomainsToServices,
+  buildAdditionalSecretPromptMessage,
   buildManualSecretPromptLines,
   buildSecretPromptMessage,
   mergeGuidedServiceAnswers,
@@ -109,6 +110,10 @@ describe('guided add helpers', () => {
       'detected in docker-compose',
     )
     expect(buildSecretPromptMessage('blog', ['DATABASE_URL'])).toContain('values prompted next')
+    expect(buildAdditionalSecretPromptMessage('blog', ['DATABASE_URL'])).toContain(
+      'Additional secret keys for "blog"?',
+    )
+    expect(buildAdditionalSecretPromptMessage('blog', ['DATABASE_URL'])).toContain('blank to skip')
     expect(secretPromptPlaceholder()).toBe('DATABASE_URL, API_KEY')
     expect(buildManualSecretPromptLines()).toContain(
       'Jib could not detect any required secrets from docker-compose.',
