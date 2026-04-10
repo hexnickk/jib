@@ -14,11 +14,14 @@ export interface ComposeService {
   ports: unknown[]
   /** Raw `expose:` entries from the compose file. */
   expose: unknown[]
+  /** Environment keys the compose file expects the operator to supply. */
+  envRefs: string[]
 }
 
 interface RawService {
   ports?: unknown[]
   expose?: unknown[]
+  environment?: unknown
 }
 
 interface RawComposeFile {
@@ -44,13 +47,19 @@ export function parseComposeServices(
       const next: RawService = { ...existing }
       if (svc.ports) next.ports = svc.ports
       if (svc.expose) next.expose = svc.expose
+      if (svc.environment !== undefined) next.environment = svc.environment
       merged.set(name, next)
     }
   }
 
   const out: ComposeService[] = []
   for (const [name, svc] of merged) {
-    out.push({ name, ports: svc.ports ?? [], expose: svc.expose ?? [] })
+    out.push({
+      name,
+      ports: svc.ports ?? [],
+      expose: svc.expose ?? [],
+      envRefs: parseEnvRefs(svc.environment),
+    })
   }
   return out
 }
@@ -101,4 +110,31 @@ function parseContainerSide(p: unknown): number | undefined {
     }
   }
   return undefined
+}
+
+function parseEnvRefs(environment: unknown): string[] {
+  const refs = new Set<string>()
+  if (Array.isArray(environment)) {
+    for (const entry of environment) {
+      if (typeof entry !== 'string') continue
+      const eq = entry.indexOf('=')
+      if (eq < 0) {
+        if (entry) refs.add(entry)
+        continue
+      }
+      const key = entry.slice(0, eq)
+      const value = entry.slice(eq + 1)
+      if (key && (value.length === 0 || value.includes('${'))) refs.add(key)
+    }
+    return [...refs]
+  }
+  if (!environment || typeof environment !== 'object') return []
+  for (const [key, value] of Object.entries(environment as Record<string, unknown>)) {
+    if (value === null || value === undefined) {
+      refs.add(key)
+      continue
+    }
+    if (typeof value === 'string' && value.includes('${')) refs.add(key)
+  }
+  return [...refs]
 }

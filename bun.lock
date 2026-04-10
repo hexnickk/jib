@@ -17,6 +17,7 @@
         "@jib/core": "workspace:*",
         "@jib/docker": "workspace:*",
         "@jib/flows": "workspace:*",
+        "@jib/ingress": "workspace:*",
         "@jib/rpc": "workspace:*",
         "@jib/secrets": "workspace:*",
         "@jib/sources": "workspace:*",
@@ -102,6 +103,17 @@
         "@jib/core": "workspace:*",
         "@jib/rpc": "workspace:*",
         "@jib/sources": "workspace:*",
+      },
+    },
+    "modules/ingress": {
+      "name": "@jib/ingress",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/bus": "workspace:*",
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+        "@jib/rpc": "workspace:*",
+        "@jib/tui": "workspace:*",
       },
     },
     "modules/nats": {
@@ -275,6 +287,8 @@
     "@jib/docker": ["@jib/docker@workspace:modules/docker"],
 
     "@jib/flows": ["@jib/flows@workspace:modules/flows"],
+
+    "@jib/ingress": ["@jib/ingress@workspace:modules/ingress"],
 
     "@jib/rpc": ["@jib/rpc@workspace:modules/rpc"],
 

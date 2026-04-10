@@ -31,7 +31,7 @@ export type AddFlowState =
 
 export interface AddFlowParams {
   appName: string
-  args: { 'git-provider'?: string }
+  args: { source?: string }
   cfg: Config
   configFile: string
   inputs: AddInputs
@@ -43,7 +43,7 @@ export type AddFlowResult = { finalApp: App; secretsWritten: number }
 export interface AddRepoService {
   prepare(
     appName: string,
-    target: { repo: string; branch: string; provider?: string },
+    target: { repo: string; branch: string; source?: string },
   ): Promise<{ workdir: string }>
   rollback(appName: string, repo: string): Promise<void>
 }
@@ -55,7 +55,7 @@ export interface AddPlanner {
     cfg: Config,
     appName: string,
     workdir: string,
-    args: { 'git-provider'?: string },
+    args: { source?: string },
     inputs: AddInputs,
     inspection: ComposeInspection,
     guided: GuidedInputs,

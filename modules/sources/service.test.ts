@@ -23,6 +23,7 @@ function configFor(repo: string): Config {
     config_version: 3,
     poll_interval: '5m',
     modules: {},
+    sources: {},
     apps: {
       demo: {
         repo,

@@ -14,7 +14,7 @@ const REQUIRED_NAMES = ['nats', 'deployer', 'gitsitter', 'nginx']
 const OPTIONAL_NAMES = ['cloudflared', 'github']
 
 function configWith(modules: Record<string, boolean>): Config {
-  return { config_version: 3, poll_interval: '5m', modules, apps: {} } as Config
+  return { config_version: 3, poll_interval: '5m', modules, sources: {}, apps: {} } as Config
 }
 
 describe('module registry', () => {

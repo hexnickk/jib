@@ -1,4 +1,4 @@
-import { type Config, type GitHubProvider, loadConfig, writeConfig } from '@jib/config'
+import { type Config, type GitHubSource, loadConfig, writeConfig } from '@jib/config'
 import { JibError } from '@jib/core'
 
 /**
@@ -12,64 +12,53 @@ async function editConfig(path: string, edit: (cfg: Config) => void): Promise<vo
   await writeConfig(path, cfg)
 }
 
-function providers(cfg: Config): Record<string, GitHubProvider> {
-  cfg.github ??= {}
-  cfg.github.providers ??= {}
-  return cfg.github.providers
-}
-
-/** Look up a provider by name, returning `undefined` if absent. */
-export function getProvider(cfg: Config, name: string): GitHubProvider | undefined {
-  return cfg.github?.providers?.[name]
+/** Look up a GitHub source ref by name, returning `undefined` if absent. */
+export function getGitHubSource(cfg: Config, name: string): GitHubSource | undefined {
+  const source = cfg.sources[name]
+  return source?.driver === 'github' ? source : undefined
 }
 
 /**
- * Throws if a provider name is already taken. Used as input validation by
+ * Throws if a source name is already taken. Used as input validation by
  * `jib github key setup` and `jib github app setup` so both commands share
  * the same "name already in use" error message.
  */
-export function providerNameAvailable(cfg: Config, name: string): void {
-  if (getProvider(cfg, name) !== undefined) {
-    throw new JibError('github.config', `provider "${name}" already exists`)
+export function sourceNameAvailable(cfg: Config, name: string): void {
+  if (cfg.sources[name] !== undefined) {
+    throw new JibError('github.config', `source "${name}" already exists`)
   }
 }
 
-/** Returns the names of apps that still reference `providerName`. */
-export function appsUsingProvider(cfg: Config, providerName: string): string[] {
+/** Returns the names of apps that still reference `sourceName`. */
+export function appsUsingSource(cfg: Config, sourceName: string): string[] {
   return Object.entries(cfg.apps)
-    .filter(([, app]) => app.provider === providerName)
+    .filter(([, app]) => app.source === sourceName)
     .map(([name]) => name)
 }
 
-/** Write a deploy-key provider entry (idempotent — overwrites on re-setup). */
-export async function addKeyProvider(configFile: string, name: string): Promise<void> {
+/** Write a deploy-key source entry (idempotent — overwrites on re-setup). */
+export async function addGitHubKeySource(configFile: string, name: string): Promise<void> {
   await editConfig(configFile, (cfg) => {
-    providers(cfg)[name] = { type: 'key' }
+    cfg.sources[name] = { driver: 'github', type: 'key' }
   })
 }
 
-/** Write a GitHub App provider entry, storing the numeric App ID. */
-export async function addAppProvider(
+/** Write a GitHub App source entry, storing the numeric App ID. */
+export async function addGitHubAppSource(
   configFile: string,
   name: string,
   appId: number,
 ): Promise<void> {
   await editConfig(configFile, (cfg) => {
-    providers(cfg)[name] = { type: 'app', app_id: appId }
+    cfg.sources[name] = { driver: 'github', type: 'app', app_id: appId }
   })
 }
 
 /**
- * Remove a provider entry. Cleans up the parent `github` / `providers` maps
- * if they end up empty so writing an otherwise-empty config doesn't leave
- * stub keys behind.
+ * Remove a GitHub source entry.
  */
-export async function removeProvider(configFile: string, name: string): Promise<void> {
+export async function removeGitHubSource(configFile: string, name: string): Promise<void> {
   await editConfig(configFile, (cfg) => {
-    const gh = cfg.github
-    if (!gh?.providers) return
-    delete gh.providers[name]
-    if (Object.keys(gh.providers).length === 0) gh.providers = undefined
-    if (gh.providers === undefined) cfg.github = undefined
+    delete cfg.sources[name]
   })
 }

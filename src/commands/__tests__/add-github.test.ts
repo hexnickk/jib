@@ -1,38 +1,32 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { getPaths } from '@jib/core'
-import {
-  buildGitHubProviderChoices,
-  isGitHubAuthFailure,
-  maybeRecoverGitHubProvider,
-} from '../add-github.ts'
+import { buildSourceChoices, isSourceAuthFailure, maybeRecoverSource } from '../sources-flow.ts'
 
 const paths = getPaths('/tmp/jib-add-github-test')
 const cfg = {
   config_version: 3,
   poll_interval: '5m',
   modules: {},
-  apps: {},
-  github: {
-    providers: {
-      appy: { type: 'app', app_id: 1 },
-      keyy: { type: 'key' },
-    },
+  sources: {
+    appy: { driver: 'github', type: 'app', app_id: 1 },
+    keyy: { driver: 'github', type: 'key' },
   },
+  apps: {},
 } as Config
 
-describe('GitHub provider recovery', () => {
-  test('lists existing providers before setup options', () => {
-    expect(buildGitHubProviderChoices(cfg)).toEqual([
+describe('source recovery', () => {
+  test('lists existing sources before setup options', () => {
+    expect(buildSourceChoices(cfg)).toEqual([
       { value: 'existing:appy', label: 'appy', hint: 'GitHub App' },
-      { value: 'existing:keyy', label: 'keyy', hint: 'deployment key' },
-      { value: 'setup:key', label: 'Set up new GitHub deployment key' },
+      { value: 'existing:keyy', label: 'keyy', hint: 'GitHub deployment key' },
+      { value: 'setup:key', label: 'Set up new GitHub deploy key' },
       { value: 'setup:app', label: 'Set up new GitHub app' },
     ])
   })
 
-  test('existing provider can be selected after an auth-shaped clone failure', async () => {
-    const provider = await maybeRecoverGitHubProvider(
+  test('existing source can be selected after an auth-shaped clone failure', async () => {
+    const source = await maybeRecoverSource(
       cfg,
       paths,
       'acme/private',
@@ -44,13 +38,13 @@ describe('GitHub provider recovery', () => {
       },
     )
 
-    expect(provider).toBe('keyy')
+    expect(source).toBe('keyy')
   })
 
-  test('new deploy-key setup can create a provider and confirm retry', async () => {
+  test('new deploy-key setup can create a source and confirm retry', async () => {
     const calls: string[] = []
 
-    const provider = await maybeRecoverGitHubProvider(
+    const source = await maybeRecoverSource(
       cfg,
       paths,
       'acme/private',
@@ -70,12 +64,12 @@ describe('GitHub provider recovery', () => {
       },
     )
 
-    expect(provider).toBe('fresh-key')
+    expect(source).toBe('fresh-key')
     expect(calls).toEqual(['setup:key', 'confirm'])
   })
 
-  test('non-auth failures do not trigger provider recovery', async () => {
-    const provider = await maybeRecoverGitHubProvider(
+  test('non-auth failures do not trigger source recovery', async () => {
+    const source = await maybeRecoverSource(
       cfg,
       paths,
       'acme/private',
@@ -84,22 +78,25 @@ describe('GitHub provider recovery', () => {
       { isInteractive: () => true },
     )
 
-    expect(provider).toBeNull()
-    expect(isGitHubAuthFailure(new Error('compose file missing'))).toBe(false)
+    expect(source).toBeNull()
+    expect(isSourceAuthFailure(new Error('compose file missing'))).toBe(false)
   })
 
-  test('missing provider config can still recover via the chooser', async () => {
+  test('missing source config can still recover via the chooser', async () => {
     const prompts: string[] = []
 
-    const provider = await maybeRecoverGitHubProvider(
+    const source = await maybeRecoverSource(
       cfg,
       paths,
       'acme/private',
-      new Error('provider "ghost" not found in config'),
+      new Error('source "ghost" not found in config'),
       'ghost',
       {
         isInteractive: () => true,
-        promptSelect: async (opts) => {
+        promptSelect: async (opts: {
+          message: string
+          initialValue?: `existing:${string}` | 'setup:key' | 'setup:app'
+        }) => {
           prompts.push(opts.message)
           expect(opts.initialValue).toBeUndefined()
           return 'existing:appy'
@@ -107,7 +104,7 @@ describe('GitHub provider recovery', () => {
       },
     )
 
-    expect(provider).toBe('appy')
+    expect(source).toBe('appy')
     expect(prompts).toHaveLength(1)
   })
 })

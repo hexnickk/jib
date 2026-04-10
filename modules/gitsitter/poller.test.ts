@@ -8,6 +8,7 @@ function mkCfg(overrides: Partial<Config> = {}): Config {
   return {
     config_version: 3,
     poll_interval: '5m',
+    sources: {},
     apps: {
       demo: {
         repo: 'acme/demo',
@@ -21,10 +22,12 @@ function mkCfg(overrides: Partial<Config> = {}): Config {
 }
 
 describe('parsePollInterval', () => {
-  test('parses seconds, minutes, hours', () => {
+  test('parses supported config durations', () => {
     expect(parsePollInterval('30s')).toBe(30_000)
     expect(parsePollInterval('5m')).toBe(300_000)
     expect(parsePollInterval('1h')).toBe(3_600_000)
+    expect(parsePollInterval('1.5h')).toBe(5_400_000)
+    expect(parsePollInterval('1h30m')).toBe(5_400_000)
   })
   test('defaults to 5m on garbage', () => {
     expect(parsePollInterval('nonsense')).toBe(300_000)

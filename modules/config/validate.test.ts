@@ -107,26 +107,26 @@ describe('validate', () => {
     expect(() => validate(cfg)).not.toThrow()
   })
 
-  test('rejects app referencing unknown provider', () => {
+  test('rejects app referencing unknown source', () => {
     const cfg = base({
       apps: {
         web: {
           repo: 'hexnickk/web',
-          provider: 'ghost',
+          source: 'ghost',
           domains: [{ host: 'example.com', port: 80 }],
         },
       },
     })
-    expect(() => validate(cfg)).toThrow(/provider/)
+    expect(() => validate(cfg)).toThrow(/source/)
   })
 
-  test('accepts app with matching provider', () => {
+  test('accepts app with matching source', () => {
     const cfg = base({
-      github: { providers: { prod: { type: 'key' } } },
+      sources: { prod: { driver: 'github', type: 'key' } },
       apps: {
         web: {
           repo: 'hexnickk/web',
-          provider: 'prod',
+          source: 'prod',
           domains: [{ host: 'example.com', port: 80 }],
         },
       },

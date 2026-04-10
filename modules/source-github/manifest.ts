@@ -1,7 +1,7 @@
 import type { ModuleManifest } from '@jib/core'
 
 /**
- * GitHub authentication provider module. Ships the `jib github key|app ...`
+ * GitHub authentication source module. Ships the `jib github key|app ...`
  * CLI commands plus the pure helpers `modules/gitsitter` uses to mint live
  * credentials (deploy-key SSH command, GitHub App installation tokens).
  *

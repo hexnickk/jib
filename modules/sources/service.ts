@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import type { App, Config } from '@jib/config'
 import { JibError, type Paths, pathExists, repoPath } from '@jib/core'
 import * as git from './git.ts'
-import { resolveGitHubSource } from './github.ts'
+import { resolveSourceDriver } from './registry.ts'
 import type {
   PreparedSource,
   ProbeSourceDeps,
@@ -20,7 +20,7 @@ function resolveApp(cfg: Config, target: SourceTarget): App {
     branch: target.branch ?? 'main',
     domains: [],
     env_file: '.env',
-    ...(target.provider ? { provider: target.provider } : {}),
+    ...(target.source ? { source: target.source } : {}),
   }
 }
 
@@ -36,7 +36,8 @@ export async function resolveSource(
   }
   const workdir = repoPath(paths, target.app, app.repo)
   const branch = target.branch ?? app.branch
-  const remote = await resolveGitHubSource(cfg, app, paths)
+  const driver = resolveSourceDriver(cfg, app)
+  const remote = await driver.resolve(cfg, app, paths)
   return {
     app,
     branch,
@@ -70,8 +71,6 @@ export async function prepareSource(
   await git.checkout(source.workdir, sha)
   return { workdir: source.workdir, sha }
 }
-
-export const syncSource = prepareSource
 
 export async function probeSource(
   cfg: Config,

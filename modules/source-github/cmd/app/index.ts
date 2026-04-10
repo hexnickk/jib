@@ -4,6 +4,6 @@ import setup from './setup.ts'
 import status from './status.ts'
 
 export default defineCommand({
-  meta: { name: 'app', description: 'Manage GitHub App providers' },
+  meta: { name: 'app', description: 'Manage GitHub App sources' },
   subCommands: { setup, status, remove },
 })

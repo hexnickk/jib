@@ -4,6 +4,6 @@ import setup from './setup.ts'
 import status from './status.ts'
 
 export default defineCommand({
-  meta: { name: 'key', description: 'Manage SSH deploy key providers' },
+  meta: { name: 'key', description: 'Manage SSH deploy key sources' },
   subCommands: { setup, status, remove },
 })

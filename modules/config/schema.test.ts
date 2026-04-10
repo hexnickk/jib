@@ -50,19 +50,18 @@ describe('ConfigSchema', () => {
     const cfg = ConfigSchema.parse({
       config_version: 3,
       poll_interval: '2m',
-      github: { providers: { prod: { type: 'app', app_id: 12345 } } },
+      sources: { prod: { driver: 'github', type: 'app', app_id: 12345 } },
       tunnel: { provider: 'cloudflare', tunnel_id: 'abc', account_id: 'def' },
       apps: {
         web: {
           repo: 'hexnickk/web',
-          provider: 'prod',
+          source: 'prod',
           domains: [{ host: 'example.com', port: 8080, ingress: 'cloudflare-tunnel' }],
           health: [{ path: '/health', port: 8080 }],
-          warmup: '30s',
         },
       },
     })
-    expect(cfg.github?.providers?.prod?.app_id).toBe(12345)
+    expect(cfg.sources.prod?.app_id).toBe(12345)
     expect(cfg.tunnel?.provider).toBe('cloudflare')
   })
 

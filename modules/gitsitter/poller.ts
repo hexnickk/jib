@@ -1,21 +1,15 @@
 import type { Bus } from '@jib/bus'
-import type { Config } from '@jib/config'
+import { type Config, parseDuration } from '@jib/config'
 import type { Logger, Paths } from '@jib/core'
 import { SUBJECTS } from '@jib/rpc'
 import { type ProbeSourceDeps, probeSource } from '@jib/sources'
 
 /**
- * Parses jib's `poll_interval` ("5m", "30s", ...). Accepts the same subset Go
- * used: integer + unit. Returns milliseconds, defaulting to 5 minutes if the
- * string is unparseable.
+ * Parses jib's `poll_interval` using the same duration grammar the config
+ * validator accepts. Falls back to 5 minutes only for invalid raw strings.
  */
 export function parsePollInterval(raw: string): number {
-  const m = /^(\d+)(s|m|h)$/.exec(raw.trim())
-  if (!m) return 5 * 60_000
-  const n = Number(m[1])
-  const unit = m[2] as 's' | 'm' | 'h'
-  const mult = unit === 's' ? 1_000 : unit === 'm' ? 60_000 : 3_600_000
-  return n * mult
+  return parseDuration(raw) ?? 5 * 60_000
 }
 
 /**
@@ -69,7 +63,7 @@ export async function pollApp(
 export interface PollerDeps {
   bus: Bus
   paths: Paths
-  getConfig: () => Config
+  getConfig: () => Promise<Config> | Config
   log: Logger
   /** Injected for tests — defaults to real `setTimeout`. */
   sleep?: (ms: number) => Promise<void>
@@ -85,7 +79,7 @@ export async function runPoller(deps: PollerDeps, abort: AbortSignal): Promise<v
   const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))
   const lastSeen = new Map<string, string>()
   while (!abort.aborted) {
-    const cfg = deps.getConfig()
+    const cfg = await deps.getConfig()
     for (const name of Object.keys(cfg.apps)) {
       if (abort.aborted) return
       await pollApp(deps.bus, cfg, deps.paths, name, lastSeen, deps.log)

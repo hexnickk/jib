@@ -8,8 +8,6 @@
  */
 export const SUBJECTS = {
   cmd: {
-    repoPrepare: 'jib.cmd.repo.prepare',
-    repoRemove: 'jib.cmd.repo.remove',
     deploy: 'jib.cmd.deploy',
     appUp: 'jib.cmd.app.up',
     appDown: 'jib.cmd.app.down',
@@ -19,10 +17,6 @@ export const SUBJECTS = {
     nginxRelease: 'jib.cmd.nginx.release',
   },
   evt: {
-    repoReady: 'jib.evt.repo.ready',
-    repoRemoved: 'jib.evt.repo.removed',
-    repoFailed: 'jib.evt.repo.failed',
-    repoProgress: 'jib.evt.repo.progress',
     deploySuccess: 'jib.evt.deploy.success',
     deployFailure: 'jib.evt.deploy.failure',
     deployProgress: 'jib.evt.deploy.progress',

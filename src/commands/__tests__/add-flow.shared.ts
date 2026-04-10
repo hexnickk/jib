@@ -6,6 +6,7 @@ const baseCfg: Config = {
   config_version: 3,
   poll_interval: '5m',
   modules: {},
+  sources: {},
   apps: {
     existing: { repo: 'owner/existing', branch: 'main', domains: [], env_file: '.env' },
   },
@@ -20,7 +21,7 @@ const draftApp: App = {
 
 const inspection: ComposeInspection = {
   composeFiles: ['compose.yml'],
-  services: [{ name: 'web', ports: ['8080:80'], expose: [] }],
+  services: [{ name: 'web', ports: ['8080:80'], expose: [], envRefs: [] }],
 }
 
 const guided = {

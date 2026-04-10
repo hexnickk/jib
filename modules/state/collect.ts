@@ -10,8 +10,9 @@ export interface ServiceStatus {
   status: string
 }
 
-export interface ProviderStatus {
+export interface SourceStatus {
   name: string
+  driver: string
   type: 'key' | 'app'
   appId?: number | undefined
   hasCredential: boolean
@@ -45,18 +46,18 @@ async function checkUnit(name: string): Promise<ServiceStatus> {
   return { name, active: status === 'active', status }
 }
 
-export async function collectProviders(cfg: Config, paths: Paths): Promise<ProviderStatus[]> {
-  const providers = cfg.github?.providers ?? {}
-  const results: ProviderStatus[] = []
-  for (const [name, p] of Object.entries(providers)) {
+export async function collectSources(cfg: Config, paths: Paths): Promise<SourceStatus[]> {
+  const results: SourceStatus[] = []
+  for (const [name, source] of Object.entries(cfg.sources)) {
     const credPath =
-      p.type === 'app'
+      source.driver === 'github' && source.type === 'app'
         ? credsPath(paths, 'github-app', `${name}.pem`)
         : credsPath(paths, 'github-key', name)
     results.push({
       name,
-      type: p.type,
-      appId: p.type === 'app' ? p.app_id : undefined,
+      driver: source.driver,
+      type: source.type,
+      appId: source.type === 'app' ? source.app_id : undefined,
       hasCredential: await pathExists(credPath),
     })
   }

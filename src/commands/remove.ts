@@ -1,8 +1,7 @@
-import { withBus } from '@jib/bus'
 import { loadAppOrExit, writeConfig } from '@jib/config'
 import { canPrompt, isTextOutput } from '@jib/core'
 import { composeFor } from '@jib/docker'
-import { SUBJECTS, emitAndWait } from '@jib/rpc'
+import { releaseIngress } from '@jib/ingress'
 import { removeSource } from '@jib/sources'
 import { promptConfirm } from '@jib/tui'
 import { defineCommand } from 'citty'
@@ -11,9 +10,9 @@ import { applyCliArgs, missingInput, withCliArgs } from './_cli.ts'
 
 /**
  * `jib remove <app>` — reverse of add. Order matters:
- *   1. `cmd.nginx.release` — stop accepting traffic first
+ *   1. ingress release — stop accepting traffic first
  *   2. `docker compose down` — stop the app itself
- *   3. `cmd.repo.remove` — cleanup gitsitter's workdir
+ *   3. repo cleanup — remove the cached checkout
  *   4. drop the config entry
  *
  * Every step is best-effort: if one fails we log and continue so the
@@ -52,21 +51,14 @@ export default defineCommand({
       }
     }
 
-    try {
-      await withBus(async (bus) => {
-        await emitAndWait(
-          bus,
-          SUBJECTS.cmd.nginxRelease,
-          { app: args.app },
-          { success: SUBJECTS.evt.nginxReleased, failure: SUBJECTS.evt.nginxFailed },
-          SUBJECTS.evt.nginxProgress,
-          { source: 'cli', timeoutMs: DEFAULT_TIMEOUT_MS },
-        )
-        if (isTextOutput()) consola.info('nginx routes released')
-      })
-    } catch (err) {
-      if (isTextOutput()) {
-        consola.warn(`nginx release: ${err instanceof Error ? err.message : String(err)}`)
+    if (appCfg.domains.length > 0) {
+      try {
+        await releaseIngress(args.app, DEFAULT_TIMEOUT_MS)
+        if (isTextOutput()) consola.info('ingress released')
+      } catch (err) {
+        if (isTextOutput()) {
+          consola.warn(`ingress release: ${err instanceof Error ? err.message : String(err)}`)
+        }
       }
     }
 

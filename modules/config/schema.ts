@@ -5,14 +5,13 @@ export const StringOrSlice = z
   .union([z.string(), z.array(z.string())])
   .transform((v) => (typeof v === 'string' ? [v] : v))
 
-export const GitHubProviderSchema = z.object({
+export const GitHubSourceSchema = z.object({
+  driver: z.literal('github'),
   type: z.enum(['key', 'app']),
   app_id: z.number().int().positive().optional(),
 })
 
-export const GitHubConfigSchema = z.object({
-  providers: z.record(z.string(), GitHubProviderSchema).optional(),
-})
+export const SourceSchema = z.discriminatedUnion('driver', [GitHubSourceSchema])
 
 // NOTE: `port` is the *host* port jib proxies to, and is only needed when a
 // service has ingress. It is optional at parse time because `jib add`
@@ -42,7 +41,7 @@ export const PreDeployHookSchema = z.object({
 
 export const AppSchema = z.object({
   repo: z.string().min(1),
-  provider: z.string().optional(),
+  source: z.string().optional(),
   branch: z.string().default('main'),
   compose: StringOrSlice.optional(),
   health: z.array(HealthCheckSchema).optional(),
@@ -63,13 +62,13 @@ export const ConfigSchema = z.object({
   config_version: z.number().int().positive(),
   poll_interval: z.string().default('5m'),
   modules: z.record(z.string(), z.boolean()).optional().default({}),
-  github: GitHubConfigSchema.optional(),
+  sources: z.record(z.string(), SourceSchema).optional().default({}),
   apps: z.record(z.string(), AppSchema).default({}),
   tunnel: TunnelConfigSchema.optional(),
 })
 
-export type GitHubProvider = z.infer<typeof GitHubProviderSchema>
-export type GitHubConfig = z.infer<typeof GitHubConfigSchema>
+export type GitHubSource = z.infer<typeof GitHubSourceSchema>
+export type Source = z.infer<typeof SourceSchema>
 export type Domain = z.infer<typeof DomainSchema>
 export type HealthCheck = z.infer<typeof HealthCheckSchema>
 export type PreDeployHook = z.infer<typeof PreDeployHookSchema>

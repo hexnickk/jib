@@ -3,14 +3,14 @@ import { dirname } from 'node:path'
 import { JibError, type Paths, credsPath } from '@jib/core'
 import { $ } from 'bun'
 
-/** Disk layout for a deploy-key provider. Mirrors Go `ghPkg.KeyPath`. */
+/** Disk layout for a deploy-key source. Mirrors Go `ghPkg.KeyPath`. */
 export interface DeployKeyPaths {
   privateKey: string
   publicKey: string
 }
 
 /**
- * Returns the private + public key paths for a named deploy-key provider.
+ * Returns the private + public key paths for a named deploy-key source.
  * Lives under `secrets/_jib/github-key/<name>{,.pub}` so permissions follow
  * the rest of the jib-managed secret tree.
  */

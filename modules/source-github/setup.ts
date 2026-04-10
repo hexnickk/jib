@@ -4,7 +4,7 @@ import { type Config, loadConfig } from '@jib/config'
 import type { ModuleContext } from '@jib/core'
 import { log, note, promptInt, promptPEM, promptSelect, promptString } from '@jib/tui'
 import { appPemPath } from './auth.ts'
-import { addAppProvider, addKeyProvider, providerNameAvailable } from './config-edit.ts'
+import { addGitHubAppSource, addGitHubKeySource, sourceNameAvailable } from './config-edit.ts'
 import { deployKeyPaths, generateDeployKey } from './keygen.ts'
 
 /**
@@ -14,7 +14,7 @@ import { deployKeyPaths, generateDeployKey } from './keygen.ts'
  */
 export async function setup(ctx: ModuleContext<Config>): Promise<void> {
   const choice = await promptSelect<'key' | 'app' | 'skip'>({
-    message: 'Set up a git auth provider? (needed for private repos)',
+    message: 'Set up a git source ref? (needed for private repos)',
     options: [
       { value: 'key', label: 'SSH deploy key (simplest, per-repo)' },
       { value: 'app', label: 'GitHub App (recommended for orgs)' },
@@ -27,13 +27,13 @@ export async function setup(ctx: ModuleContext<Config>): Promise<void> {
 
 export async function setupDeployKey(ctx: ModuleContext<Config>): Promise<string | null> {
   try {
-    const name = await promptString({ message: 'Provider name (e.g. my-org-key)' })
+    const name = await promptString({ message: 'Source name (e.g. my-org-key)' })
     const cfg = await loadConfig(ctx.paths.configFile)
-    providerNameAvailable(cfg, name)
+    sourceNameAvailable(cfg, name)
     const pubKey = await generateDeployKey(name, ctx.paths)
-    await addKeyProvider(ctx.paths.configFile, name)
+    await addGitHubKeySource(ctx.paths.configFile, name)
     const keyPaths = deployKeyPaths(ctx.paths, name)
-    log.success(`deploy key "${name}" added to config`)
+    log.success(`GitHub source "${name}" added to config`)
     note(
       [
         'Add this public key to your GitHub repo → Settings → Deploy Keys:',
@@ -54,17 +54,17 @@ export async function setupDeployKey(ctx: ModuleContext<Config>): Promise<string
 
 export async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<string | null> {
   try {
-    const name = await promptString({ message: 'Provider name (e.g. my-org)' })
+    const name = await promptString({ message: 'Source name (e.g. my-org)' })
     const cfg = await loadConfig(ctx.paths.configFile)
-    providerNameAvailable(cfg, name)
+    sourceNameAvailable(cfg, name)
     log.info('create the app at github.com → Settings → Developer settings → GitHub Apps')
     const appId = await promptInt({ message: 'GitHub App ID', min: 1 })
     const pem = await promptPEM({ message: 'Private key PEM' })
     const pemPath = appPemPath(ctx.paths, name)
     await mkdir(dirname(pemPath), { recursive: true, mode: 0o750 })
     await writeFile(pemPath, pem, { mode: 0o640 })
-    await addAppProvider(ctx.paths.configFile, name, appId)
-    log.success(`provider "${name}" (app ${appId}) created`)
+    await addGitHubAppSource(ctx.paths.configFile, name, appId)
+    log.success(`source "${name}" (GitHub App ${appId}) created`)
     return name
   } catch (err) {
     log.warning(`app setup failed: ${err instanceof Error ? err.message : String(err)}`)

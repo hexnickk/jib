@@ -2,11 +2,11 @@ import { loadAppConfig } from '@jib/config'
 import { isTextOutput } from '@jib/core'
 import {
   type AppStatus,
-  type ProviderStatus,
   type ServiceStatus,
+  type SourceStatus,
   collectApps,
-  collectProviders,
   collectServices,
+  collectSources,
   hasTunnelToken,
 } from '@jib/state'
 import { defineCommand } from 'citty'
@@ -31,16 +31,19 @@ function printServices(services: ServiceStatus[]): void {
   }
 }
 
-function printProviders(providers: ProviderStatus[]): void {
-  if (providers.length === 0) {
-    consola.log('\ngit providers  (none)')
+function printSources(sources: SourceStatus[]): void {
+  if (sources.length === 0) {
+    consola.log('\nsources  (none)')
     return
   }
-  consola.log('\ngit providers')
-  for (const p of providers) {
-    const detail = p.type === 'app' ? `github-app (id ${p.appId})` : 'ssh-key'
-    const warn = p.hasCredential ? '' : '  ⚠ credential missing'
-    consola.log(`  ${p.name.padEnd(18)} ${detail}${warn}`)
+  consola.log('\nsources')
+  for (const source of sources) {
+    const detail =
+      source.type === 'app'
+        ? `${source.driver} app (id ${source.appId})`
+        : `${source.driver} deploy-key`
+    const warn = source.hasCredential ? '' : '  ⚠ credential missing'
+    consola.log(`  ${source.name.padEnd(18)} ${detail}${warn}`)
   }
 }
 
@@ -68,24 +71,24 @@ function printApps(apps: AppStatus[]): void {
 }
 
 export default defineCommand({
-  meta: { name: 'status', description: 'Show server status: services, providers, apps' },
+  meta: { name: 'status', description: 'Show server status: services, sources, apps' },
   async run() {
     const { cfg, paths } = await loadAppConfig()
     const tunnel = hasTunnelToken(paths)
 
-    const [services, providers, apps] = await Promise.all([
+    const [services, sources, apps] = await Promise.all([
       collectServices(tunnel),
-      collectProviders(cfg, paths),
+      collectSources(cfg, paths),
       collectApps(cfg, paths),
     ])
 
     if (isTextOutput()) {
       printServices(services)
-      printProviders(providers)
+      printSources(sources)
       printApps(apps)
       return
     }
 
-    return { services, providers, apps }
+    return { services, sources, apps }
   },
 })

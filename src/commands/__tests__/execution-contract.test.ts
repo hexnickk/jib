@@ -13,6 +13,7 @@ async function withTmpRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
       config_version: 3,
       poll_interval: '5m',
       modules: {},
+      sources: {},
       apps: {},
     } satisfies Config)
     return await fn(root)
@@ -111,7 +112,7 @@ describe('execution contract', () => {
       const parsed = JSON.parse(result.stdout)
       expect(parsed.ok).toBe(true)
       expect(Array.isArray(parsed.data.services)).toBe(true)
-      expect(Array.isArray(parsed.data.providers)).toBe(true)
+      expect(Array.isArray(parsed.data.sources)).toBe(true)
       expect(Array.isArray(parsed.data.apps)).toBe(true)
     })
   })
@@ -133,6 +134,7 @@ describe('execution contract', () => {
         config_version: 3,
         poll_interval: '5m',
         modules: {},
+        sources: {},
         apps: {
           demo: {
             repo: 'owner/name',

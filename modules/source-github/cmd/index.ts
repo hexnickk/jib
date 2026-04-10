@@ -5,7 +5,7 @@ import key from './key/index.ts'
 
 const commands: CommandDef[] = [
   defineCommand({
-    meta: { name: 'github', description: 'Manage GitHub providers' },
+    meta: { name: 'github', description: 'Manage GitHub source refs' },
     subCommands: { key, app },
   }),
 ]

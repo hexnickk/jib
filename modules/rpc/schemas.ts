@@ -15,17 +15,6 @@ export type Envelope = z.infer<typeof EnvelopeSchema>
 
 const app = z.string().min(1)
 
-export const CmdRepoPrepareSchema = EnvelopeSchema.extend({
-  app,
-  repo: z.string().min(1).optional(),
-  branch: z.string().min(1).optional(),
-  provider: z.string().min(1).optional(),
-  ref: z.string().min(1).optional(),
-})
-export const CmdRepoRemoveSchema = EnvelopeSchema.extend({
-  app,
-  repo: z.string().min(1).optional(),
-})
 export const CmdDeploySchema = EnvelopeSchema.extend({
   app,
   workdir: z.string().min(1),
@@ -40,15 +29,6 @@ export const CmdAppDownSchema = EnvelopeSchema.extend({
 })
 export const CmdAppRestartSchema = EnvelopeSchema.extend({ app })
 export const CmdConfigReloadSchema = EnvelopeSchema
-
-export const EvtRepoReadySchema = EnvelopeSchema.extend({
-  app,
-  workdir: z.string().min(1),
-  sha: z.string().min(1),
-})
-export const EvtRepoRemovedSchema = EnvelopeSchema.extend({ app })
-export const EvtRepoFailedSchema = EnvelopeSchema.extend({ app, error: z.string() })
-export const EvtRepoProgressSchema = EnvelopeSchema.extend({ app, message: z.string() })
 
 export const EvtDeploySuccessSchema = EnvelopeSchema.extend({
   app,
@@ -97,18 +77,12 @@ export const EvtNginxReleasedSchema = EnvelopeSchema.extend({ app })
 export const EvtNginxFailedSchema = EnvelopeSchema.extend({ app, error: z.string() })
 export const EvtNginxProgressSchema = EnvelopeSchema.extend({ app, message: z.string() })
 
-export type CmdRepoPrepare = z.infer<typeof CmdRepoPrepareSchema>
-export type CmdRepoRemove = z.infer<typeof CmdRepoRemoveSchema>
 export type CmdDeploy = z.infer<typeof CmdDeploySchema>
 export type CmdAppUp = z.infer<typeof CmdAppUpSchema>
 export type CmdAppDown = z.infer<typeof CmdAppDownSchema>
 export type CmdAppRestart = z.infer<typeof CmdAppRestartSchema>
 export type CmdConfigReload = z.infer<typeof CmdConfigReloadSchema>
 
-export type EvtRepoReady = z.infer<typeof EvtRepoReadySchema>
-export type EvtRepoRemoved = z.infer<typeof EvtRepoRemovedSchema>
-export type EvtRepoFailed = z.infer<typeof EvtRepoFailedSchema>
-export type EvtRepoProgress = z.infer<typeof EvtRepoProgressSchema>
 export type EvtDeploySuccess = z.infer<typeof EvtDeploySuccessSchema>
 export type EvtDeployFailure = z.infer<typeof EvtDeployFailureSchema>
 export type EvtDeployProgress = z.infer<typeof EvtDeployProgressSchema>
@@ -132,17 +106,11 @@ export type EvtNginxProgress = z.infer<typeof EvtNginxProgressSchema>
  * validate messages without callers threading schemas in by hand.
  */
 export const SCHEMAS = {
-  [SUBJECTS.cmd.repoPrepare]: CmdRepoPrepareSchema,
-  [SUBJECTS.cmd.repoRemove]: CmdRepoRemoveSchema,
   [SUBJECTS.cmd.deploy]: CmdDeploySchema,
   [SUBJECTS.cmd.appUp]: CmdAppUpSchema,
   [SUBJECTS.cmd.appDown]: CmdAppDownSchema,
   [SUBJECTS.cmd.appRestart]: CmdAppRestartSchema,
   [SUBJECTS.cmd.configReload]: CmdConfigReloadSchema,
-  [SUBJECTS.evt.repoReady]: EvtRepoReadySchema,
-  [SUBJECTS.evt.repoRemoved]: EvtRepoRemovedSchema,
-  [SUBJECTS.evt.repoFailed]: EvtRepoFailedSchema,
-  [SUBJECTS.evt.repoProgress]: EvtRepoProgressSchema,
   [SUBJECTS.evt.deploySuccess]: EvtDeploySuccessSchema,
   [SUBJECTS.evt.deployFailure]: EvtDeployFailureSchema,
   [SUBJECTS.evt.deployProgress]: EvtDeployProgressSchema,

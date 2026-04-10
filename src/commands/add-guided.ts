@@ -6,6 +6,7 @@ export interface AddServiceSummary {
   name: string
   inferredContainerPort?: number
   publishesPorts: boolean
+  envRefs?: string[]
 }
 
 export interface GuidedServiceAnswer {
@@ -29,6 +30,7 @@ export function summarizeComposeServices(services: ComposeService[]): AddService
       name: service.name,
       ...(inferredContainerPort !== undefined ? { inferredContainerPort } : {}),
       publishesPorts: hasPublishedPorts(service),
+      ...(service.envRefs.length > 0 ? { envRefs: service.envRefs } : {}),
     }
   })
 }

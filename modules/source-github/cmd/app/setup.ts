@@ -6,7 +6,7 @@ import { isInteractive, promptInt, promptPEM, promptSelect } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { appPemPath } from '../../auth.ts'
-import { addAppProvider, providerNameAvailable } from '../../config-edit.ts'
+import { addGitHubAppSource, sourceNameAvailable } from '../../config-edit.ts'
 import { runManifestFlow } from '../../manifest-flow.ts'
 
 async function savePem(
@@ -20,7 +20,7 @@ async function savePem(
 }
 
 export default defineCommand({
-  meta: { name: 'setup', description: 'Register a GitHub App provider' },
+  meta: { name: 'setup', description: 'Register a GitHub App source' },
   args: {
     name: { type: 'positional', required: true },
     'app-id': { type: 'string', description: 'GitHub App ID (skip prompt)' },
@@ -29,7 +29,7 @@ export default defineCommand({
   async run({ args }) {
     const paths = getPaths()
     const cfg = await loadConfig(paths.configFile)
-    providerNameAvailable(cfg, args.name)
+    sourceNameAvailable(cfg, args.name)
 
     const flagAppId = args['app-id'] ? Number(args['app-id']) : 0
     const flagPemPath = args['private-key'] ?? ''
@@ -45,8 +45,8 @@ export default defineCommand({
       if (method === 'manifest') {
         const res = await runManifestFlow(args.name)
         await savePem(paths, args.name, res.pem)
-        await addAppProvider(paths.configFile, args.name, res.appId)
-        return consola.success(`provider "${args.name}" (app ${res.appId}) created`)
+        await addGitHubAppSource(paths.configFile, args.name, res.appId)
+        return consola.success(`source "${args.name}" (app ${res.appId}) created`)
       }
     }
 
@@ -55,7 +55,7 @@ export default defineCommand({
       ? await readFile(flagPemPath, 'utf8')
       : await promptPEM({ message: 'Private key PEM' })
     await savePem(paths, args.name, pem)
-    await addAppProvider(paths.configFile, args.name, appId)
-    consola.success(`provider "${args.name}" (app ${appId}) created`)
+    await addGitHubAppSource(paths.configFile, args.name, appId)
+    consola.success(`source "${args.name}" (app ${appId}) created`)
   },
 })

@@ -20,6 +20,7 @@ const cfg: Config = {
   config_version: 3,
   poll_interval: '5m',
   modules: {},
+  sources: {},
   apps: {
     demo: {
       repo: 'local',
@@ -28,7 +29,7 @@ const cfg: Config = {
       env_file: '.env',
     },
   },
-} as Config
+}
 
 describe('deployer handlers', () => {
   test('cmd.deploy → evt.deploy.success', async () => {

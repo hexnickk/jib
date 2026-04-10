@@ -10,7 +10,7 @@ import {
 } from './parse.ts'
 
 function svc(partial: Partial<ComposeService>): ComposeService {
-  return { name: 'x', ports: [], expose: [], ...partial }
+  return { name: 'x', ports: [], expose: [], envRefs: [], ...partial }
 }
 
 function fixture(files: Record<string, string>): string {
@@ -31,6 +31,7 @@ describe('parseComposeServices', () => {
     expect(out[0]?.name).toBe('web')
     expect(out[0]?.ports).toEqual([])
     expect(out[0]?.expose).toEqual([])
+    expect(out[0]?.envRefs).toEqual([])
   })
 
   test('extracts ports and expose', () => {
@@ -45,6 +46,7 @@ describe('parseComposeServices', () => {
     const out = parseComposeServices(dir)
     expect(out[0]?.ports).toEqual(['8080:80'])
     expect(out[0]?.expose).toEqual(['9000'])
+    expect(out[0]?.envRefs).toEqual([])
   })
 
   test('later file overrides earlier file field-by-field', () => {
@@ -54,6 +56,21 @@ describe('parseComposeServices', () => {
     })
     const out = parseComposeServices(dir, ['base.yml', 'over.yml'])
     expect(out[0]?.ports).toEqual(['4000:3000'])
+  })
+
+  test('extracts referenced environment keys', () => {
+    const dir = fixture({
+      'docker-compose.yml': `services:
+  api:
+    environment:
+      DATABASE_URL: \${DATABASE_URL}
+      STATIC_VALUE: hello
+      EMPTY_FROM_ENV:
+      API_KEY: ""
+`,
+    })
+    const out = parseComposeServices(dir)
+    expect(out[0]?.envRefs).toEqual(['DATABASE_URL', 'EMPTY_FROM_ENV'])
   })
 })
 

@@ -4,66 +4,73 @@ import { emitAndWait } from './client.ts'
 import { FakeBus, flush } from './fake-bus.ts'
 import { SUBJECTS } from './subjects.ts'
 
-/** Helper: emit a completion event that echoes a correlation ID. */
 function echo(bus: FakeBus, subject: string, extra: Record<string, unknown>, corrId: string) {
   bus.publish(subject, { corrId, ts: new Date().toISOString(), source: 'test', ...extra })
 }
 
-/**
- * Drain microtasks enough for a roundtrip: publish → subscribe handler →
- * emitAndWait promise resolution.
- */
 async function roundtrip() {
   await flush()
   await flush()
 }
 
+const deployPayload = {
+  app: 'demo',
+  workdir: '/tmp/demo',
+  sha: 'abc123',
+  trigger: 'manual' as const,
+}
+
 describe('emitAndWait', () => {
   test('happy path: progress stream then success resolves with event payload', async () => {
     const bus = new FakeBus()
-    // As soon as the command lands, stub gitsitter emits progress + ready.
-    bus.subscribe(SUBJECTS.cmd.repoPrepare, (raw) => {
-      const cmd = raw as { corrId: string; app: string }
-      echo(bus, SUBJECTS.evt.repoProgress, { app: cmd.app, message: 'cloning' }, cmd.corrId)
-      echo(bus, SUBJECTS.evt.repoReady, { app: cmd.app, workdir: '/tmp/x', sha: 'abc' }, cmd.corrId)
+    bus.subscribe(SUBJECTS.cmd.deploy, (raw) => {
+      const cmd = raw as { corrId: string; app: string; sha: string }
+      echo(
+        bus,
+        SUBJECTS.evt.deployProgress,
+        { app: cmd.app, step: 'clone', message: 'ready' },
+        cmd.corrId,
+      )
+      echo(
+        bus,
+        SUBJECTS.evt.deploySuccess,
+        { app: cmd.app, sha: cmd.sha, durationMs: 25 },
+        cmd.corrId,
+      )
     })
 
     const progress: string[] = []
     const result = await emitAndWait(
       bus.asBus(),
-      SUBJECTS.cmd.repoPrepare,
-      { app: 'demo', ref: 'main' },
-      { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
-      SUBJECTS.evt.repoProgress,
-      {
-        source: 'cli',
-        timeoutMs: 500,
-        onProgress: (m) => progress.push(m.message),
-      },
+      SUBJECTS.cmd.deploy,
+      deployPayload,
+      { success: SUBJECTS.evt.deploySuccess, failure: SUBJECTS.evt.deployFailure },
+      SUBJECTS.evt.deployProgress,
+      { source: 'cli', timeoutMs: 500, onProgress: (m) => progress.push(m.message) },
     )
 
-    expect(result.workdir).toBe('/tmp/x')
-    expect(result.sha).toBe('abc')
-    expect(progress).toEqual(['cloning'])
+    expect(result.sha).toBe('abc123')
+    expect(result.durationMs).toBe(25)
+    expect(progress).toEqual(['ready'])
   })
 
   test('failure event rejects with surfaced error', async () => {
     const bus = new FakeBus()
-    bus.subscribe(SUBJECTS.cmd.repoPrepare, (raw) => {
+    bus.subscribe(SUBJECTS.cmd.deploy, (raw) => {
       const cmd = raw as { corrId: string; app: string }
-      echo(bus, SUBJECTS.evt.repoFailed, { app: cmd.app, error: 'clone failed' }, cmd.corrId)
+      echo(bus, SUBJECTS.evt.deployFailure, { app: cmd.app, error: 'deploy failed' }, cmd.corrId)
     })
 
     await expect(
       emitAndWait(
         bus.asBus(),
-        SUBJECTS.cmd.repoPrepare,
-        { app: 'demo', ref: 'main' },
-        { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
+        SUBJECTS.cmd.deploy,
+        deployPayload,
+        { success: SUBJECTS.evt.deploySuccess, failure: SUBJECTS.evt.deployFailure },
         undefined,
         { source: 'cli', timeoutMs: 500 },
       ),
-    ).rejects.toThrow('clone failed')
+    ).rejects.toThrow('deploy failed')
   })
 
   test('timeout rejects when no terminal event arrives', async () => {
@@ -71,9 +78,9 @@ describe('emitAndWait', () => {
     await expect(
       emitAndWait(
         bus.asBus(),
-        SUBJECTS.cmd.repoPrepare,
-        { app: 'demo', ref: 'main' },
-        { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
+        SUBJECTS.cmd.deploy,
+        deployPayload,
+        { success: SUBJECTS.evt.deploySuccess, failure: SUBJECTS.evt.deployFailure },
         undefined,
         { source: 'cli', timeoutMs: 20 },
       ),
@@ -82,54 +89,48 @@ describe('emitAndWait', () => {
 
   test('events with wrong corrId are ignored', async () => {
     const bus = new FakeBus()
-    bus.subscribe(SUBJECTS.cmd.repoPrepare, (raw) => {
-      const cmd = raw as { corrId: string; app: string }
-      // Noise: an unrelated app's ready event.
+    bus.subscribe(SUBJECTS.cmd.deploy, (raw) => {
+      const cmd = raw as { corrId: string; app: string; sha: string }
       echo(
         bus,
-        SUBJECTS.evt.repoReady,
-        { app: 'other', workdir: '/tmp/other', sha: 'zzz' },
+        SUBJECTS.evt.deploySuccess,
+        { app: 'other', sha: 'zzz', durationMs: 1 },
         'different-corr-id',
       )
-      // Then the one we actually want.
       echo(
         bus,
-        SUBJECTS.evt.repoReady,
-        { app: cmd.app, workdir: '/tmp/mine', sha: 'mine' },
+        SUBJECTS.evt.deploySuccess,
+        { app: cmd.app, sha: cmd.sha, durationMs: 2 },
         cmd.corrId,
       )
     })
 
     const result = await emitAndWait(
       bus.asBus(),
-      SUBJECTS.cmd.repoPrepare,
-      { app: 'demo', ref: 'main' },
-      { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
+      SUBJECTS.cmd.deploy,
+      deployPayload,
+      { success: SUBJECTS.evt.deploySuccess, failure: SUBJECTS.evt.deployFailure },
       undefined,
       { source: 'cli', timeoutMs: 500 },
     )
-    expect(result.workdir).toBe('/tmp/mine')
+    expect(result.durationMs).toBe(2)
   })
 
   test('publish error tears down subs + timer and rejects', async () => {
     const bus = new FakeBus()
     const boom = new Error('bus down')
-    // Swap out publish with a thrower; subscribe still works.
     ;(bus as unknown as { publish: (s: string, p: unknown) => void }).publish = () => {
       throw boom
     }
     const err = await emitAndWait(
       bus.asBus(),
-      SUBJECTS.cmd.repoPrepare,
-      { app: 'demo', ref: 'main' },
-      { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
+      SUBJECTS.cmd.deploy,
+      deployPayload,
+      { success: SUBJECTS.evt.deploySuccess, failure: SUBJECTS.evt.deployFailure },
       undefined,
       { source: 'cli', timeoutMs: 500 },
     ).catch((e) => e)
     expect(err).toBe(boom)
-    // If cleanup leaked, a trailing microtask flush would still hold timers;
-    // bun:test will fail the run on dangling handles, so reaching here is the
-    // assertion. Drain anyway to surface any late rejections.
     await roundtrip()
   })
 
@@ -138,9 +139,9 @@ describe('emitAndWait', () => {
     await expect(
       emitAndWait(
         bus.asBus(),
-        SUBJECTS.cmd.repoPrepare,
-        { app: '', ref: 'main' } as never,
-        { success: SUBJECTS.evt.repoReady, failure: SUBJECTS.evt.repoFailed },
+        SUBJECTS.cmd.deploy,
+        { ...deployPayload, app: '' } as never,
+        { success: SUBJECTS.evt.deploySuccess, failure: SUBJECTS.evt.deployFailure },
         undefined,
         { source: 'cli', timeoutMs: 500 },
       ),

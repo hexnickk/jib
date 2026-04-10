@@ -57,14 +57,14 @@ export function validate(cfg: Config): void {
     errs.push(`poll_interval: invalid duration "${cfg.poll_interval}"`)
   }
 
-  const providerNames = new Set(Object.keys(cfg.github?.providers ?? {}))
-  for (const name of providerNames) {
+  const sourceNames = new Set(Object.keys(cfg.sources))
+  for (const name of sourceNames) {
     if (!APP_NAME_RE.test(name)) {
-      errs.push(`github.providers '${name}': name must match [a-z0-9-]+`)
+      errs.push(`sources '${name}': name must match [a-z0-9-]+`)
     }
-    const p = cfg.github?.providers?.[name]
-    if (p?.type === 'app' && (p.app_id === undefined || p.app_id <= 0)) {
-      errs.push(`github.providers '${name}': app_id is required for type 'app'`)
+    const source = cfg.sources[name]
+    if (source?.driver === 'github' && source.type === 'app' && source.app_id === undefined) {
+      errs.push(`sources '${name}': app_id is required for driver github type app`)
     }
   }
 
@@ -73,8 +73,8 @@ export function validate(cfg: Config): void {
     if (!APP_NAME_RE.test(name)) errs.push(`app '${name}': name must match [a-z0-9-]+`)
     const repoErr = validateRepo(app.repo)
     if (repoErr) errs.push(`app '${name}': repo "${app.repo}" ${repoErr}`)
-    if (app.provider && app.repo !== 'local' && !providerNames.has(app.provider)) {
-      errs.push(`app '${name}': provider "${app.provider}" not found in github.providers`)
+    if (app.source && app.repo !== 'local' && !sourceNames.has(app.source)) {
+      errs.push(`app '${name}': source "${app.source}" not found in sources`)
     }
     for (const d of app.domains) {
       if (d.host !== d.host.toLowerCase() || !DOMAIN_RE.test(d.host)) {

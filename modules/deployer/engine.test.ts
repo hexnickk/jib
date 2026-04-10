@@ -13,6 +13,7 @@ function mkCfg(): Config {
     config_version: 3,
     poll_interval: '5m',
     modules: {},
+    sources: {},
     apps: {
       demo: {
         repo: 'local',
@@ -21,7 +22,7 @@ function mkCfg(): Config {
         env_file: '.env',
       },
     },
-  } as Config
+  }
 }
 
 async function mkWorkdir(): Promise<string> {

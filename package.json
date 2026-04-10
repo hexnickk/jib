@@ -36,6 +36,7 @@
     "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",
     "@jib/docker": "workspace:*",
+    "@jib/ingress": "workspace:*",
     "@jib/rpc": "workspace:*",
     "@jib/secrets": "workspace:*",
     "@jib/state": "workspace:*",

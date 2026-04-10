@@ -6,22 +6,20 @@ const cfg = {
   config_version: 3,
   poll_interval: '5m',
   modules: {},
-  apps: {},
-  github: {
-    providers: {
-      appy: { type: 'app', app_id: 1 },
-      keyy: { type: 'key' },
-    },
+  sources: {
+    appy: { driver: 'github', type: 'app', app_id: 1 },
+    keyy: { driver: 'github', type: 'key' },
   },
+  apps: {},
 } as Config
 
-function app(provider?: string): App {
+function app(source?: string): App {
   return {
     repo: 'acme/site',
     branch: 'main',
     domains: [],
     env_file: '.env',
-    ...(provider ? { provider } : {}),
+    ...(source ? { source } : {}),
   }
 }
 
@@ -30,11 +28,11 @@ describe('GitHub source driver', () => {
     expect(cloneURL(app(), cfg)).toBe('https://github.com/acme/site.git')
   })
 
-  test('deploy-key providers use SSH', () => {
+  test('deploy-key sources use SSH', () => {
     expect(cloneURL(app('keyy'), cfg)).toBe('git@github.com:acme/site.git')
   })
 
-  test('GitHub App providers use HTTPS', () => {
+  test('GitHub App sources use HTTPS', () => {
     expect(cloneURL(app('appy'), cfg)).toBe('https://github.com/acme/site.git')
   })
 })

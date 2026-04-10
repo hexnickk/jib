@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test'
 import {
   CmdDeploySchema,
   CmdNginxClaimSchema,
-  CmdRepoPrepareSchema,
   EnvelopeSchema,
   EvtDeploySuccessSchema,
   EvtNginxProgressSchema,
@@ -19,22 +18,20 @@ describe('schemas', () => {
     expect(EnvelopeSchema.safeParse({ corrId: '', ts: 'bad', source: 's' }).success).toBe(false)
   })
 
-  test('CmdRepoPrepare round-trips', () => {
-    const v = CmdRepoPrepareSchema.parse({
+  test('CmdDeploy round-trips', () => {
+    const v = CmdDeploySchema.parse({
       corrId: 'c',
       ts: '2024-01-01T00:00:00Z',
       source: 'cli',
       app: 'demo',
-      repo: 'owner/name',
-      branch: 'main',
-      provider: 'prod',
-      ref: 'main',
+      workdir: '/tmp/demo',
+      sha: 'abc123',
+      trigger: 'manual',
     })
     expect(v.app).toBe('demo')
-    expect(v.repo).toBe('owner/name')
-    expect(v.branch).toBe('main')
-    expect(v.provider).toBe('prod')
-    expect(v.ref).toBe('main')
+    expect(v.workdir).toBe('/tmp/demo')
+    expect(v.sha).toBe('abc123')
+    expect(v.trigger).toBe('manual')
   })
 
   test('CmdDeploy trigger is enforced as enum', () => {

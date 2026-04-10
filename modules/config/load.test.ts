@@ -23,6 +23,7 @@ describe('loadConfig/writeConfig', () => {
         config_version: 3,
         poll_interval: '2m',
         modules: {},
+        sources: {},
         apps: {
           web: {
             repo: 'hexnickk/web',

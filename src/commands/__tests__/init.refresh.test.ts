@@ -4,7 +4,7 @@ import { getPaths } from '@jib/core'
 import { refreshExistingInstall } from '../init/refresh.ts'
 
 const paths = getPaths('/tmp/jib-init-refresh-test')
-const baseConfig = { config_version: 3, poll_interval: '5m', apps: {} } as Config
+const baseConfig = { config_version: 3, poll_interval: '5m', sources: {}, apps: {} } as Config
 
 describe('refreshExistingInstall', () => {
   test('restarts only active services when no unit refresh is requested', async () => {

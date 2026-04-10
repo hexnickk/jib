@@ -9,7 +9,9 @@ import {
 
 describe('guided add helpers', () => {
   test('single-service web app can collect a domain and app secret', () => {
-    const services = summarizeComposeServices([{ name: 'web', ports: ['8080:80'], expose: [] }])
+    const services = summarizeComposeServices([
+      { name: 'web', ports: ['8080:80'], expose: [], envRefs: [] },
+    ])
 
     const [service] = services
     expect(service).toBeDefined()

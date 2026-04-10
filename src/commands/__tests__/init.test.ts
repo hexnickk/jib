@@ -12,7 +12,7 @@ import type { ModLike } from '../init/registry.ts'
  */
 
 const ctx: ModuleContext<Config> = {
-  config: { config_version: 3, poll_interval: '5m', apps: {} } as Config,
+  config: { config_version: 3, poll_interval: '5m', sources: {}, apps: {} } as Config,
   logger: createLogger('init-test'),
   paths: getPaths('/tmp/jib-init-test'),
 }

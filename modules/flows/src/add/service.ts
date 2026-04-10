@@ -19,7 +19,7 @@ export class AddFlow {
       const { workdir } = await this.services.repo.prepare(params.appName, {
         repo: params.inputs.repo,
         branch: 'main',
-        ...(params.args['git-provider'] ? { provider: params.args['git-provider'] } : {}),
+        ...(params.args.source ? { source: params.args.source } : {}),
       })
       cleanup.preparedRepo = true
       this.services.onStateChange?.('repo_prepared')
