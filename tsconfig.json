@@ -27,7 +27,6 @@
     "main.ts",
     "libs/**/*.ts",
     "modules/**/*.ts",
-    "packages/**/*.ts",
     "src/**/*.ts",
     "tests/**/*.ts"
   ],
