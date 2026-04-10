@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { CliError } from '@jib/core'
-import type { AddFlowResult } from '@jib/flows'
-import { type RolledBackAddError, runAddSequence } from '../add-sequence.ts'
+import { type RolledBackAddError, runAddSequence } from './sequence.ts'
+import type { AddFlowResult } from './types.ts'
 
 const addResult: AddFlowResult = {
   finalApp: {
@@ -36,7 +36,7 @@ describe('runAddSequence', () => {
       async () => {
         calls.push('rollback')
       },
-      { interrupted: false, dispose() {} },
+      { interrupted: false },
     )
 
     expect(calls).toEqual(['add', 'deploy'])
@@ -58,7 +58,7 @@ describe('runAddSequence', () => {
         async () => {
           calls.push('rollback')
         },
-        { interrupted: false, dispose() {} },
+        { interrupted: false },
       ),
     ).rejects.toMatchObject({
       message: 'deploy failed',
@@ -89,10 +89,7 @@ describe('runAddSequence', () => {
         async () => {
           calls.push('rollback')
         },
-        {
-          interrupted: true,
-          dispose() {},
-        },
+        { interrupted: true },
       ),
     ).rejects.toMatchObject({
       message: 'add cancelled',
@@ -130,7 +127,6 @@ describe('runAddSequence', () => {
         get interrupted() {
           return interrupted
         },
-        dispose() {},
       },
     )
 

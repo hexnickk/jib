@@ -4,8 +4,8 @@ import { CliError, type Paths, isTextOutput } from '@jib/core'
 import { type AddFlowResult, DefaultRemoveSupport, RemoveService } from '@jib/flows'
 import { releaseIngress } from '@jib/ingress'
 import { consola } from 'consola'
-import { createIngressOperator } from '../ingress-operator.ts'
 import type { DeployRunResult } from './deploy-run.ts'
+import { createIngressOperator } from './ingress-operator.ts'
 
 export interface InterruptTrap {
   readonly interrupted: boolean
@@ -65,9 +65,7 @@ export function normalizeAddDeployError(error: unknown, app: string, configFile:
   return new CliError(
     error instanceof CliError && error.code === 'cancelled' ? 'cancelled' : 'add_failed',
     message,
-    {
-      hint,
-    },
+    { hint },
   )
 }
 
@@ -108,9 +106,4 @@ export function trapInterrupt(): InterruptTrap {
       return interrupted
     },
   }
-}
-
-export function throwIfInterrupted(interrupt: InterruptTrap): void {
-  if (!interrupt.interrupted) return
-  throw new CliError('cancelled', 'add cancelled')
 }

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { setCliRuntime } from '@jib/core'
 import type { Paths } from '@jib/core'
-import { runDeploy } from '../deploy-run.ts'
+import { runDeploy } from './deploy-run.ts'
 
 const cfg: Config = {
   config_version: 3,

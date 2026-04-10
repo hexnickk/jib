@@ -1,7 +1,17 @@
-import type { AddFlowResult } from '@jib/flows'
-import type { InterruptTrap } from './add-runtime.ts'
-import { throwIfInterrupted } from './add-runtime.ts'
-import type { DeployRunResult } from './deploy-run.ts'
+import { CliError } from '@jib/core'
+import type { AddFlowResult } from './types.ts'
+
+export interface InterruptState {
+  readonly interrupted: boolean
+}
+
+export interface DeploySequenceResult {
+  app: string
+  durationMs: number
+  preparedSha: string
+  sha: string
+  workdir: string
+}
 
 export class RolledBackAddError extends Error {
   constructor(readonly original: unknown) {
@@ -12,10 +22,10 @@ export class RolledBackAddError extends Error {
 
 export async function runAddSequence(
   add: () => Promise<AddFlowResult>,
-  deploy: (result: AddFlowResult) => Promise<DeployRunResult>,
+  deploy: (result: AddFlowResult) => Promise<DeploySequenceResult>,
   rollback: (result: AddFlowResult) => Promise<void>,
-  interrupt: InterruptTrap,
-): Promise<{ addResult: AddFlowResult; deployResult: DeployRunResult }> {
+  interrupt: InterruptState,
+): Promise<{ addResult: AddFlowResult; deployResult: DeploySequenceResult }> {
   let addResult: AddFlowResult | null = null
   try {
     addResult = await add()
@@ -27,4 +37,9 @@ export async function runAddSequence(
     await rollback(addResult)
     throw new RolledBackAddError(error)
   }
+}
+
+function throwIfInterrupted(interrupt: InterruptState): void {
+  if (!interrupt.interrupted) return
+  throw new CliError('cancelled', 'add cancelled')
 }
