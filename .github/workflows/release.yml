@@ -46,18 +46,11 @@ jobs:
         run: |
           mkdir -p dist
           bun build --compile apps/jib/main.ts --target=${{ matrix.target }} --outfile dist/jib-${{ matrix.target }}
-          bun build --compile apps/jib-daemon/main.ts --target=${{ matrix.target }} --outfile dist/jib-daemon-${{ matrix.target }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: jib-${{ matrix.target }}
           path: dist/jib-${{ matrix.target }}
-          if-no-files-found: error
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: jib-daemon-${{ matrix.target }}
-          path: dist/jib-daemon-${{ matrix.target }}
           if-no-files-found: error
 
   release:
@@ -78,4 +71,3 @@ jobs:
           generate_release_notes: true
           files: |
             dist/jib-*
-            dist/jib-daemon-*
