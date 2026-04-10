@@ -21,7 +21,6 @@ export async function runAddSequence(
     addResult = await add()
     throwIfInterrupted(interrupt)
     const deployResult = await deploy(addResult)
-    throwIfInterrupted(interrupt)
     return { addResult, deployResult }
   } catch (error) {
     if (!addResult) throw error

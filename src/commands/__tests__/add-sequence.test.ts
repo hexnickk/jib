@@ -102,4 +102,39 @@ describe('runAddSequence', () => {
 
     expect(calls).toEqual(['add', 'rollback'])
   })
+
+  test('does not roll back after a successful deploy even if interrupted late', async () => {
+    const calls: string[] = []
+    let interrupted = false
+
+    const result = await runAddSequence(
+      async () => {
+        calls.push('add')
+        return addResult
+      },
+      async () => {
+        calls.push('deploy')
+        interrupted = true
+        return {
+          app: 'blog',
+          durationMs: 42,
+          preparedSha: '1234567890',
+          sha: 'abcdef1234',
+          workdir: '/tmp/blog',
+        }
+      },
+      async () => {
+        calls.push('rollback')
+      },
+      {
+        get interrupted() {
+          return interrupted
+        },
+        dispose() {},
+      },
+    )
+
+    expect(calls).toEqual(['add', 'deploy'])
+    expect(result.deployResult.sha).toBe('abcdef1234')
+  })
 })
