@@ -1,8 +1,8 @@
 import { loadAppOrExit } from '@jib/config'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { applyCliArgs, withCliArgs } from '../cli-runtime.ts'
-import { createDeployEngine } from '../deploy-engine.ts'
+import { applyCliArgs, withCliArgs } from '../../../src/cli-runtime.ts'
+import { createDeployEngine } from '../../../src/deploy-engine.ts'
 
 export default defineCommand({
   meta: { name: 'up', description: 'Start existing containers without rebuilding' },

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { CliError, normalizeCliError } from '@jib/core'
-import { normalizeAddError } from '@jib/flows'
-import { normalizeAddDeployError } from '../../add-runtime.ts'
+import { normalizeAddError } from './index.ts'
+import { normalizeAddDeployError } from './runtime.ts'
 
 describe('add command error normalization', () => {
   test('unexpected add failures keep the retry-safe rollback hint', () => {

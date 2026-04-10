@@ -6,7 +6,7 @@ import {
   optionalModules,
   requiredModules,
   resolveModules,
-} from '../../module-registry.ts'
+} from '../../../../src/module-registry.ts'
 
 export type ModLike = FirstPartyModule
 

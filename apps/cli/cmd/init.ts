@@ -5,14 +5,18 @@ import { CliError, canPrompt, getPaths, isTextOutput } from '@jib/core'
 import { openDb } from '@jib/state'
 import { intro, log, note, outro } from '@jib/tui'
 import { defineCommand } from 'citty'
-import { applyCliArgs, missingInput, withCliArgs } from '../../cli-runtime.ts'
-import { migrations, runJibMigrations } from '../../migrations/index.ts'
-import type { MigrationContext } from '../../migrations/types.ts'
-import { configureOptionalModules } from './optional.ts'
-import { repairManagedTreePermissions } from './permissions.ts'
-import { reconcileOptionalModules } from './reconcile.ts'
-import { refreshExistingInstall } from './refresh.ts'
-import { describeModules, requiredModules, unseenOptionalModules } from './registry.ts'
+import { applyCliArgs, missingInput, withCliArgs } from '../../../src/cli-runtime.ts'
+import { migrations, runJibMigrations } from '../../../src/migrations/index.ts'
+import type { MigrationContext } from '../../../src/migrations/types.ts'
+import { configureOptionalModules } from '../modules/init/optional.ts'
+import { repairManagedTreePermissions } from '../modules/init/permissions.ts'
+import { reconcileOptionalModules } from '../modules/init/reconcile.ts'
+import { refreshExistingInstall } from '../modules/init/refresh.ts'
+import {
+  describeModules,
+  requiredModules,
+  unseenOptionalModules,
+} from '../modules/init/registry.ts'
 
 function ensureRoot(): void {
   if (process.getuid?.() === 0) return

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { makeDeps, makeParams } from './add-flow.shared.ts'
+import { makeDeps, makeParams } from './service.test-support.ts'
 
 describe('add flow rollback', () => {
   test('post-config failures roll back repo, secrets, and remove only the failed app', async () => {

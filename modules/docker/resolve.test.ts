@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { App } from '@jib/config'
-import { inspectComposeApp, resolveFromCompose } from '@jib/docker'
+import { inspectComposeApp, resolveFromCompose } from './resolve.ts'
 
 function fixture(yaml: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))

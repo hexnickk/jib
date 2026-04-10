@@ -1,14 +1,14 @@
 import { loadAppOrExit } from '@jib/config'
 import { type Paths, canPrompt, isTextOutput } from '@jib/core'
-import { DefaultRemoveSupport, RemoveService } from '@jib/flows'
 import { releaseIngress } from '@jib/ingress'
 import { promptConfirm, spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { applyCliArgs, missingInput, withCliArgs } from '../cli-runtime.ts'
-import { createIngressOperator } from '../ingress-operator.ts'
+import { applyCliArgs, missingInput, withCliArgs } from '../../../src/cli-runtime.ts'
+import { createIngressOperator } from '../../../src/ingress-operator.ts'
+import { DefaultRemoveSupport, RemoveService } from '../modules/remove/index.ts'
 
-/** `jib remove <app>` — prompt in the CLI, then delegate teardown to flows. */
+/** `jib remove <app>` — prompt in the CLI, then delegate teardown to the remove module. */
 
 export default defineCommand({
   meta: { name: 'remove', description: 'Remove an app completely' },

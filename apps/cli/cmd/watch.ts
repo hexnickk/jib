@@ -2,7 +2,7 @@ import { runPollCycle, runPoller } from '@jib-module/watcher'
 import { loadConfig } from '@jib/config'
 import { createLogger, getPaths } from '@jib/core'
 import { defineCommand } from 'citty'
-import { applyCliArgs, withCliArgs } from '../cli-runtime.ts'
+import { applyCliArgs, withCliArgs } from '../../../src/cli-runtime.ts'
 
 export default defineCommand({
   meta: { name: 'watch', description: 'Poll repos and auto-deploy changed apps' },

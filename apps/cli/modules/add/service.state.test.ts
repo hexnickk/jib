@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { finalApp, makeDeps, makeParams } from './add-flow.shared.ts'
+import { finalApp, makeDeps, makeParams } from './service.test-support.ts'
 
 describe('add flow state machine', () => {
   test('success visits each state in order', async () => {

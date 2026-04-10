@@ -9,7 +9,7 @@ PREFIX ?= /usr/local/bin
 build:
 	@mkdir -p dist
 	@tmp="$$(mktemp -d)" && \
-		bun build --compile apps/jib/main.ts --outfile "$$tmp/jib" && \
+		bun build --compile apps/cli/main.ts --outfile "$$tmp/jib" && \
 		install -m 0755 "$$tmp/jib" $(CLI_BIN) && \
 		rm -rf "$$tmp"
 
@@ -23,7 +23,7 @@ fmt:
 	bun x biome format --write .
 
 dev:
-	bun run apps/jib/main.ts
+	bun run apps/cli/main.ts
 
 install-all: build
 	sudo install -m 0755 $(CLI_BIN) $(PREFIX)/jib

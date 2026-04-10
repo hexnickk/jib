@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { parseExecArgs, parseRunArgs } from '@jib/docker'
+import { parseExecArgs, parseRunArgs } from './shell.ts'
 
 describe('parseExecArgs', () => {
   test('app + service + -- + cmd', () => {

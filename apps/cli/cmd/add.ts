@@ -1,6 +1,14 @@
 import { loadAppConfig } from '@jib/config'
 import type { App } from '@jib/config'
 import { CliError, type Paths, ValidationError, isTextOutput } from '@jib/core'
+import { claimIngress } from '@jib/ingress'
+import { preflightSourceSelection } from '@jib/sources'
+import { spinner } from '@jib/tui'
+import { defineCommand } from 'citty'
+import { consola } from 'consola'
+import { applyCliArgs, withCliArgs } from '../../../src/cli-runtime.ts'
+import { DEFAULT_TIMEOUT_MS, runDeploy } from '../../../src/deploy-run.ts'
+import { createIngressOperator } from '../../../src/ingress-operator.ts'
 import {
   AddService,
   DefaultAddSupport,
@@ -9,21 +17,13 @@ import {
   createAddPlanner,
   gatherAddInputs,
   runAddSequence,
-} from '@jib/flows'
-import { claimIngress } from '@jib/ingress'
-import { preflightSourceSelection } from '@jib/sources'
-import { spinner } from '@jib/tui'
-import { defineCommand } from 'citty'
-import { consola } from 'consola'
+} from '../modules/add/index.ts'
 import {
   normalizeAddDeployError,
   renderAddResult,
   rollbackAddedApp,
   trapInterrupt,
-} from '../add-runtime.ts'
-import { applyCliArgs, withCliArgs } from '../cli-runtime.ts'
-import { DEFAULT_TIMEOUT_MS, runDeploy } from '../deploy-run.ts'
-import { createIngressOperator } from '../ingress-operator.ts'
+} from '../modules/add/runtime.ts'
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 

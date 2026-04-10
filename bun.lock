@@ -14,7 +14,6 @@
         "@jib/core": "workspace:*",
         "@jib/deploy": "workspace:*",
         "@jib/docker": "workspace:*",
-        "@jib/flows": "workspace:*",
         "@jib/ingress": "workspace:*",
         "@jib/secrets": "workspace:*",
         "@jib/sources": "workspace:*",
@@ -78,17 +77,6 @@
         "yaml": "*",
       },
     },
-    "modules/flows": {
-      "name": "@jib/flows",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
-        "@jib/docker": "workspace:*",
-        "@jib/secrets": "workspace:*",
-        "@jib/sources": "workspace:*",
-      },
-    },
     "modules/ingress": {
       "name": "@jib/ingress",
       "version": "0.0.0",
@@ -129,6 +117,7 @@
         "@jib-module/github": "workspace:*",
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
+        "@jib/tui": "workspace:*",
       },
     },
     "modules/state": {
@@ -256,8 +245,6 @@
     "@jib/deploy": ["@jib/deploy@workspace:modules/deploy"],
 
     "@jib/docker": ["@jib/docker@workspace:modules/docker"],
-
-    "@jib/flows": ["@jib/flows@workspace:modules/flows"],
 
     "@jib/ingress": ["@jib/ingress@workspace:modules/ingress"],
 

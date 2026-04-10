@@ -2,8 +2,8 @@ import { loadAppOrExit } from '@jib/config'
 import { isTextOutput } from '@jib/core'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { applyCliArgs, withCliArgs } from '../cli-runtime.ts'
-import { DEFAULT_TIMEOUT_MS, runDeploy } from '../deploy-run.ts'
+import { applyCliArgs, withCliArgs } from '../../../src/cli-runtime.ts'
+import { DEFAULT_TIMEOUT_MS, runDeploy } from '../../../src/deploy-run.ts'
 
 /**
  * `jib deploy <app>` — prepare the repo locally through the shared sources

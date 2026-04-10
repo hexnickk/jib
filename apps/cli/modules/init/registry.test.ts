@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { moduleSubCommands } from '../../module-registry.ts'
 import {
   ALL_MODULES,
   installedOptionalModules,
@@ -45,10 +44,6 @@ describe('module registry', () => {
   test('resolveModules ignores unknown names', () => {
     const mods = resolveModules(['nginx', 'nonexistent'])
     expect(mods.map((m) => m.manifest.name)).toEqual(['nginx'])
-  })
-
-  test('module CLI commands are derived from the shared registry', () => {
-    expect(Object.keys(moduleSubCommands())).toEqual(['cloudflared', 'github'])
   })
 
   test('installedOptionalModules returns modules with true', () => {

@@ -1,18 +1,18 @@
 import { loadAppOrExit } from '@jib/config'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { applyCliArgs, withCliArgs } from '../cli-runtime.ts'
-import { createDeployEngine } from '../deploy-engine.ts'
+import { applyCliArgs, withCliArgs } from '../../../src/cli-runtime.ts'
+import { createDeployEngine } from '../../../src/deploy-engine.ts'
 
 export default defineCommand({
-  meta: { name: 'down', description: 'Stop containers without removing app from config' },
+  meta: { name: 'restart', description: 'Restart containers without redeploying' },
   args: withCliArgs({ app: { type: 'positional', required: true } }),
   async run({ args }) {
     try {
       applyCliArgs(args)
       const { cfg, paths } = await loadAppOrExit(args.app)
-      await createDeployEngine(cfg, paths, 'down').down(args.app)
-      consola.success(`stopped ${args.app}`)
+      await createDeployEngine(cfg, paths, 'restart').restart(args.app)
+      consola.success(`restarted ${args.app}`)
     } catch (err) {
       consola.error(err instanceof Error ? err.message : String(err))
       consola.info('check running containers: docker ps --filter label=com.docker.compose.project')

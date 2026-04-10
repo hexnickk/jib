@@ -23,7 +23,7 @@ async function withTmpRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
 }
 
 async function runCli(root: string, args: string[]) {
-  return runEntry(root, 'apps/jib/main.ts', args)
+  return runEntry(root, 'apps/cli/main.ts', args)
 }
 
 async function runEntry(root: string, entrypoint: string, args: string[]) {

@@ -7,7 +7,7 @@ import {
   type AddPlanner,
   AddService,
   type AddSupport,
-} from '@jib/flows'
+} from './index.ts'
 
 const baseCfg: Config = {
   config_version: 3,
