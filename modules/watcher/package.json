@@ -11,9 +11,10 @@
     "module": true
   },
   "dependencies": {
-    "@jib/deploy": "workspace:*",
     "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",
-    "@jib/sources": "workspace:*"
+    "@jib/deploy": "workspace:*",
+    "@jib/sources": "workspace:*",
+    "@jib/state": "workspace:*"
   }
 }

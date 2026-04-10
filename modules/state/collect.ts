@@ -1,6 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs'
 import type { Config } from '@jib/config'
-import { type Paths, credsPath } from '@jib/core'
+import type { Paths } from '@jib/core'
 import { type SourceStatus, collectSourceStatuses } from '@jib/sources'
 import { $ } from 'bun'
 import { Store } from './store.ts'
@@ -26,11 +25,15 @@ export interface AppStatus {
   domains: { host: string; port?: number | undefined }[]
 }
 
-const JIB_SERVICES = ['jib-watcher']
+const WATCHER_SERVICE = 'jib-watcher'
+const CLOUDFLARED_SERVICE = 'jib-cloudflared'
 
-export async function collectServices(hasTunnel: boolean): Promise<ServiceStatus[]> {
-  const names = hasTunnel ? [...JIB_SERVICES, 'jib-cloudflared'] : JIB_SERVICES
-  return Promise.all(names.map(checkUnit))
+export function managedServiceNames(hasCloudflared: boolean): string[] {
+  return hasCloudflared ? [WATCHER_SERVICE, CLOUDFLARED_SERVICE] : [WATCHER_SERVICE]
+}
+
+export async function collectServices(hasCloudflared: boolean): Promise<ServiceStatus[]> {
+  return Promise.all(managedServiceNames(hasCloudflared).map(checkUnit))
 }
 
 async function checkUnit(name: string): Promise<ServiceStatus> {
@@ -78,9 +81,4 @@ async function collectContainers(app: string): Promise<ContainerStatus[]> {
   } catch {
     return []
   }
-}
-
-export function hasTunnelToken(paths: Paths): boolean {
-  const tokenPath = credsPath(paths, 'cloudflare', 'tunnel.env')
-  return existsSync(tokenPath) && readFileSync(tokenPath, 'utf8').trim().length > 0
 }

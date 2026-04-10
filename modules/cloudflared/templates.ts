@@ -12,7 +12,7 @@ export interface CloudflaredTemplateVars {
 export function composeYaml(vars: CloudflaredTemplateVars): string {
   return `# Managed by jib (modules/cloudflared) — do not edit.
 # The tunnel token is passed as an environment variable via env_file (never
-# as a volume mount). \`jib cloudflare setup\` writes the env file.
+# as a volume mount). \`jib cloudflared setup\` writes the env file.
 name: jib-cloudflared
 
 services:

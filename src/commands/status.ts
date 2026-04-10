@@ -7,7 +7,6 @@ import {
   collectApps,
   collectServices,
   collectSources,
-  hasTunnelToken,
 } from '@jib/state'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
@@ -70,10 +69,10 @@ export default defineCommand({
   meta: { name: 'status', description: 'Show server status: services, sources, apps' },
   async run() {
     const { cfg, paths } = await loadAppConfig()
-    const tunnel = hasTunnelToken(paths)
+    const hasCloudflared = cfg.modules?.cloudflared === true
 
     const [services, sources, apps] = await Promise.all([
-      collectServices(tunnel),
+      collectServices(hasCloudflared),
       collectSources(cfg, paths),
       collectApps(cfg, paths),
     ])

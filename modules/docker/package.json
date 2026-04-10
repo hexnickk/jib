@@ -10,6 +10,7 @@
   "dependencies": {
     "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",
+    "consola": "*",
     "yaml": "*"
   }
 }

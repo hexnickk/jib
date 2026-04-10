@@ -7,7 +7,7 @@ import { UNIT_PATH, composeYaml, systemdUnit } from './templates.ts'
  * Writes the compose file + systemd unit under `$JIB_ROOT/cloudflared/` but
  * does NOT enable or start the service. cloudflared requires a tunnel token
  * to run; the service is enabled+started only after the user provides a
- * token via `jib init` (tunnel mode) or `jib cloudflare set-token`.
+ * token via `jib init` (tunnel mode) or `jib cloudflared setup`.
  */
 export const install: InstallFn = async (ctx) => {
   const log = ctx.logger
@@ -28,6 +28,6 @@ export const install: InstallFn = async (ctx) => {
   log.info('systemctl daemon-reload')
   await Bun.$`sudo systemctl daemon-reload`.quiet()
   // NOT enabled — cloudflared can't run without a tunnel token. The token
-  // is stored by `jib init` or `jib cloudflare set-token`, which also
+  // is stored by `jib init` or `jib cloudflared setup`, which also
   // enables + starts the service.
 }

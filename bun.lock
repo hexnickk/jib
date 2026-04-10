@@ -37,7 +37,11 @@
       "name": "@jib-module/cloudflared",
       "version": "0.0.0",
       "dependencies": {
+        "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
+        "@jib/tui": "workspace:*",
+        "citty": "*",
+        "consola": "*",
       },
     },
     "modules/config": {
@@ -50,6 +54,9 @@
     "modules/core": {
       "name": "@jib/core",
       "version": "0.0.0",
+      "dependencies": {
+        "consola": "*",
+      },
     },
     "modules/deploy": {
       "name": "@jib/deploy",
@@ -67,6 +74,7 @@
       "dependencies": {
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
+        "consola": "*",
         "yaml": "*",
       },
     },
@@ -136,6 +144,7 @@
       "name": "@jib/tui",
       "version": "0.0.0",
       "dependencies": {
+        "@clack/prompts": "*",
         "@jib/core": "workspace:*",
       },
     },
@@ -147,6 +156,7 @@
         "@jib/core": "workspace:*",
         "@jib/deploy": "workspace:*",
         "@jib/sources": "workspace:*",
+        "@jib/state": "workspace:*",
       },
     },
   },
