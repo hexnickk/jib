@@ -117,22 +117,54 @@ describe('source recovery', () => {
   test('preflightSourceSelection retries probe after choosing a new source', async () => {
     const loads: string[] = []
     const probed: string[] = []
-    const result = await preflightSourceSelection('demo', cfg, paths, 'acme/private', undefined, {
-      isInteractive: () => true,
-      promptSelect: async () => 'existing:keyy',
-      probe: async (_cfg, _paths, target) => {
-        probed.push(target.source ?? 'none')
-        if (!target.source) throw new Error('git clone: Repository not found')
-        return { workdir: '/tmp/demo', sha: 'abc123abc123abc123abc123abc123abc123abc1' }
+    const result = await preflightSourceSelection(
+      'demo',
+      cfg,
+      paths,
+      'acme/private',
+      undefined,
+      undefined,
+      {
+        isInteractive: () => true,
+        promptSelect: async () => 'existing:keyy',
+        probe: async (_cfg, _paths, target) => {
+          probed.push(target.source ?? 'none')
+          if (!target.source) throw new Error('git clone: Repository not found')
+          return {
+            branch: 'main',
+            workdir: '/tmp/demo',
+            sha: 'abc123abc123abc123abc123abc123abc123abc1',
+          }
+        },
+        loadConfig: async (configFile) => {
+          loads.push(configFile)
+          return cfg
+        },
       },
-      loadConfig: async (configFile) => {
-        loads.push(configFile)
-        return cfg
-      },
-    })
+    )
 
-    expect(result).toEqual({ cfg, source: 'keyy' })
+    expect(result).toEqual({ cfg, source: 'keyy', branch: 'main' })
     expect(loads).toEqual([paths.configFile])
     expect(probed).toEqual(['none', 'keyy'])
+  })
+
+  test('preflightSourceSelection returns the detected branch', async () => {
+    const result = await preflightSourceSelection(
+      'demo',
+      cfg,
+      paths,
+      '/tmp/demo.git',
+      undefined,
+      undefined,
+      {
+        probe: async () => ({
+          branch: 'master',
+          workdir: '/tmp/demo',
+          sha: 'abc123abc123abc123abc123abc123abc123abc1',
+        }),
+      },
+    )
+
+    expect(result).toEqual({ cfg, branch: 'master' })
   })
 })

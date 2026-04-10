@@ -85,20 +85,22 @@ export async function preflightSourceSelection(
   paths: Paths,
   repo: string,
   currentSource?: string,
+  currentBranch?: string,
   deps: SourceRecoveryDeps = {},
-): Promise<{ cfg: Config; source?: string }> {
+): Promise<{ cfg: Config; source?: string; branch: string }> {
   let resolvedCfg = cfg
   let source = currentSource
   const probeSource = deps.probe ?? probe
   for (;;) {
     try {
-      await probeSource(resolvedCfg, paths, {
+      const probed = await probeSource(resolvedCfg, paths, {
         app: appName,
         repo,
-        branch: 'main',
+        ...(currentBranch ? { branch: currentBranch } : {}),
         ...(source ? { source } : {}),
       })
-      return source ? { cfg: resolvedCfg, source } : { cfg: resolvedCfg }
+      const branch = probed?.branch ?? currentBranch ?? 'main'
+      return source ? { cfg: resolvedCfg, source, branch } : { cfg: resolvedCfg, branch }
     } catch (error) {
       const nextSource = await maybeRecoverSource(resolvedCfg, paths, repo, error, source, deps)
       if (!nextSource) throw error

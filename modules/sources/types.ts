@@ -19,6 +19,7 @@ export interface InspectionCheckout {
 }
 
 export interface SourceProbe {
+  branch: string
   workdir: string
   sha: string
 }

@@ -99,7 +99,7 @@ async function buildResolvedApp(
   cfg: Config,
   appName: string,
   workdir: string,
-  args: { source?: string },
+  args: { source?: string; branch?: string },
   inputs: AddInputs,
   inspection: ComposeInspection,
   guided: { domains: ParsedDomain[] },
@@ -108,7 +108,7 @@ async function buildResolvedApp(
   return resolveFromCompose(
     parseApp({
       repo: inputs.repo,
-      branch: 'main',
+      branch: args.branch ?? 'main',
       domains,
       env_file: '.env',
       services: inspection.services.map((service) => service.name),

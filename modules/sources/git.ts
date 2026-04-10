@@ -50,9 +50,9 @@ export async function currentSHA(dir: string): Promise<string> {
   return res.stdout.toString().trim()
 }
 
-export async function remoteSHA(dir: string, branch: string): Promise<string> {
-  const res = await runIn(dir, ['rev-parse', `origin/${branch}`])
-  check(res, `git rev-parse origin/${branch}`)
+export async function fetchedSHA(dir: string): Promise<string> {
+  const res = await runIn(dir, ['rev-parse', 'FETCH_HEAD'])
+  check(res, 'git rev-parse FETCH_HEAD')
   return res.stdout.toString().trim()
 }
 
@@ -61,6 +61,16 @@ export async function lsRemote(url: string, ref = 'HEAD', env: GitEnv = {}): Pro
   check(res, 'git ls-remote')
   const first = res.stdout.toString().trim().split('\n')[0] ?? ''
   return (first.split('\t')[0] ?? '').trim()
+}
+
+export async function defaultBranch(url: string, env: GitEnv = {}): Promise<string | undefined> {
+  const res = await run(['ls-remote', '--symref', url, 'HEAD'], env)
+  check(res, 'git ls-remote --symref')
+  for (const line of res.stdout.toString().split('\n')) {
+    const match = /^ref:\s+refs\/heads\/([^\t]+)\tHEAD$/.exec(line.trim())
+    if (match?.[1]) return match[1]
+  }
+  return undefined
 }
 
 export async function isRepo(dir: string): Promise<boolean> {

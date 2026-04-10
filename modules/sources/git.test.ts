@@ -26,7 +26,7 @@ describe('sources git (smoke)', () => {
     expect(sha).toMatch(/^[0-9a-f]{40}$/)
   })
 
-  test('fetch + remoteSHA + checkout detects new commits', async () => {
+  test('fetch + fetchedSHA + checkout detects new commits', async () => {
     const upstream = await makeUpstream()
     const work = await mkdtemp(join(tmpdir(), 'jib-clone2-'))
     const repo = join(work, 'repo')
@@ -37,9 +37,26 @@ describe('sources git (smoke)', () => {
     await $`git -C ${upstream} commit -m second`.quiet()
 
     await git.fetch(repo, 'main')
-    const remote = await git.remoteSHA(repo, 'main')
-    await git.checkout(repo, remote)
-    expect(await git.currentSHA(repo)).toBe(remote)
+    const fetched = await git.fetchedSHA(repo)
+    await git.checkout(repo, fetched)
+    expect(await git.currentSHA(repo)).toBe(fetched)
+  })
+
+  test('fetch + fetchedSHA resolves tags', async () => {
+    const upstream = await makeUpstream()
+    const work = await mkdtemp(join(tmpdir(), 'jib-clone3-'))
+    const repo = join(work, 'repo')
+    await git.clone(upstream, repo, { branch: 'main' })
+
+    await writeFile(join(upstream, 'RELEASE'), 'v2\n')
+    await $`git -C ${upstream} add RELEASE`.quiet()
+    await $`git -C ${upstream} commit -m release`.quiet()
+    await $`git -C ${upstream} tag v2`.quiet()
+
+    await git.fetch(repo, 'v2')
+    const fetched = await git.fetchedSHA(repo)
+    await git.checkout(repo, fetched)
+    expect(await git.currentSHA(repo)).toBe(fetched)
   })
 
   test('configureSSHKey builds a GIT_SSH_COMMAND', () => {

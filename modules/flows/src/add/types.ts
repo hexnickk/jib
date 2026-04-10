@@ -32,7 +32,7 @@ export type AddFlowState =
 
 export interface AddFlowParams {
   appName: string
-  args: { source?: string }
+  args: { source?: string; branch?: string }
   cfg: Config
   configFile: string
   inputs: AddInputs
@@ -48,7 +48,7 @@ export interface AddPlanner {
     cfg: Config,
     appName: string,
     workdir: string,
-    args: { source?: string },
+    args: { source?: string; branch?: string },
     inputs: AddInputs,
     inspection: ComposeInspection,
     guided: GuidedInputs,

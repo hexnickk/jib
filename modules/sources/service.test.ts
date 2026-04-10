@@ -18,6 +18,17 @@ async function makeUpstream(name: string): Promise<string> {
   return dir
 }
 
+async function makeUpstreamOnBranch(name: string, branch: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), `${name}-`))
+  await $`git init -b ${branch} ${dir}`.quiet()
+  await $`git -C ${dir} config user.email test@jib.local`.quiet()
+  await $`git -C ${dir} config user.name test`.quiet()
+  await writeFile(join(dir, 'README'), `${name}\n`)
+  await $`git -C ${dir} add README`.quiet()
+  await $`git -C ${dir} commit -m initial`.quiet()
+  return dir
+}
+
 function configFor(repo: string): Config {
   return {
     config_version: 3,
@@ -60,5 +71,38 @@ describe('sources service', () => {
 
     await removeCheckout(paths, 'demo', upstream)
     expect(await pathExists(workdir)).toBe(false)
+  })
+
+  test('probe and syncApp follow the remote default branch for a new app', async () => {
+    const upstream = await makeUpstreamOnBranch('jib-master', 'master')
+    const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+    const paths = getPaths(root)
+    const cfg: Config = {
+      config_version: 3,
+      poll_interval: '5m',
+      modules: {},
+      sources: {},
+      apps: {},
+    }
+
+    const probed = await probe(cfg, paths, { app: 'demo', repo: upstream })
+    const prepared = await syncApp(cfg, paths, { app: 'demo', repo: upstream })
+
+    expect(probed?.branch).toBe('master')
+    expect(prepared.sha).toMatch(/^[0-9a-f]{40}$/)
+  })
+
+  test('syncApp accepts a tag ref', async () => {
+    const upstream = await makeUpstream('jib-tag')
+    await writeFile(join(upstream, 'RELEASE'), 'v2\n')
+    await $`git -C ${upstream} add RELEASE`.quiet()
+    await $`git -C ${upstream} commit -m release`.quiet()
+    await $`git -C ${upstream} tag v2`.quiet()
+
+    const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+    const paths = getPaths(root)
+    const prepared = await syncApp(configFor(upstream), paths, { app: 'demo' }, 'v2')
+
+    expect(prepared.sha).toMatch(/^[0-9a-f]{40}$/)
   })
 })

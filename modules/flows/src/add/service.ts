@@ -29,7 +29,7 @@ export class AddService {
     try {
       const { workdir } = await this.support.cloneForInspection(params.cfg, params.appName, {
         repo: params.inputs.repo,
-        branch: 'main',
+        branch: params.draftApp.branch,
         ...(params.args.source ? { source: params.args.source } : {}),
       })
       cleanup.preparedRepo = true

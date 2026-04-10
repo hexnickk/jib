@@ -50,10 +50,10 @@ export async function gatherAddInputs(args: {
   }
 }
 
-export function buildDraftApp(args: { source?: string }, inputs: AddInputs): App {
+export function buildDraftApp(args: { source?: string; branch?: string }, inputs: AddInputs): App {
   return parseApp({
     repo: inputs.repo,
-    branch: 'main',
+    branch: args.branch ?? 'main',
     domains: [],
     env_file: '.env',
     ...(args.source ? { source: args.source } : {}),

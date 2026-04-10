@@ -31,16 +31,21 @@ export async function resolve(
   target: SourceTarget,
   ref?: string,
 ): Promise<ResolvedSource> {
+  const existing = cfg.apps[target.app]
   const app = resolveApp(cfg, target)
   if (app.repo === 'local') {
     throw new Error(`app "${target.app}" uses a local repo and has no remote source`)
   }
   const workdir = repoPath(paths, target.app, app.repo)
-  const branch = target.branch ?? app.branch
   const driver = resolveSourceDriver(cfg, app)
   const remote = await driver.resolve(cfg, app, paths)
+  const branch =
+    target.branch ??
+    existing?.branch ??
+    (await git.defaultBranch(remote.url, remote.env)) ??
+    app.branch
   return {
-    app,
+    app: app.branch === branch ? app : { ...app, branch },
     branch,
     ref: ref ?? branch,
     workdir,
@@ -68,7 +73,7 @@ export async function syncApp(
   await ensureCheckout(source.workdir, source.url, source.branch, source.env)
   await source.applyAuth(source.workdir)
   await git.fetch(source.workdir, source.ref, source.env)
-  const sha = await git.remoteSHA(source.workdir, source.ref)
+  const sha = await git.fetchedSHA(source.workdir)
   await git.checkout(source.workdir, sha)
   return { workdir: source.workdir, sha }
 }
@@ -93,7 +98,7 @@ export async function probe(
   const source = await resolve(cfg, paths, target)
   const lsRemote = deps.lsRemote ?? git.lsRemote
   const sha = await lsRemote(source.url, source.ref, source.env)
-  return sha ? { workdir: source.workdir, sha } : null
+  return sha ? { branch: source.branch, workdir: source.workdir, sha } : null
 }
 
 export async function removeCheckout(paths: Paths, app: string, repo: string): Promise<void> {

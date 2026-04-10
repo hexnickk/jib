@@ -24,6 +24,7 @@ export default defineCommand({
       description: 'Git repo: "owner/name", "local", file:// URL, http(s):// URL, or absolute path',
     },
     source: { type: 'string', description: 'Configured source ref name' },
+    branch: { type: 'string', description: 'Git branch to track (defaults to the repo default)' },
     ingress: {
       type: 'string',
       default: 'direct',
@@ -51,8 +52,18 @@ export default defineCommand({
 
     const inputs = await gatherAddInputs(args)
     const planner = createAddPlanner()
-    const preflight = await preflightSourceSelection(args.app, cfg, paths, inputs.repo, args.source)
-    const flowArgs: { source?: string } = preflight.source ? { source: preflight.source } : {}
+    const preflight = await preflightSourceSelection(
+      args.app,
+      cfg,
+      paths,
+      inputs.repo,
+      args.source,
+      args.branch,
+    )
+    const flowArgs: { source?: string; branch?: string } = {
+      branch: preflight.branch,
+      ...(preflight.source ? { source: preflight.source } : {}),
+    }
     const addService = new AddService(
       new DefaultAddSupport({
         paths,
