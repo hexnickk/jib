@@ -22,7 +22,6 @@ describe('getPaths', () => {
     expect(p.reposDir).toBe('/opt/jib/repos')
     expect(p.repoRoot).toBe('/opt/jib/src')
     expect(p.nginxDir).toBe('/opt/jib/nginx')
-    expect(p.busDir).toBe('/opt/jib/bus')
     expect(p.cloudflaredDir).toBe('/opt/jib/cloudflared')
   })
 

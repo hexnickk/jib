@@ -28,7 +28,7 @@ export function appPemPath(paths: Paths, sourceName: string): string {
  * are stateless (return the key path); GitHub App sources mint a new
  * installation token on every call since they're short-lived (~1 hour).
  *
- * Called by `modules/gitsitter` before every `fetch`/`clone` — it's the only
+ * Called by the watcher/source sync flows before every `fetch`/`clone` — it's the only
  * consumer of this module's network code.
  */
 export async function refreshAuth(

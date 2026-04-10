@@ -17,10 +17,7 @@ describe('refreshExistingInstall', () => {
       {
         collectServices: async (hasTunnel) => {
           calls.push(`collect:${hasTunnel}`)
-          return [
-            { name: 'jib-gitsitter', active: true, status: 'active' },
-            { name: 'jib-nginx', active: false, status: 'inactive' },
-          ]
+          return [{ name: 'jib-watcher', active: true, status: 'active' }]
         },
         reinstallModules: async () => {
           calls.push('reinstall')
@@ -32,7 +29,7 @@ describe('refreshExistingInstall', () => {
     )
 
     expect(restarted).toBe(1)
-    expect(calls).toEqual(['collect:false', 'restart:jib-gitsitter'])
+    expect(calls).toEqual(['collect:false', 'restart:jib-watcher'])
   })
 
   test('reinstalls enabled modules before restarting managed services', async () => {
@@ -64,7 +61,7 @@ describe('refreshExistingInstall', () => {
 
     expect(restarted).toBe(1)
     expect(calls).toEqual([
-      'reinstall:nats,deployer,gitsitter,nginx,cloudflared,github',
+      'reinstall:watcher,nginx,cloudflared,github',
       'collect:true',
       'restart:jib-cloudflared',
     ])

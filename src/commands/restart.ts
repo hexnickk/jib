@@ -1,22 +1,21 @@
-import { SUBJECTS, emitLifecycle } from '@jib/rpc'
+import { loadAppOrExit } from '@jib/config'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { createDeployEngine } from '../deploy-engine.ts'
+import { applyCliArgs, withCliArgs } from './_cli.ts'
 
 export default defineCommand({
   meta: { name: 'restart', description: 'Restart containers without redeploying' },
-  args: { app: { type: 'positional', required: true } },
+  args: withCliArgs({ app: { type: 'positional', required: true } }),
   async run({ args }) {
     try {
-      await emitLifecycle(
-        args.app,
-        SUBJECTS.cmd.appRestart,
-        SUBJECTS.evt.appRestartSuccess,
-        SUBJECTS.evt.appRestartFailure,
-      )
+      applyCliArgs(args)
+      const { cfg, paths } = await loadAppOrExit(args.app)
+      await createDeployEngine(cfg, paths, 'restart').restart(args.app)
       consola.success(`restarted ${args.app}`)
     } catch (err) {
       consola.error(err instanceof Error ? err.message : String(err))
-      consola.info('check logs: journalctl -u jib-deployer --since "5m ago"')
+      consola.info('check running containers: docker ps --filter label=com.docker.compose.project')
       process.exit(1)
     }
   },

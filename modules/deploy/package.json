@@ -1,5 +1,5 @@
 {
-  "name": "@jib/bus",
+  "name": "@jib/deploy",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,9 @@
     ".": "./index.ts"
   },
   "dependencies": {
+    "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",
-    "nats": "*"
+    "@jib/docker": "workspace:*",
+    "@jib/state": "workspace:*"
   }
 }

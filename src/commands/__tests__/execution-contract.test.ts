@@ -26,10 +26,6 @@ async function runCli(root: string, args: string[]) {
   return runEntry(root, 'apps/jib/main.ts', args)
 }
 
-async function runDaemon(root: string, args: string[]) {
-  return runEntry(root, 'apps/jib-daemon/main.ts', args)
-}
-
 async function runEntry(root: string, entrypoint: string, args: string[]) {
   const proc = Bun.spawn([process.execPath, 'run', join(process.cwd(), entrypoint), ...args], {
     cwd: process.cwd(),
@@ -60,28 +56,6 @@ describe('execution contract', () => {
       expect(parsed.error.issues).toEqual([
         { field: 'repo', message: 'provide --repo or rerun with interactive prompts enabled' },
       ])
-    })
-  })
-
-  test('service list returns structured JSON success', async () => {
-    await withTmpRoot(async (root) => {
-      const result = await runCli(root, ['--output=json', 'service', 'list'])
-      expect(result.exitCode).toBe(0)
-      expect(result.stderr).toBe('')
-      const parsed = JSON.parse(result.stdout)
-      expect(parsed.ok).toBe(true)
-      expect(parsed.data.services).toEqual(['deployer', 'gitsitter', 'nginx'])
-    })
-  })
-
-  test('daemon list returns structured JSON success', async () => {
-    await withTmpRoot(async (root) => {
-      const result = await runDaemon(root, ['--output=json', 'list'])
-      expect(result.exitCode).toBe(0)
-      expect(result.stderr).toBe('')
-      const parsed = JSON.parse(result.stdout)
-      expect(parsed.ok).toBe(true)
-      expect(parsed.data.services).toEqual(['deployer', 'gitsitter', 'nginx'])
     })
   })
 
@@ -119,7 +93,7 @@ describe('execution contract', () => {
 
   test('invalid root runtime flag is normalized instead of crashing', async () => {
     await withTmpRoot(async (root) => {
-      const result = await runCli(root, ['--output=xml', 'service', 'list'])
+      const result = await runCli(root, ['--output=xml', 'status'])
       expect(result.exitCode).toBe(1)
       expect(result.stdout).toBe('')
       expect(result.stderr).toContain('invalid --output value "xml"')

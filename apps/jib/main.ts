@@ -12,10 +12,10 @@ import {
   restartCmd,
   runCmd,
   secretsCmd,
-  serviceCmd,
   sourcesCmd,
   statusCmd,
   upCmd,
+  watchCmd,
 } from '../../src/commands/index.ts'
 import { moduleSubCommands as getModuleSubCommands } from '../../src/module-registry.ts'
 
@@ -35,8 +35,8 @@ await runCommandApp({
     exec: execCmd,
     run: runCmd,
     secrets: secretsCmd,
-    service: serviceCmd,
     status: statusCmd,
+    watch: watchCmd,
     sources: sourcesCmd,
     ...getModuleSubCommands(),
   },

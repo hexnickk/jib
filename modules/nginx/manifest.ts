@@ -1,8 +1,8 @@
 import type { ModuleManifest } from '@jib/core'
 
 /**
- * Nginx reverse-proxy module. A long-running bus operator that wraps the
- * ingress-owned nginx adapter and applies claims/releases on the host.
+ * Nginx reverse-proxy module. Installs nginx and the jib include snippet so
+ * CLI flows can apply ingress claims directly on the host.
  */
 const manifest: ModuleManifest = {
   name: 'nginx',

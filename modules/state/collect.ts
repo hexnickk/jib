@@ -26,7 +26,7 @@ export interface AppStatus {
   domains: { host: string; port?: number | undefined }[]
 }
 
-const JIB_SERVICES = ['jib-bus', 'jib-deployer', 'jib-gitsitter', 'jib-nginx']
+const JIB_SERVICES = ['jib-watcher']
 
 export async function collectServices(hasTunnel: boolean): Promise<ServiceStatus[]> {
   const names = hasTunnel ? [...JIB_SERVICES, 'jib-cloudflared'] : JIB_SERVICES

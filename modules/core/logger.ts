@@ -11,7 +11,7 @@ export const rootLogger: ConsolaInstance = consola
 /**
  * Returns a child logger prefixed with `[tag]`. By default only shows
  * warnings and errors — step-by-step detail (writing files, systemctl
- * calls, nats connect) is hidden. Set `JIB_DEBUG=1` to see everything.
+ * calls, docker invocations) is hidden. Set `JIB_DEBUG=1` to see everything.
  */
 export function createLogger(tag: string): ConsolaInstance {
   const child = consola.withTag(tag)

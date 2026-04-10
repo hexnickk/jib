@@ -10,9 +10,8 @@ export interface ModuleManifest {
 
 export type InstallFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>
 export type SetupFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>
-export type StartFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>
 
-/** Contract implemented by modules that provide git credentials to gitsitter. */
+/** Contract implemented by modules that provide live git credentials. */
 export interface GitAuthProvider<C = unknown> {
   name: string
   credentialsFor: (
@@ -23,14 +22,13 @@ export interface GitAuthProvider<C = unknown> {
 
 /**
  * Shape a module file tree conforms to once resolved by the loader.
- * Each field mirrors a convention file (`install.ts`, `start.ts`, ...).
+ * Each field mirrors a convention file (`install.ts`, `manifest.ts`, ...).
  */
 export interface Module<C = unknown> {
   manifest: ModuleManifest
   install?: InstallFn<C>
   uninstall?: InstallFn<C>
   setup?: SetupFn<C>
-  start?: StartFn<C>
   cli?: readonly CommandDef[]
   gitAuthProvider?: GitAuthProvider<C>
 }

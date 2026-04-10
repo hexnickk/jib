@@ -19,8 +19,9 @@ export function httpsCloneURL(repo: string, token?: string): string {
 /**
  * Rewrites a repo's `origin` remote URL in place so subsequent git operations
  * use the supplied installation token. Only touches git config — pure
- * shell-out. Lives in `modules/source-github` (not gitsitter) because the URL shape
- * is GitHub-specific; gitsitter imports it and applies it to a workdir.
+ * shell-out. Lives in `modules/source-github` because the URL shape is
+ * GitHub-specific; watcher/source sync code imports it and applies it to
+ * a workdir.
  */
 export async function setRemoteToken(repoDir: string, repo: string, token: string): Promise<void> {
   const url = httpsCloneURL(repo, token)

@@ -9,8 +9,6 @@ import {
   optionalModules,
   requiredModules,
   resolveModules,
-  resolveRunnableModule,
-  runnableModuleNames,
 } from './module-registry.ts'
 
 function fakeModule(
@@ -20,7 +18,7 @@ function fakeModule(
 }
 
 describe('module registry projections', () => {
-  test('one registry can power cli, service, and init capability views', () => {
+  test('one registry can power cli and init capability views', () => {
     const cliOnly = fakeModule({
       manifest: { name: 'cli-only' },
       cli: [
@@ -29,31 +27,27 @@ describe('module registry projections', () => {
         }),
       ],
     })
-    const serviceOnly = fakeModule({
-      manifest: { name: 'service-only', required: true },
-      start: async (_ctx: ModuleContext<Config>) => undefined,
+    const requiredOnly = fakeModule({
+      manifest: { name: 'required-only', required: true },
+      install: async (_ctx: ModuleContext<Config>) => undefined,
     })
     const setupModule = fakeModule({
       manifest: { name: 'setup-module' },
       install: async (_ctx: ModuleContext<Config>) => undefined,
       setup: async (_ctx: ModuleContext<Config>) => undefined,
     })
-    const registry = [cliOnly, serviceOnly, setupModule] as const
+    const registry = [cliOnly, requiredOnly, setupModule] as const
 
-    expect(requiredModules(registry).map((mod) => mod.manifest.name)).toEqual(['service-only'])
+    expect(requiredModules(registry).map((mod) => mod.manifest.name)).toEqual(['required-only'])
     expect(optionalModules(registry).map((mod) => mod.manifest.name)).toEqual([
       'cli-only',
       'setup-module',
     ])
     expect(modulesWithCli(registry).map((mod) => mod.manifest.name)).toEqual(['cli-only'])
     expect(Object.keys(moduleSubCommands(registry))).toEqual(['fake-cli'])
-    expect(runnableModuleNames(registry)).toEqual(['service-only'])
-    expect(resolveRunnableModule('service-only', registry)?.manifest.name).toBe(
-      serviceOnly.manifest.name,
-    )
     expect(
-      resolveModules(['setup-module', 'service-only'], registry).map((mod) => mod.manifest.name),
-    ).toEqual(['service-only', 'setup-module'])
+      resolveModules(['setup-module', 'required-only'], registry).map((mod) => mod.manifest.name),
+    ).toEqual(['required-only', 'setup-module'])
     expect(typeof resolveModules(['setup-module'], registry)[0]?.setup).toBe('function')
     expect(typeof resolveModules(['setup-module'], registry)[0]?.install).toBe('function')
   })

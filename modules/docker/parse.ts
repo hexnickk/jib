@@ -70,7 +70,7 @@ export function parseComposeServices(
  *   2. first entry in `expose:`
  *   3. undefined
  * Used by `jib add` to fill `domain.container_port` from the compose file
- * so the deployer can emit a correct `!override` ports list.
+ * so the deploy engine can emit a correct `!override` ports list.
  */
 export function inferContainerPort(service: ComposeService): number | undefined {
   if (service.ports.length > 0) {

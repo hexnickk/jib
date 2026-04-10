@@ -8,15 +8,13 @@
     "bun": "1.3.11"
   },
   "scripts": {
-    "build": "bun run build:jib && bun run build:daemon",
+    "build": "bun run build:jib",
     "build:jib": "bun build --compile apps/jib/main.ts --outfile dist/jib",
-    "build:daemon": "bun build --compile apps/jib-daemon/main.ts --outfile dist/jib-daemon",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "fmt": "biome format --write .",
-    "dev": "bun run apps/jib/main.ts",
-    "dev:daemon": "bun run apps/jib-daemon/main.ts"
+    "dev": "bun run apps/jib/main.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -26,18 +24,15 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.8.2",
+    "@jib/deploy": "workspace:*",
     "@jib-module/cloudflared": "workspace:*",
-    "@jib-module/deployer": "workspace:*",
     "@jib-module/github": "workspace:*",
-    "@jib-module/gitsitter": "workspace:*",
-    "@jib-module/nats": "workspace:*",
     "@jib-module/nginx": "workspace:*",
-    "@jib/bus": "workspace:*",
+    "@jib-module/watcher": "workspace:*",
     "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",
     "@jib/docker": "workspace:*",
     "@jib/ingress": "workspace:*",
-    "@jib/rpc": "workspace:*",
     "@jib/secrets": "workspace:*",
     "@jib/state": "workspace:*",
     "@jib/tui": "workspace:*",
@@ -46,7 +41,6 @@
     "citty": "^0.1.6",
     "consola": "^3.2.3",
     "drizzle-orm": "^0.45.2",
-    "nats": "^2.29.3",
     "yaml": "^2.8.3",
     "zod": "^3.23.8"
   }

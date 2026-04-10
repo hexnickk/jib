@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { jibMigrations } from '@jib/state'
 import { type JibMigration, type MigrationContext, moduleCtx } from './types.ts'
 
@@ -70,7 +71,6 @@ const m0001_ensure_dirs: JibMigration = {
       p.reposDir,
       p.repoRoot,
       p.nginxDir,
-      p.busDir,
       p.cloudflaredDir,
     ]
     for (const d of dirs) await mkdir(d, { recursive: true, mode: 0o750 })
@@ -105,32 +105,12 @@ const m0003_ensure_group: JibMigration = {
   },
 }
 
-const m0005_install_nats: JibMigration = {
-  id: '0005_install_nats',
-  description: 'Install NATS message bus',
+const m0007_install_watcher: JibMigration = {
+  id: '0007_install_watcher',
+  description: 'Install watcher service',
   up: async (ctx) => {
     const mctx = await moduleCtx(ctx)
-    const { install } = await import('@jib-module/nats')
-    await install(mctx)
-  },
-}
-
-const m0006_install_deployer: JibMigration = {
-  id: '0006_install_deployer',
-  description: 'Install deployer service',
-  up: async (ctx) => {
-    const mctx = await moduleCtx(ctx)
-    const { install } = await import('@jib-module/deployer')
-    await install(mctx)
-  },
-}
-
-const m0007_install_gitsitter: JibMigration = {
-  id: '0007_install_gitsitter',
-  description: 'Install gitsitter service',
-  up: async (ctx) => {
-    const mctx = await moduleCtx(ctx)
-    const { install } = await import('@jib-module/gitsitter')
+    const { install } = await import('@jib-module/watcher')
     await install(mctx)
   },
 }
@@ -161,6 +141,27 @@ const m0009_install_sudoers: JibMigration = {
   },
 }
 
+const LEGACY_UNITS = [
+  'jib-bus.service',
+  'jib-deployer.service',
+  'jib-gitsitter.service',
+  'jib-nginx.service',
+]
+
+const m0010_cleanup_legacy_runtime: JibMigration = {
+  id: '0010_cleanup_legacy_runtime',
+  description: 'Remove legacy multi-service runtime leftovers',
+  up: async (ctx) => {
+    for (const unit of LEGACY_UNITS) {
+      await Bun.$`sudo systemctl disable --now ${unit}`.quiet().nothrow()
+      await rm(`/etc/systemd/system/${unit}`, { force: true })
+    }
+    await rm('/usr/local/bin/jib-daemon', { force: true })
+    await rm(join(ctx.paths.root, 'bus'), { recursive: true, force: true })
+    await Bun.$`sudo systemctl daemon-reload`.quiet().nothrow()
+  },
+}
+
 // ---------------------------------------------------------------------------
 // Registry — ordered list of all migrations
 // ---------------------------------------------------------------------------
@@ -169,9 +170,8 @@ export const migrations: JibMigration[] = [
   m0001_ensure_dirs,
   m0002_ensure_config,
   m0003_ensure_group,
-  m0005_install_nats,
-  m0006_install_deployer,
-  m0007_install_gitsitter,
+  m0007_install_watcher,
   m0008_install_nginx,
   m0009_install_sudoers,
+  m0010_cleanup_legacy_runtime,
 ]

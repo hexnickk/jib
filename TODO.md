@@ -1,8 +1,7 @@
 # V0
 
 - add documentation
-- there must be no external dependencies with "*" as a version (see nats & yaml)
-- introduce jib-stack.service as a systemd oneshot unit that manages the Docker Compose stack (jib-bus + module containers). Wire the native services (jib-deployer, jib-watcher) to depend on it explicitly, replacing the implicit nc -z 4222 busy-wait.
+- there must be no external dependencies with "*" as a version (see workspace deps & yaml)
 
 # V1
 
@@ -37,4 +36,4 @@
 - [ ] Custom nginx includes
 - [ ] GitLab provider
 - [ ] Wildcard SSL certificates (DNS challenge)
-- [ ] Extract a GitProvider interface now — gitsitter depends on an abstract interface (cloneURL, refreshAuth, applyAuth), github implements it. When GitLab arrives, it just implements the same interface. ~150 LoC of refactoring.
+- [ ] Extract a GitProvider interface now — the watcher depends on an abstract interface (cloneURL, refreshAuth, applyAuth), github implements it. When GitLab arrives, it just implements the same interface. ~150 LoC of refactoring.

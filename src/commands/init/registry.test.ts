@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { moduleSubCommands, runnableModuleNames } from '../../module-registry.ts'
+import { moduleSubCommands } from '../../module-registry.ts'
 import {
   ALL_MODULES,
   installedOptionalModules,
@@ -10,7 +10,7 @@ import {
   unseenOptionalModules,
 } from './registry.ts'
 
-const REQUIRED_NAMES = ['nats', 'deployer', 'gitsitter', 'nginx']
+const REQUIRED_NAMES = ['watcher', 'nginx']
 const OPTIONAL_NAMES = ['cloudflared', 'github']
 
 function configWith(modules: Record<string, boolean>): Config {
@@ -20,9 +20,7 @@ function configWith(modules: Record<string, boolean>): Config {
 describe('module registry', () => {
   test('all first-party modules are present in dependency order', () => {
     expect(ALL_MODULES.map((mod) => mod.manifest.name)).toEqual([
-      'nats',
-      'deployer',
-      'gitsitter',
+      'watcher',
       'nginx',
       'cloudflared',
       'github',
@@ -51,10 +49,6 @@ describe('module registry', () => {
 
   test('module CLI commands are derived from the shared registry', () => {
     expect(Object.keys(moduleSubCommands())).toEqual(['cloudflared', 'github'])
-  })
-
-  test('runnable services are derived from the shared registry', () => {
-    expect(runnableModuleNames()).toEqual(['deployer', 'gitsitter', 'nginx'])
   })
 
   test('installedOptionalModules returns modules with true', () => {

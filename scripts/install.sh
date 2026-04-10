@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # jib installer. Downloads the prebuilt binaries for the current OS/arch from
-# a GitHub release and installs them to /usr/local/bin/{jib,jib-daemon}.
+# a GitHub release and installs it to /usr/local/bin/jib.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/hexnickk/jib/main/scripts/install.sh | bash
@@ -62,9 +62,7 @@ else
 fi
 
 cli_asset="jib-${target}"
-daemon_asset="jib-daemon-${target}"
 cli_url="https://github.com/${REPO}/releases/download/${tag}/${cli_asset}"
-daemon_url="https://github.com/${REPO}/releases/download/${tag}/${daemon_asset}"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -72,26 +70,21 @@ trap 'rm -rf "$tmp"' EXIT
 log "downloading $cli_url"
 curl -fsSL "$cli_url" -o "$tmp/jib" || fail "download failed"
 
-log "downloading $daemon_url"
-curl -fsSL "$daemon_url" -o "$tmp/jib-daemon" || fail "download failed"
-
 chmod +x "$tmp/jib"
-chmod +x "$tmp/jib-daemon"
 if command -v file >/dev/null 2>&1; then
   file "$tmp/jib" | grep -qiE 'executable|Mach-O' || fail "downloaded file is not an executable"
-  file "$tmp/jib-daemon" | grep -qiE 'executable|Mach-O' || fail "downloaded daemon file is not an executable"
 fi
 
 cli_dest="$PREFIX/jib"
-daemon_dest="$PREFIX/jib-daemon"
-log "installing $cli_dest and $daemon_dest (version $tag)"
+legacy_daemon_dest="$PREFIX/jib-daemon"
+log "installing $cli_dest (version $tag)"
 if [ -w "$PREFIX" ] || [ "$(id -u)" = "0" ]; then
   install -m 0755 "$tmp/jib" "$cli_dest"
-  install -m 0755 "$tmp/jib-daemon" "$daemon_dest"
+  rm -f "$legacy_daemon_dest"
 else
   need sudo
   sudo install -m 0755 "$tmp/jib" "$cli_dest"
-  sudo install -m 0755 "$tmp/jib-daemon" "$daemon_dest"
+  sudo rm -f "$legacy_daemon_dest"
 fi
 
 log "jib $tag installed"

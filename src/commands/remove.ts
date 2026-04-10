@@ -1,16 +1,14 @@
-import { withBus } from '@jib/bus'
 import { loadAppOrExit } from '@jib/config'
-import { canPrompt, isTextOutput } from '@jib/core'
+import { type Paths, canPrompt, isTextOutput } from '@jib/core'
 import { DefaultRemoveSupport, RemoveService } from '@jib/flows'
-import { createBusIngressOperator, releaseIngress } from '@jib/ingress'
+import { releaseIngress } from '@jib/ingress'
 import { promptConfirm, spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { createIngressOperator } from '../ingress-operator.ts'
 import { applyCliArgs, missingInput, withCliArgs } from './_cli.ts'
 
 /** `jib remove <app>` — prompt in the CLI, then delegate teardown to flows. */
-
-const DEFAULT_TIMEOUT_MS = 2 * 60_000
 
 export default defineCommand({
   meta: { name: 'remove', description: 'Remove an app completely' },
@@ -44,7 +42,7 @@ export default defineCommand({
     const service = new RemoveService(
       new DefaultRemoveSupport({
         paths,
-        releaseIngress: (appName) => releaseIngressForRemove(appName),
+        releaseIngress: (appName) => releaseIngressForRemove(paths, appName),
       }),
       {
         warn: (message) => {
@@ -63,18 +61,16 @@ export default defineCommand({
   },
 })
 
-async function releaseIngressForRemove(app: string): Promise<void> {
-  await withBus(async (bus) => {
-    const s = isTextOutput() ? spinner() : null
-    s?.start(`releasing ingress for ${app}`)
-    try {
-      await releaseIngress(createBusIngressOperator(bus, DEFAULT_TIMEOUT_MS), app, (progress) =>
-        s?.message(progress.message),
-      )
-      s?.stop('ingress released')
-    } catch (error) {
-      s?.stop('ingress release failed')
-      throw error
-    }
-  })
+async function releaseIngressForRemove(paths: Paths, app: string): Promise<void> {
+  const s = isTextOutput() ? spinner() : null
+  s?.start(`releasing ingress for ${app}`)
+  try {
+    await releaseIngress(createIngressOperator(paths), app, (progress) =>
+      s?.message(progress.message),
+    )
+    s?.stop('ingress released')
+  } catch (error) {
+    s?.stop('ingress release failed')
+    throw error
+  }
 }

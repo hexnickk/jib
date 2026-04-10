@@ -1,19 +1,18 @@
-import { withBus } from '@jib/bus'
 import { loadAppConfig } from '@jib/config'
 import type { App } from '@jib/config'
-import { ValidationError, isTextOutput } from '@jib/core'
+import { type Paths, ValidationError, isTextOutput } from '@jib/core'
 import { type AddFlowResult, AddService, DefaultAddSupport } from '@jib/flows'
-import { claimIngress, createBusIngressOperator } from '@jib/ingress'
+import { claimIngress } from '@jib/ingress'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { createIngressOperator } from '../ingress-operator.ts'
 import { applyCliArgs, withCliArgs } from './_cli.ts'
 import { buildDraftApp, gatherAddInputs } from './add/inputs.ts'
 import { createAddPlanner } from './add/planner.ts'
 import { preflightSourceSelection } from './sources-flow.ts'
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
-const DEFAULT_TIMEOUT_MS = 5 * 60_000
 
 export default defineCommand({
   meta: { name: 'add', description: 'Register a new app (config + repo + optional ingress)' },
@@ -67,7 +66,7 @@ export default defineCommand({
     const addService = new AddService(
       new DefaultAddSupport({
         paths,
-        claimIngress: (appName, finalApp) => claimIngressForAdd(appName, finalApp),
+        claimIngress: (appName, finalApp) => claimIngressForAdd(paths, appName, finalApp),
       }),
       planner,
       {
@@ -117,21 +116,16 @@ function renderResult(app: string, repo: string, result: AddFlowResult) {
   }
 }
 
-async function claimIngressForAdd(app: string, appCfg: App): Promise<void> {
-  await withBus(async (bus) => {
-    const s = isTextOutput() ? spinner() : null
-    s?.start(`claiming ingress for ${app}`)
-    try {
-      await claimIngress(
-        createBusIngressOperator(bus, DEFAULT_TIMEOUT_MS),
-        app,
-        appCfg,
-        (progress) => s?.message(progress.message),
-      )
-      s?.stop('ingress ready')
-    } catch (error) {
-      s?.stop('ingress failed')
-      throw error
-    }
-  })
+async function claimIngressForAdd(paths: Paths, app: string, appCfg: App): Promise<void> {
+  const s = isTextOutput() ? spinner() : null
+  s?.start(`claiming ingress for ${app}`)
+  try {
+    await claimIngress(createIngressOperator(paths), app, appCfg, (progress) =>
+      s?.message(progress.message),
+    )
+    s?.stop('ingress ready')
+  } catch (error) {
+    s?.stop('ingress failed')
+    throw error
+  }
 }

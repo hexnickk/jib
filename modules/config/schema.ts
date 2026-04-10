@@ -25,7 +25,7 @@ export const DomainSchema = z.object({
   ingress: z.enum(['', 'direct', 'cloudflare-tunnel']).optional(),
   // Compose service name this domain targets. Required when the compose
   // file has multiple services; `jib add` auto-fills it for single-service
-  // apps. The deployer uses it to attach the `!override` ports list to the
+  // apps. The deploy engine uses it to attach the `!override` ports list to the
   // right service.
   service: z.string().min(1).optional(),
 })

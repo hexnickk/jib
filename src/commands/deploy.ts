@@ -1,24 +1,19 @@
-import { withBus } from '@jib/bus'
 import { loadAppOrExit } from '@jib/config'
 import { CliError, isTextOutput } from '@jib/core'
-import { type EvtDeployProgress, SUBJECTS, emitAndWait } from '@jib/rpc'
 import { syncApp } from '@jib/sources'
 import { spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { createDeployEngine } from '../deploy-engine.ts'
 import { applyCliArgs, withCliArgs } from './_cli.ts'
 
 /**
  * `jib deploy <app>` — prepare the repo locally through the shared sources
- * package, then hand the resolved sha+path to the deployer over the bus.
+ * package, then hand the resolved sha+path to the shared deploy engine.
  * A clack spinner renders progress for each stage.
  */
 
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
-
-function currentUser(): string {
-  return process.env.USER ?? process.env.LOGNAME ?? 'jib'
-}
 
 export default defineCommand({
   meta: { name: 'deploy', description: 'Build and deploy an app' },
@@ -47,36 +42,26 @@ export default defineCommand({
       })
       s?.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
 
-      const result = await withBus(async (bus) => {
-        const s2 = showProgress ? spinner() : null
-        s2?.start(`[2/2] deploying ${args.app}`)
-        const result = await emitAndWait(
-          bus,
-          SUBJECTS.cmd.deploy,
-          {
-            app: args.app,
-            workdir: ready.workdir,
-            sha: ready.sha,
-            trigger: 'manual',
-            user: currentUser(),
-          },
-          { success: SUBJECTS.evt.deploySuccess, failure: SUBJECTS.evt.deployFailure },
-          SUBJECTS.evt.deployProgress,
-          {
-            source: 'cli',
-            timeoutMs,
-            onProgress: (p: EvtDeployProgress) => s2?.message(`${p.step}: ${p.message}`),
-          },
-        )
-        s2?.stop(`[2/2] ${args.app} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
-        return {
-          app: args.app,
-          workdir: ready.workdir,
-          preparedSha: ready.sha,
-          sha: result.sha,
-          durationMs: result.durationMs,
-        }
-      })
+      const engine = createDeployEngine(cfg, paths)
+      const s2 = showProgress ? spinner() : null
+      s2?.start(`[2/2] deploying ${args.app}`)
+      const deployed = await withTimeout(
+        engine.deploy(
+          { app: args.app, workdir: ready.workdir, sha: ready.sha, trigger: 'manual' },
+          { emit: (step, message) => s2?.message(`${step}: ${message}`) },
+        ),
+        timeoutMs,
+      )
+      s2?.stop(
+        `[2/2] ${args.app} deployed @ ${deployed.deployedSHA.slice(0, 8)} (${deployed.durationMs}ms)`,
+      )
+      const result = {
+        app: args.app,
+        workdir: ready.workdir,
+        preparedSha: ready.sha,
+        sha: deployed.deployedSHA,
+        durationMs: deployed.durationMs,
+      }
       if (isTextOutput()) {
         consola.success(`${args.app} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
       }
@@ -84,8 +69,27 @@ export default defineCommand({
     } catch (err) {
       if (err instanceof CliError) throw err
       throw new CliError('deploy_failed', err instanceof Error ? err.message : String(err), {
-        hint: 'check logs: journalctl -u jib-deployer --since "5m ago"',
+        hint: 'check docker compose output, then retry `jib deploy ...`',
       })
     }
   },
 })
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`deploy timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    )
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+}

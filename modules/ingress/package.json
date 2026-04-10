@@ -8,8 +8,6 @@
     ".": "./index.ts"
   },
   "dependencies": {
-    "@jib/bus": "workspace:*",
-    "@jib/config": "workspace:*",
-    "@jib/rpc": "workspace:*"
+    "@jib/config": "workspace:*"
   }
 }

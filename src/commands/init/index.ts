@@ -65,7 +65,7 @@ export default defineCommand({
     const config = await loadConfig(paths.configFile)
     let restartedServices = 0
 
-    // Existing installs should always refresh long-lived daemons so they pick
+    // Existing installs should always refresh long-lived services so they pick
     // up a new `jib` binary. Unit re-install remains tied to migrations.
     if (configExisted) {
       restartedServices = await refreshExistingInstall(config, paths, {

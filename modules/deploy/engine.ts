@@ -13,7 +13,6 @@ import {
   parseComposeServices,
   writeOverride,
 } from '@jib/docker'
-import type { CmdDeploy } from '@jib/rpc'
 import { type AppState, type Store, acquire } from '@jib/state'
 import { $ } from 'bun'
 
@@ -39,12 +38,16 @@ export interface ProgressCtx {
   emit: (step: string, message: string) => void
 }
 
-export type DeployCmd = Pick<CmdDeploy, 'app' | 'workdir' | 'sha' | 'trigger'> & { user?: string }
+export interface DeployCmd {
+  app: string
+  workdir: string
+  sha: string
+  trigger: 'manual' | 'auto'
+  user?: string
+}
 
 /**
- * Minimal return shape for `Engine.deploy`. Only fields the NATS handler
- * actually forwards into `evt.deploy.success` — failure flows through
- * thrown errors, not a result field, so there's no `error`/`success` here.
+ * Minimal return shape for `Engine.deploy`.
  */
 export interface DeployResult {
   deployedSHA: string
@@ -215,7 +218,7 @@ export class Engine {
 
 /**
  * Group ingress mappings by target compose service and build the
- * `OverrideService[]` list the deployer passes to `writeOverride`. Only
+ * `OverrideService[]` list the deploy engine passes to `writeOverride`. Only
  * services targeted by ingress receive a jib-managed `ports:` replacement;
  * internal-only services keep the user's compose file untouched.
  */

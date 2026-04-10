@@ -1,8 +1,6 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import type { InstallFn } from '@jib/core'
 import { getExec } from '@jib/ingress'
-import { $ } from 'bun'
-import { NGINX_SERVICE_NAME, NGINX_UNIT_PATH, renderSystemdUnit } from './templates.ts'
 
 /**
  * Jib-owned snippet that pulls every file under `$JIB_ROOT/nginx/` into the
@@ -33,6 +31,9 @@ export const install: InstallFn = async (ctx) => {
   const log = ctx.logger
   const exec = getExec()
 
+  await exec(['sudo', 'systemctl', 'disable', '--now', 'jib-nginx.service'])
+  await rm('/etc/systemd/system/jib-nginx.service', { force: true })
+
   const which = await exec(['which', 'nginx'])
   if (!which.ok) {
     log.info('nginx not found, attempting apt install')
@@ -60,26 +61,8 @@ export const install: InstallFn = async (ctx) => {
     await writeFile(JIB_INCLUDE_PATH, desired, { mode: 0o644 })
   }
 
-  // Always (re)install the systemd unit — cheap, idempotent, and means a
-  // reinstall recovers if someone deleted `/etc/systemd/system/jib-nginx.service`
-  // by hand. Previously this lived behind the `include` early-return and
-  // got skipped on every subsequent `jib install` run.
-  await installOperatorUnit(ctx.paths.root, log)
-}
-
-/**
- * Writes `/etc/systemd/system/jib-nginx.service` from the template and
- * enables it. Idempotent: rewriting the unit is cheap and `enable --now`
- * short-circuits when the service is already active.
- */
-async function installOperatorUnit(jibRoot: string, log: { info: (m: string) => void }) {
-  const unit = renderSystemdUnit({ jibRoot, binPath: '/usr/local/bin/jib-daemon' })
-  log.info(`writing ${NGINX_UNIT_PATH}`)
-  await writeFile(NGINX_UNIT_PATH, unit, { mode: 0o644 })
   log.info('systemctl daemon-reload')
-  await $`sudo systemctl daemon-reload`.quiet()
-  log.info(`sudo systemctl enable --now ${NGINX_SERVICE_NAME}`)
-  await $`sudo systemctl enable --now ${NGINX_SERVICE_NAME}`.quiet()
+  await exec(['sudo', 'systemctl', 'daemon-reload'])
 }
 
 export const JIB_NGINX_INCLUDE_PATH = JIB_INCLUDE_PATH

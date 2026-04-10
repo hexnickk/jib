@@ -1,9 +1,7 @@
 import * as cloudflaredMod from '@jib-module/cloudflared'
-import * as deployerMod from '@jib-module/deployer'
 import * as githubMod from '@jib-module/github'
-import * as gitsitterMod from '@jib-module/gitsitter'
-import * as natsMod from '@jib-module/nats'
 import * as nginxMod from '@jib-module/nginx'
+import * as watcherMod from '@jib-module/watcher'
 import type { Config } from '@jib/config'
 import { CliError, type Module, type ModuleManifest } from '@jib/core'
 import type { CommandDef } from 'citty'
@@ -13,16 +11,10 @@ export type FirstPartyModule = Module<Config> & {
 }
 
 export type CliModule = FirstPartyModule & { cli: readonly CommandDef[] }
-export type RunnableModule = FirstPartyModule & {
-  manifest: ModuleManifest & { name: string }
-  start: NonNullable<FirstPartyModule['start']>
-}
 
 /** Static first-party module registry for bun build --compile visibility. */
 export const MODULES: readonly FirstPartyModule[] = [
-  natsMod,
-  deployerMod,
-  gitsitterMod,
+  watcherMod,
   nginxMod,
   cloudflaredMod,
   githubMod,
@@ -56,21 +48,6 @@ export function resolveModules(
 
 export function modulesWithCli(registry: readonly FirstPartyModule[] = MODULES): CliModule[] {
   return registry.filter((mod): mod is CliModule => Array.isArray(mod.cli) && mod.cli.length > 0)
-}
-
-export function runnableModules(registry: readonly FirstPartyModule[] = MODULES): RunnableModule[] {
-  return registry.filter((mod): mod is RunnableModule => typeof mod.start === 'function')
-}
-
-export function runnableModuleNames(registry: readonly FirstPartyModule[] = MODULES): string[] {
-  return runnableModules(registry).map((mod) => mod.manifest.name)
-}
-
-export function resolveRunnableModule(
-  name: string,
-  registry: readonly FirstPartyModule[] = MODULES,
-): RunnableModule | undefined {
-  return runnableModules(registry).find((mod) => mod.manifest.name === name)
 }
 
 export function moduleSubCommands(

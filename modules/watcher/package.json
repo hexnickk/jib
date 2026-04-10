@@ -1,5 +1,5 @@
 {
-  "name": "@jib-module/deployer",
+  "name": "@jib-module/watcher",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,12 +11,9 @@
     "module": true
   },
   "dependencies": {
-    "@jib/bus": "workspace:*",
+    "@jib/deploy": "workspace:*",
     "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",
-    "@jib/docker": "workspace:*",
-    "@jib/rpc": "workspace:*",
-    "@jib/secrets": "workspace:*",
-    "@jib/state": "workspace:*"
+    "@jib/sources": "workspace:*"
   }
 }

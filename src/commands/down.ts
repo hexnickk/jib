@@ -1,18 +1,17 @@
-import { SUBJECTS, emitLifecycle } from '@jib/rpc'
+import { loadAppOrExit } from '@jib/config'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { createDeployEngine } from '../deploy-engine.ts'
+import { applyCliArgs, withCliArgs } from './_cli.ts'
 
 export default defineCommand({
   meta: { name: 'down', description: 'Stop containers without removing app from config' },
-  args: { app: { type: 'positional', required: true } },
+  args: withCliArgs({ app: { type: 'positional', required: true } }),
   async run({ args }) {
     try {
-      await emitLifecycle(
-        args.app,
-        SUBJECTS.cmd.appDown,
-        SUBJECTS.evt.appDownSuccess,
-        SUBJECTS.evt.appDownFailure,
-      )
+      applyCliArgs(args)
+      const { cfg, paths } = await loadAppOrExit(args.app)
+      await createDeployEngine(cfg, paths, 'down').down(args.app)
       consola.success(`stopped ${args.app}`)
     } catch (err) {
       consola.error(err instanceof Error ? err.message : String(err))

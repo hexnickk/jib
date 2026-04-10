@@ -7,18 +7,15 @@
       "dependencies": {
         "@clack/prompts": "^0.8.2",
         "@jib-module/cloudflared": "workspace:*",
-        "@jib-module/deployer": "workspace:*",
         "@jib-module/github": "workspace:*",
-        "@jib-module/gitsitter": "workspace:*",
-        "@jib-module/nats": "workspace:*",
         "@jib-module/nginx": "workspace:*",
-        "@jib/bus": "workspace:*",
+        "@jib-module/watcher": "workspace:*",
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
+        "@jib/deploy": "workspace:*",
         "@jib/docker": "workspace:*",
         "@jib/flows": "workspace:*",
         "@jib/ingress": "workspace:*",
-        "@jib/rpc": "workspace:*",
         "@jib/secrets": "workspace:*",
         "@jib/sources": "workspace:*",
         "@jib/state": "workspace:*",
@@ -26,7 +23,6 @@
         "citty": "^0.1.6",
         "consola": "^3.2.3",
         "drizzle-orm": "^0.45.2",
-        "nats": "^2.29.3",
         "yaml": "^2.8.3",
         "zod": "^3.23.8",
       },
@@ -35,14 +31,6 @@
         "@types/bun": "^1.2.0",
         "drizzle-kit": "^0.31.10",
         "typescript": "^5.6.3",
-      },
-    },
-    "modules/bus": {
-      "name": "@jib/bus",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/core": "workspace:*",
-        "nats": "*",
       },
     },
     "modules/cloudflared": {
@@ -63,16 +51,13 @@
       "name": "@jib/core",
       "version": "0.0.0",
     },
-    "modules/deployer": {
-      "name": "@jib-module/deployer",
+    "modules/deploy": {
+      "name": "@jib/deploy",
       "version": "0.0.0",
       "dependencies": {
-        "@jib/bus": "workspace:*",
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
         "@jib/docker": "workspace:*",
-        "@jib/rpc": "workspace:*",
-        "@jib/secrets": "workspace:*",
         "@jib/state": "workspace:*",
       },
     },
@@ -92,16 +77,7 @@
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
         "@jib/docker": "workspace:*",
-      },
-    },
-    "modules/gitsitter": {
-      "name": "@jib-module/gitsitter",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/bus": "workspace:*",
-        "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
-        "@jib/rpc": "workspace:*",
+        "@jib/secrets": "workspace:*",
         "@jib/sources": "workspace:*",
       },
     },
@@ -109,37 +85,15 @@
       "name": "@jib/ingress",
       "version": "0.0.0",
       "dependencies": {
-        "@jib/bus": "workspace:*",
         "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
-        "@jib/rpc": "workspace:*",
-        "@jib/tui": "workspace:*",
-      },
-    },
-    "modules/nats": {
-      "name": "@jib-module/nats",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/core": "workspace:*",
       },
     },
     "modules/nginx": {
       "name": "@jib-module/nginx",
       "version": "0.0.0",
       "dependencies": {
-        "@jib/bus": "workspace:*",
-        "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
-        "@jib/rpc": "workspace:*",
-      },
-    },
-    "modules/rpc": {
-      "name": "@jib/rpc",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/bus": "workspace:*",
-        "@jib/core": "workspace:*",
-        "zod": "*",
+        "@jib/ingress": "workspace:*",
       },
     },
     "modules/secrets": {
@@ -174,6 +128,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@jib/core": "workspace:*",
+        "@jib/sources": "workspace:*",
         "drizzle-orm": "*",
       },
     },
@@ -182,6 +137,16 @@
       "version": "0.0.0",
       "dependencies": {
         "@jib/core": "workspace:*",
+      },
+    },
+    "modules/watcher": {
+      "name": "@jib-module/watcher",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/config": "workspace:*",
+        "@jib/core": "workspace:*",
+        "@jib/deploy": "workspace:*",
+        "@jib/sources": "workspace:*",
       },
     },
   },
@@ -268,29 +233,23 @@
 
     "@jib-module/cloudflared": ["@jib-module/cloudflared@workspace:modules/cloudflared"],
 
-    "@jib-module/deployer": ["@jib-module/deployer@workspace:modules/deployer"],
-
     "@jib-module/github": ["@jib-module/github@workspace:modules/source-github"],
-
-    "@jib-module/gitsitter": ["@jib-module/gitsitter@workspace:modules/gitsitter"],
-
-    "@jib-module/nats": ["@jib-module/nats@workspace:modules/nats"],
 
     "@jib-module/nginx": ["@jib-module/nginx@workspace:modules/nginx"],
 
-    "@jib/bus": ["@jib/bus@workspace:modules/bus"],
+    "@jib-module/watcher": ["@jib-module/watcher@workspace:modules/watcher"],
 
     "@jib/config": ["@jib/config@workspace:modules/config"],
 
     "@jib/core": ["@jib/core@workspace:modules/core"],
+
+    "@jib/deploy": ["@jib/deploy@workspace:modules/deploy"],
 
     "@jib/docker": ["@jib/docker@workspace:modules/docker"],
 
     "@jib/flows": ["@jib/flows@workspace:modules/flows"],
 
     "@jib/ingress": ["@jib/ingress@workspace:modules/ingress"],
-
-    "@jib/rpc": ["@jib/rpc@workspace:modules/rpc"],
 
     "@jib/secrets": ["@jib/secrets@workspace:modules/secrets"],
 
@@ -322,10 +281,6 @@
 
     "get-tsconfig": ["get-tsconfig@4.13.7", "", { "dependencies": { "resolve-pkg-maps": "^1.0.0" } }, "sha512-7tN6rFgBlMgpBML5j8typ92BKFi2sFQvIdpAqLA2beia5avZDrMs0FLZiM5etShWq5irVyGcGMEA1jcDaK7A/Q=="],
 
-    "nats": ["nats@2.29.3", "", { "dependencies": { "nkeys.js": "1.1.0" } }, "sha512-tOQCRCwC74DgBTk4pWZ9V45sk4d7peoE2njVprMRCBXrhJ5q5cYM7i6W+Uvw2qUrcfOSnuisrX7bEx3b3Wx4QA=="],
-
-    "nkeys.js": ["nkeys.js@1.1.0", "", { "dependencies": { "tweetnacl": "1.0.3" } }, "sha512-tB/a0shZL5UZWSwsoeyqfTszONTt4k2YS0tuQioMOD180+MbombYVgzDUYHlx+gejYK6rgf08n/2Df99WY0Sxg=="],
-
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 
     "resolve-pkg-maps": ["resolve-pkg-maps@1.0.0", "", {}, "sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw=="],
@@ -337,8 +292,6 @@
     "source-map-support": ["source-map-support@0.5.21", "", { "dependencies": { "buffer-from": "^1.0.0", "source-map": "^0.6.0" } }, "sha512-uBHU3L3czsIyYXKX88fdrGovxdSCoTGDRZ6SYXtSRxLZUzHg5P/66Ht6uoUlHu9EZod+inXhKo3qQgwXUT/y1w=="],
 
     "tsx": ["tsx@4.21.0", "", { "dependencies": { "esbuild": "~0.27.0", "get-tsconfig": "^4.7.5" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "bin": { "tsx": "dist/cli.mjs" } }, "sha512-5C1sg4USs1lfG0GFb2RLXsdpXqBSEhAaA/0kPL01wxzpMqLILNxIxIOKiILz+cdg/pLnOUxFYOR5yhHU666wbw=="],
-
-    "tweetnacl": ["tweetnacl@1.0.3", "", {}, "sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
