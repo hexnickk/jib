@@ -9,3 +9,5 @@ Fight entropy. Leave the codebase better than you found it.
 # Important
 
 - Files should target 100 LoC, anything above 200 LoC needs an explicit approval
+- Don't commit until user asks to do so
+- Don't ever edit TODO.txt

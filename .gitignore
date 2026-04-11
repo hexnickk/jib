@@ -1,5 +1,4 @@
 # Binaries
-/bin/
 /dist/
 
 # Bun / Node
@@ -20,10 +19,6 @@ Thumbs.db
 # Environment
 .env
 .env.*
-
-# Claude Code
-.claude/memories/
-.claude/plans/
 
 # Local planning docs
 docs/plans/

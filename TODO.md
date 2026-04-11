@@ -1,11 +1,20 @@
 # V0
 
 - add documentation
-- there must be no external dependencies with "*" as a version (see workspace deps & yaml)
+
+# 10 April
+
+- [x] remove @main.ts & move apps/jib/main.ts to apps/cli/main.ts
+- [x] remove getModuleSubCommands from main.ts
+- [x] move src/commands to apps/cli/ (so they resemble file-based routing structure in next.js)
+- [x] clean up src folder (either modules, either libs)
+- [x] remove githubcmd from cli as it's a part of sources cmd
+- [ ] cloudflared service should live in apps
+- [ ] Consider not running cloudflare daemon as it is only needed when adding a new domain
+- [ ] split cloudflared modules into app/cli/module
 
 # V1
 
-- [ ] Consider not running cloudflare daemon as it is only needed when adding a new domain
 - [ ] Bring back history
 - [ ] Bring back health checker
 - [ ] Self-update / upgrade command
