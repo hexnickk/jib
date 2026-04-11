@@ -2,10 +2,5 @@
   "name": "${localWorkspaceFolderBasename}",
   "build": { "dockerfile": "Dockerfile" },
   "postCreateCommand": "./scripts/bootstrap.sh",
-  "features": {
-    "ghcr.io/devcontainers/features/go:1": {
-      "version": "1.25"
-    }
-  },
   "remoteUser": "user"
 }

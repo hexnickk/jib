@@ -2,6 +2,12 @@
 
 - add documentation
 
+# 11 April
+
+- [x] split cloudflared modules into app/cli/module
+- [x] rename apps/cli -> src
+- [x] merge modules/core with apps/cli/modules/runtime
+
 # 10 April
 
 - [x] remove @main.ts & move apps/jib/main.ts to apps/cli/main.ts
@@ -9,9 +15,9 @@
 - [x] move src/commands to apps/cli/ (so they resemble file-based routing structure in next.js)
 - [x] clean up src folder (either modules, either libs)
 - [x] remove githubcmd from cli as it's a part of sources cmd
-- [ ] cloudflared service should live in apps
-- [ ] Consider not running cloudflare daemon as it is only needed when adding a new domain
-- [ ] split cloudflared modules into app/cli/module
+- [ ] ~~cloudflared service should live in apps~~
+- [ ] ~~consider not running cloudflare daemon as it is only needed when adding a new domain~~
+- [ ] ~~split cloudflared modules into app/cli/module~~
 
 # V1
 
@@ -46,3 +52,4 @@
 - [ ] GitLab provider
 - [ ] Wildcard SSL certificates (DNS challenge)
 - [ ] Extract a GitProvider interface now — the watcher depends on an abstract interface (cloneURL, refreshAuth, applyAuth), github implements it. When GitLab arrives, it just implements the same interface. ~150 LoC of refactoring.
+- [ ] split between runtime env & build env
