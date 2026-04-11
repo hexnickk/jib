@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import type { InstallFn } from '@jib/core'
-import { getExec } from '@jib/ingress'
+import { getExec } from '../../exec.ts'
 
 /**
  * Jib-owned snippet that pulls every file under `$JIB_ROOT/nginx/` into the
@@ -14,7 +14,7 @@ function includeSnippet(nginxDir: string): string {
   // The operator writes per-app subdirs (`<app>/<host>.conf`). The flat
   // `*.conf` glob is retained so operators can drop hand-written site
   // files directly under `$JIB_ROOT/nginx/` without a wrapper dir.
-  return `# Managed by jib (modules/nginx) — do not edit.
+  return `# Managed by jib (modules/ingress/backends/nginx) — do not edit.
 include ${nginxDir}/*.conf;
 include ${nginxDir}/*/*.conf;
 `

@@ -1,8 +1,8 @@
 import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { type ExecFn, getExec } from './exec.ts'
-import { nginxAppConfDir, nginxConfFilename, renderNginxSite } from './nginx-templates.ts'
-import type { IngressClaim, IngressOperator } from './types.ts'
+import { type ExecFn, getExec } from '../../exec.ts'
+import type { IngressClaim, IngressOperator } from '../../types.ts'
+import { nginxAppConfDir, nginxConfFilename, renderNginxSite } from './templates.ts'
 
 export type CertExistsFn = (host: string) => Promise<boolean>
 

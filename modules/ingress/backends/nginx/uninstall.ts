@@ -15,8 +15,8 @@ export const uninstall: InstallFn = async (ctx) => {
 
   try {
     const entries = await readdir(ctx.paths.nginxDir)
-    for (const e of entries) {
-      const path = `${ctx.paths.nginxDir}/${e}`
+    for (const entry of entries) {
+      const path = `${ctx.paths.nginxDir}/${entry}`
       await rm(path, { recursive: true, force: true })
       log.info(`removed ${path}`)
     }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { nginxAppConfDir, nginxConfFilename, renderNginxSite } from './nginx-templates.ts'
+import { nginxAppConfDir, nginxConfFilename, renderNginxSite } from './templates.ts'
 
 describe('nginx ingress templates', () => {
   test('HTTP-only site emits port 80 server block with proxy_pass', () => {

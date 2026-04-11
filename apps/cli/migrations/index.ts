@@ -133,10 +133,10 @@ const m0007_install_watcher: JibMigration = {
 
 const m0008_install_nginx: JibMigration = {
   id: '0008_install_nginx',
-  description: 'Install nginx reverse proxy',
+  description: 'Install ingress reverse proxy',
   up: async (ctx) => {
     const mctx = await moduleCtx(ctx)
-    const { install } = await import('@jib-module/nginx')
+    const { install } = await import('@jib/ingress')
     await install(mctx)
   },
 }
