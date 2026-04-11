@@ -17,6 +17,16 @@ function initCtx(config: Config, paths: Paths): InitContext {
   return { config, logger: createLogger('init'), paths }
 }
 
+async function rollbackModuleInstall(mod: ModLike, ctx: InitContext): Promise<void> {
+  if (!mod.uninstall) return
+  try {
+    await mod.uninstall(ctx)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    ctx.logger.warn(`${mod.manifest.name} uninstall failed after setup error: ${message}`)
+  }
+}
+
 export async function persistModuleChoice(
   configFile: string,
   name: string,
@@ -48,9 +58,18 @@ export async function configureOptionalModules(
       continue
     }
 
-    if (mod.install) await runInstallsTx([mod], initCtx(current, paths))
+    const ctx = initCtx(current, paths)
     const setup = setupFor(mod.manifest.name)
-    if (setup) await setup(initCtx(current, paths))
-    current = await persistModuleChoice(paths.configFile, mod.manifest.name, true, deps)
+    try {
+      if (mod.install) await runInstallsTx([mod], ctx)
+      if (setup) {
+        const configured = await setup(ctx)
+        if (!configured) throw new Error(`${mod.manifest.name} setup did not complete`)
+      }
+      current = await persistModuleChoice(paths.configFile, mod.manifest.name, true, deps)
+    } catch (error) {
+      if (mod.install) await rollbackModuleInstall(mod, ctx)
+      throw error
+    }
   }
 }

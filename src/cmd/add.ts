@@ -1,7 +1,6 @@
 import { CliError, applyCliArgs, isTextOutput } from '@jib/cli'
 import { loadAppConfig, loadConfig } from '@jib/config'
 import type { App } from '@jib/config'
-import { ValidationError } from '@jib/errors'
 import { claimIngress, createIngressOperator } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { buildSourceChoices, preflightSourceSelection, runSourceSetup } from '@jib/sources'
@@ -161,7 +160,7 @@ function createInspectionObserver(interrupt: ReturnType<typeof trapInterrupt>) {
   return {
     observer: {
       onStateChange: (state: string) => {
-        if (interrupt.interrupted) throw new ValidationError('cancelled')
+        if (interrupt.interrupted) throw new CliError('cancelled', 'add cancelled')
         if (!spin) return
         if (state === 'inputs_ready') {
           active = true

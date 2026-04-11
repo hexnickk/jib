@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type Config, writeConfig } from '@jib/config'
+import { type Config, loadConfig, writeConfig } from '@jib/config'
 import { credsPath, getPaths } from '@jib/paths'
 import { inferredOptionalModules, reconcileOptionalModules } from './reconcile.ts'
 
@@ -36,6 +36,26 @@ describe('reconcileOptionalModules', () => {
 
       const next = await reconcileOptionalModules(cfg, paths)
       expect(next.modules).toEqual({ cloudflared: true })
+    })
+  })
+
+  test('can infer modules without persisting config changes', async () => {
+    await withTmpConfig(async (cfg, root) => {
+      const paths = getPaths(root)
+      const tokenPath = credsPath(paths, 'cloudflare', 'tunnel.env')
+      await mkdir(join(root, 'secrets', '_jib', 'cloudflare'), { recursive: true })
+      await writeFile(tokenPath, 'TUNNEL_TOKEN=abc\n')
+
+      const writes: Config[] = []
+      const next = await reconcileOptionalModules(cfg, paths, {
+        writeConfig: async (_file, updated) => {
+          writes.push(structuredClone(updated))
+        },
+      })
+
+      expect(next.modules).toEqual({ cloudflared: true })
+      expect(writes).toHaveLength(1)
+      expect((await loadConfig(paths.configFile)).modules).toEqual({})
     })
   })
 

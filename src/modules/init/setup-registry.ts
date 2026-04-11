@@ -1,7 +1,7 @@
 import { runCloudflaredSetup } from '../cloudflared/setup.ts'
-import type { ModuleHook } from './types.ts'
+import type { InitContext } from './types.ts'
 
-type ModuleSetup = ModuleHook
+type ModuleSetup = (ctx: InitContext) => Promise<boolean>
 
 const SETUPS: Readonly<Record<string, ModuleSetup>> = {
   cloudflared: ({ paths }) => runCloudflaredSetup(paths),

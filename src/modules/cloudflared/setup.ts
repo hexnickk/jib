@@ -6,7 +6,7 @@ function startFailureMessage(prefix: string, detail: string): string {
   return detail ? `${prefix}: ${detail}` : prefix
 }
 
-export async function runCloudflaredSetup(paths: Paths): Promise<void> {
+export async function runCloudflaredSetup(paths: Paths): Promise<boolean> {
   if (hasTunnelToken(paths)) {
     const replace = await promptConfirm({
       message: 'Existing tunnel token found. Replace it?',
@@ -17,8 +17,9 @@ export async function runCloudflaredSetup(paths: Paths): Promise<void> {
       const started = await enableCloudflaredService()
       if (!started.ok) {
         log.warning(startFailureMessage('cloudflared failed to start', started.detail))
+        return false
       }
-      return
+      return true
     }
   }
 
@@ -30,18 +31,20 @@ export async function runCloudflaredSetup(paths: Paths): Promise<void> {
     })
     if (!(await saveTunnelToken(paths, raw))) {
       log.warning('tunnel token setup skipped: input did not contain a tunnel token')
-      return
+      return false
     }
 
     log.success('tunnel token saved')
     const started = await enableCloudflaredService()
     if (!started.ok) {
       log.warning(startFailureMessage('cloudflared failed to start', started.detail))
-      return
+      return false
     }
     log.success('cloudflared started')
+    return true
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     log.warning(`tunnel token setup skipped: ${message}`)
+    return false
   }
 }

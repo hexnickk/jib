@@ -60,6 +60,7 @@ describe('optional module configuration', () => {
                 const next = await loadConfig(ctx.paths.configFile)
                 next.sources.demo = { driver: 'github', type: 'key' }
                 await writeConfig(ctx.paths.configFile, next)
+                return true
               }
             : undefined,
       })
@@ -67,6 +68,52 @@ describe('optional module configuration', () => {
       const final = await loadConfig(paths.configFile)
       expect(final.modules).toEqual({ 'source-auth': true })
       expect(final.sources.demo).toEqual({ driver: 'github', type: 'key' })
+    })
+  })
+
+  test('configureOptionalModules rolls back install when setup does not complete', async () => {
+    await withTmpConfig(async (cfg, root) => {
+      const paths = getPaths(root)
+      const calls: string[] = []
+      const mods: ModLike[] = [
+        {
+          manifest: { name: 'cloudflared' },
+          install: async () => {
+            calls.push('install')
+          },
+          uninstall: async () => {
+            calls.push('uninstall')
+          },
+        },
+      ]
+
+      await expect(
+        configureOptionalModules(cfg, paths, mods, {
+          promptOptionalModule: async () => true,
+          resolveModuleSetup: () => async () => false,
+        }),
+      ).rejects.toThrow('cloudflared setup did not complete')
+
+      expect(calls).toEqual(['install', 'uninstall'])
+      const final = await loadConfig(paths.configFile)
+      expect(final.modules).toEqual({})
+    })
+  })
+
+  test('configureOptionalModules does not enable a module when setup does not complete', async () => {
+    await withTmpConfig(async (cfg, root) => {
+      const paths = getPaths(root)
+      const mods: ModLike[] = [mod('cloudflared')]
+
+      await expect(
+        configureOptionalModules(cfg, paths, mods, {
+          promptOptionalModule: async () => true,
+          resolveModuleSetup: () => async () => false,
+        }),
+      ).rejects.toThrow('cloudflared setup did not complete')
+
+      const final = await loadConfig(paths.configFile)
+      expect(final.modules).toEqual({})
     })
   })
 

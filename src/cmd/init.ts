@@ -46,11 +46,12 @@ export default defineCommand({
     ensureMigrated(hasBootstrapState(paths))
     if (isTextOutput()) intro('jib init')
 
-    let config = await loadConfig(paths.configFile)
-    config = await reconcileOptionalModules(config, paths)
-    const pending = pendingOptionalModuleNames(config)
-
     if (args.check) {
+      let config = await loadConfig(paths.configFile)
+      config = await reconcileOptionalModules(config, paths, {
+        writeConfig: async () => undefined,
+      })
+      const pending = pendingOptionalModuleNames(config)
       if (isTextOutput()) {
         if (pending.length === 0) {
           note('No optional modules are waiting for setup.', 'Optional modules')
@@ -66,6 +67,8 @@ export default defineCommand({
       }
     }
 
+    let config = await loadConfig(paths.configFile)
+    config = await reconcileOptionalModules(config, paths)
     const unseen = unseenOptionalModules(config)
 
     if (unseen.length === 0) {
