@@ -25,8 +25,8 @@ async function withTmpConfig<T>(fn: (cfg: Config, root: string) => Promise<T>): 
   }
 }
 
-function mod(name: string, setup?: ModLike['setup']): ModLike {
-  return { manifest: { name }, ...(setup ? { setup } : {}) }
+function mod(name: string): ModLike {
+  return { manifest: { name } }
 }
 
 describe('optional module configuration', () => {
@@ -50,16 +50,18 @@ describe('optional module configuration', () => {
   test('configureOptionalModules preserves setup-written config before enabling the module', async () => {
     await withTmpConfig(async (cfg, root) => {
       const paths = getPaths(root)
-      const mods: ModLike[] = [
-        mod('source-auth', async (ctx) => {
-          const next = await loadConfig(ctx.paths.configFile)
-          next.sources.demo = { driver: 'github', type: 'key' }
-          await writeConfig(ctx.paths.configFile, next)
-        }),
-      ]
+      const mods: ModLike[] = [mod('source-auth')]
 
       await configureOptionalModules(cfg, paths, mods, {
         promptOptionalModule: async () => true,
+        resolveModuleSetup: (name) =>
+          name === 'source-auth'
+            ? async (ctx) => {
+                const next = await loadConfig(ctx.paths.configFile)
+                next.sources.demo = { driver: 'github', type: 'key' }
+                await writeConfig(ctx.paths.configFile, next)
+              }
+            : undefined,
       })
 
       const final = await loadConfig(paths.configFile)
@@ -71,20 +73,21 @@ describe('optional module configuration', () => {
   test('configureOptionalModules keeps earlier choices when a later setup fails', async () => {
     await withTmpConfig(async (cfg, root) => {
       const paths = getPaths(root)
-      const mods: ModLike[] = [
-        mod('cloudflared'),
-        mod('source-auth', async (ctx) => {
-          const next = await loadConfig(ctx.paths.configFile)
-          next.sources.demo = { driver: 'github', type: 'key' }
-          await writeConfig(ctx.paths.configFile, next)
-          throw new Error('stop after saving source')
-        }),
-      ]
+      const mods: ModLike[] = [mod('cloudflared'), mod('source-auth')]
       const answers = [true, true]
 
       await expect(
         configureOptionalModules(cfg, paths, mods, {
           promptOptionalModule: async () => answers.shift() ?? false,
+          resolveModuleSetup: (name) =>
+            name === 'source-auth'
+              ? async (ctx) => {
+                  const next = await loadConfig(ctx.paths.configFile)
+                  next.sources.demo = { driver: 'github', type: 'key' }
+                  await writeConfig(ctx.paths.configFile, next)
+                  throw new Error('stop after saving source')
+                }
+              : undefined,
         }),
       ).rejects.toThrow('stop after saving source')
 

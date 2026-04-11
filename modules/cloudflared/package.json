@@ -12,9 +12,6 @@
   },
   "dependencies": {
     "@jib/config": "workspace:*",
-    "@jib/core": "workspace:*",
-    "@jib/tui": "workspace:*",
-    "citty": "*",
-    "consola": "*"
+    "@jib/core": "workspace:*"
   }
 }

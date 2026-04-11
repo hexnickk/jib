@@ -1,6 +1,11 @@
 export { default as manifest } from './manifest.ts'
 export { install } from './install.ts'
 export { uninstall } from './uninstall.ts'
+export {
+  enableCloudflaredService,
+  hasTunnelToken,
+  saveTunnelToken,
+  tunnelTokenPath,
+} from './service.ts'
+export { getCloudflaredStatus } from './status.ts'
 export { extractTunnelToken } from './token.ts'
-export { setup } from './setup.ts'
-export { default as cli, cloudflaredCmd } from './cmd/index.ts'

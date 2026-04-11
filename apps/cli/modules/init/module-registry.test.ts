@@ -23,22 +23,22 @@ describe('module registry projections', () => {
     const optionalOnly = fakeModule({
       manifest: { name: 'optional-only' },
     })
-    const setupModule = fakeModule({
-      manifest: { name: 'setup-module' },
+    const installedOptional = fakeModule({
+      manifest: { name: 'installed-optional' },
       install: async (_ctx: ModuleContext<Config>) => undefined,
-      setup: async (_ctx: ModuleContext<Config>) => undefined,
     })
-    const registry = [requiredOnly, optionalOnly, setupModule] as const
+    const registry = [requiredOnly, optionalOnly, installedOptional] as const
 
     expect(requiredModules(registry).map((mod) => mod.manifest.name)).toEqual(['required-only'])
     expect(optionalModules(registry).map((mod) => mod.manifest.name)).toEqual([
       'optional-only',
-      'setup-module',
+      'installed-optional',
     ])
     expect(
-      resolveModules(['setup-module', 'required-only'], registry).map((mod) => mod.manifest.name),
-    ).toEqual(['required-only', 'setup-module'])
-    expect(typeof resolveModules(['setup-module'], registry)[0]?.setup).toBe('function')
-    expect(typeof resolveModules(['setup-module'], registry)[0]?.install).toBe('function')
+      resolveModules(['installed-optional', 'required-only'], registry).map(
+        (mod) => mod.manifest.name,
+      ),
+    ).toEqual(['required-only', 'installed-optional'])
+    expect(typeof resolveModules(['installed-optional'], registry)[0]?.install).toBe('function')
   })
 })

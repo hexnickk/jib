@@ -1,4 +1,3 @@
-import type { CommandDef } from 'citty'
 import type { ModuleContext } from './context.ts'
 
 /** Static metadata exported by every module's `manifest.ts`. */
@@ -9,7 +8,6 @@ export interface ModuleManifest {
 }
 
 export type InstallFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>
-export type SetupFn<C = unknown> = (ctx: ModuleContext<C>) => Promise<void>
 
 /** Contract implemented by modules that provide live git credentials. */
 export interface GitAuthProvider<C = unknown> {
@@ -28,7 +26,5 @@ export interface Module<C = unknown> {
   manifest: ModuleManifest
   install?: InstallFn<C>
   uninstall?: InstallFn<C>
-  setup?: SetupFn<C>
-  cli?: readonly CommandDef[]
   gitAuthProvider?: GitAuthProvider<C>
 }

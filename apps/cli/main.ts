@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-import { cloudflaredCmd } from '@jib-module/cloudflared'
 import pkg from '../../package.json' with { type: 'json' }
 import addCmd from './cmd/add.ts'
+import cloudflaredCmd from './cmd/cloudflared.ts'
 import deployCmd from './cmd/deploy.ts'
 import downCmd from './cmd/down.ts'
 import execCmd from './cmd/exec.ts'

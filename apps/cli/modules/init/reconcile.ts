@@ -1,20 +1,15 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { hasTunnelToken } from '@jib-module/cloudflared'
 import { type Config, writeConfig } from '@jib/config'
-import { type Paths, credsPath } from '@jib/core'
+import type { Paths } from '@jib/core'
 
 interface ReconcileDeps {
   writeConfig?: typeof writeConfig
 }
 
-function hasCloudflaredToken(paths: Paths): boolean {
-  const tokenPath = credsPath(paths, 'cloudflare', 'tunnel.env')
-  return existsSync(tokenPath) && readFileSync(tokenPath, 'utf8').trim().length > 0
-}
-
 export function inferredOptionalModules(config: Config, paths: Paths): Record<string, true> {
   const inferred: Record<string, true> = {}
 
-  if (config.modules.cloudflared === undefined && hasCloudflaredToken(paths)) {
+  if (config.modules.cloudflared === undefined && hasTunnelToken(paths)) {
     inferred.cloudflared = true
   }
 

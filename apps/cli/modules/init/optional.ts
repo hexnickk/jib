@@ -2,10 +2,12 @@ import { type Config, loadConfig, writeConfig } from '@jib/config'
 import { type ModuleContext, type Paths, createLogger } from '@jib/core'
 import { runInstallsTx } from './install.ts'
 import { type ModLike, promptOptionalModule } from './registry.ts'
+import { resolveModuleSetup } from './setup-registry.ts'
 
 interface OptionalModuleDeps {
   loadConfig?: typeof loadConfig
   promptOptionalModule?: typeof promptOptionalModule
+  resolveModuleSetup?: typeof resolveModuleSetup
   writeConfig?: typeof writeConfig
 }
 
@@ -34,6 +36,7 @@ export async function configureOptionalModules(
   deps: OptionalModuleDeps = {},
 ): Promise<void> {
   const ask = deps.promptOptionalModule ?? promptOptionalModule
+  const setupFor = deps.resolveModuleSetup ?? resolveModuleSetup
 
   let current = config
   for (const mod of candidates) {
@@ -44,7 +47,8 @@ export async function configureOptionalModules(
     }
 
     if (mod.install) await runInstallsTx([mod], moduleCtx(current, paths))
-    if (mod.setup) await mod.setup(moduleCtx(current, paths))
+    const setup = setupFor(mod.manifest.name)
+    if (setup) await setup(moduleCtx(current, paths))
     current = await persistModuleChoice(paths.configFile, mod.manifest.name, true, deps)
   }
 }
