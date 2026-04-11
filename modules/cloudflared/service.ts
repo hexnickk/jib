@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
-import { type Paths, credsPath } from '@jib/paths'
+import { writeFile } from 'node:fs/promises'
+import { type Paths, credsPath, ensureCredsDir } from '@jib/paths'
 import { SERVICE_NAME } from './templates.ts'
 import { extractTunnelToken } from './token.ts'
 
@@ -34,7 +33,7 @@ export async function saveTunnelToken(paths: Paths, raw: string): Promise<boolea
   if (!token) return false
 
   const path = tunnelTokenPath(paths)
-  await mkdir(dirname(path), { recursive: true, mode: 0o750 })
+  await ensureCredsDir(paths, 'cloudflare')
   await writeFile(path, `TUNNEL_TOKEN=${token}\n`, { mode: 0o640 })
   return true
 }

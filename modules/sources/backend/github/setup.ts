@@ -1,6 +1,6 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { writeFile } from 'node:fs/promises'
 import { loadConfig } from '@jib/config'
+import { ensureCredsDir } from '@jib/paths'
 import { log, note, promptInt, promptPEM, promptSelect, promptString } from '@jib/tui'
 import type { SourceSetupContext } from '../../types.ts'
 import { appPemPath } from './auth.ts'
@@ -62,7 +62,7 @@ export async function setupGitHubApp(ctx: SourceSetupContext): Promise<string | 
     const appId = await promptInt({ message: 'GitHub App ID', min: 1 })
     const pem = await promptPEM({ message: 'Private key PEM' })
     const pemPath = appPemPath(ctx.paths, name)
-    await mkdir(dirname(pemPath), { recursive: true, mode: 0o750 })
+    await ensureCredsDir(ctx.paths, 'github-app')
     await writeFile(pemPath, pem, { mode: 0o640 })
     await addGitHubAppSource(ctx.paths.configFile, name, appId)
     log.success(`source "${name}" (GitHub App ${appId}) created`)

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { jibMigrations } from '@jib/state'
+import { repairManagedSecretsTree } from './secrets.ts'
 import { type JibMigration, type MigrationContext, initCtx } from './types.ts'
 
 // ---------------------------------------------------------------------------
@@ -157,6 +158,14 @@ const m0010_expand_sudoers_for_nginx: JibMigration = {
   },
 }
 
+const m0011_repair_managed_secret_permissions: JibMigration = {
+  id: '0011_repair_managed_secret_permissions',
+  description: 'Repair jib-managed secret tree permissions',
+  up: async (ctx) => {
+    await repairManagedSecretsTree(ctx.paths)
+  },
+}
+
 // ---------------------------------------------------------------------------
 // Registry — ordered list of all migrations
 // ---------------------------------------------------------------------------
@@ -169,4 +178,5 @@ export const migrations: JibMigration[] = [
   m0008_install_nginx,
   m0009_install_sudoers,
   m0010_expand_sudoers_for_nginx,
+  m0011_repair_managed_secret_permissions,
 ]

@@ -1,4 +1,4 @@
-import { stat } from 'node:fs/promises'
+import { mkdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export interface Paths {
@@ -15,6 +15,7 @@ export interface Paths {
 }
 
 const DEFAULT_ROOT = '/opt/jib'
+const CREDS_DIR_MODE = '2770'
 
 /**
  * Resolves every jib-managed directory under a single root. `$JIB_ROOT`
@@ -75,6 +76,25 @@ export function repoPath(paths: Paths, app: string, repo: string): string {
  */
 export function credsPath(paths: Paths, kind: string, name: string): string {
   return join(paths.secretsDir, '_jib', kind, name)
+}
+
+/**
+ * Creates credential directories beneath the shared `secrets/_jib` tree.
+ * Existing directories are left alone so a non-root CLI does not try to chmod
+ * root-owned paths; migrations repair older installs in place.
+ */
+export async function ensureCredsDir(paths: Paths, kind: string): Promise<string> {
+  const baseDir = join(paths.secretsDir, '_jib')
+  const dir = join(baseDir, kind)
+  if (!(await pathExists(baseDir))) {
+    await mkdir(baseDir, { recursive: true, mode: 0o770 })
+    await Bun.$`chmod ${CREDS_DIR_MODE} ${baseDir}`.quiet()
+  }
+  if (!(await pathExists(dir))) {
+    await mkdir(dir, { recursive: true, mode: 0o770 })
+    await Bun.$`chmod ${CREDS_DIR_MODE} ${dir}`.quiet()
+  }
+  return dir
 }
 
 /** Returns true if a file or directory exists at `path`. */

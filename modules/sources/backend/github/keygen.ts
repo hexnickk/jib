@@ -1,7 +1,6 @@
-import { chmod, mkdir, readFile, stat } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { chmod, readFile, stat } from 'node:fs/promises'
 import { JibError } from '@jib/errors'
-import { type Paths, credsPath } from '@jib/paths'
+import { type Paths, credsPath, ensureCredsDir } from '@jib/paths'
 import { $ } from 'bun'
 
 /** Disk layout for a deploy-key source. Mirrors Go `ghPkg.KeyPath`. */
@@ -30,7 +29,7 @@ export async function generateDeployKey(name: string, paths: Paths): Promise<str
   if (await exists(privateKey)) {
     throw new JibError('github.keygen', `deploy key already exists at ${privateKey}`)
   }
-  await mkdir(dirname(privateKey), { recursive: true, mode: 0o750 })
+  await ensureCredsDir(paths, 'github-key')
   const comment = `jib-${name}`
   const res = await $`ssh-keygen -t ed25519 -f ${privateKey} -N "" -C ${comment}`.quiet().nothrow()
   if (res.exitCode !== 0) {

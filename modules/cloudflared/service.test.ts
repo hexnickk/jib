@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getPaths } from '@jib/paths'
@@ -35,6 +35,7 @@ describe('cloudflared service helpers', () => {
       expect(saved).toBe(true)
       expect(hasTunnelToken(paths)).toBe(true)
       expect(await readFile(tunnelTokenPath(paths), 'utf8')).toBe('TUNNEL_TOKEN=eyJhIjoiNzQ\n')
+      expect((await stat(join(root, 'secrets', '_jib', 'cloudflare'))).mode & 0o7777).toBe(0o2770)
     })
   })
 

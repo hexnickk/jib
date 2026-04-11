@@ -117,24 +117,38 @@ async function claimIngressForAdd(paths: Paths, app: string, appCfg: App): Promi
   }
 }
 
-async function chooseInitialSource(
+export interface ChooseInitialSourceDeps {
+  buildSourceChoices?: typeof buildSourceChoices
+  isInteractive?: typeof isInteractive
+  promptSelect?: typeof promptSelect
+  runSourceSetup?: typeof runSourceSetup
+}
+
+export async function chooseInitialSource(
   cfg: Awaited<ReturnType<typeof loadAppConfig>>['cfg'],
   paths: Paths,
   currentSource?: string,
+  deps: ChooseInitialSourceDeps = {},
 ): Promise<{ value?: string; created: boolean }> {
-  if (currentSource || !isInteractive()) {
+  const interactive = deps.isInteractive ?? isInteractive
+  const select = deps.promptSelect ?? promptSelect
+  const sourceChoices = deps.buildSourceChoices ?? buildSourceChoices
+  const setupSource = deps.runSourceSetup ?? runSourceSetup
+
+  if (currentSource || !interactive()) {
     return currentSource ? { value: currentSource, created: false } : { created: false }
   }
-  const options = buildSourceChoices(cfg)
+  const options = sourceChoices(cfg)
   if (options.length === 0) return { created: false }
-  const choice = await promptSelect({
+  const choice = await select({
     message: 'Source for this app?',
     options: [{ value: 'none', label: 'None', hint: 'Public repo or local path' }, ...options],
   })
   if (choice === 'none') return { created: false }
   if (choice.startsWith('setup:')) {
-    const created = await runSourceSetup(cfg, paths, choice.slice('setup:'.length))
-    return created ? { value: created, created: true } : { created: false }
+    const created = await setupSource(cfg, paths, choice.slice('setup:'.length))
+    if (!created) throw new CliError('cancelled', 'source setup did not complete; add cancelled')
+    return { value: created, created: true }
   }
   return choice.startsWith('existing:')
     ? { value: choice.slice('existing:'.length), created: false }

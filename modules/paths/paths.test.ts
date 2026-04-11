@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { credsPath, getPaths, repoPath } from './paths.ts'
+import { mkdtemp, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { credsPath, ensureCredsDir, getPaths, repoPath } from './paths.ts'
 
 describe('getPaths', () => {
   const prev = process.env.JIB_ROOT
@@ -55,5 +58,18 @@ describe('credsPath', () => {
   test('groups by kind and name', () => {
     const p = getPaths('/opt/jib')
     expect(credsPath(p, 'github-app', 'prod.pem')).toBe('/opt/jib/secrets/_jib/github-app/prod.pem')
+  })
+})
+
+describe('ensureCredsDir', () => {
+  test('creates group-writable setgid credential directories', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-paths-'))
+    const p = getPaths(root)
+
+    const dir = await ensureCredsDir(p, 'github-app')
+    const info = await stat(dir)
+
+    expect(dir).toBe(join(root, 'secrets', '_jib', 'github-app'))
+    expect(info.mode & 0o7777).toBe(0o2770)
   })
 })
