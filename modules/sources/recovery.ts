@@ -1,7 +1,7 @@
 import type { Config } from '@jib/config'
 import { type Paths, createLogger } from '@jib/core'
 import { sourceDriver, sourceDrivers } from './registry.ts'
-import type { SourceSelectOption, SourceSetupChoice, SourceStatus } from './types.ts'
+import type { SourceSelectOption, SourceSetupOption, SourceStatus } from './types.ts'
 
 export function configuredSourceOptions(cfg: Config): SourceSelectOption[] {
   return Object.entries(cfg.sources).map(([name, source]) => {
@@ -14,8 +14,10 @@ export function configuredSourceOptions(cfg: Config): SourceSelectOption[] {
   })
 }
 
-export function availableSourceSetupChoices(): SourceSetupChoice[] {
-  return sourceDrivers().flatMap((driver) => [...driver.setupChoices()])
+export function availableSourceSetupOptions(): SourceSetupOption[] {
+  return sourceDrivers().flatMap((driver) =>
+    driver.setup ? [{ value: driver.name, label: driver.setupLabel ?? driver.name }] : [],
+  )
 }
 
 export function repoSupportsSourceRecovery(repo: string): boolean {
@@ -31,9 +33,9 @@ export async function runSourceSetup(
   paths: Paths,
   value: string,
 ): Promise<string | null> {
-  const choice = availableSourceSetupChoices().find((entry) => entry.value === value)
-  if (!choice) return null
-  return choice.run({ config: cfg, logger: createLogger('sources'), paths })
+  const driver = sourceDriver(value)
+  if (!driver?.setup) return null
+  return driver.setup({ config: cfg, logger: createLogger('sources'), paths })
 }
 
 export async function collectSourceStatuses(cfg: Config, paths: Paths): Promise<SourceStatus[]> {

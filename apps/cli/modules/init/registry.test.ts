@@ -9,8 +9,8 @@ import {
   unseenOptionalModules,
 } from './registry.ts'
 
-const REQUIRED_NAMES = ['watcher', 'nginx']
-const OPTIONAL_NAMES = ['cloudflared', 'github']
+const REQUIRED_NAMES = ['watcher', 'ingress']
+const OPTIONAL_NAMES = ['cloudflared']
 
 function configWith(modules: Record<string, boolean>): Config {
   return { config_version: 3, poll_interval: '5m', modules, sources: {}, apps: {} } as Config
@@ -20,9 +20,8 @@ describe('module registry', () => {
   test('all first-party modules are present in dependency order', () => {
     expect(ALL_MODULES.map((mod) => mod.manifest.name)).toEqual([
       'watcher',
-      'nginx',
+      'ingress',
       'cloudflared',
-      'github',
     ])
   })
 
@@ -37,17 +36,17 @@ describe('module registry', () => {
   })
 
   test('resolveModules looks up by name', () => {
-    const mods = resolveModules(['nginx', 'cloudflared'])
-    expect(mods.map((m) => m.manifest.name)).toEqual(['nginx', 'cloudflared'])
+    const mods = resolveModules(['ingress', 'cloudflared'])
+    expect(mods.map((m) => m.manifest.name)).toEqual(['ingress', 'cloudflared'])
   })
 
   test('resolveModules ignores unknown names', () => {
-    const mods = resolveModules(['nginx', 'nonexistent'])
-    expect(mods.map((m) => m.manifest.name)).toEqual(['nginx'])
+    const mods = resolveModules(['ingress', 'nonexistent'])
+    expect(mods.map((m) => m.manifest.name)).toEqual(['ingress'])
   })
 
   test('installedOptionalModules returns modules with true', () => {
-    const config = configWith({ cloudflared: true, github: false })
+    const config = configWith({ cloudflared: true })
     const names = installedOptionalModules(config).map((m) => m.manifest.name)
     expect(names).toEqual(['cloudflared'])
   })
@@ -55,7 +54,7 @@ describe('module registry', () => {
   test('unseenOptionalModules returns modules not in config.modules', () => {
     const config = configWith({ cloudflared: true })
     const names = unseenOptionalModules(config).map((m) => m.manifest.name)
-    expect(names).toEqual(['github'])
+    expect(names).toEqual([])
   })
 
   test('unseenOptionalModules returns all when modules is empty', () => {
@@ -65,7 +64,7 @@ describe('module registry', () => {
   })
 
   test('unseenOptionalModules returns none when all are decided', () => {
-    const config = configWith({ cloudflared: true, github: false })
+    const config = configWith({ cloudflared: true })
     const names = unseenOptionalModules(config).map((m) => m.manifest.name)
     expect(names).toEqual([])
   })

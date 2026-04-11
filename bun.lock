@@ -7,8 +7,6 @@
       "dependencies": {
         "@clack/prompts": "^0.8.2",
         "@jib-module/cloudflared": "workspace:*",
-        "@jib-module/github": "workspace:*",
-        "@jib-module/nginx": "workspace:*",
         "@jib-module/watcher": "workspace:*",
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
@@ -82,14 +80,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@jib/config": "workspace:*",
-      },
-    },
-    "modules/nginx": {
-      "name": "@jib-module/nginx",
-      "version": "0.0.0",
-      "dependencies": {
         "@jib/core": "workspace:*",
-        "@jib/ingress": "workspace:*",
       },
     },
     "modules/secrets": {
@@ -99,22 +90,10 @@
         "@jib/core": "workspace:*",
       },
     },
-    "modules/source-github": {
-      "name": "@jib-module/github",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
-        "@jib/tui": "workspace:*",
-        "citty": "*",
-        "consola": "*",
-      },
-    },
     "modules/sources": {
       "name": "@jib/sources",
       "version": "0.0.0",
       "dependencies": {
-        "@jib-module/github": "workspace:*",
         "@jib/config": "workspace:*",
         "@jib/core": "workspace:*",
         "@jib/tui": "workspace:*",
@@ -231,10 +210,6 @@
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
 
     "@jib-module/cloudflared": ["@jib-module/cloudflared@workspace:modules/cloudflared"],
-
-    "@jib-module/github": ["@jib-module/github@workspace:modules/source-github"],
-
-    "@jib-module/nginx": ["@jib-module/nginx@workspace:modules/nginx"],
 
     "@jib-module/watcher": ["@jib-module/watcher@workspace:modules/watcher"],
 

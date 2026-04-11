@@ -3,7 +3,7 @@ import type { Config } from '@jib/config'
 import { CliError, type Paths } from '@jib/core'
 import { isInteractive, promptConfirm, promptSelect } from '@jib/tui'
 import {
-  availableSourceSetupChoices,
+  availableSourceSetupOptions,
   configuredSourceOptions,
   isSourceAuthFailure as isSourceAuthFailureForRepo,
   repoSupportsSourceRecovery,
@@ -38,9 +38,9 @@ export function buildSourceChoices(
     label: string
     hint?: string
   }[]
-  const setup = availableSourceSetupChoices().map((choice) => ({
-    value: `setup:${choice.value}` as const,
-    label: `Set up new ${choice.label}`,
+  const setup = availableSourceSetupOptions().map((option) => ({
+    value: `setup:${option.value}` as const,
+    label: `Set up new ${option.label}`,
   }))
   return [...existing, ...setup]
 }
@@ -60,10 +60,17 @@ export async function setupSourceRef(
   paths: Paths,
   deps: Pick<SourceRecoveryDeps, 'promptSelect' | 'runSetup'> = {},
 ): Promise<string | null> {
-  const setupChoices = availableSourceSetupChoices()
+  const setupOptions = availableSourceSetupOptions()
+  if (setupOptions.length === 0) return null
+  if (setupOptions.length === 1) {
+    const setupOption = setupOptions[0]
+    if (!setupOption) return null
+    return await (deps.runSetup ?? runSourceSetup)(cfg, paths, setupOption.value)
+  }
+
   const choice = await (deps.promptSelect ?? promptSelect<SourceChoice>)({
     message: 'What kind of source would you like to set up?',
-    options: setupChoices.map((option) => ({
+    options: setupOptions.map((option) => ({
       value: `setup:${option.value}` as const,
       label: option.label,
     })),

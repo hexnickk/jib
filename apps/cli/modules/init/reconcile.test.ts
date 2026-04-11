@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type Config, loadConfig, writeConfig } from '@jib/config'
+import { type Config, writeConfig } from '@jib/config'
 import { credsPath, getPaths } from '@jib/core'
 import { inferredOptionalModules, reconcileOptionalModules } from './reconcile.ts'
 
@@ -39,26 +39,6 @@ describe('reconcileOptionalModules', () => {
     })
   })
 
-  test('infers github when github sources already exist', async () => {
-    await withTmpConfig(async (_, root) => {
-      const paths = getPaths(root)
-      const cfg = {
-        config_version: 3,
-        poll_interval: '5m',
-        modules: {},
-        sources: { demo: { driver: 'github', type: 'key' } },
-        apps: {},
-      } satisfies Config
-
-      expect(inferredOptionalModules(cfg, paths)).toEqual({ github: true })
-
-      await writeConfig(paths.configFile, cfg)
-      const next = await reconcileOptionalModules(cfg, paths)
-      expect(next.modules).toEqual({ github: true })
-      expect((await loadConfig(paths.configFile)).modules).toEqual({ github: true })
-    })
-  })
-
   test('preserves explicit module decisions', async () => {
     await withTmpConfig(async (_, root) => {
       const paths = getPaths(root)
@@ -68,7 +48,7 @@ describe('reconcileOptionalModules', () => {
       const cfg = {
         config_version: 3,
         poll_interval: '5m',
-        modules: { cloudflared: false, github: false },
+        modules: { cloudflared: false },
         sources: { demo: { driver: 'github', type: 'key' } },
         apps: {},
       } satisfies Config

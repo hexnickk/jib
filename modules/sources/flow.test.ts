@@ -6,6 +6,7 @@ import {
   isSourceAuthFailure,
   maybeRecoverSource,
   preflightSourceSelection,
+  setupSourceRef,
 } from './flow.ts'
 import type { SourceTarget } from './types.ts'
 
@@ -26,9 +27,19 @@ describe('source recovery', () => {
     expect(buildSourceChoices(cfg)).toEqual([
       { value: 'existing:appy', label: 'appy', hint: 'GitHub App' },
       { value: 'existing:keyy', label: 'keyy', hint: 'GitHub deployment key' },
-      { value: 'setup:github:key', label: 'Set up new GitHub deploy key' },
-      { value: 'setup:github:app', label: 'Set up new GitHub app' },
+      { value: 'setup:github', label: 'Set up new GitHub source' },
     ])
+  })
+
+  test('setupSourceRef uses the shared driver setup flow when available', async () => {
+    const source = await setupSourceRef(cfg, paths, {
+      runSetup: async (_cfg, _paths, value) => {
+        expect(value).toBe('github')
+        return 'fresh-source'
+      },
+    })
+
+    expect(source).toBe('fresh-source')
   })
 
   test('existing source can be selected after an auth-shaped clone failure', async () => {
@@ -58,10 +69,10 @@ describe('source recovery', () => {
       undefined,
       {
         isInteractive: () => true,
-        promptSelect: async () => 'setup:github:key',
+        promptSelect: async () => 'setup:github',
         runSetup: async (_cfg, _paths, value) => {
           calls.push(`setup:${value}`)
-          expect(value).toBe('github:key')
+          expect(value).toBe('github')
           return 'fresh-key'
         },
         promptConfirm: async () => {
@@ -72,7 +83,7 @@ describe('source recovery', () => {
     )
 
     expect(source).toBe('fresh-key')
-    expect(calls).toEqual(['setup:github:key', 'confirm'])
+    expect(calls).toEqual(['setup:github', 'confirm'])
   })
 
   test('non-auth failures do not trigger source recovery', async () => {

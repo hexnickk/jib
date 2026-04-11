@@ -19,7 +19,7 @@ export function httpsCloneURL(repo: string, token?: string): string {
 /**
  * Rewrites a repo's `origin` remote URL in place so subsequent git operations
  * use the supplied installation token. Only touches git config — pure
- * shell-out. Lives in `modules/source-github` because the URL shape is
+ * shell-out. Lives in `modules/sources/backend/github` because the URL shape is
  * GitHub-specific; watcher/source sync code imports it and applies it to
  * a workdir.
  */

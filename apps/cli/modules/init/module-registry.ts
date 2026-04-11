@@ -1,21 +1,15 @@
 import * as cloudflaredMod from '@jib-module/cloudflared'
-import * as githubMod from '@jib-module/github'
-import * as nginxMod from '@jib-module/nginx'
 import * as watcherMod from '@jib-module/watcher'
 import type { Config } from '@jib/config'
 import type { Module, ModuleManifest } from '@jib/core'
+import * as ingressMod from '@jib/ingress'
 
 export type FirstPartyModule = Module<Config> & {
   manifest: ModuleManifest & { name: string }
 }
 
 /** Static first-party module registry for bun build --compile visibility. */
-export const MODULES: readonly FirstPartyModule[] = [
-  watcherMod,
-  nginxMod,
-  cloudflaredMod,
-  githubMod,
-]
+export const MODULES: readonly FirstPartyModule[] = [watcherMod, ingressMod, cloudflaredMod]
 
 export function allModules(
   registry: readonly FirstPartyModule[] = MODULES,

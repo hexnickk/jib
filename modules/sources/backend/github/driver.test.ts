@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { App, Config } from '@jib/config'
-import { cloneURL } from './github.ts'
+import { cloneURL } from './driver.ts'
 
 const cfg = {
   config_version: 3,

@@ -40,10 +40,9 @@ export interface ResolvedDriverSource {
   applyAuth: (workdir: string) => Promise<void>
 }
 
-export interface SourceSetupChoice {
+export interface SourceSetupOption {
   value: string
   label: string
-  run(ctx: ModuleContext<Config>): Promise<string | null>
 }
 
 export interface SourceSelectOption {
@@ -66,12 +65,13 @@ export interface DriverSourceStatus {
 
 export interface SourceDriver {
   name: string
+  setupLabel?: string
+  setup?: (ctx: ModuleContext<Config>) => Promise<string | null>
   resolve(cfg: Config, app: App, paths: Paths): Promise<ResolvedDriverSource>
   supportsRepo(repo: string): boolean
   isAuthFailure(error: unknown): boolean
   describe(source: Source): string
   describeStatus(sourceName: string, source: Source, paths: Paths): Promise<DriverSourceStatus>
-  setupChoices(): readonly SourceSetupChoice[]
 }
 
 export interface ProbeSourceDeps {

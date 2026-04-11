@@ -6,9 +6,7 @@ import { loadConfig } from '@jib/config'
 import {
   addGitHubAppSource,
   addGitHubKeySource,
-  appsUsingSource,
   getGitHubSource,
-  removeGitHubSource,
   sourceNameAvailable,
 } from './config-edit.ts'
 
@@ -39,7 +37,6 @@ describe('config-edit', () => {
     const cfg = await loadConfig(p)
     expect(getGitHubSource(cfg, 'gh-key')).toEqual({ driver: 'github', type: 'key' })
     expect(() => sourceNameAvailable(cfg, 'gh-key')).toThrow(/already exists/)
-    expect(appsUsingSource(cfg, 'gh-key')).toEqual(['demo'])
   })
 
   test('addGitHubKeySource writes a new entry', async () => {
@@ -49,18 +46,14 @@ describe('config-edit', () => {
     expect(getGitHubSource(cfg, 'fresh')).toEqual({ driver: 'github', type: 'key' })
   })
 
-  test('round-trips an app source and removes it cleanly', async () => {
+  test('round-trips an app source', async () => {
     const p = await seedConfig()
     await addGitHubAppSource(p, 'gh-app', 42)
-    let cfg = await loadConfig(p)
+    const cfg = await loadConfig(p)
     expect(getGitHubSource(cfg, 'gh-app')).toEqual({
       driver: 'github',
       type: 'app',
       app_id: 42,
     })
-
-    await removeGitHubSource(p, 'gh-app')
-    cfg = await loadConfig(p)
-    expect(getGitHubSource(cfg, 'gh-app')).toBeUndefined()
   })
 })

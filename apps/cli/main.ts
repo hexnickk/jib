@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { cloudflaredCmd } from '@jib-module/cloudflared'
-import { githubCmd } from '@jib-module/github'
 import pkg from '../../package.json' with { type: 'json' }
 import addCmd from './cmd/add.ts'
 import deployCmd from './cmd/deploy.ts'
@@ -40,6 +39,5 @@ await runCommandApp({
     watch: watchCmd,
     sources: sourcesCmd,
     cloudflared: cloudflaredCmd,
-    github: githubCmd,
   },
 })

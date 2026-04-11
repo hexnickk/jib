@@ -1,5 +1,5 @@
 import type { App, Config } from '@jib/config'
-import { githubDriver } from './github.ts'
+import { githubDriver } from './backend/github/driver.ts'
 import type { SourceDriver } from './types.ts'
 
 const DRIVERS = new Map<string, SourceDriver>([[githubDriver.name, githubDriver]])

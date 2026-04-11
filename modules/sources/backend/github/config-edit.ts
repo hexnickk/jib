@@ -20,20 +20,13 @@ export function getGitHubSource(cfg: Config, name: string): GitHubSource | undef
 
 /**
  * Throws if a source name is already taken. Used as input validation by
- * `jib github key setup` and `jib github app setup` so both commands share
- * the same "name already in use" error message.
+ * GitHub source setup flows so they share the same "name already in use"
+ * error message.
  */
 export function sourceNameAvailable(cfg: Config, name: string): void {
   if (cfg.sources[name] !== undefined) {
     throw new JibError('github.config', `source "${name}" already exists`)
   }
-}
-
-/** Returns the names of apps that still reference `sourceName`. */
-export function appsUsingSource(cfg: Config, sourceName: string): string[] {
-  return Object.entries(cfg.apps)
-    .filter(([, app]) => app.source === sourceName)
-    .map(([name]) => name)
 }
 
 /** Write a deploy-key source entry (idempotent — overwrites on re-setup). */
@@ -51,14 +44,5 @@ export async function addGitHubAppSource(
 ): Promise<void> {
   await editConfig(configFile, (cfg) => {
     cfg.sources[name] = { driver: 'github', type: 'app', app_id: appId }
-  })
-}
-
-/**
- * Remove a GitHub source entry.
- */
-export async function removeGitHubSource(configFile: string, name: string): Promise<void> {
-  await editConfig(configFile, (cfg) => {
-    delete cfg.sources[name]
   })
 }

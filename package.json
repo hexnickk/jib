@@ -26,8 +26,6 @@
     "@clack/prompts": "^0.8.2",
     "@jib/deploy": "workspace:*",
     "@jib-module/cloudflared": "workspace:*",
-    "@jib-module/github": "workspace:*",
-    "@jib-module/nginx": "workspace:*",
     "@jib-module/watcher": "workspace:*",
     "@jib/config": "workspace:*",
     "@jib/core": "workspace:*",

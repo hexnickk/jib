@@ -1,18 +1,12 @@
-import {
-  appPemPath,
-  applyAuth,
-  deployKeyPaths,
-  httpsCloneURL,
-  refreshAuth,
-  setupDeployKey,
-  setupGitHubApp,
-  sshCloneURL,
-} from '@jib-module/github'
 import type { App, Config, Source } from '@jib/config'
 import type { Paths } from '@jib/core'
 import { isExternalRepoURL, pathExists } from '@jib/core'
-import { configureSSHKey } from './git.ts'
-import type { DriverSourceStatus, ResolvedDriverSource, SourceDriver } from './types.ts'
+import { configureSSHKey } from '../../git.ts'
+import type { DriverSourceStatus, ResolvedDriverSource, SourceDriver } from '../../types.ts'
+import { appPemPath, applyAuth, refreshAuth } from './auth.ts'
+import { deployKeyPaths } from './keygen.ts'
+import { httpsCloneURL, sshCloneURL } from './remote-url.ts'
+import { setup as setupGitHubSource } from './setup.ts'
 
 const AUTH_FAILURE_SNIPPETS = [
   'Permission denied (publickey)',
@@ -80,13 +74,11 @@ async function describeGitHubStatus(
 
 export const githubDriver: SourceDriver = {
   name: 'github',
+  setupLabel: 'GitHub source',
+  setup: setupGitHubSource,
   resolve: resolveGitHubSource,
   supportsRepo: supportsGitHubRepo,
   isAuthFailure: isGitHubAuthFailure,
   describe: describeGitHubSource,
   describeStatus: describeGitHubStatus,
-  setupChoices: () => [
-    { value: 'github:key', label: 'GitHub deploy key', run: setupDeployKey },
-    { value: 'github:app', label: 'GitHub app', run: setupGitHubApp },
-  ],
 }

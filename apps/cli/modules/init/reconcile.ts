@@ -11,18 +11,11 @@ function hasCloudflaredToken(paths: Paths): boolean {
   return existsSync(tokenPath) && readFileSync(tokenPath, 'utf8').trim().length > 0
 }
 
-function hasGitHubSources(config: Config): boolean {
-  return Object.values(config.sources).some((source) => source.driver === 'github')
-}
-
 export function inferredOptionalModules(config: Config, paths: Paths): Record<string, true> {
   const inferred: Record<string, true> = {}
 
   if (config.modules.cloudflared === undefined && hasCloudflaredToken(paths)) {
     inferred.cloudflared = true
-  }
-  if (config.modules.github === undefined && hasGitHubSources(config)) {
-    inferred.github = true
   }
 
   return inferred

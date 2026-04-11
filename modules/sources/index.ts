@@ -12,7 +12,7 @@ export type {
   SourceDriver,
   SourceProbe,
   SourceSelectOption,
-  SourceSetupChoice,
+  SourceSetupOption,
   SourceStatus,
   SourceTarget,
 } from './types.ts'

@@ -51,7 +51,7 @@ describe('optional module configuration', () => {
     await withTmpConfig(async (cfg, root) => {
       const paths = getPaths(root)
       const mods: ModLike[] = [
-        mod('github', async (ctx) => {
+        mod('source-auth', async (ctx) => {
           const next = await loadConfig(ctx.paths.configFile)
           next.sources.demo = { driver: 'github', type: 'key' }
           await writeConfig(ctx.paths.configFile, next)
@@ -63,7 +63,7 @@ describe('optional module configuration', () => {
       })
 
       const final = await loadConfig(paths.configFile)
-      expect(final.modules).toEqual({ github: true })
+      expect(final.modules).toEqual({ 'source-auth': true })
       expect(final.sources.demo).toEqual({ driver: 'github', type: 'key' })
     })
   })
@@ -73,7 +73,7 @@ describe('optional module configuration', () => {
       const paths = getPaths(root)
       const mods: ModLike[] = [
         mod('cloudflared'),
-        mod('github', async (ctx) => {
+        mod('source-auth', async (ctx) => {
           const next = await loadConfig(ctx.paths.configFile)
           next.sources.demo = { driver: 'github', type: 'key' }
           await writeConfig(ctx.paths.configFile, next)

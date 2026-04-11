@@ -8,11 +8,11 @@ import { addGitHubAppSource, addGitHubKeySource, sourceNameAvailable } from './c
 import { deployKeyPaths, generateDeployKey } from './keygen.ts'
 
 /**
- * Interactive git auth setup, shared between `jib init` (optional-module wizard)
- * and potentially `jib github setup` (standalone). Prompts the user to
+ * Interactive GitHub source setup, shared between `jib sources setup`
+ * and auth-recovery prompts. Prompts the user to
  * choose between SSH deploy key, GitHub App, or skip.
  */
-export async function setup(ctx: ModuleContext<Config>): Promise<void> {
+export async function setup(ctx: ModuleContext<Config>): Promise<string | null> {
   const choice = await promptSelect<'key' | 'app' | 'skip'>({
     message: 'Set up a git source ref? (needed for private repos)',
     options: [
@@ -21,8 +21,9 @@ export async function setup(ctx: ModuleContext<Config>): Promise<void> {
       { value: 'skip', label: 'Skip — public repos only or set up later' },
     ],
   })
-  if (choice === 'key') await setupDeployKey(ctx)
-  else if (choice === 'app') await setupGitHubApp(ctx)
+  if (choice === 'key') return await setupDeployKey(ctx)
+  if (choice === 'app') return await setupGitHubApp(ctx)
+  return null
 }
 
 export async function setupDeployKey(ctx: ModuleContext<Config>): Promise<string | null> {
@@ -47,7 +48,7 @@ export async function setupDeployKey(ctx: ModuleContext<Config>): Promise<string
     return name
   } catch (err) {
     log.warning(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
-    log.info('you can retry later: jib github key setup <name>')
+    log.info('you can retry later: jib sources setup')
     return null
   }
 }
@@ -68,7 +69,7 @@ export async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<string
     return name
   } catch (err) {
     log.warning(`app setup failed: ${err instanceof Error ? err.message : String(err)}`)
-    log.info('you can retry later: jib github app setup <name>')
+    log.info('you can retry later: jib sources setup')
     return null
   }
 }
