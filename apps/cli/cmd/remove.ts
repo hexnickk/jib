@@ -4,9 +4,9 @@ import { releaseIngress } from '@jib/ingress'
 import { promptConfirm, spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { applyCliArgs, missingInput, withCliArgs } from '../../../src/cli-runtime.ts'
-import { createIngressOperator } from '../../../src/ingress-operator.ts'
 import { DefaultRemoveSupport, RemoveService } from '../modules/remove/index.ts'
+import { applyCliArgs, missingInput, withCliArgs } from '../modules/runtime/cli-runtime.ts'
+import { createIngressOperator } from '../modules/runtime/ingress-operator.ts'
 
 /** `jib remove <app>` — prompt in the CLI, then delegate teardown to the remove module. */
 

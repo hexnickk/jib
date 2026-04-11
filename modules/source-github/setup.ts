@@ -8,7 +8,7 @@ import { addGitHubAppSource, addGitHubKeySource, sourceNameAvailable } from './c
 import { deployKeyPaths, generateDeployKey } from './keygen.ts'
 
 /**
- * Interactive git auth setup, shared between `jib init` (first-run wizard)
+ * Interactive git auth setup, shared between `jib init` (optional-module wizard)
  * and potentially `jib github setup` (standalone). Prompts the user to
  * choose between SSH deploy key, GitHub App, or skip.
  */

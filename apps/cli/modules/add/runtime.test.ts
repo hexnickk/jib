@@ -17,7 +17,7 @@ describe('add command error normalization', () => {
     const normalized = normalizeCliError(
       normalizeAddDeployError(
         new CliError('deploy_failed', 'permission denied', {
-          hint: 'rerun `sudo jib init` to repair /opt/jib permissions',
+          hint: 'repair /opt/jib ownership and permissions',
         }),
         'blog',
         '/opt/jib/config.yml',
@@ -25,7 +25,7 @@ describe('add command error normalization', () => {
     )
 
     expect(normalized.message).toBe('permission denied')
-    expect(normalized.hint).toContain('rerun `sudo jib init`')
+    expect(normalized.hint).toContain('repair /opt/jib ownership and permissions')
     expect(normalized.hint).toContain('rolled back blog from /opt/jib/config.yml')
   })
 })

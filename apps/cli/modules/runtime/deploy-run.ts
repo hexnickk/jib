@@ -78,7 +78,7 @@ export async function runDeploy(
 function deployFailureHint(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   if (message.includes('EACCES') && message.includes('/opt/jib/')) {
-    return 'rerun `sudo jib init` to repair /opt/jib permissions, then retry `jib deploy ...`'
+    return 'repair /opt/jib ownership and permissions, then retry `jib deploy ...`'
   }
   return 'check docker compose output, then retry `jib deploy ...`'
 }

@@ -43,11 +43,9 @@ describe('runJibMigrations', () => {
   test('skips already-applied migrations', async () => {
     const log: string[] = []
     const migs = [migration('a', () => log.push('a')), migration('b', () => log.push('b'))]
-    // Run once
     await runJibMigrations(ctx, migs)
     log.length = 0
 
-    // Add a third, re-run
     migs.push(migration('c', () => log.push('c')))
     const applied = await runJibMigrations(ctx, migs)
     expect(applied).toEqual(['c'])

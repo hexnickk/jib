@@ -61,7 +61,7 @@ describe('runDeploy', () => {
     })
   })
 
-  test('permission failures hint to rerun sudo jib init', async () => {
+  test('permission failures hint to repair the managed tree', async () => {
     setCliRuntime({ output: 'json' })
     await expect(
       runDeploy(cfg, paths, 'demo', undefined, 1000, {
@@ -75,7 +75,7 @@ describe('runDeploy', () => {
       }),
     ).rejects.toMatchObject({
       code: 'deploy_failed',
-      hint: 'rerun `sudo jib init` to repair /opt/jib permissions, then retry `jib deploy ...`',
+      hint: 'repair /opt/jib ownership and permissions, then retry `jib deploy ...`',
     })
   })
 })

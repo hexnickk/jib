@@ -1,8 +1,8 @@
 import { loadAppOrExit } from '@jib/config'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { applyCliArgs, withCliArgs } from '../../../src/cli-runtime.ts'
-import { createDeployEngine } from '../../../src/deploy-engine.ts'
+import { applyCliArgs, withCliArgs } from '../modules/runtime/cli-runtime.ts'
+import { createDeployEngine } from '../modules/runtime/deploy-engine.ts'
 
 export default defineCommand({
   meta: { name: 'down', description: 'Stop containers without removing app from config' },

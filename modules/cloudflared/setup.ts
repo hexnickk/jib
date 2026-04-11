@@ -8,7 +8,7 @@ import { $ } from 'bun'
 import { extractTunnelToken } from './token.ts'
 
 /**
- * Interactive tunnel token setup, shared between `jib init` (first-run
+ * Interactive tunnel token setup, shared between `jib init` (optional-module
  * wizard) and `jib cloudflared setup` (standalone CLI). Detects an
  * existing token on disk and lets the user keep it.
  */

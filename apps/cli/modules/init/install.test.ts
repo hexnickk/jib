@@ -5,7 +5,7 @@ import { runInstallsTx } from './install.ts'
 import type { ModLike } from './registry.ts'
 
 /**
- * Covers the transactional semantics of `jib init`'s module install loop.
+ * Covers the transactional semantics of the optional-module install loop.
  * On any failure, already-installed modules must have their `uninstall()`
  * called in reverse order. Each rollback step is independent — a failing
  * uninstall doesn't abort the rest.

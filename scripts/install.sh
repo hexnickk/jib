@@ -20,6 +20,9 @@ log()  { printf '==> %s\n' "$*"; }
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 need() { command -v "$1" >/dev/null 2>&1 || fail "missing required command: $1"; }
+run_as_root() {
+  if [ "$(id -u)" = "0" ]; then "$@"; else need sudo; sudo "$@"; fi
+}
 need curl
 need uname
 need install
@@ -80,9 +83,22 @@ log "installing $cli_dest (version $tag)"
 if [ -w "$PREFIX" ] || [ "$(id -u)" = "0" ]; then
   install -m 0755 "$tmp/jib" "$cli_dest"
 else
-  need sudo
-  sudo install -m 0755 "$tmp/jib" "$cli_dest"
+  run_as_root install -m 0755 "$tmp/jib" "$cli_dest"
+fi
+
+if [ "$os" = "linux" ]; then
+  log "running automatic migrations"
+  run_as_root "$cli_dest" migrate
+
+  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet jib-watcher.service; then
+    log "restarting jib-watcher.service to pick up the new binary"
+    run_as_root systemctl restart jib-watcher.service
+  fi
 fi
 
 log "jib $tag installed"
-log "next: run 'sudo jib init' to bootstrap"
+if [ "$os" = "linux" ]; then
+  log "next: run 'sudo jib init' to configure optional modules"
+else
+  log "automatic migrations skipped on $os; run jib on the target Linux host"
+fi

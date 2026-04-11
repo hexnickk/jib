@@ -3,9 +3,9 @@ import type { App, Config } from '@jib/config'
 import { CliError, type Paths, isTextOutput } from '@jib/core'
 import { releaseIngress } from '@jib/ingress'
 import { consola } from 'consola'
-import type { DeployRunResult } from '../../../../src/deploy-run.ts'
-import { createIngressOperator } from '../../../../src/ingress-operator.ts'
 import { DefaultRemoveSupport, RemoveService } from '../remove/index.ts'
+import type { DeployRunResult } from '../runtime/deploy-run.ts'
+import { createIngressOperator } from '../runtime/ingress-operator.ts'
 import type { AddFlowResult } from './types.ts'
 
 export interface InterruptTrap {
