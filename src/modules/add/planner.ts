@@ -9,6 +9,7 @@ import {
 } from '@jib/docker'
 import { isInteractive, note, promptConfirm, promptString } from '@jib/tui'
 import { consola } from 'consola'
+import { canScaffoldCompose, scaffoldComposeFromDockerfile } from './compose-scaffold.ts'
 import { configEntriesToBuildArgs } from './config-entries.ts'
 import {
   mergeGuidedServiceAnswers,
@@ -19,9 +20,18 @@ import { parseApp } from './inputs.ts'
 import { collectDomains, promptForServices } from './prompting.ts'
 import type { AddInputs, AddPlanner, ConfigEntry } from './types.ts'
 
-export function createAddPlanner(): AddPlanner {
+interface PlannerDeps {
+  canScaffoldCompose?: (workdir: string) => boolean
+  isInteractive?: () => boolean
+  note?: typeof note
+  promptConfirm?: typeof promptConfirm
+  promptString?: typeof promptString
+  scaffoldComposeFromDockerfile?: (workdir: string) => string | null
+}
+
+export function createAddPlanner(deps: PlannerDeps = {}): AddPlanner {
   return {
-    inspectCompose: inspectComposeWithPrompts,
+    inspectCompose: (draftApp, workdir) => inspectComposeWithPrompts(draftApp, workdir, deps),
     collectGuidedInputs,
     buildResolvedApp,
     confirmPlan: confirmAddPlan,
@@ -44,6 +54,7 @@ function composeNotFoundMessage(workdir: string, compose?: string[]): string {
 async function inspectComposeWithPrompts(
   draftApp: App,
   workdir: string,
+  deps: PlannerDeps,
 ): Promise<ComposeInspection> {
   let compose = draftApp.compose
   for (;;) {
@@ -58,11 +69,28 @@ async function inspectComposeWithPrompts(
       if (
         error instanceof ComposeInspectionError &&
         error.code === 'compose_not_found' &&
-        isInteractive()
+        (deps.isInteractive ?? isInteractive)()
       ) {
-        if (isTextOutput()) note(composeNotFoundMessage(workdir, compose), 'Compose file')
+        if (isTextOutput())
+          (deps.note ?? note)(composeNotFoundMessage(workdir, compose), 'Compose file')
+        if (
+          (!compose || compose.length === 0) &&
+          (deps.canScaffoldCompose ?? canScaffoldCompose)(workdir) &&
+          (await (deps.promptConfirm ?? promptConfirm)({
+            message: 'Generate a minimal docker-compose.generated.yml from the repo Dockerfile?',
+            initialValue: true,
+          }))
+        ) {
+          const generated = (deps.scaffoldComposeFromDockerfile ?? scaffoldComposeFromDockerfile)(
+            workdir,
+          )
+          if (generated) {
+            compose = [generated]
+            continue
+          }
+        }
         compose = (
-          await promptString({
+          await (deps.promptString ?? promptString)({
             message: 'Compose file(s) relative to the repo (comma-separated)',
             placeholder: 'docker-compose.yml',
             ...(compose ? { initialValue: compose.join(',') } : {}),
@@ -76,7 +104,7 @@ async function inspectComposeWithPrompts(
       if (error instanceof ComposeInspectionError && error.code === 'compose_not_found') {
         if (!compose || compose.length === 0) {
           throw new CliError('compose_inspection_failed', composeNotFoundMessage(workdir), {
-            hint: 'add a compose file to the repo root, or rerun with --compose <file>',
+            hint: 'add a compose file to the repo root, rerun with --compose <file>, or rerun interactively to generate one from Dockerfile',
           })
         }
         throw new CliError('compose_inspection_failed', error.message, {
