@@ -9,7 +9,7 @@ import {
   promptSelect,
   promptString,
 } from '@jib/tui'
-import { mergeConfigEntries, scopeCovers, scopeLabel, unionScopes } from './config-entries.ts'
+import { mergeConfigEntries, scopeCovers, scopeLabel } from './config-entries.ts'
 import {
   assignCliDomainsToServices,
   parseEnvEntry,
@@ -22,8 +22,9 @@ import {
 import type { ConfigEntry, ConfigScope } from './types.ts'
 
 const MANUAL_CONFIG_LINES = [
-  'Enter additional config as KEY=VALUE, one per line.',
-  'Each value defaults to runtime only unless you change it in the next step.',
+  'Enter additional environment variables as KEY=VALUE, one per line.',
+  'New entries are added to the runtime .env file by default.',
+  'If you need extra build args, add them to the app config after add completes.',
   'Press Enter on a blank line when finished.',
 ]
 
@@ -93,7 +94,7 @@ export async function promptForServices(
     if (!isInteractive()) {
       for (const [key, requiredScope] of requiredEntries) {
         issues.push({
-          field: `config.${key}`,
+          field: `env.${key}`,
           message: `${service.name} requires ${key} for ${scopeLabel(requiredScope)}; rerun with --env ${key}=VALUE, --build-arg ${key}=VALUE, or --build-env ${key}=VALUE`,
         })
       }
@@ -122,21 +123,20 @@ export async function promptForServices(
     if (
       isInteractive() &&
       (await promptConfirm({
-        message: `Add more config for "${service.name}"?`,
+        message: `Add more runtime environment variables for "${service.name}"?`,
         initialValue: false,
       }))
     ) {
       const manual = await promptLines({
-        title: `Additional config for "${service.name}"`,
+        title: `Additional runtime environment variables for "${service.name}"`,
         lines: MANUAL_CONFIG_LINES,
-        promptLabel: 'config',
+        promptLabel: 'var',
         validateLine: validateEnvEntry,
       })
       for (const raw of manual) {
         const base = parseEnvEntry(raw)
         const existing = provided.get(base.key)
-        const scope = await promptManualScope(service.name, base.key, existing?.scope)
-        const entry = { ...base, scope }
+        const entry = { ...base, scope: existing?.scope ?? 'runtime' }
         configEntries.push(entry)
         provided.set(base.key, mergeEntry(existing, entry))
       }
@@ -161,10 +161,10 @@ async function confirmRecommendedScopes(
 ): Promise<boolean> {
   note(
     entries.map(([key, scope]) => `${key}: ${scopeLabel(scope)}`).join('\n'),
-    `Detected config for ${service}`,
+    `Detected environment variables and build args for ${service}`,
   )
   return await promptConfirm({
-    message: `Use these recommended config scopes for "${service}"?`,
+    message: `Use these recommended runtime/build placements for "${service}"?`,
     initialValue: true,
   })
 }
@@ -188,30 +188,8 @@ async function promptRequiredScope(
   recommended: ConfigScope,
 ): Promise<ConfigScope> {
   return await promptSelect({
-    message: `How should jib use ${key} for service "${service}"?`,
+    message: `Where should jib store ${key} for service "${service}"?`,
     options: scopeOptions(recommended),
     initialValue: recommended,
-  })
-}
-
-async function promptManualScope(
-  service: string,
-  key: string,
-  initialValue?: ConfigScope,
-): Promise<ConfigScope> {
-  const defaultScope = initialValue ?? 'runtime'
-  const keepDefault = await promptConfirm({
-    message: `Use ${scopeLabel(defaultScope)} for ${key}?`,
-    initialValue: true,
-  })
-  if (keepDefault) return defaultScope
-  return await promptSelect({
-    message: `How should jib use ${key} for service "${service}"?`,
-    options: [
-      { value: 'runtime', label: 'runtime only', hint: 'Write to the runtime .env file' },
-      { value: 'build', label: 'build only', hint: 'Write to app.build_args' },
-      { value: 'both', label: 'build + runtime', hint: 'Write to both places' },
-    ],
-    initialValue: initialValue ? unionScopes(initialValue, 'runtime') : 'runtime',
   })
 }
