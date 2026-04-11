@@ -1,4 +1,4 @@
-import type { Paths } from '@jib/core'
+import type { Paths } from '@jib/paths'
 import { nginxBackend } from './nginx/index.ts'
 import type { IngressBackend } from './types.ts'
 

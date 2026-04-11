@@ -1,5 +1,6 @@
 import type { App, Config, Source } from '@jib/config'
-import type { ModuleContext, Paths } from '@jib/core'
+import type { Logger } from '@jib/logging'
+import type { Paths } from '@jib/paths'
 import type { GitEnv, lsRemote } from './git.ts'
 
 export interface SourceTarget {
@@ -63,10 +64,16 @@ export interface DriverSourceStatus {
   hasCredential: boolean
 }
 
+export interface SourceSetupContext {
+  config: Config
+  logger: Logger
+  paths: Paths
+}
+
 export interface SourceDriver {
   name: string
   setupLabel?: string
-  setup?: (ctx: ModuleContext<Config>) => Promise<string | null>
+  setup?: (ctx: SourceSetupContext) => Promise<string | null>
   resolve(cfg: Config, app: App, paths: Paths): Promise<ResolvedDriverSource>
   supportsRepo(repo: string): boolean
   isAuthFailure(error: unknown): boolean

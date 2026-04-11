@@ -13,27 +13,6 @@ export class JibError extends Error {
   }
 }
 
-export class ConfigError extends JibError {
-  constructor(message: string, options?: ErrorOptions) {
-    super('config', message, options)
-    this.name = 'ConfigError'
-  }
-}
-
-export class StateError extends JibError {
-  constructor(message: string, options?: ErrorOptions) {
-    super('state', message, options)
-    this.name = 'StateError'
-  }
-}
-
-export class LockError extends JibError {
-  constructor(message: string, options?: ErrorOptions) {
-    super('lock', message, options)
-    this.name = 'LockError'
-  }
-}
-
 export class ValidationError extends JibError {
   constructor(message: string, options?: ErrorOptions) {
     super('validation', message, options)

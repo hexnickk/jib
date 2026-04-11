@@ -1,5 +1,5 @@
+import { MissingInputError } from '@jib/cli'
 import type { ParsedDomain } from '@jib/config'
-import { MissingInputError } from '@jib/core'
 import type { ComposeService } from '@jib/docker'
 import {
   isInteractive,

@@ -1,6 +1,6 @@
 import { hasTunnelToken } from '@jib-module/cloudflared'
 import { type Config, writeConfig } from '@jib/config'
-import type { Paths } from '@jib/core'
+import type { Paths } from '@jib/paths'
 
 interface ReconcileDeps {
   writeConfig?: typeof writeConfig

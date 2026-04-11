@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { createLogger, getPaths } from '@jib/core'
+import { createLogger } from '@jib/logging'
+import { getPaths } from '@jib/paths'
 import { type PollAppDeps, parsePollInterval, pollApp, runPoller } from './poller.ts'
 
 function mkCfg(overrides: Partial<Config> = {}): Config {

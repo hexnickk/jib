@@ -8,11 +8,14 @@
         "@clack/prompts": "^0.8.2",
         "@jib-module/cloudflared": "workspace:*",
         "@jib-module/watcher": "workspace:*",
+        "@jib/cli": "workspace:*",
         "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
         "@jib/deploy": "workspace:*",
         "@jib/docker": "workspace:*",
+        "@jib/errors": "workspace:*",
         "@jib/ingress": "workspace:*",
+        "@jib/logging": "workspace:*",
+        "@jib/paths": "workspace:*",
         "@jib/secrets": "workspace:*",
         "@jib/sources": "workspace:*",
         "@jib/state": "workspace:*",
@@ -30,29 +33,30 @@
         "typescript": "^5.6.3",
       },
     },
+    "modules/cli": {
+      "name": "@jib/cli",
+      "version": "0.0.0",
+      "dependencies": {
+        "@jib/errors": "workspace:*",
+        "@jib/logging": "workspace:*",
+        "citty": "*",
+      },
+    },
     "modules/cloudflared": {
       "name": "@jib-module/cloudflared",
       "version": "0.0.0",
       "dependencies": {
         "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
-        "@jib/tui": "workspace:*",
-        "citty": "*",
-        "consola": "*",
+        "@jib/logging": "workspace:*",
+        "@jib/paths": "workspace:*",
       },
     },
     "modules/config": {
       "name": "@jib/config",
       "version": "0.0.0",
       "dependencies": {
-        "@jib/core": "workspace:*",
-      },
-    },
-    "modules/core": {
-      "name": "@jib/core",
-      "version": "0.0.0",
-      "dependencies": {
-        "consola": "*",
+        "@jib/errors": "workspace:*",
+        "@jib/paths": "workspace:*",
       },
     },
     "modules/deploy": {
@@ -60,8 +64,10 @@
       "version": "0.0.0",
       "dependencies": {
         "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
         "@jib/docker": "workspace:*",
+        "@jib/errors": "workspace:*",
+        "@jib/logging": "workspace:*",
+        "@jib/paths": "workspace:*",
         "@jib/state": "workspace:*",
       },
     },
@@ -70,32 +76,48 @@
       "version": "0.0.0",
       "dependencies": {
         "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
-        "consola": "*",
+        "@jib/errors": "workspace:*",
+        "@jib/paths": "workspace:*",
         "yaml": "*",
       },
+    },
+    "modules/errors": {
+      "name": "@jib/errors",
+      "version": "0.0.0",
     },
     "modules/ingress": {
       "name": "@jib/ingress",
       "version": "0.0.0",
       "dependencies": {
         "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
+        "@jib/logging": "workspace:*",
+        "@jib/paths": "workspace:*",
       },
+    },
+    "modules/logging": {
+      "name": "@jib/logging",
+      "version": "0.0.0",
+      "dependencies": {
+        "consola": "*",
+      },
+    },
+    "modules/paths": {
+      "name": "@jib/paths",
+      "version": "0.0.0",
     },
     "modules/secrets": {
       "name": "@jib/secrets",
       "version": "0.0.0",
-      "dependencies": {
-        "@jib/core": "workspace:*",
-      },
     },
     "modules/sources": {
       "name": "@jib/sources",
       "version": "0.0.0",
       "dependencies": {
+        "@jib/cli": "workspace:*",
         "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
+        "@jib/errors": "workspace:*",
+        "@jib/logging": "workspace:*",
+        "@jib/paths": "workspace:*",
         "@jib/tui": "workspace:*",
       },
     },
@@ -103,7 +125,8 @@
       "name": "@jib/state",
       "version": "0.0.0",
       "dependencies": {
-        "@jib/core": "workspace:*",
+        "@jib/errors": "workspace:*",
+        "@jib/paths": "workspace:*",
         "@jib/sources": "workspace:*",
         "drizzle-orm": "*",
       },
@@ -113,7 +136,8 @@
       "version": "0.0.0",
       "dependencies": {
         "@clack/prompts": "*",
-        "@jib/core": "workspace:*",
+        "@jib/cli": "workspace:*",
+        "@jib/errors": "workspace:*",
       },
     },
     "modules/watcher": {
@@ -121,8 +145,9 @@
       "version": "0.0.0",
       "dependencies": {
         "@jib/config": "workspace:*",
-        "@jib/core": "workspace:*",
         "@jib/deploy": "workspace:*",
+        "@jib/logging": "workspace:*",
+        "@jib/paths": "workspace:*",
         "@jib/sources": "workspace:*",
         "@jib/state": "workspace:*",
       },
@@ -213,15 +238,21 @@
 
     "@jib-module/watcher": ["@jib-module/watcher@workspace:modules/watcher"],
 
-    "@jib/config": ["@jib/config@workspace:modules/config"],
+    "@jib/cli": ["@jib/cli@workspace:modules/cli"],
 
-    "@jib/core": ["@jib/core@workspace:modules/core"],
+    "@jib/config": ["@jib/config@workspace:modules/config"],
 
     "@jib/deploy": ["@jib/deploy@workspace:modules/deploy"],
 
     "@jib/docker": ["@jib/docker@workspace:modules/docker"],
 
+    "@jib/errors": ["@jib/errors@workspace:modules/errors"],
+
     "@jib/ingress": ["@jib/ingress@workspace:modules/ingress"],
+
+    "@jib/logging": ["@jib/logging@workspace:modules/logging"],
+
+    "@jib/paths": ["@jib/paths@workspace:modules/paths"],
 
     "@jib/secrets": ["@jib/secrets@workspace:modules/secrets"],
 

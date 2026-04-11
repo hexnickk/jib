@@ -1,7 +1,7 @@
+import { CliError } from '@jib/cli'
 import { loadConfig } from '@jib/config'
 import type { Config } from '@jib/config'
-import { CliError, type Paths } from '@jib/core'
-import { isInteractive, promptConfirm, promptSelect } from '@jib/tui'
+import type { Paths } from '@jib/paths'
 import {
   availableSourceSetupOptions,
   configuredSourceOptions,
@@ -68,7 +68,13 @@ export async function setupSourceRef(
     return await (deps.runSetup ?? runSourceSetup)(cfg, paths, setupOption.value)
   }
 
-  const choice = await (deps.promptSelect ?? promptSelect<SourceChoice>)({
+  if (!deps.promptSelect) {
+    throw new CliError('missing_input', 'missing source setup selection', {
+      issues: [{ field: 'source', message: 'rerun with interactive prompts enabled' }],
+    })
+  }
+
+  const choice = await deps.promptSelect({
     message: 'What kind of source would you like to set up?',
     options: setupOptions.map((option) => ({
       value: `setup:${option.value}` as const,
@@ -125,12 +131,13 @@ export async function maybeRecoverSource(
   currentSource?: string,
   deps: SourceRecoveryDeps = {},
 ): Promise<string | null> {
-  const interactive = deps.isInteractive ?? isInteractive
-  if (!interactive() || !repoSupportsSourceRecovery(repo) || !isSourceAuthFailure(repo, error)) {
+  const interactive = deps.isInteractive?.() ?? false
+  if (!interactive || !repoSupportsSourceRecovery(repo) || !isSourceAuthFailure(repo, error)) {
     return null
   }
+  if (!deps.promptSelect) return null
   const hasCurrentSource = currentSource ? cfg.sources[currentSource] !== undefined : false
-  const choice = await (deps.promptSelect ?? promptSelect<SourceChoice>)({
+  const choice = await deps.promptSelect({
     message:
       'Repo access failed. Choose an existing source or set up a new one, then retry the clone.',
     options: buildSourceChoices(cfg),
@@ -151,7 +158,7 @@ export async function maybeRecoverSource(
   if (!created) {
     throw new CliError('cancelled', 'source setup did not complete; add cancelled')
   }
-  const confirmed = await (deps.promptConfirm ?? promptConfirm)({
+  const confirmed = await (deps.promptConfirm ?? (async () => true))({
     message: `After finishing setup for "${created}", retry the clone now?`,
     initialValue: true,
   })

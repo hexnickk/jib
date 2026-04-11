@@ -1,4 +1,4 @@
-import { CliError } from '@jib/core'
+import { CliError } from '@jib/cli'
 import type { AddFlowResult } from './types.ts'
 
 export interface InterruptState {

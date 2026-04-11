@@ -1,12 +1,11 @@
+import { applyCliArgs, canPrompt, isTextOutput, missingInput, withCliArgs } from '@jib/cli'
 import { loadAppOrExit } from '@jib/config'
-import { type Paths, canPrompt, isTextOutput } from '@jib/core'
-import { releaseIngress } from '@jib/ingress'
+import { createIngressOperator, releaseIngress } from '@jib/ingress'
+import type { Paths } from '@jib/paths'
 import { promptConfirm, spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { DefaultRemoveSupport, RemoveService } from '../modules/remove/index.ts'
-import { applyCliArgs, missingInput, withCliArgs } from '../modules/runtime/cli-runtime.ts'
-import { createIngressOperator } from '../modules/runtime/ingress-operator.ts'
 
 /** `jib remove <app>` — prompt in the CLI, then delegate teardown to the remove module. */
 

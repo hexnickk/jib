@@ -1,8 +1,9 @@
+import { CliError, isTextOutput } from '@jib/cli'
 import type { Config } from '@jib/config'
-import { CliError, type Paths, isTextOutput } from '@jib/core'
+import type { Paths } from '@jib/paths'
 import { syncApp } from '@jib/sources'
 import { spinner } from '@jib/tui'
-import { createDeployEngine } from './deploy-engine.ts'
+import { createDeployEngine } from './engine.ts'
 
 export const DEFAULT_TIMEOUT_MS = 5 * 60_000
 

@@ -1,8 +1,7 @@
-import type { Config } from '@jib/config'
-import type { ModuleContext } from '@jib/core'
 import { runCloudflaredSetup } from '../cloudflared/setup.ts'
+import type { ModuleHook } from './types.ts'
 
-type ModuleSetup = (ctx: ModuleContext<Config>) => Promise<void>
+type ModuleSetup = ModuleHook
 
 const SETUPS: Readonly<Record<string, ModuleSetup>> = {
   cloudflared: ({ paths }) => runCloudflaredSetup(paths),

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { ConfigError } from '@jib/core'
+import { ConfigError } from './errors.ts'
 import { ConfigSchema } from './schema.ts'
 import { parseDuration, validate, validateRepo } from './validate.ts'
 

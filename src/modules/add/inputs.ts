@@ -1,3 +1,4 @@
+import { MissingInputError } from '@jib/cli'
 import {
   type App,
   AppSchema,
@@ -9,7 +10,7 @@ import {
   toArray,
   validateRepo,
 } from '@jib/config'
-import { MissingInputError, ValidationError } from '@jib/core'
+import { ValidationError } from '@jib/errors'
 import { isInteractive, promptString } from '@jib/tui'
 import { parseEnvEntry, splitCommaValues } from './guided.ts'
 import type { AddInputs, EnvEntry } from './types.ts'

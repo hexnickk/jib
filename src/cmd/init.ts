@@ -1,5 +1,15 @@
+import {
+  CliError,
+  applyCliArgs,
+  canPrompt,
+  ensureLinux,
+  ensureRoot,
+  isTextOutput,
+  missingInput,
+  withCliArgs,
+} from '@jib/cli'
 import { loadConfig } from '@jib/config'
-import { CliError, canPrompt, getPaths, isTextOutput } from '@jib/core'
+import { getPaths } from '@jib/paths'
 import { intro, note, outro } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { hasBootstrapState } from '../migrations/service.ts'
@@ -10,8 +20,6 @@ import {
   installedOptionalModules,
   unseenOptionalModules,
 } from '../modules/init/registry.ts'
-import { applyCliArgs, missingInput, withCliArgs } from '../modules/runtime/cli-runtime.ts'
-import { ensureLinux, ensureRoot } from '../modules/runtime/root.ts'
 
 function ensureMigrated(rootReady: boolean): void {
   if (rootReady) return

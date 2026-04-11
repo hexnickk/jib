@@ -1,10 +1,9 @@
 import { existsSync } from 'node:fs'
-import { getPaths, isTextOutput } from '@jib/core'
+import { applyCliArgs, ensureLinux, ensureRoot, isTextOutput, withCliArgs } from '@jib/cli'
+import { getPaths } from '@jib/paths'
 import { intro, outro } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { runPendingMigrations } from '../migrations/service.ts'
-import { applyCliArgs, withCliArgs } from '../modules/runtime/cli-runtime.ts'
-import { ensureLinux, ensureRoot } from '../modules/runtime/root.ts'
 
 export default defineCommand({
   meta: { name: 'migrate', description: 'Run automatic server migrations' },

@@ -1,5 +1,5 @@
 import { createSign } from 'node:crypto'
-import { JibError } from '@jib/core'
+import { JibError } from '@jib/errors'
 
 /**
  * Base64url encoder — GitHub JWT headers/payloads use the URL-safe variant

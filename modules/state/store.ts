@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { StateError } from '@jib/core'
 import { ZodError } from 'zod'
+import { StateError } from './errors.ts'
 import { type AppState, AppStateSchema, CURRENT_SCHEMA_VERSION, emptyState } from './schema.ts'
 
 /** JSON-backed per-app state store. Writes are atomic via temp file + rename. */

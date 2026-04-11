@@ -1,5 +1,5 @@
+import { CliError, MissingInputError, isDebugEnabled, isTextOutput } from '@jib/cli'
 import { type App, type Config, type Domain, type ParsedDomain, assignPorts } from '@jib/config'
-import { CliError, MissingInputError, isDebugEnabled, isTextOutput } from '@jib/core'
 import {
   type ComposeInspection,
   ComposeInspectionError,
@@ -119,6 +119,7 @@ async function buildResolvedApp(
       ...(inputs.healthChecks.length > 0 ? { health: inputs.healthChecks } : {}),
     }),
     workdir,
+    isTextOutput() ? { warn: (message) => consola.warn(message) } : {},
   )
 }
 

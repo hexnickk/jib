@@ -1,4 +1,5 @@
-import { ValidationError, assertCanPrompt, canPrompt, promptBlockReason } from '@jib/core'
+import { assertCanPrompt, canPrompt, promptBlockReason } from '@jib/cli'
+import { ValidationError } from '@jib/errors'
 
 /**
  * A jib process is considered interactive iff both std streams are TTYs and

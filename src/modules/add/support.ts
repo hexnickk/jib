@@ -1,6 +1,6 @@
 import { loadConfig, writeConfig } from '@jib/config'
 import type { App, Config } from '@jib/config'
-import type { Paths } from '@jib/core'
+import type { Paths } from '@jib/paths'
 import { SecretsManager } from '@jib/secrets'
 import { cloneForInspection, removeCheckout } from '@jib/sources'
 import type { AddSupport, EnvEntry } from './types.ts'

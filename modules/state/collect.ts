@@ -1,5 +1,5 @@
 import type { Config } from '@jib/config'
-import type { Paths } from '@jib/core'
+import type { Paths } from '@jib/paths'
 import { type SourceStatus, collectSourceStatuses } from '@jib/sources'
 import { $ } from 'bun'
 import { Store } from './store.ts'

@@ -1,0 +1,15 @@
+{
+  "name": "@jib/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@jib/errors": "workspace:*",
+    "@jib/logging": "workspace:*",
+    "citty": "*"
+  }
+}

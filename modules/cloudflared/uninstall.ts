@@ -1,10 +1,16 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { InstallFn } from '@jib/core'
+import type { Logger } from '@jib/logging'
+import type { Paths } from '@jib/paths'
 import { SERVICE_NAME, UNIT_PATH } from './templates.ts'
 
+interface CloudflaredContext {
+  logger: Logger
+  paths: Paths
+}
+
 /** Stops the unit, removes the unit file + compose file. Leaves the dir. */
-export const uninstall: InstallFn = async (ctx) => {
+export const uninstall = async (ctx: CloudflaredContext): Promise<void> => {
   const log = ctx.logger
   const dir = ctx.paths.cloudflaredDir
 

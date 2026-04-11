@@ -1,6 +1,7 @@
 import { getCloudflaredStatus } from '@jib-module/cloudflared'
+import { isTextOutput } from '@jib/cli'
 import { loadConfig } from '@jib/config'
-import { getPaths, isTextOutput } from '@jib/core'
+import { getPaths } from '@jib/paths'
 import { defineCommand } from 'citty'
 import { runCloudflaredSetup } from '../modules/cloudflared/setup.ts'
 

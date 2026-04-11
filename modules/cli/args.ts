@@ -1,14 +1,13 @@
+import type { ArgsDef, ParsedArgs } from 'citty'
+import { type CliIssue, MissingInputError } from './errors.ts'
 import {
-  type CliIssue,
   type InteractiveMode,
-  MissingInputError,
   type OutputMode,
   getCliRuntime,
   parseInteractiveMode,
   parseOutputMode,
   setCliRuntime,
-} from '@jib/core'
-import type { ArgsDef, ParsedArgs } from 'citty'
+} from './runtime.ts'
 
 export const commonCliArgs = {
   interactive: {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import net from 'node:net'
-import { JibError } from './errors.ts'
+import { JibError } from '@jib/errors'
 import { type PortAllocatorConfig, allocatePort } from './port-allocator.ts'
 
 function cfg(...portsPerApp: number[][]): PortAllocatorConfig {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { type Paths, getPaths } from '@jib/core'
+import { type Paths, getPaths } from '@jib/paths'
 import {
   buildSourceChoices,
   isSourceAuthFailure,

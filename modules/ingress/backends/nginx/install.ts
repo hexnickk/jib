@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import type { InstallFn } from '@jib/core'
 import { getExec } from '../../exec.ts'
+import type { IngressHook } from '../types.ts'
 
 /**
  * Jib-owned snippet that pulls every file under `$JIB_ROOT/nginx/` into the
@@ -27,7 +27,7 @@ include ${nginxDir}/*/*.conf;
  * nginx's conf.d directory if it isn't already present with the expected
  * content.
  */
-export const install: InstallFn = async (ctx) => {
+export const install: IngressHook = async (ctx) => {
   const log = ctx.logger
   const exec = getExec()
 

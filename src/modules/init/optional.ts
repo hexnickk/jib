@@ -1,8 +1,10 @@
 import { type Config, loadConfig, writeConfig } from '@jib/config'
-import { type ModuleContext, type Paths, createLogger } from '@jib/core'
+import { createLogger } from '@jib/logging'
+import type { Paths } from '@jib/paths'
 import { runInstallsTx } from './install.ts'
 import { type ModLike, promptOptionalModule } from './registry.ts'
 import { resolveModuleSetup } from './setup-registry.ts'
+import type { InitContext } from './types.ts'
 
 interface OptionalModuleDeps {
   loadConfig?: typeof loadConfig
@@ -11,7 +13,7 @@ interface OptionalModuleDeps {
   writeConfig?: typeof writeConfig
 }
 
-function moduleCtx(config: Config, paths: Paths): ModuleContext<Config> {
+function initCtx(config: Config, paths: Paths): InitContext {
   return { config, logger: createLogger('init'), paths }
 }
 
@@ -46,9 +48,9 @@ export async function configureOptionalModules(
       continue
     }
 
-    if (mod.install) await runInstallsTx([mod], moduleCtx(current, paths))
+    if (mod.install) await runInstallsTx([mod], initCtx(current, paths))
     const setup = setupFor(mod.manifest.name)
-    if (setup) await setup(moduleCtx(current, paths))
+    if (setup) await setup(initCtx(current, paths))
     current = await persistModuleChoice(paths.configFile, mod.manifest.name, true, deps)
   }
 }

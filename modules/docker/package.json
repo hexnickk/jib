@@ -9,8 +9,8 @@
   },
   "dependencies": {
     "@jib/config": "workspace:*",
-    "@jib/core": "workspace:*",
-    "consola": "*",
+    "@jib/errors": "workspace:*",
+    "@jib/paths": "workspace:*",
     "yaml": "*"
   }
 }

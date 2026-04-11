@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@clack/prompts": "*",
-    "@jib/core": "workspace:*"
+    "@jib/cli": "workspace:*",
+    "@jib/errors": "workspace:*"
   }
 }

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { type Paths, credsPath } from '@jib/core'
+import { type Paths, credsPath } from '@jib/paths'
 import { SERVICE_NAME } from './templates.ts'
 import { extractTunnelToken } from './token.ts'
 

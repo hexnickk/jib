@@ -12,8 +12,9 @@
   },
   "dependencies": {
     "@jib/config": "workspace:*",
-    "@jib/core": "workspace:*",
     "@jib/deploy": "workspace:*",
+    "@jib/logging": "workspace:*",
+    "@jib/paths": "workspace:*",
     "@jib/sources": "workspace:*",
     "@jib/state": "workspace:*"
   }

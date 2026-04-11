@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type Config, loadConfig, writeConfig } from '@jib/config'
-import { getPaths } from '@jib/core'
+import { getPaths } from '@jib/paths'
 import { configureOptionalModules, persistModuleChoice } from './optional.ts'
 import type { ModLike } from './registry.ts'
 

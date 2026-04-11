@@ -1,6 +1,7 @@
+import type { CliIssue } from '@jib/cli'
 import type { ParsedDomain } from '@jib/config'
-import { type CliIssue, ValidationError } from '@jib/core'
 import { type ComposeService, hasPublishedPorts, inferContainerPort } from '@jib/docker'
+import { ValidationError } from '@jib/errors'
 import type { EnvEntry } from './types.ts'
 
 export interface AddServiceSummary {

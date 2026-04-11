@@ -1,7 +1,6 @@
 import { stat, symlink, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { App, Config } from '@jib/config'
-import { JibError, type Logger, type Paths, repoPath } from '@jib/core'
 import {
   type CheckHealthOptions,
   Compose,
@@ -13,6 +12,9 @@ import {
   parseComposeServices,
   writeOverride,
 } from '@jib/docker'
+import { JibError } from '@jib/errors'
+import type { Logger } from '@jib/logging'
+import { type Paths, repoPath } from '@jib/paths'
 import { type AppState, type Store, acquire } from '@jib/state'
 import { $ } from 'bun'
 

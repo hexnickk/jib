@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { type Config, loadConfig } from '@jib/config'
-import type { ModuleContext } from '@jib/core'
+import { loadConfig } from '@jib/config'
 import { log, note, promptInt, promptPEM, promptSelect, promptString } from '@jib/tui'
+import type { SourceSetupContext } from '../../types.ts'
 import { appPemPath } from './auth.ts'
 import { addGitHubAppSource, addGitHubKeySource, sourceNameAvailable } from './config-edit.ts'
 import { deployKeyPaths, generateDeployKey } from './keygen.ts'
@@ -12,7 +12,7 @@ import { deployKeyPaths, generateDeployKey } from './keygen.ts'
  * and auth-recovery prompts. Prompts the user to
  * choose between SSH deploy key, GitHub App, or skip.
  */
-export async function setup(ctx: ModuleContext<Config>): Promise<string | null> {
+export async function setup(ctx: SourceSetupContext): Promise<string | null> {
   const choice = await promptSelect<'key' | 'app' | 'skip'>({
     message: 'Set up a git source ref? (needed for private repos)',
     options: [
@@ -26,7 +26,7 @@ export async function setup(ctx: ModuleContext<Config>): Promise<string | null> 
   return null
 }
 
-export async function setupDeployKey(ctx: ModuleContext<Config>): Promise<string | null> {
+export async function setupDeployKey(ctx: SourceSetupContext): Promise<string | null> {
   try {
     const name = await promptString({ message: 'Source name (e.g. my-org-key)' })
     const cfg = await loadConfig(ctx.paths.configFile)
@@ -53,7 +53,7 @@ export async function setupDeployKey(ctx: ModuleContext<Config>): Promise<string
   }
 }
 
-export async function setupGitHubApp(ctx: ModuleContext<Config>): Promise<string | null> {
+export async function setupGitHubApp(ctx: SourceSetupContext): Promise<string | null> {
   try {
     const name = await promptString({ message: 'Source name (e.g. my-org)' })
     const cfg = await loadConfig(ctx.paths.configFile)

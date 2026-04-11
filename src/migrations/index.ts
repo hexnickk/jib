@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { jibMigrations } from '@jib/state'
-import { type JibMigration, type MigrationContext, moduleCtx } from './types.ts'
+import { type JibMigration, type MigrationContext, initCtx } from './types.ts'
 
 // ---------------------------------------------------------------------------
 // Runner
@@ -125,7 +125,7 @@ const m0007_install_watcher: JibMigration = {
   id: '0007_install_watcher',
   description: 'Install watcher service',
   up: async (ctx) => {
-    const mctx = await moduleCtx(ctx)
+    const mctx = await initCtx(ctx)
     const { install } = await import('@jib-module/watcher')
     await install(mctx)
   },
@@ -135,7 +135,7 @@ const m0008_install_nginx: JibMigration = {
   id: '0008_install_nginx',
   description: 'Install ingress reverse proxy',
   up: async (ctx) => {
-    const mctx = await moduleCtx(ctx)
+    const mctx = await initCtx(ctx)
     const { install } = await import('@jib/ingress')
     await install(mctx)
   },

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { ValidationError } from '@jib/core'
-import { configureCliRuntime } from '@jib/core'
+import { configureCliRuntime } from '@jib/cli'
+import { ValidationError } from '@jib/errors'
 import { assertInteractive, isInteractive } from './interactive.ts'
 
 // `isTTY` is a writable boolean on the real streams; the Node types mark it

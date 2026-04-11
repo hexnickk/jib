@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
-import { type Paths, repoPath } from '@jib/core'
+import { type Paths, repoPath } from '@jib/paths'
 import { Compose } from './compose.ts'
 import { overridePath } from './override.ts'
 

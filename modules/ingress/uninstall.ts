@@ -1,7 +1,6 @@
-import type { Config } from '@jib/config'
-import type { InstallFn } from '@jib/core'
 import { defaultIngressBackend } from './backends/index.ts'
+import type { IngressHook } from './backends/types.ts'
 
-export const uninstall: InstallFn<Config> = async (ctx) => {
+export const uninstall: IngressHook = async (ctx) => {
   await defaultIngressBackend().uninstall?.(ctx)
 }

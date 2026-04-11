@@ -1,13 +1,13 @@
+import type { ArgsDef, CommandDef, Resolvable, SubCommandsDef } from 'citty'
+import { defineCommand, renderUsage, runCommand } from 'citty'
+import { normalizeCliError } from './errors.ts'
 import {
   canPrompt,
   configureCliRuntime,
   getCliRuntime,
   isJsonOutput,
-  normalizeCliError,
   stripCliRuntimeArgs,
-} from '@jib/core'
-import type { ArgsDef, CommandDef, Resolvable, SubCommandsDef } from 'citty'
-import { defineCommand, renderUsage, runCommand } from 'citty'
+} from './runtime.ts'
 
 const ESC = String.fromCharCode(27)
 const ANSI_ESCAPE_RE = new RegExp(`${ESC}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`, 'g')
@@ -76,15 +76,11 @@ function printSuccess(value: unknown): void {
   if (typeof value === 'string') writeText(process.stdout, value)
 }
 
-function hasSubCommands(cmd: CommandNode): boolean {
-  return Object.keys(cmd.subCommands ?? {}).length > 0
-}
-
 function shouldRenderBareCommandUsage(cmd: CommandNode, leafArgs: string[]): boolean {
   if (isJsonOutput()) return false
   const runtime = getCliRuntime()
   if (runtime.interactive !== 'always' && !canPrompt()) return false
-  return leafArgs.length === 0 && hasSubCommands(cmd)
+  return leafArgs.length === 0 && Object.keys(cmd.subCommands ?? {}).length > 0
 }
 
 export async function runCommandApp(options: CommandAppOptions): Promise<void> {
@@ -125,6 +121,7 @@ export async function runCommandApp(options: CommandAppOptions): Promise<void> {
       printSuccess(usage)
       return
     }
+
     const { result } = await runCommand(leaf as CommandDef, { rawArgs: leafArgs })
     printSuccess(result)
   } catch (error) {

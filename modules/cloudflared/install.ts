@@ -1,7 +1,13 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { type InstallFn, credsPath } from '@jib/core'
+import type { Logger } from '@jib/logging'
+import { type Paths, credsPath } from '@jib/paths'
 import { UNIT_PATH, composeYaml, systemdUnit } from './templates.ts'
+
+interface CloudflaredContext {
+  logger: Logger
+  paths: Paths
+}
 
 /**
  * Writes the compose file + systemd unit under `$JIB_ROOT/cloudflared/` but
@@ -9,7 +15,7 @@ import { UNIT_PATH, composeYaml, systemdUnit } from './templates.ts'
  * to run; the service is enabled+started only after the user provides a
  * token via `jib init` (tunnel mode) or `jib cloudflared setup`.
  */
-export const install: InstallFn = async (ctx) => {
+export const install = async (ctx: CloudflaredContext): Promise<void> => {
   const log = ctx.logger
   const dir = ctx.paths.cloudflaredDir
   const tunnelEnvPath = credsPath(ctx.paths, 'cloudflare', 'tunnel.env')

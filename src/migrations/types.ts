@@ -1,8 +1,8 @@
-import type { Config } from '@jib/config'
 import { loadConfig } from '@jib/config'
-import type { ModuleContext, Paths } from '@jib/core'
-import { createLogger } from '@jib/core'
+import { createLogger } from '@jib/logging'
+import type { Paths } from '@jib/paths'
 import type { JibDb } from '@jib/state'
+import type { InitContext } from '../modules/init/types.ts'
 
 export interface MigrationContext {
   db: JibDb
@@ -15,8 +15,8 @@ export interface JibMigration {
   up: (ctx: MigrationContext) => Promise<void>
 }
 
-/** Build a ModuleContext from a MigrationContext. Safe from migration 0003+. */
-export async function moduleCtx(mctx: MigrationContext): Promise<ModuleContext<Config>> {
+/** Build an init context from a MigrationContext. Safe from migration 0003+. */
+export async function initCtx(mctx: MigrationContext): Promise<InitContext> {
   const config = await loadConfig(mctx.paths.configFile)
   return { config, logger: createLogger('init'), paths: mctx.paths }
 }

@@ -1,5 +1,6 @@
 import { readlinkSync } from 'node:fs'
-import { CliError, canPrompt } from '@jib/core'
+import { CliError } from './errors.ts'
+import { canPrompt } from './runtime.ts'
 
 export function ensureLinux(commandName: string): void {
   if (process.platform === 'linux') return
@@ -18,9 +19,6 @@ export function ensureRoot(commandName: string): void {
     )
   }
 
-  // /proc/self/exe resolves to the real binary on disk (process.execPath
-  // returns a virtual /$bunfs/ path in compiled binaries). argv.slice(2)
-  // skips both the binary path and the Bun entry-point path.
   const bin = readlinkSync('/proc/self/exe')
   const result = Bun.spawnSync(['sudo', bin, ...process.argv.slice(2)], {
     stdio: ['inherit', 'inherit', 'inherit'],

@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { type ModuleContext, createLogger, getPaths } from '@jib/core'
+import { createLogger } from '@jib/logging'
+import { getPaths } from '@jib/paths'
 import { runInstallsTx } from './install.ts'
 import type { ModLike } from './registry.ts'
+import type { InitContext } from './types.ts'
 
 /**
  * Covers the transactional semantics of the optional-module install loop.
@@ -11,7 +13,7 @@ import type { ModLike } from './registry.ts'
  * uninstall doesn't abort the rest.
  */
 
-const ctx: ModuleContext<Config> = {
+const ctx: InitContext = {
   config: { config_version: 3, poll_interval: '5m', sources: {}, apps: {} } as Config,
   logger: createLogger('init-test'),
   paths: getPaths('/tmp/jib-init-test'),

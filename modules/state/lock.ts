@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { LockError } from '@jib/core'
+import { LockError } from './errors.ts'
 
 export interface LockOptions {
   blocking?: boolean

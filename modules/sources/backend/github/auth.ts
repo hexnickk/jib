@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import type { App, Config } from '@jib/config'
-import { JibError, type Paths, credsPath } from '@jib/core'
+import { JibError } from '@jib/errors'
+import { type Paths, credsPath } from '@jib/paths'
 import { getGitHubSource } from './config-edit.ts'
 import { findInstallationForOrg } from './installation.ts'
 import { generateInstallationToken } from './jwt.ts'

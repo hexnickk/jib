@@ -1,4 +1,5 @@
-import { JibError, ValidationError } from './errors.ts'
+import { ValidationError } from '@jib/errors'
+import { CliError } from './errors.ts'
 
 export type InteractiveMode = 'auto' | 'always' | 'never'
 export type OutputMode = 'text' | 'json'
@@ -11,55 +12,16 @@ export interface CliRuntime {
   stdoutTty: boolean
 }
 
-export interface CliIssue {
-  field: string
-  message: string
-}
-
-export interface CliErrorOptions extends ErrorOptions {
-  details?: unknown
-  exitCode?: number
-  hint?: string
-  issues?: CliIssue[]
-}
-
-export interface NormalizedCliError {
-  code: string
-  message: string
-  exitCode: number
-  hint?: string
-  issues?: CliIssue[]
-  details?: unknown
-}
-
-export class CliError extends JibError {
-  readonly details: unknown | undefined
-  readonly exitCode: number
-  readonly hint: string | undefined
-  readonly issues: CliIssue[] | undefined
-
-  constructor(code: string, message: string, options: CliErrorOptions = {}) {
-    super(code, message, options)
-    this.name = 'CliError'
-    this.details = options.details
-    this.exitCode = options.exitCode ?? 1
-    this.hint = options.hint
-    this.issues = options.issues
-  }
-}
-
-export class MissingInputError extends CliError {
-  constructor(message: string, issues: CliIssue[], options: Omit<CliErrorOptions, 'issues'> = {}) {
-    super('missing_input', message, { ...options, issues })
-    this.name = 'MissingInputError'
-  }
-}
-
 let currentRuntime: CliRuntime | null = null
 
 function parseTruthyEnv(value: string | undefined): boolean {
   if (!value) return false
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase())
+}
+
+function runtimeArgBoundary(rawArgs: string[]): number {
+  const boundary = rawArgs.indexOf('--')
+  return boundary >= 0 ? boundary : rawArgs.length
 }
 
 function parseStringFlag(rawArgs: string[], name: string): string | undefined {
@@ -87,11 +49,6 @@ function parseBooleanFlag(rawArgs: string[], name: string): boolean | undefined 
 
 function shouldConsumeNextValue(rawArgs: string[], index: number): boolean {
   return index + 1 < rawArgs.length && !rawArgs[index + 1]?.startsWith('-')
-}
-
-function runtimeArgBoundary(rawArgs: string[]): number {
-  const boundary = rawArgs.indexOf('--')
-  return boundary >= 0 ? boundary : rawArgs.length
 }
 
 export function parseInteractiveMode(value: string | undefined): InteractiveMode | undefined {
@@ -137,9 +94,7 @@ export function configureCliRuntime(rawArgs: string[]): CliRuntime {
   if (interactive !== undefined) next.interactive = interactive
   if (output !== undefined) next.output = output
   if (debug !== undefined) next.debug = debug
-  const runtime = materializeRuntime(next)
-  setCliRuntime(runtime)
-  return runtime
+  return setCliRuntime(next)
 }
 
 export function stripCliRuntimeArgs(rawArgs: string[]): string[] {
@@ -164,10 +119,7 @@ export function stripCliRuntimeArgs(rawArgs: string[]): string[] {
     }
     out.push(arg)
   }
-  if (boundary < rawArgs.length) {
-    out.push(...rawArgs.slice(boundary))
-  }
-  return out
+  return boundary < rawArgs.length ? [...out, ...rawArgs.slice(boundary)] : out
 }
 
 export function setCliRuntime(runtime: Partial<CliRuntime>): CliRuntime {
@@ -189,10 +141,10 @@ export function canPrompt(): boolean {
 
 export function promptBlockReason(): string | null {
   const runtime = getCliRuntime()
-  if (runtime.interactive === 'never')
+  if (runtime.interactive === 'never') {
     return 'interactive prompts are disabled by --interactive=never'
-  if (!runtime.stdinTty || !runtime.stdoutTty) return 'interactive prompts require a TTY'
-  return null
+  }
+  return !runtime.stdinTty || !runtime.stdoutTty ? 'interactive prompts require a TTY' : null
 }
 
 export function isJsonOutput(): boolean {
@@ -210,24 +162,4 @@ export function isDebugEnabled(): boolean {
 export function assertCanPrompt(): void {
   const reason = promptBlockReason()
   if (reason) throw new ValidationError(reason)
-}
-
-export function normalizeCliError(error: unknown): NormalizedCliError {
-  if (error instanceof CliError) {
-    return {
-      code: error.code,
-      message: error.message,
-      exitCode: error.exitCode,
-      ...(error.hint !== undefined && { hint: error.hint }),
-      ...(error.issues !== undefined && { issues: error.issues }),
-      ...(error.details !== undefined && { details: error.details }),
-    }
-  }
-  if (error instanceof JibError) {
-    return { code: error.code, message: error.message, exitCode: 1 }
-  }
-  if (error instanceof Error) {
-    return { code: 'internal', message: error.message, exitCode: 1 }
-  }
-  return { code: 'internal', message: String(error), exitCode: 1 }
 }

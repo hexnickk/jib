@@ -1,5 +1,6 @@
 import { type Config, loadConfig } from '@jib/config'
-import { type Paths, ValidationError, getPaths } from '@jib/core'
+import { ValidationError } from '@jib/errors'
+import { type Paths, getPaths } from '@jib/paths'
 
 /**
  * Shared config loader for every CLI command. Collapses the "read paths →

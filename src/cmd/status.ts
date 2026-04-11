@@ -1,5 +1,5 @@
+import { isTextOutput } from '@jib/cli'
 import { loadAppConfig } from '@jib/config'
-import { isTextOutput } from '@jib/core'
 import {
   type AppStatus,
   type ServiceStatus,

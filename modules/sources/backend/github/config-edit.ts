@@ -1,5 +1,5 @@
 import { type Config, type GitHubSource, loadConfig, writeConfig } from '@jib/config'
-import { JibError } from '@jib/core'
+import { JibError } from '@jib/errors'
 
 /**
  * Load the config, mutate it via `edit`, then write it back. Centralized so

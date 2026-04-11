@@ -1,6 +1,6 @@
 import type { App } from '@jib/config'
 import { loadAppOrExit } from '@jib/config'
-import { type Paths, repoPath } from '@jib/core'
+import { type Paths, repoPath } from '@jib/paths'
 import { composeFor } from './compose-for.ts'
 import { parseComposeServices } from './parse.ts'
 

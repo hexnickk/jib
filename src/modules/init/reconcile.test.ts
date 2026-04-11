@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type Config, writeConfig } from '@jib/config'
-import { credsPath, getPaths } from '@jib/core'
+import { credsPath, getPaths } from '@jib/paths'
 import { inferredOptionalModules, reconcileOptionalModules } from './reconcile.ts'
 
 async function withTmpConfig<T>(fn: (cfg: Config, root: string) => Promise<T>): Promise<T> {

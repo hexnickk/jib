@@ -1,4 +1,4 @@
-import { ConfigError } from '@jib/core'
+import { ConfigError } from './errors.ts'
 import type { Config } from './schema.ts'
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/

@@ -1,4 +1,4 @@
-import { JibError } from '@jib/core'
+import { JibError } from '@jib/errors'
 import { $ } from 'bun'
 
 /** Canonical SSH clone URL for `owner/repo`. */

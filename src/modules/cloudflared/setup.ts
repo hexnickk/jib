@@ -1,5 +1,5 @@
 import { enableCloudflaredService, hasTunnelToken, saveTunnelToken } from '@jib-module/cloudflared'
-import type { Paths } from '@jib/core'
+import type { Paths } from '@jib/paths'
 import { log, promptConfirm, promptPassword } from '@jib/tui'
 
 function startFailureMessage(prefix: string, detail: string): string {

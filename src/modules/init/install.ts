@@ -1,14 +1,13 @@
-import type { Config } from '@jib/config'
-import type { ModuleContext } from '@jib/core'
 import { log } from '@jib/tui'
 import type { ModLike } from './registry.ts'
+import type { InitContext } from './types.ts'
 
 /**
  * Install every module in `mods` in order. On the first failure, walk the
  * already-installed set in reverse and call each module's `uninstall()` as
  * best-effort rollback. Re-throws the original install error.
  */
-export async function runInstallsTx(mods: ModLike[], ctx: ModuleContext<Config>): Promise<void> {
+export async function runInstallsTx(mods: ModLike[], ctx: InitContext): Promise<void> {
   const installed: ModLike[] = []
   try {
     for (const m of mods) {

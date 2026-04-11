@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { CliError, normalizeCliError } from '@jib/core'
+import { CliError, normalizeCliError } from '@jib/cli'
 import { normalizeAddError } from './index.ts'
 import { normalizeAddDeployError } from './runtime.ts'
 

@@ -1,7 +1,7 @@
 import { chmod, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { ConfigError } from '@jib/core'
 import { stringify } from 'yaml'
+import { ConfigError } from './errors.ts'
 import type { Config } from './schema.ts'
 
 /** Serializes `config` to YAML and writes it atomically (temp file + rename). */

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
-import { ConfigError } from '@jib/core'
 import { parse } from 'yaml'
 import { ZodError } from 'zod'
+import { ConfigError } from './errors.ts'
 import { type Config, ConfigSchema } from './schema.ts'
 import { validate } from './validate.ts'
 

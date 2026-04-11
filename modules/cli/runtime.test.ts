@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import { createLogger } from '@jib/logging'
 import { LogLevels } from 'consola'
 import {
   MissingInputError,
@@ -7,8 +8,7 @@ import {
   normalizeCliError,
   setCliRuntime,
   stripCliRuntimeArgs,
-} from './cli.ts'
-import { createLogger } from './logger.ts'
+} from './index.ts'
 
 const envSnapshot = {
   JIB_NON_INTERACTIVE: process.env.JIB_NON_INTERACTIVE,

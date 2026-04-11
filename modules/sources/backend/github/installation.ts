@@ -1,4 +1,4 @@
-import { JibError } from '@jib/core'
+import { JibError } from '@jib/errors'
 import { createAppJWT } from './jwt.ts'
 
 interface RawInstallation {

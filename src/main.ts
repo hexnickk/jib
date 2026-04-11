@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { commonCliArgs, runCommandApp } from '@jib/cli'
 import pkg from '../package.json' with { type: 'json' }
 import addCmd from './cmd/add.ts'
 import cloudflaredCmd from './cmd/cloudflared.ts'
@@ -15,8 +16,6 @@ import sourcesCmd from './cmd/sources.ts'
 import statusCmd from './cmd/status.ts'
 import upCmd from './cmd/up.ts'
 import watchCmd from './cmd/watch.ts'
-import { commonCliArgs } from './modules/runtime/cli-runtime.ts'
-import { runCommandApp } from './modules/runtime/command-app.ts'
 
 await runCommandApp({
   name: 'jib',

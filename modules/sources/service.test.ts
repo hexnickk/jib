@@ -3,7 +3,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
-import { getPaths, pathExists, repoPath } from '@jib/core'
+import { getPaths, pathExists, repoPath } from '@jib/paths'
 import { $ } from 'bun'
 import { cloneForInspection, probe, removeCheckout, syncApp } from './index.ts'
 

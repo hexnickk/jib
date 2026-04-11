@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { LockError } from '@jib/core'
+import { LockError } from './errors.ts'
 import { acquire } from './lock.ts'
 
 async function withDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {

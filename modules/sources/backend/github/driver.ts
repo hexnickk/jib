@@ -1,6 +1,6 @@
 import type { App, Config, Source } from '@jib/config'
-import type { Paths } from '@jib/core'
-import { isExternalRepoURL, pathExists } from '@jib/core'
+import type { Paths } from '@jib/paths'
+import { isExternalRepoURL, pathExists } from '@jib/paths'
 import { configureSSHKey } from '../../git.ts'
 import type { DriverSourceStatus, ResolvedDriverSource, SourceDriver } from '../../types.ts'
 import { appPemPath, applyAuth, refreshAuth } from './auth.ts'

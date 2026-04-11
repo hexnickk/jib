@@ -1,5 +1,6 @@
-import { CliError, ValidationError } from '@jib/core'
+import { CliError } from '@jib/cli'
 import { ComposeInspectionError } from '@jib/docker'
+import { ValidationError } from '@jib/errors'
 
 export function normalizeAddError(error: unknown, appName: string, configFile: string): Error {
   if (error instanceof CliError || error instanceof ValidationError) {

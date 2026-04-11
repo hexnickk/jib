@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { JibError } from '@jib/core'
+import { JibError } from '@jib/errors'
 import { type DockerExec, type ExecResult, realExec } from './exec.ts'
 
 export interface ComposeConfig {

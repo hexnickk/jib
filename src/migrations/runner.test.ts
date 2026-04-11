@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdirSync, rmSync } from 'node:fs'
-import { getPaths } from '@jib/core'
+import { getPaths } from '@jib/paths'
 import { openDb } from '@jib/state'
 import type { JibDb } from '@jib/state'
 import { jibMigrations } from '@jib/state'

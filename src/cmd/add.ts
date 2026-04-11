@@ -1,11 +1,14 @@
+import { CliError, applyCliArgs, isTextOutput, withCliArgs } from '@jib/cli'
 import { loadAppConfig } from '@jib/config'
 import type { App } from '@jib/config'
-import { CliError, type Paths, ValidationError, isTextOutput } from '@jib/core'
-import { claimIngress } from '@jib/ingress'
+import { ValidationError } from '@jib/errors'
+import { claimIngress, createIngressOperator } from '@jib/ingress'
+import type { Paths } from '@jib/paths'
 import { preflightSourceSelection } from '@jib/sources'
-import { spinner } from '@jib/tui'
+import { isInteractive, promptConfirm, promptSelect, spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
+import { DEFAULT_TIMEOUT_MS, runDeploy } from '../deploy/run.ts'
 import {
   AddService,
   DefaultAddSupport,
@@ -21,9 +24,6 @@ import {
   rollbackAddedApp,
   trapInterrupt,
 } from '../modules/add/runtime.ts'
-import { applyCliArgs, withCliArgs } from '../modules/runtime/cli-runtime.ts'
-import { DEFAULT_TIMEOUT_MS, runDeploy } from '../modules/runtime/deploy-run.ts'
-import { createIngressOperator } from '../modules/runtime/ingress-operator.ts'
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 
@@ -72,6 +72,7 @@ export default defineCommand({
       inputs.repo,
       args.source,
       args.branch,
+      { isInteractive, promptConfirm, promptSelect },
     )
     const flowArgs: { source?: string; branch?: string } = {
       branch: preflight.branch,

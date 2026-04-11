@@ -1,6 +1,7 @@
 import { loadConfig } from '@jib/config'
-import { getPaths } from '@jib/core'
+import { getPaths } from '@jib/paths'
 import { setupSourceRef } from '@jib/sources'
+import { promptSelect } from '@jib/tui'
 import { defineCommand } from 'citty'
 
 const setupCmd = defineCommand({
@@ -8,7 +9,7 @@ const setupCmd = defineCommand({
   async run() {
     const paths = getPaths()
     const config = await loadConfig(paths.configFile)
-    const source = await setupSourceRef(config, paths)
+    const source = await setupSourceRef(config, paths, { promptSelect })
     return { ok: source !== null, ...(source ? { source } : {}) }
   },
 })

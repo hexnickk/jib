@@ -1,16 +1,13 @@
 import { describe, expect, test } from 'bun:test'
-import type { Config } from '@jib/config'
-import type { Module, ModuleContext } from '@jib/core'
 import {
   type FirstPartyModule,
   optionalModules,
   requiredModules,
   resolveModules,
 } from './module-registry.ts'
+import type { InitContext } from './types.ts'
 
-function fakeModule(
-  mod: Module<Config> & { manifest: { name: string; required?: boolean } },
-): FirstPartyModule {
+function fakeModule(mod: FirstPartyModule): FirstPartyModule {
   return mod
 }
 
@@ -18,14 +15,14 @@ describe('module registry projections', () => {
   test('one registry can power init capability views', () => {
     const requiredOnly = fakeModule({
       manifest: { name: 'required-only', required: true },
-      install: async (_ctx: ModuleContext<Config>) => undefined,
+      install: async (_ctx: InitContext) => undefined,
     })
     const optionalOnly = fakeModule({
       manifest: { name: 'optional-only' },
     })
     const installedOptional = fakeModule({
       manifest: { name: 'installed-optional' },
-      install: async (_ctx: ModuleContext<Config>) => undefined,
+      install: async (_ctx: InitContext) => undefined,
     })
     const registry = [requiredOnly, optionalOnly, installedOptional] as const
 

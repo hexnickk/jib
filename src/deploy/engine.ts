@@ -1,6 +1,7 @@
 import type { Config } from '@jib/config'
-import { type Paths, createLogger } from '@jib/core'
 import { Engine } from '@jib/deploy'
+import { createLogger } from '@jib/logging'
+import type { Paths } from '@jib/paths'
 import { Store } from '@jib/state'
 
 export function createDeployEngine(config: Config, paths: Paths, name = 'deploy'): Engine {

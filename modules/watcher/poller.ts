@@ -1,6 +1,7 @@
 import { type Config, parseDuration } from '@jib/config'
-import type { Logger, Paths } from '@jib/core'
 import { Engine } from '@jib/deploy'
+import type { Logger } from '@jib/logging'
+import type { Paths } from '@jib/paths'
 import { type ProbeSourceDeps, probe, syncApp } from '@jib/sources'
 import { Store } from '@jib/state'
 

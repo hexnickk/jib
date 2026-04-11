@@ -1,5 +1,5 @@
 import type { App, Config, Domain } from '@jib/config'
-import { allocatePort } from '@jib/core'
+import { allocatePort } from './port-allocator.ts'
 
 export interface ParsedDomain {
   host: string

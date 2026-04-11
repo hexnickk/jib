@@ -1,4 +1,4 @@
-import { ValidationError } from '@jib/core'
+import { ValidationError } from '@jib/errors'
 
 function isBoundary(line: string, kind: 'BEGIN' | 'END'): boolean {
   return line.startsWith(`-----${kind} `) && line.endsWith('-----')

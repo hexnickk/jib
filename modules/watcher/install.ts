@@ -1,13 +1,19 @@
 import { writeFile } from 'node:fs/promises'
-import type { InstallFn } from '@jib/core'
+import type { Logger } from '@jib/logging'
+import type { Paths } from '@jib/paths'
 import { $ } from 'bun'
 import { SERVICE_NAME, UNIT_PATH, systemdUnit } from './templates.ts'
+
+interface WatcherContext {
+  logger: Logger
+  paths: Paths
+}
 
 /**
  * Installs the watcher systemd unit. Requires root. The unit runs the main
  * `jib` binary directly, so there is no separate daemon artifact to ship.
  */
-export const install: InstallFn = async (ctx) => {
+export const install = async (ctx: WatcherContext): Promise<void> => {
   const vars = { jibRoot: ctx.paths.root, binPath: '/usr/local/bin/jib' }
   ctx.logger.info(`writing ${UNIT_PATH}`)
   await writeFile(UNIT_PATH, systemdUnit(vars), { mode: 0o644 })

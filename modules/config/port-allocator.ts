@@ -1,11 +1,11 @@
 import net from 'node:net'
-import { JibError } from './errors.ts'
+import { JibError } from '@jib/errors'
 
 /**
  * Minimal structural shape the allocator needs from a parsed jib config.
- * Declared locally (not imported from `@jib/config`) to avoid a core→config
- * dependency cycle — `@jib/config` already depends on `@jib/core` for error
- * types. Any `Config` from `@jib/config` is structurally assignable.
+ * Declared locally so the allocator can live inside `@jib/config` without
+ * tying itself to the full parsed config type. Any `Config` from `@jib/config`
+ * is structurally assignable.
  */
 export interface PortAllocatorConfig {
   apps: Record<string, { domains: ReadonlyArray<{ port?: number | undefined }> }>

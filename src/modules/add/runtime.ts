@@ -1,11 +1,11 @@
+import { CliError, isTextOutput } from '@jib/cli'
 import { loadConfig } from '@jib/config'
 import type { App, Config } from '@jib/config'
-import { CliError, type Paths, isTextOutput } from '@jib/core'
-import { releaseIngress } from '@jib/ingress'
+import { createIngressOperator, releaseIngress } from '@jib/ingress'
+import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
+import type { DeployRunResult } from '../../deploy/run.ts'
 import { DefaultRemoveSupport, RemoveService } from '../remove/index.ts'
-import type { DeployRunResult } from '../runtime/deploy-run.ts'
-import { createIngressOperator } from '../runtime/ingress-operator.ts'
 import type { AddFlowResult } from './types.ts'
 
 export interface InterruptTrap {

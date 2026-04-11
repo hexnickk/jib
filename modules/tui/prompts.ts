@@ -1,6 +1,6 @@
 import { createInterface } from 'node:readline'
 import * as clack from '@clack/prompts'
-import { ValidationError } from '@jib/core'
+import { ValidationError } from '@jib/errors'
 import { assertInteractive } from './interactive.ts'
 import { readPemBlock } from './pem.ts'
 

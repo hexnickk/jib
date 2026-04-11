@@ -1,6 +1,7 @@
 import { rm } from 'node:fs/promises'
 import type { App, Config } from '@jib/config'
-import { JibError, type Paths, pathExists, repoPath } from '@jib/core'
+import { JibError } from '@jib/errors'
+import { type Paths, pathExists, repoPath } from '@jib/paths'
 import * as git from './git.ts'
 import { resolveSourceDriver } from './registry.ts'
 import type {

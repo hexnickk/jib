@@ -1,6 +1,7 @@
 import { chmod, mkdir, readFile, stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { JibError, type Paths, credsPath } from '@jib/core'
+import { JibError } from '@jib/errors'
+import { type Paths, credsPath } from '@jib/paths'
 import { $ } from 'bun'
 
 /** Disk layout for a deploy-key source. Mirrors Go `ghPkg.KeyPath`. */

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Paths } from '@jib/core'
+import type { Paths } from '@jib/paths'
 import { openDb } from '@jib/state'
 import { migrations, runJibMigrations } from './index.ts'
 

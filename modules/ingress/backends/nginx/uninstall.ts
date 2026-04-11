@@ -1,5 +1,5 @@
 import { readdir, rm } from 'node:fs/promises'
-import type { InstallFn } from '@jib/core'
+import type { IngressHook } from '../types.ts'
 import { JIB_NGINX_INCLUDE_PATH } from './install.ts'
 
 /**
@@ -7,7 +7,7 @@ import { JIB_NGINX_INCLUDE_PATH } from './install.ts'
  * `$JIB_ROOT/nginx/`. Leaves nginx itself alone — uninstalling a package
  * the operator may own is out of scope.
  */
-export const uninstall: InstallFn = async (ctx) => {
+export const uninstall: IngressHook = async (ctx) => {
   const log = ctx.logger
 
   log.info(`removing ${JIB_NGINX_INCLUDE_PATH}`)
