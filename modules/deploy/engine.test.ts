@@ -93,7 +93,9 @@ describe('Engine.deploy', () => {
     const workdir = await mkWorkdir()
     const calls: Call[] = []
     const cfg = mkCfg()
-    cfg.apps.demo.build_args = { VITE_HOST_URL: 'https://demo.example.com' }
+    const demo = cfg.apps.demo
+    if (!demo) throw new Error('demo app missing in test fixture')
+    demo.build_args = { VITE_HOST_URL: 'https://demo.example.com' }
     const engine = new Engine({
       config: cfg,
       paths,

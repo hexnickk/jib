@@ -1,4 +1,4 @@
-import type { App, Config, HealthCheck, ParsedDomain } from '@jib/config'
+import type { App, Config, Domain, HealthCheck, ParsedDomain } from '@jib/config'
 import type { ComposeInspection, ComposeService } from '@jib/docker'
 import type { InspectionCheckout } from '@jib/sources'
 
@@ -20,7 +20,7 @@ export interface AddInputs {
 }
 
 export interface GuidedInputs {
-  domains: ParsedDomain[]
+  domains: Domain[]
   configEntries: ConfigEntry[]
 }
 

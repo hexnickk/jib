@@ -122,7 +122,9 @@ async function chooseInitialSource(
   paths: Paths,
   currentSource?: string,
 ): Promise<{ value?: string; created: boolean }> {
-  if (currentSource || !isInteractive()) return { value: currentSource, created: false }
+  if (currentSource || !isInteractive()) {
+    return currentSource ? { value: currentSource, created: false } : { created: false }
+  }
   const options = buildSourceChoices(cfg)
   if (options.length === 0) return { created: false }
   const choice = await promptSelect({

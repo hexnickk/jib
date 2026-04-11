@@ -184,13 +184,11 @@ function scopeOptions(recommended: ConfigScope) {
   const order = [recommended, 'runtime', 'build', 'both'].filter(
     (value, index, list) => list.indexOf(value) === index,
   ) as ConfigScope[]
-  return [
-    ...order.map((scope) => ({
-      value: scope,
-      label: scopeLabel(scope),
-      hint: scope === recommended ? 'Recommended' : undefined,
-    })),
-  ]
+  return order.map((scope) =>
+    scope === recommended
+      ? { value: scope, label: scopeLabel(scope), hint: 'Recommended' }
+      : { value: scope, label: scopeLabel(scope) },
+  )
 }
 
 async function promptRequiredScope(
