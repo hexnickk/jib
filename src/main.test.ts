@@ -45,6 +45,20 @@ async function runEntry(root: string, entrypoint: string, args: string[]) {
 }
 
 describe('execution contract', () => {
+  test('non-interactive add without app returns structured JSON', async () => {
+    await withTmpRoot(async (root) => {
+      const result = await runCli(root, ['--interactive=never', '--output=json', 'add'])
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toBe('')
+      const parsed = JSON.parse(result.stderr)
+      expect(parsed.ok).toBe(false)
+      expect(parsed.error.code).toBe('missing_input')
+      expect(parsed.error.issues).toEqual([
+        { field: 'app', message: 'provide <app> or rerun with interactive prompts enabled' },
+      ])
+    })
+  })
+
   test('non-interactive add without repo returns structured JSON', async () => {
     await withTmpRoot(async (root) => {
       const result = await runCli(root, ['--interactive=never', '--output=json', 'add', 'demo'])

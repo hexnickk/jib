@@ -1,5 +1,5 @@
 export { normalizeAddError } from './errors.ts'
-export { buildDraftApp, gatherAddInputs } from './inputs.ts'
+export { buildDraftApp, gatherAddInputs, resolveAddAppName } from './inputs.ts'
 export { createAddPlanner } from './planner.ts'
 export { AddService } from './service.ts'
 export { RolledBackAddError, runAddSequence } from './sequence.ts'

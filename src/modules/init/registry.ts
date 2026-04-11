@@ -24,6 +24,10 @@ export function unseenOptionalModules(config: Config): ModLike[] {
   return optionalModules().filter((m) => !(m.manifest.name in mods))
 }
 
+export function pendingOptionalModuleNames(config: Config): string[] {
+  return unseenOptionalModules(config).map((mod) => mod.manifest.name)
+}
+
 export function describeModules(modules: ModLike[]): string[] {
   return modules.map(
     (mod) => `${mod.manifest.name}: ${mod.manifest.description ?? mod.manifest.name}`,

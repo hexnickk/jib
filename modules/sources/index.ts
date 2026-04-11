@@ -1,5 +1,6 @@
-export { collectSourceStatuses } from './recovery.ts'
+export { collectSourceStatuses, runSourceSetup } from './recovery.ts'
 export {
+  buildSourceChoices,
   preflightSourceSelection,
   setupSourceRef,
 } from './flow.ts'

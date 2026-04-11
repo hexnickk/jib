@@ -1,13 +1,14 @@
-import { CliError, MissingInputError, isDebugEnabled, isTextOutput } from '@jib/cli'
+import { CliError, isDebugEnabled, isTextOutput } from '@jib/cli'
 import { type App, type Config, type Domain, type ParsedDomain, assignPorts } from '@jib/config'
 import {
   type ComposeInspection,
   ComposeInspectionError,
   type ComposeService,
+  discoverComposeFiles,
   inspectComposeApp,
   resolveFromCompose,
 } from '@jib/docker'
-import { isInteractive, promptConfirm, promptPassword, promptString } from '@jib/tui'
+import { isInteractive, note, promptConfirm, promptPassword, promptString } from '@jib/tui'
 import { consola } from 'consola'
 import {
   mergeGuidedServiceAnswers,
@@ -26,6 +27,14 @@ export function createAddPlanner(): AddPlanner {
     buildResolvedApp,
     confirmPlan: confirmAddPlan,
   }
+}
+
+function composeNotFoundMessage(workdir: string, compose?: string[]): string {
+  const searched = compose?.length ? compose : ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']
+  const discovered = discoverComposeFiles(workdir)
+  const lines = [`Jib could not find a compose file in the repo.`, `Looked for: ${searched.join(', ')}`]
+  if (discovered.length > 0) lines.push(`Detected compose-like files: ${discovered.join(', ')}`)
+  return lines.join('\n')
 }
 
 async function inspectComposeWithPrompts(
@@ -47,6 +56,7 @@ async function inspectComposeWithPrompts(
         error.code === 'compose_not_found' &&
         isInteractive()
       ) {
+        if (isTextOutput()) note(composeNotFoundMessage(workdir, compose), 'Compose file')
         const answer = await promptString({
           message: 'Compose file(s) relative to the repo (comma-separated)',
           placeholder: 'docker-compose.yml',
@@ -57,13 +67,9 @@ async function inspectComposeWithPrompts(
       }
       if (error instanceof ComposeInspectionError && error.code === 'compose_not_found') {
         if (!compose || compose.length === 0) {
-          throw new MissingInputError('missing required input for jib add', [
-            {
-              field: 'compose',
-              message:
-                'provide --compose <file> (or comma-separated files) so jib can inspect services',
-            },
-          ])
+          throw new CliError('compose_inspection_failed', composeNotFoundMessage(workdir), {
+            hint: 'add a compose file to the repo root, or rerun with --compose <file>',
+          })
         }
         throw new CliError('compose_inspection_failed', error.message, {
           hint: 'fix --compose and retry, or rerun with interactive prompts enabled',

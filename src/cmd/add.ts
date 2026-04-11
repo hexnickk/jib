@@ -1,10 +1,10 @@
 import { CliError, applyCliArgs, isTextOutput, withCliArgs } from '@jib/cli'
-import { loadAppConfig } from '@jib/config'
+import { loadAppConfig, loadConfig } from '@jib/config'
 import type { App } from '@jib/config'
 import { ValidationError } from '@jib/errors'
 import { claimIngress, createIngressOperator } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
-import { preflightSourceSelection } from '@jib/sources'
+import { buildSourceChoices, preflightSourceSelection, runSourceSetup } from '@jib/sources'
 import { isInteractive, promptConfirm, promptSelect, spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
@@ -16,6 +16,7 @@ import {
   buildDraftApp,
   createAddPlanner,
   gatherAddInputs,
+  resolveAddAppName,
   runAddSequence,
 } from '../modules/add/index.ts'
 import {
@@ -24,13 +25,10 @@ import {
   rollbackAddedApp,
   trapInterrupt,
 } from '../modules/add/runtime.ts'
-
-const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
-
 export default defineCommand({
   meta: { name: 'add', description: 'Register and deploy a new app' },
   args: withCliArgs({
-    app: { type: 'positional', required: true },
+    app: { type: 'positional' },
     repo: {
       type: 'string',
       description: 'Git repo: "owner/name", "local", file:// URL, http(s):// URL, or absolute path',
@@ -53,24 +51,21 @@ export default defineCommand({
   }),
   async run({ args }) {
     applyCliArgs(args)
-    if (!APP_NAME_RE.test(args.app)) {
-      throw new ValidationError(`app name "${args.app}" must match ${APP_NAME_RE}`)
-    }
 
-    const { cfg, paths } = await loadAppConfig()
-    if (cfg.apps[args.app]) {
-      throw new ValidationError(`app "${args.app}" already exists in config`)
-    }
+    let { cfg, paths } = await loadAppConfig()
+    const appName = await resolveAddAppName(args.app, cfg.apps)
+    const source = await chooseInitialSource(cfg, paths, args.source)
+    if (source.created) cfg = await loadConfig(paths.configFile)
 
     const inputs = await gatherAddInputs(args)
     const planner = createAddPlanner()
     const interrupt = trapInterrupt()
     const preflight = await preflightSourceSelection(
-      args.app,
+      appName,
       cfg,
       paths,
       inputs.repo,
-      args.source,
+      source.value,
       args.branch,
       { isInteractive, promptConfirm, promptSelect },
     )
@@ -78,27 +73,21 @@ export default defineCommand({
       branch: preflight.branch,
       ...(preflight.source ? { source: preflight.source } : {}),
     }
+    const inspection = createInspectionObserver(interrupt)
     const addService = new AddService(
       new DefaultAddSupport({
         paths,
         claimIngress: (appName, finalApp) => claimIngressForAdd(paths, appName, finalApp),
       }),
       planner,
-      {
-        onStateChange: () => {
-          if (interrupt.interrupted) throw new ValidationError('cancelled')
-        },
-        warn: (message) => {
-          if (isTextOutput()) consola.warn(message)
-        },
-      },
+      inspection.observer,
     )
 
     try {
       const { addResult, deployResult } = await runAddSequence(
         () =>
           addService.run({
-            appName: args.app,
+            appName,
             args: flowArgs,
             cfg: preflight.cfg,
             configFile: paths.configFile,
@@ -107,22 +96,24 @@ export default defineCommand({
           }),
         (result) =>
           runDeploy(
-            { ...preflight.cfg, apps: { ...preflight.cfg.apps, [args.app]: result.finalApp } },
+            { ...preflight.cfg, apps: { ...preflight.cfg.apps, [appName]: result.finalApp } },
             paths,
-            args.app,
+            appName,
             undefined,
             DEFAULT_TIMEOUT_MS,
           ),
-        (result) => rollbackAddedApp(paths, args.app, preflight.cfg, result.finalApp),
+        (result) => rollbackAddedApp(paths, appName, preflight.cfg, result.finalApp),
         interrupt,
       )
-      return renderAddResult(args.app, inputs.repo, addResult, deployResult)
+      inspection.stop()
+      return renderAddResult(appName, inputs.repo, addResult, deployResult)
     } catch (error) {
+      inspection.fail()
       if (error instanceof RolledBackAddError) {
         const original = interrupt.interrupted
           ? new CliError('cancelled', 'add cancelled')
           : error.original
-        throw normalizeAddDeployError(original, args.app, paths.configFile)
+        throw normalizeAddDeployError(original, appName, paths.configFile)
       }
       throw error
     } finally {
@@ -142,5 +133,65 @@ async function claimIngressForAdd(paths: Paths, app: string, appCfg: App): Promi
   } catch (error) {
     s?.stop('ingress failed')
     throw error
+  }
+}
+
+async function chooseInitialSource(
+  cfg: Awaited<ReturnType<typeof loadAppConfig>>['cfg'],
+  paths: Paths,
+  currentSource?: string,
+): Promise<{ value?: string; created: boolean }> {
+  if (currentSource || !isInteractive()) return { value: currentSource, created: false }
+  const options = buildSourceChoices(cfg)
+  if (options.length === 0) return { created: false }
+  const choice = await promptSelect({
+    message: 'Source for this app?',
+    options: [
+      { value: 'none', label: 'None', hint: 'Public repo or local path' },
+      ...options,
+    ],
+  })
+  if (choice === 'none') return { created: false }
+  if (choice.startsWith('setup:')) {
+    const created = await runSourceSetup(cfg, paths, choice.slice('setup:'.length))
+    return created ? { value: created, created: true } : { created: false }
+  }
+  return choice.startsWith('existing:')
+    ? { value: choice.slice('existing:'.length), created: false }
+    : { created: false }
+}
+
+function createInspectionObserver(interrupt: ReturnType<typeof trapInterrupt>) {
+  const spin = isTextOutput() ? spinner() : null
+  let active = false
+  return {
+    observer: {
+      onStateChange: (state: string) => {
+        if (interrupt.interrupted) throw new ValidationError('cancelled')
+        if (!spin) return
+        if (state === 'inputs_ready') {
+          active = true
+          spin.start('preparing repo')
+        }
+        if (state === 'repo_prepared') spin.message('inspecting docker-compose')
+        if (state === 'compose_inspected' && active) {
+          active = false
+          spin.stop('compose inspected')
+        }
+      },
+      warn: (message: string) => {
+        if (isTextOutput()) consola.warn(message)
+      },
+    },
+    stop: () => {
+      if (!spin || !active) return
+      active = false
+      spin.stop('compose inspected')
+    },
+    fail: () => {
+      if (!spin || !active) return
+      active = false
+      spin.stop('inspection failed')
+    },
   }
 }

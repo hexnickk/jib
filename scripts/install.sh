@@ -98,7 +98,12 @@ fi
 
 log "jib $tag installed"
 if [ "$os" = "linux" ]; then
-  log "next: run 'sudo jib init' to configure optional modules"
+  init_check_json="$(run_as_root "$cli_dest" init --check --output=json --interactive=never)"
+  if printf '%s\n' "$init_check_json" | grep -q '"optionalModulesPending": \[\]'; then
+    log "optional modules already configured"
+  else
+    log "next: run 'sudo jib init' to configure pending optional modules"
+  fi
 else
   log "automatic migrations skipped on $os; run jib on the target Linux host"
 fi

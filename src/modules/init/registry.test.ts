@@ -4,6 +4,7 @@ import {
   ALL_MODULES,
   installedOptionalModules,
   optionalModules,
+  pendingOptionalModuleNames,
   requiredModules,
   resolveModules,
   unseenOptionalModules,
@@ -67,5 +68,10 @@ describe('module registry', () => {
     const config = configWith({ cloudflared: true })
     const names = unseenOptionalModules(config).map((m) => m.manifest.name)
     expect(names).toEqual([])
+  })
+
+  test('pendingOptionalModuleNames returns undecided optional module names', () => {
+    expect(pendingOptionalModuleNames(configWith({}))).toEqual(['cloudflared'])
+    expect(pendingOptionalModuleNames(configWith({ cloudflared: false }))).toEqual([])
   })
 })

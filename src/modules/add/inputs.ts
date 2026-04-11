@@ -15,6 +15,31 @@ import { isInteractive, promptString } from '@jib/tui'
 import { parseEnvEntry, splitCommaValues } from './guided.ts'
 import type { AddInputs, EnvEntry } from './types.ts'
 
+const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
+
+export async function resolveAddAppName(
+  app: string | undefined,
+  existingApps: Record<string, App>,
+): Promise<string> {
+  let value = app
+  if (!value) {
+    if (!isInteractive()) {
+      throw new MissingInputError('missing required input for jib add', [
+        { field: 'app', message: 'provide <app> or rerun with interactive prompts enabled' },
+      ])
+    }
+    value = await promptString({ message: 'App name', placeholder: 'my-app' })
+  }
+
+  if (!APP_NAME_RE.test(value)) {
+    throw new ValidationError(`app name "${value}" must match ${APP_NAME_RE}`)
+  }
+  if (existingApps[value]) {
+    throw new ValidationError(`app "${value}" already exists in config`)
+  }
+  return value
+}
+
 export async function gatherAddInputs(args: {
   repo?: string
   ingress?: string

@@ -18,6 +18,7 @@ import { reconcileOptionalModules } from '../modules/init/reconcile.ts'
 import {
   describeModules,
   installedOptionalModules,
+  pendingOptionalModuleNames,
   unseenOptionalModules,
 } from '../modules/init/registry.ts'
 
@@ -30,11 +31,16 @@ function ensureMigrated(rootReady: boolean): void {
 
 export default defineCommand({
   meta: { name: 'init', description: 'Configure optional modules' },
-  args: withCliArgs({}),
+  args: withCliArgs({
+    check: {
+      type: 'boolean',
+      description: 'Print pending optional module setup without making changes',
+    },
+  }),
   async run({ args }) {
     applyCliArgs(args)
     ensureLinux('init')
-    ensureRoot('init')
+    if (!args.check) ensureRoot('init')
 
     const paths = getPaths()
     ensureMigrated(hasBootstrapState(paths))
@@ -42,6 +48,24 @@ export default defineCommand({
 
     let config = await loadConfig(paths.configFile)
     config = await reconcileOptionalModules(config, paths)
+    const pending = pendingOptionalModuleNames(config)
+
+    if (args.check) {
+      if (isTextOutput()) {
+        if (pending.length === 0) {
+          note('No optional modules are waiting for setup.', 'Optional modules')
+          outro('nothing to do')
+        } else {
+          note(`Pending optional modules: ${pending.join(', ')}`, 'Optional modules')
+          outro('run `sudo jib init` to configure them')
+        }
+      }
+      return {
+        enabledOptionalModules: installedOptionalModules(config).map((mod) => mod.manifest.name),
+        optionalModulesPending: pending,
+      }
+    }
+
     const unseen = unseenOptionalModules(config)
 
     if (unseen.length === 0) {
