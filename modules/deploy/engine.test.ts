@@ -40,11 +40,12 @@ async function mkWorkdir(): Promise<string> {
 
 interface Call {
   args: string[]
+  env?: Record<string, string>
 }
 
 function fakeExec(calls: Call[], exitCode = 0): DockerExec {
-  return async (args): Promise<ExecResult> => {
-    calls.push({ args: [...args] })
+  return async (args, opts): Promise<ExecResult> => {
+    calls.push({ args: [...args], ...(opts.env ? { env: opts.env } : {}) })
     return { stdout: '', stderr: '', exitCode }
   }
 }
@@ -85,6 +86,29 @@ describe('Engine.deploy', () => {
     // build + up were called
     expect(calls.some((c) => c.args.includes('build'))).toBe(true)
     expect(calls.some((c) => c.args.includes('up'))).toBe(true)
+  })
+
+  test('forwards build args to both build and up', async () => {
+    const { paths, store, log } = await mkEnv()
+    const workdir = await mkWorkdir()
+    const calls: Call[] = []
+    const cfg = mkCfg()
+    cfg.apps.demo.build_args = { VITE_HOST_URL: 'https://demo.example.com' }
+    const engine = new Engine({
+      config: cfg,
+      paths,
+      store,
+      log,
+      diskFree: async () => 10 * 1024 * 1024 * 1024,
+      dockerExec: fakeExec(calls),
+    })
+
+    await engine.deploy({ app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' }, noProgress)
+
+    const buildCall = calls.find((c) => c.args.includes('build'))
+    const upCall = calls.find((c) => c.args.includes('up'))
+    expect(buildCall?.env).toEqual({ VITE_HOST_URL: 'https://demo.example.com' })
+    expect(upCall?.env).toEqual({ VITE_HOST_URL: 'https://demo.example.com' })
   })
 
   test('insufficient disk space throws', async () => {

@@ -151,9 +151,8 @@ export function renderAddPlanSummary(input: {
 }
 
 export function shouldDefaultExposeService(
-  service: AddServiceSummary,
+  _service: AddServiceSummary,
   totalServices: number,
 ): boolean {
-  if (totalServices !== 1) return false
-  return service.inferredContainerPort !== undefined || service.publishesPorts
+  return totalServices === 1
 }

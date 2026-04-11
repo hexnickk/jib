@@ -155,16 +155,27 @@ function mergeEntry(existing: ConfigEntry | undefined, next: ConfigEntry): Confi
   return mergeConfigEntries(existing ? [existing, next] : [next])[0] as ConfigEntry
 }
 
+function scopeSummaryLabel(scope: ConfigScope): string {
+  switch (scope) {
+    case 'runtime':
+      return 'runtime env var'
+    case 'build':
+      return 'build arg'
+    case 'both':
+      return 'runtime env var + build arg'
+  }
+}
+
 async function confirmRecommendedScopes(
   service: string,
   entries: [string, ConfigScope][],
 ): Promise<boolean> {
   note(
-    entries.map(([key, scope]) => `${key}: ${scopeLabel(scope)}`).join('\n'),
-    `Detected environment variables and build args for ${service}`,
+    entries.map(([key, scope]) => `${key}: ${scopeSummaryLabel(scope)}`).join('\n'),
+    `Detected variables from compose for ${service}`,
   )
   return await promptConfirm({
-    message: `Use these recommended runtime/build placements for "${service}"?`,
+    message: `Use these placements for the detected variables in "${service}"?`,
     initialValue: true,
   })
 }

@@ -142,9 +142,10 @@ export class Engine {
       await this.linkSecrets(cmd.app, appCfg, cmd.workdir)
 
       const compose = this.newCompose(cmd.app, appCfg, cmd.workdir)
+      const buildArgs = appCfg.build_args ?? {}
 
       progress.emit('build', `building ${cmd.app}`)
-      await compose.build(appCfg.build_args ?? {})
+      await compose.build(buildArgs)
 
       for (const hook of appCfg.pre_deploy ?? []) {
         progress.emit('pre_deploy', `running ${hook.service}`)
@@ -152,7 +153,7 @@ export class Engine {
       }
 
       progress.emit('up', 'starting containers')
-      await compose.up({ services: appCfg.services ?? [] })
+      await compose.up({ services: appCfg.services ?? [], buildArgs })
 
       if (appCfg.health && appCfg.health.length > 0) {
         progress.emit('health', 'running health checks')
@@ -202,7 +203,7 @@ export class Engine {
   /** `jib up` equivalent — start containers without rebuilding. */
   async up(appName: string): Promise<void> {
     const { compose, appCfg } = await this.composeFor(appName)
-    await compose.up({ services: appCfg.services ?? [] })
+    await compose.up({ services: appCfg.services ?? [], buildArgs: appCfg.build_args ?? {} })
   }
 
   /** `jib down` equivalent — stop containers. Optionally removes volumes. */
