@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import pkg from '../../package.json' with { type: 'json' }
+import pkg from '../package.json' with { type: 'json' }
 import addCmd from './cmd/add.ts'
 import cloudflaredCmd from './cmd/cloudflared.ts'
 import deployCmd from './cmd/deploy.ts'

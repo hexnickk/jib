@@ -9,12 +9,12 @@
   },
   "scripts": {
     "build": "bun run build:jib",
-    "build:jib": "bun build --compile apps/cli/main.ts --outfile dist/jib",
+    "build:jib": "bun build --compile src/main.ts --outfile dist/jib",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "fmt": "biome format --write .",
-    "dev": "bun run apps/cli/main.ts"
+    "dev": "bun run src/main.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
