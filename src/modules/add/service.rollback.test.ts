@@ -10,7 +10,7 @@ describe('add flow rollback', () => {
       expect(calls).toContain('rollbackRepo')
       expect(calls).toContain('loadConfig')
       expect(calls).toContain('removeSecret:APP_KEY')
-      expect(calls.includes('removeSecret:TOKEN')).toBe(failAt === 'claimRoutes')
+      expect(calls.includes('removeSecret:PUBLIC_URL')).toBe(failAt === 'claimRoutes')
       expect(warnings).toEqual([])
 
       const rollbackConfig = writtenConfigs.at(-1)
@@ -38,7 +38,7 @@ describe('add flow rollback', () => {
     expect(calls).toContain('rollbackRepo')
     expect(calls).toContain('loadConfig')
     expect(calls).toContain('removeSecret:APP_KEY')
-    expect(calls).toContain('removeSecret:TOKEN')
+    expect(calls).toContain('removeSecret:PUBLIC_URL')
     expect(warnings).toContain('repo rollback: rollbackRepo failed')
     expect(writtenConfigs.at(-1)?.apps.blog).toBeUndefined()
     expect(writtenConfigs.at(-1)?.apps.worker).toBeDefined()

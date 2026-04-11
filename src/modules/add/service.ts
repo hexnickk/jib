@@ -1,4 +1,5 @@
 import { cleanupFailedAdd } from './cleanup.ts'
+import { configEntriesToRuntime } from './config-entries.ts'
 import { normalizeAddError } from './errors.ts'
 import type {
   AddFlowObserver,
@@ -52,7 +53,7 @@ export class AddService {
       )
       this.observer.onStateChange?.('app_resolved')
 
-      await this.planner.confirmPlan(params.appName, inspection, finalApp, guided.secretKeys)
+      await this.planner.confirmPlan(params.appName, inspection, finalApp, guided.configEntries)
       this.observer.onStateChange?.('confirmed')
 
       const finalCfg = {
@@ -64,7 +65,8 @@ export class AddService {
       cleanup.finalEnvFile = finalApp.env_file
       this.observer.onStateChange?.('config_written')
 
-      for (const entry of guided.envEntries) {
+      const runtimeEntries = configEntriesToRuntime(guided.configEntries)
+      for (const entry of runtimeEntries) {
         await this.support.upsertSecret(params.appName, entry, finalApp.env_file)
         cleanup.writtenSecretKeys.push(entry.key)
       }
@@ -73,7 +75,7 @@ export class AddService {
       await this.support.claimIngress(params.appName, finalApp)
       this.observer.onStateChange?.('routes_claimed')
 
-      return { finalApp, secretsWritten: guided.envEntries.length }
+      return { finalApp, secretsWritten: runtimeEntries.length }
     } catch (error) {
       await cleanupFailedAdd(params, this.support, this.observer, cleanup)
       throw normalizeAddError(error, params.appName, params.configFile)

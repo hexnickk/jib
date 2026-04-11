@@ -1,24 +1,23 @@
 import { CliError, isDebugEnabled, isTextOutput } from '@jib/cli'
-import { type App, type Config, type Domain, type ParsedDomain, assignPorts } from '@jib/config'
+import { type App, type Config, type Domain, assignPorts } from '@jib/config'
 import {
   type ComposeInspection,
   ComposeInspectionError,
-  type ComposeService,
   discoverComposeFiles,
   inspectComposeApp,
   resolveFromCompose,
 } from '@jib/docker'
-import { isInteractive, note, promptConfirm, promptPassword, promptString } from '@jib/tui'
+import { isInteractive, note, promptConfirm, promptString } from '@jib/tui'
 import { consola } from 'consola'
+import { configEntriesToBuildArgs } from './config-entries.ts'
 import {
   mergeGuidedServiceAnswers,
   renderAddPlanSummary,
-  splitCommaValues,
   summarizeComposeServices,
 } from './guided.ts'
 import { parseApp } from './inputs.ts'
 import { collectDomains, promptForServices } from './prompting.ts'
-import type { AddInputs, AddPlanner, EnvEntry } from './types.ts'
+import type { AddInputs, AddPlanner, ConfigEntry } from './types.ts'
 
 export function createAddPlanner(): AddPlanner {
   return {
@@ -30,9 +29,14 @@ export function createAddPlanner(): AddPlanner {
 }
 
 function composeNotFoundMessage(workdir: string, compose?: string[]): string {
-  const searched = compose?.length ? compose : ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']
+  const searched = compose?.length
+    ? compose
+    : ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']
   const discovered = discoverComposeFiles(workdir)
-  const lines = [`Jib could not find a compose file in the repo.`, `Looked for: ${searched.join(', ')}`]
+  const lines = [
+    'Jib could not find a compose file in the repo.',
+    `Looked for: ${searched.join(', ')}`,
+  ]
   if (discovered.length > 0) lines.push(`Detected compose-like files: ${discovered.join(', ')}`)
   return lines.join('\n')
 }
@@ -57,12 +61,16 @@ async function inspectComposeWithPrompts(
         isInteractive()
       ) {
         if (isTextOutput()) note(composeNotFoundMessage(workdir, compose), 'Compose file')
-        const answer = await promptString({
-          message: 'Compose file(s) relative to the repo (comma-separated)',
-          placeholder: 'docker-compose.yml',
-          ...(compose ? { initialValue: compose.join(',') } : {}),
-        })
-        compose = splitCommaValues(answer)
+        compose = (
+          await promptString({
+            message: 'Compose file(s) relative to the repo (comma-separated)',
+            placeholder: 'docker-compose.yml',
+            ...(compose ? { initialValue: compose.join(',') } : {}),
+          })
+        )
+          .split(',')
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0)
         continue
       }
       if (error instanceof ComposeInspectionError && error.code === 'compose_not_found') {
@@ -82,25 +90,12 @@ async function inspectComposeWithPrompts(
 
 async function collectGuidedInputs(
   inputs: AddInputs,
-  composeServices: ComposeService[],
-): Promise<{ domains: ParsedDomain[]; envEntries: EnvEntry[]; secretKeys: string[] }> {
+  composeServices: ComposeInspection['services'],
+): Promise<{ domains: Domain[]; configEntries: ConfigEntry[] }> {
   const serviceNames = composeServices.map((service) => service.name)
   const domains = await collectDomains(inputs.parsedDomains, serviceNames)
-  const secretValues = new Map(inputs.envEntries.map((entry) => [entry.key, entry.value]))
-  const answers = await promptForServices(domains, composeServices, secretValues)
-  const merged = mergeGuidedServiceAnswers(domains, serviceNames, answers, inputs.ingressDefault)
-  for (const entry of merged.envEntries) {
-    secretValues.set(entry.key, entry.value)
-  }
-  for (const key of merged.secretKeys) {
-    if (secretValues.has(key)) continue
-    secretValues.set(key, await promptPassword({ message: `Value for ${key}` }))
-  }
-  return {
-    domains: merged.domains,
-    envEntries: [...secretValues.entries()].map(([key, value]) => ({ key, value })),
-    secretKeys: [...secretValues.keys()],
-  }
+  const answers = await promptForServices(domains, composeServices, inputs.configEntries)
+  return mergeGuidedServiceAnswers(domains, serviceNames, answers, inputs.ingressDefault)
 }
 
 async function buildResolvedApp(
@@ -110,9 +105,10 @@ async function buildResolvedApp(
   args: { source?: string; branch?: string },
   inputs: AddInputs,
   inspection: ComposeInspection,
-  guided: { domains: ParsedDomain[] },
+  guided: { domains: Domain[]; configEntries: ConfigEntry[] },
 ): Promise<App> {
-  const domains = await assignPorts(cfg, appName, guided.domains as Domain[])
+  const domains = await assignPorts(cfg, appName, guided.domains)
+  const buildArgs = configEntriesToBuildArgs(guided.configEntries)
   return resolveFromCompose(
     parseApp({
       repo: inputs.repo,
@@ -123,6 +119,7 @@ async function buildResolvedApp(
       compose: inspection.composeFiles,
       ...(args.source ? { source: args.source } : {}),
       ...(inputs.healthChecks.length > 0 ? { health: inputs.healthChecks } : {}),
+      ...(buildArgs ? { build_args: buildArgs } : {}),
     }),
     workdir,
     isTextOutput() ? { warn: (message) => consola.warn(message) } : {},
@@ -133,7 +130,7 @@ async function confirmAddPlan(
   appName: string,
   inspection: ComposeInspection,
   finalApp: App,
-  secretKeys: string[],
+  configEntries: ConfigEntry[],
 ): Promise<void> {
   if (!isTextOutput()) return
   consola.box(
@@ -142,7 +139,7 @@ async function confirmAddPlan(
       composeFiles: inspection.composeFiles,
       services: summarizeComposeServices(inspection.services),
       domains: finalApp.domains,
-      secretKeys,
+      configEntries,
       envFile: finalApp.env_file,
     }),
   )

@@ -27,7 +27,7 @@ describe('add flow state machine', () => {
       'confirmPlan',
       'writeConfig',
       'upsertSecret:APP_KEY',
-      'upsertSecret:TOKEN',
+      'upsertSecret:PUBLIC_URL',
       'claimRoutes',
     ])
   })

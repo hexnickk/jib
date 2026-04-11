@@ -1,4 +1,4 @@
-import { CliError, applyCliArgs, isTextOutput, withCliArgs } from '@jib/cli'
+import { CliError, applyCliArgs, isTextOutput } from '@jib/cli'
 import { loadAppConfig, loadConfig } from '@jib/config'
 import type { App } from '@jib/config'
 import { ValidationError } from '@jib/errors'
@@ -25,30 +25,11 @@ import {
   rollbackAddedApp,
   trapInterrupt,
 } from '../modules/add/runtime.ts'
+import { addCommandArgs } from './add-args.ts'
+
 export default defineCommand({
   meta: { name: 'add', description: 'Register and deploy a new app' },
-  args: withCliArgs({
-    app: { type: 'positional' },
-    repo: {
-      type: 'string',
-      description: 'Git repo: "owner/name", "local", file:// URL, http(s):// URL, or absolute path',
-    },
-    source: { type: 'string', description: 'Configured source ref name' },
-    branch: { type: 'string', description: 'Git branch to track (defaults to the repo default)' },
-    ingress: {
-      type: 'string',
-      default: 'direct',
-      description: 'Default ingress: direct|cloudflare-tunnel',
-    },
-    compose: { type: 'string', description: 'Compose file (comma-separated)' },
-    domain: {
-      type: 'string',
-      description:
-        'host=<domain>[,port=<port>][,service=<name>][,ingress=direct|cloudflare-tunnel] (repeatable)',
-    },
-    env: { type: 'string', description: 'KEY=VALUE secret (repeatable)' },
-    health: { type: 'string', description: '/path:port (repeatable via comma)' },
-  }),
+  args: addCommandArgs,
   async run({ args }) {
     applyCliArgs(args)
 
@@ -146,10 +127,7 @@ async function chooseInitialSource(
   if (options.length === 0) return { created: false }
   const choice = await promptSelect({
     message: 'Source for this app?',
-    options: [
-      { value: 'none', label: 'None', hint: 'Public repo or local path' },
-      ...options,
-    ],
+    options: [{ value: 'none', label: 'None', hint: 'Public repo or local path' }, ...options],
   })
   if (choice === 'none') return { created: false }
   if (choice.startsWith('setup:')) {

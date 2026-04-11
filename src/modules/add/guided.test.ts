@@ -1,13 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
   assignCliDomainsToServices,
-  buildAdditionalSecretPromptMessage,
-  buildManualSecretPromptLines,
-  buildSecretPromptMessage,
   mergeGuidedServiceAnswers,
   parseEnvEntry,
   renderAddPlanSummary,
-  secretPromptPlaceholder,
+  requiredConfigScopes,
   shouldDefaultExposeService,
   splitCommaValues,
   summarizeComposeServices,
@@ -15,9 +12,9 @@ import {
 } from './guided.ts'
 
 describe('guided add helpers', () => {
-  test('single-service web app can collect a domain and app secret', () => {
+  test('single-service web app can collect a domain and scoped config', () => {
     const services = summarizeComposeServices([
-      { name: 'web', ports: ['8080:80'], expose: [], envRefs: [] },
+      { name: 'web', ports: ['8080:80'], expose: [], envRefs: [], buildArgRefs: [] },
     ])
 
     const [service] = services
@@ -34,31 +31,43 @@ describe('guided add helpers', () => {
           service: 'web',
           expose: true,
           domainHosts: ['demo.example.com'],
-          secretKeys: ['APP_KEY'],
-          envEntries: [{ key: 'DATABASE_URL', value: 'postgres://db' }],
+          configEntries: [
+            { key: 'DATABASE_URL', value: 'postgres://db', scope: 'runtime' },
+            { key: 'VITE_HOST_URL', value: 'https://demo.example.com', scope: 'build' },
+          ],
         },
       ],
       'direct',
     )
 
     expect(merged.domains).toEqual([{ host: 'demo.example.com', service: 'web' }])
-    expect(merged.envEntries).toEqual([{ key: 'DATABASE_URL', value: 'postgres://db' }])
-    expect(merged.secretKeys.sort()).toEqual(['APP_KEY', 'DATABASE_URL'])
+    expect(merged.configEntries).toEqual([
+      { key: 'DATABASE_URL', value: 'postgres://db', scope: 'runtime' },
+      { key: 'VITE_HOST_URL', value: 'https://demo.example.com', scope: 'build' },
+    ])
   })
 
-  test('multi-service app keeps public and internal services separate', () => {
+  test('multi-service app merges repeated config keys across scopes', () => {
     const merged = mergeGuidedServiceAnswers(
       [{ host: 'app.example.com', service: 'web' }],
       ['web', 'worker'],
       [
-        { service: 'web', expose: true, secretKeys: ['DATABASE_URL'] },
-        { service: 'worker', expose: false, secretKeys: ['DATABASE_URL', 'QUEUE_TOKEN'] },
+        {
+          service: 'web',
+          expose: true,
+          configEntries: [{ key: 'API_URL', value: 'https://api', scope: 'build' }],
+        },
+        {
+          service: 'worker',
+          expose: false,
+          configEntries: [{ key: 'API_URL', value: 'https://api', scope: 'runtime' }],
+        },
       ],
       'direct',
     )
 
     expect(merged.domains).toEqual([{ host: 'app.example.com', service: 'web' }])
-    expect(merged.secretKeys.sort()).toEqual(['DATABASE_URL', 'QUEUE_TOKEN'])
+    expect(merged.configEntries).toEqual([{ key: 'API_URL', value: 'https://api', scope: 'both' }])
   })
 
   test('worker-only app remains valid without ingress', () => {
@@ -70,7 +79,7 @@ describe('guided add helpers', () => {
     )
 
     expect(merged.domains).toEqual([])
-    expect(merged.secretKeys).toEqual([])
+    expect(merged.configEntries).toEqual([])
   })
 
   test('multi-service cli domains must name a service in non-interactive mode', () => {
@@ -86,7 +95,23 @@ describe('guided add helpers', () => {
     ])
   })
 
-  test('summary renders services, ingress, and secret file expectations', () => {
+  test('requiredConfigScopes merges runtime and build references for the same key', () => {
+    expect(
+      requiredConfigScopes({
+        name: 'web',
+        publishesPorts: true,
+        envRefs: ['PUBLIC_URL', 'DATABASE_URL'],
+        buildArgRefs: ['PUBLIC_URL'],
+      }),
+    ).toEqual(
+      new Map([
+        ['PUBLIC_URL', 'both'],
+        ['DATABASE_URL', 'runtime'],
+      ]),
+    )
+  })
+
+  test('summary renders services plus runtime and build config expectations', () => {
     const summary = renderAddPlanSummary({
       app: 'demo',
       composeFiles: ['compose.yml'],
@@ -95,30 +120,19 @@ describe('guided add helpers', () => {
         { name: 'worker', publishesPorts: false },
       ],
       domains: [{ host: 'demo.example.com', service: 'web' }],
-      secretKeys: ['APP_KEY'],
+      configEntries: [
+        { key: 'DATABASE_URL', value: 'postgres://db', scope: 'runtime' },
+        { key: 'VITE_HOST_URL', value: 'https://demo.example.com', scope: 'build' },
+        { key: 'PUBLIC_URL', value: 'https://demo.example.com', scope: 'both' },
+      ],
       envFile: '.env',
     })
 
     expect(summary).toContain('app "demo"')
     expect(summary).toContain('web: demo.example.com')
     expect(summary).toContain('worker: internal only')
-    expect(summary).toContain('secrets file: .env')
-  })
-
-  test('secret prompt copy explains that jib will prompt for key values next', () => {
-    expect(buildSecretPromptMessage('blog', ['DATABASE_URL'])).toContain(
-      'detected in docker-compose',
-    )
-    expect(buildSecretPromptMessage('blog', ['DATABASE_URL'])).toContain('values prompted next')
-    expect(buildAdditionalSecretPromptMessage('blog', ['DATABASE_URL'])).toContain(
-      'Additional secret keys for "blog"?',
-    )
-    expect(buildAdditionalSecretPromptMessage('blog', ['DATABASE_URL'])).toContain('blank to skip')
-    expect(secretPromptPlaceholder()).toBe('DATABASE_URL, API_KEY')
-    expect(buildManualSecretPromptLines()).toContain(
-      'Jib could not detect any required secrets from docker-compose.',
-    )
-    expect(buildManualSecretPromptLines()).toContain('SECRET_KEY=VALUE')
+    expect(summary).toContain('runtime vars (.env): DATABASE_URL, PUBLIC_URL')
+    expect(summary).toContain('build args: VITE_HOST_URL, PUBLIC_URL')
   })
 
   test('env entry parser accepts KEY=VALUE format and rejects missing equals', () => {

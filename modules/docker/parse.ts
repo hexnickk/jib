@@ -16,12 +16,19 @@ export interface ComposeService {
   expose: unknown[]
   /** Environment keys the compose file expects the operator to supply. */
   envRefs: string[]
+  /** Build args the compose file expects the operator to supply. */
+  buildArgRefs: string[]
+}
+
+interface RawBuildConfig {
+  args?: unknown
 }
 
 interface RawService {
   ports?: unknown[]
   expose?: unknown[]
   environment?: unknown
+  build?: string | RawBuildConfig
 }
 
 interface RawComposeFile {
@@ -48,6 +55,7 @@ export function parseComposeServices(
       if (svc.ports) next.ports = svc.ports
       if (svc.expose) next.expose = svc.expose
       if (svc.environment !== undefined) next.environment = svc.environment
+      if (svc.build !== undefined) next.build = svc.build
       merged.set(name, next)
     }
   }
@@ -59,6 +67,7 @@ export function parseComposeServices(
       ports: svc.ports ?? [],
       expose: svc.expose ?? [],
       envRefs: parseEnvRefs(svc.environment),
+      buildArgRefs: parseBuildArgRefs(svc.build),
     })
   }
   return out
@@ -96,7 +105,7 @@ function parseContainerSide(p: unknown): number | undefined {
   if (typeof p === 'string') {
     const stripped = p.split('/')[0] ?? p
     const parts = stripped.split(':')
-    // "80" → container 80; "8080:80" → 80; "127.0.0.1:8080:80" → 80
+    // "80" -> container 80; "8080:80" -> 80; "127.0.0.1:8080:80" -> 80
     const tail = parts[parts.length - 1] ?? ''
     const n = Number.parseInt(tail, 10)
     return Number.isFinite(n) && n > 0 ? n : undefined
@@ -130,6 +139,38 @@ function parseEnvRefs(environment: unknown): string[] {
   }
   if (!environment || typeof environment !== 'object') return []
   for (const [key, value] of Object.entries(environment as Record<string, unknown>)) {
+    if (value === null || value === undefined) {
+      refs.add(key)
+      continue
+    }
+    if (typeof value === 'string' && value.includes('${')) refs.add(key)
+  }
+  return [...refs]
+}
+
+function parseBuildArgRefs(build: unknown): string[] {
+  if (!build || typeof build !== 'object' || Array.isArray(build) || !('args' in build)) return []
+  return parseArgRefs((build as RawBuildConfig).args)
+}
+
+function parseArgRefs(args: unknown): string[] {
+  const refs = new Set<string>()
+  if (Array.isArray(args)) {
+    for (const entry of args) {
+      if (typeof entry !== 'string') continue
+      const eq = entry.indexOf('=')
+      if (eq < 0) {
+        if (entry) refs.add(entry)
+        continue
+      }
+      const key = entry.slice(0, eq)
+      const value = entry.slice(eq + 1)
+      if (key && (value.length === 0 || value.includes('${'))) refs.add(key)
+    }
+    return [...refs]
+  }
+  if (!args || typeof args !== 'object') return []
+  for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
     if (value === null || value === undefined) {
       refs.add(key)
       continue

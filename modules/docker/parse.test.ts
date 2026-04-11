@@ -10,7 +10,7 @@ import {
 } from './parse.ts'
 
 function svc(partial: Partial<ComposeService>): ComposeService {
-  return { name: 'x', ports: [], expose: [], envRefs: [], ...partial }
+  return { name: 'x', ports: [], expose: [], envRefs: [], buildArgRefs: [], ...partial }
 }
 
 function fixture(files: Record<string, string>): string {
@@ -32,6 +32,7 @@ describe('parseComposeServices', () => {
     expect(out[0]?.ports).toEqual([])
     expect(out[0]?.expose).toEqual([])
     expect(out[0]?.envRefs).toEqual([])
+    expect(out[0]?.buildArgRefs).toEqual([])
   })
 
   test('extracts ports and expose', () => {
@@ -60,17 +61,48 @@ describe('parseComposeServices', () => {
 
   test('extracts referenced environment keys', () => {
     const dir = fixture({
-      'docker-compose.yml': `services:
-  api:
-    environment:
-      DATABASE_URL: \${DATABASE_URL}
-      STATIC_VALUE: hello
-      EMPTY_FROM_ENV:
-      API_KEY: ""
-`,
+      'docker-compose.yml':
+        'services:\n' +
+        '  api:\n' +
+        '    environment:\n' +
+        '      DATABASE_URL: ${DATABASE_URL}\n' +
+        '      STATIC_VALUE: hello\n' +
+        '      EMPTY_FROM_ENV:\n' +
+        '      API_KEY: ""\n',
     })
     const out = parseComposeServices(dir)
     expect(out[0]?.envRefs).toEqual(['DATABASE_URL', 'EMPTY_FROM_ENV'])
+  })
+
+  test('extracts referenced build args', () => {
+    const dir = fixture({
+      'docker-compose.yml':
+        'services:\n' +
+        '  web:\n' +
+        '    build:\n' +
+        '      context: .\n' +
+        '      args:\n' +
+        '        VITE_HOST_URL: ${VITE_HOST_URL:?required}\n' +
+        '        STATIC_VALUE: hello\n' +
+        '        EMPTY_BUILD_ARG:\n',
+    })
+    const out = parseComposeServices(dir)
+    expect(out[0]?.buildArgRefs).toEqual(['VITE_HOST_URL', 'EMPTY_BUILD_ARG'])
+  })
+
+  test('extracts list-form build args', () => {
+    const dir = fixture({
+      'docker-compose.yml':
+        'services:\n' +
+        '  web:\n' +
+        '    build:\n' +
+        '      context: .\n' +
+        '      args:\n' +
+        '        - BUILD_VERSION\n' +
+        '        - API_URL=${API_URL}\n',
+    })
+    const out = parseComposeServices(dir)
+    expect(out[0]?.buildArgRefs).toEqual(['BUILD_VERSION', 'API_URL'])
   })
 })
 

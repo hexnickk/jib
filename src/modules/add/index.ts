@@ -12,6 +12,8 @@ export type {
   AddInputs,
   AddPlanner,
   AddSupport,
+  ConfigEntry,
+  ConfigScope,
   EnvEntry,
   GuidedInputs,
 } from './types.ts'

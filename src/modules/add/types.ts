@@ -4,19 +4,24 @@ import type { InspectionCheckout } from '@jib/sources'
 
 export type EnvEntry = { key: string; value: string }
 
+export type ConfigScope = 'runtime' | 'build' | 'both'
+
+export interface ConfigEntry extends EnvEntry {
+  scope: ConfigScope
+}
+
 export interface AddInputs {
   repo: string
   ingressDefault: string
   composeRaw?: string[]
   parsedDomains: ParsedDomain[]
-  envEntries: EnvEntry[]
+  configEntries: ConfigEntry[]
   healthChecks: HealthCheck[]
 }
 
 export interface GuidedInputs {
   domains: ParsedDomain[]
-  envEntries: EnvEntry[]
-  secretKeys: string[]
+  configEntries: ConfigEntry[]
 }
 
 export type AddFlowState =
@@ -57,7 +62,7 @@ export interface AddPlanner {
     appName: string,
     inspection: ComposeInspection,
     finalApp: App,
-    secretKeys: string[],
+    configEntries: ConfigEntry[],
   ): Promise<void>
 }
 

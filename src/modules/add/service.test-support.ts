@@ -28,16 +28,16 @@ const draftApp: App = {
 
 const inspection: ComposeInspection = {
   composeFiles: ['compose.yml'],
-  services: [{ name: 'web', ports: ['8080:80'], expose: [], envRefs: [] }],
+  services: [{ name: 'web', ports: ['8080:80'], expose: [], envRefs: [], buildArgRefs: [] }],
 }
 
 const guided = {
   domains: [{ host: 'blog.example.com', service: 'web' }],
-  envEntries: [
-    { key: 'APP_KEY', value: 'secret' },
-    { key: 'TOKEN', value: 'token' },
+  configEntries: [
+    { key: 'APP_KEY', value: 'secret', scope: 'runtime' as const },
+    { key: 'PUBLIC_URL', value: 'https://blog.example.com', scope: 'both' as const },
+    { key: 'BUILD_VERSION', value: '1.2.3', scope: 'build' as const },
   ],
-  secretKeys: ['APP_KEY', 'TOKEN'],
 }
 
 export const finalApp: App = {
@@ -47,6 +47,10 @@ export const finalApp: App = {
   services: ['web'],
   domains: [{ host: 'blog.example.com', service: 'web', port: 20000, container_port: 80 }],
   env_file: '.env',
+  build_args: {
+    PUBLIC_URL: 'https://blog.example.com',
+    BUILD_VERSION: '1.2.3',
+  },
 }
 
 export function makeParams(): AddFlowParams {
@@ -59,7 +63,7 @@ export function makeParams(): AddFlowParams {
       repo: 'owner/blog',
       ingressDefault: 'direct',
       parsedDomains: [],
-      envEntries: [],
+      configEntries: [],
       healthChecks: [],
     },
     draftApp,

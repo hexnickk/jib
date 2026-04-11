@@ -12,8 +12,9 @@ import {
 } from '@jib/config'
 import { ValidationError } from '@jib/errors'
 import { isInteractive, promptString } from '@jib/tui'
+import { mergeConfigEntries } from './config-entries.ts'
 import { parseEnvEntry, splitCommaValues } from './guided.ts'
-import type { AddInputs, EnvEntry } from './types.ts'
+import type { AddInputs, ConfigEntry, ConfigScope } from './types.ts'
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 
@@ -46,6 +47,8 @@ export async function gatherAddInputs(args: {
   compose?: string
   domain?: string | string[]
   env?: string | string[]
+  'build-arg'?: string | string[]
+  'build-env'?: string | string[]
   health?: string | string[]
 }): Promise<AddInputs> {
   let repo = args.repo
@@ -65,12 +68,17 @@ export async function gatherAddInputs(args: {
   const composeRaw = args.compose ? splitCommaValues(args.compose) : undefined
   const parsedDomains = parseDomains(toArray(args.domain), ingressDefault)
   const healthChecks = parseChecks(toArray(args.health))
+  const configEntries = parseConfigEntries(
+    toArray(args.env),
+    toArray(args['build-arg']),
+    toArray(args['build-env']),
+  )
   return {
     repo,
     ingressDefault,
     ...(composeRaw ? { composeRaw } : {}),
     parsedDomains,
-    envEntries: parseEnvEntries(toArray(args.env)),
+    configEntries,
     healthChecks,
   }
 }
@@ -111,12 +119,31 @@ function parseChecks(rawHealth: string[]): HealthCheck[] {
   }
 }
 
-function parseEnvEntries(rawEntries: string[]): EnvEntry[] {
+function parseConfigEntries(runtime: string[], build: string[], both: string[]): ConfigEntry[] {
+  return mergeConfigEntries([
+    ...parseScopedEntries(runtime, 'runtime'),
+    ...parseScopedEntries(build, 'build'),
+    ...parseScopedEntries(both, 'both'),
+  ])
+}
+
+function parseScopedEntries(rawEntries: string[], scope: ConfigScope): ConfigEntry[] {
   return rawEntries.map((pair) => {
     try {
-      return parseEnvEntry(pair)
+      return { ...parseEnvEntry(pair), scope }
     } catch {
-      throw new ValidationError(`invalid --env "${pair}" - expected KEY=VALUE`)
+      throw new ValidationError(`invalid ${flagForScope(scope)} "${pair}" - expected KEY=VALUE`)
     }
   })
+}
+
+function flagForScope(scope: ConfigScope): string {
+  switch (scope) {
+    case 'runtime':
+      return '--env'
+    case 'build':
+      return '--build-arg'
+    case 'both':
+      return '--build-env'
+  }
 }
