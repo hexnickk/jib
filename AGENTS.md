@@ -1,13 +1,8 @@
-## Philosophy
+# Important rules
 
-This codebase will outlive you. Every shortcut becomes someone else's burden. Every hack compounds into technical debt that slows the whole team down.
-
-You are not just writing code. You are shaping the future of this project. The patterns you establish will be copied. The corners you cut will be cut again.
-
-Fight entropy. Leave the codebase better than you found it.
-
-# Important
-
-- Files should target 100 LoC, anything above 200 LoC needs an explicit approval
-- Don't commit until user asks to do so
-- Don't ever edit TODO.txt
+- Files should target 100 LoC, anything above 200 LoC needs an explicit approval.
+- Don't commit until asked to do so.
+- Don't ever edit TODO.txt.
+- Use 80/20 principle everywhere, especially for tests.
+- Always prefer sustainability over immediate benefit. If something doesn't fit into module/architecture and it require a major refactor, lets do.
+- Fight entropy. Leave the codebase better than you found it.

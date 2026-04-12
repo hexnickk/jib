@@ -53,3 +53,4 @@
 - [ ] Wildcard SSL certificates (DNS challenge)
 - [ ] Extract a GitProvider interface now — the watcher depends on an abstract interface (cloneURL, refreshAuth, applyAuth), github implements it. When GitLab arrives, it just implements the same interface. ~150 LoC of refactoring.
 - [ ] split between runtime env & build env
+- [ ] runtime secrets & build variables are stored separately, which is a bug
