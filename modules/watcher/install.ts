@@ -1,7 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
-import { $ } from 'bun'
 import { SERVICE_NAME, UNIT_PATH, systemdUnit } from './templates.ts'
 
 interface WatcherContext {
@@ -18,7 +17,7 @@ export const install = async (ctx: WatcherContext): Promise<void> => {
   ctx.logger.info(`writing ${UNIT_PATH}`)
   await writeFile(UNIT_PATH, systemdUnit(vars), { mode: 0o644 })
   ctx.logger.info('systemctl daemon-reload')
-  await $`sudo systemctl daemon-reload`.quiet()
+  await Bun.$`sudo systemctl daemon-reload`.quiet()
   ctx.logger.info(`systemctl enable --now ${SERVICE_NAME}`)
-  await $`sudo systemctl enable --now ${SERVICE_NAME}`.quiet()
+  await Bun.$`sudo systemctl enable --now ${SERVICE_NAME}`.quiet()
 }

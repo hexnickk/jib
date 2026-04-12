@@ -1,7 +1,6 @@
 import { chmod, readFile, stat } from 'node:fs/promises'
 import { JibError } from '@jib/errors'
 import { type Paths, credsPath, ensureCredsDir } from '@jib/paths'
-import { $ } from 'bun'
 
 /** Disk layout for a deploy-key source. Mirrors Go `ghPkg.KeyPath`. */
 export interface DeployKeyPaths {
@@ -31,7 +30,9 @@ export async function generateDeployKey(name: string, paths: Paths): Promise<str
   }
   await ensureCredsDir(paths, 'github-key')
   const comment = `jib-${name}`
-  const res = await $`ssh-keygen -t ed25519 -f ${privateKey} -N "" -C ${comment}`.quiet().nothrow()
+  const res = await Bun.$`ssh-keygen -t ed25519 -f ${privateKey} -N "" -C ${comment}`
+    .quiet()
+    .nothrow()
   if (res.exitCode !== 0) {
     throw new JibError('github.keygen', `ssh-keygen failed: ${res.stderr.toString()}`)
   }
@@ -41,7 +42,7 @@ export async function generateDeployKey(name: string, paths: Paths): Promise<str
 
 /** Parses the fingerprint line printed by `ssh-keygen -l -f <pub>`. */
 export async function keyFingerprint(pubKeyPath: string): Promise<string> {
-  const res = await $`ssh-keygen -l -f ${pubKeyPath}`.quiet().nothrow()
+  const res = await Bun.$`ssh-keygen -l -f ${pubKeyPath}`.quiet().nothrow()
   if (res.exitCode !== 0) {
     throw new JibError('github.keygen', `ssh-keygen -l failed: ${res.stderr.toString()}`)
   }
