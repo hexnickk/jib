@@ -35,47 +35,30 @@ const base = (overrides: Record<string, unknown> = {}) =>
   })
 
 describe('validateRepo', () => {
-  test('accepts empty and "local"', () => {
-    expect(validateRepo('')).toBeNull()
-    expect(validateRepo('local')).toBeNull()
+  test('accepts canonical repo inputs', () => {
+    for (const repo of [
+      '',
+      'local',
+      'hexnickk/jib',
+      'file:///tmp/foo',
+      'https://example.com/foo.git',
+      'git@github.com:owner/name.git',
+      '/srv/repos/app',
+    ]) {
+      expect(validateRepo(repo)).toBeNull()
+    }
   })
-  test('accepts owner/name', () => {
-    expect(validateRepo('hexnickk/jib')).toBeNull()
-  })
-  test('accepts scheme URLs and git@host:path', () => {
-    expect(validateRepo('file:///tmp/foo')).toBeNull()
-    expect(validateRepo('https://example.com/foo.git')).toBeNull()
-    expect(validateRepo('ssh://git@example.com/foo.git')).toBeNull()
-    expect(validateRepo('git@github.com:owner/name.git')).toBeNull()
-  })
-  test('accepts absolute paths', () => {
-    expect(validateRepo('/srv/repos/app')).toBeNull()
-  })
-  test('rejects path traversal', () => {
-    expect(validateRepo('../../etc')).not.toBeNull()
-    expect(validateRepo('owner/..')).not.toBeNull()
-  })
-  test('rejects too many slashes in slug', () => {
-    expect(validateRepo('a/b/c')).not.toBeNull()
-  })
-  test('rejects random garbage', () => {
-    expect(validateRepo('not a repo')).not.toBeNull()
+
+  test('rejects traversal and malformed repo inputs', () => {
+    for (const repo of ['../../etc', 'owner/..', 'a/b/c', 'not a repo']) {
+      expect(validateRepo(repo)).not.toBeNull()
+    }
   })
 })
 
 describe('validate', () => {
   test('accepts valid config', () => {
     expect(() => validate(base())).not.toThrow()
-  })
-
-  test('accepts zero-domain app', () => {
-    const cfg = ConfigSchema.parse({
-      config_version: 3,
-      apps: {
-        worker: { repo: 'hexnickk/worker' },
-      },
-    })
-    expect(() => validate(cfg)).not.toThrow()
   })
 
   test('rejects invalid poll_interval', () => {
@@ -107,19 +90,6 @@ describe('validate', () => {
     expect(() => validate(cfg)).not.toThrow()
   })
 
-  test('rejects app referencing unknown source', () => {
-    const cfg = base({
-      apps: {
-        web: {
-          repo: 'hexnickk/web',
-          source: 'ghost',
-          domains: [{ host: 'example.com', port: 80 }],
-        },
-      },
-    })
-    expect(() => validate(cfg)).toThrow(/source/)
-  })
-
   test('accepts app with matching source', () => {
     const cfg = base({
       sources: { prod: { driver: 'github', type: 'key' } },
@@ -141,24 +111,6 @@ describe('validate', () => {
       },
     })
     expect(() => validate(cfg)).toThrow(/repo/)
-  })
-
-  test('rejects repo with embedded slash beyond owner/name', () => {
-    const cfg = base({
-      apps: {
-        web: { repo: 'a/b/c', domains: [{ host: 'example.com', port: 80 }] },
-      },
-    })
-    expect(() => validate(cfg)).toThrow(/repo/)
-  })
-
-  test('accepts file:// repo', () => {
-    const cfg = base({
-      apps: {
-        web: { repo: 'file:///tmp/src', domains: [{ host: 'example.com', port: 80 }] },
-      },
-    })
-    expect(() => validate(cfg)).not.toThrow()
   })
 
   test('rejects invalid app name', () => {

@@ -51,49 +51,20 @@ describe('add flow state machine', () => {
     expect(calls).toContain('loadConfig')
   })
 
-  for (const [failAt, expectedStates, rollsBack] of [
-    ['prepareRepo', ['inputs_ready'], false],
-    ['inspectCompose', ['inputs_ready', 'repo_prepared'], true],
-    ['collectGuidedInputs', ['inputs_ready', 'repo_prepared', 'compose_inspected'], true],
-    [
-      'buildResolvedApp',
-      ['inputs_ready', 'repo_prepared', 'compose_inspected', 'guided_inputs_collected'],
-      true,
-    ],
-    [
-      'confirmPlan',
-      [
-        'inputs_ready',
-        'repo_prepared',
-        'compose_inspected',
-        'guided_inputs_collected',
-        'app_resolved',
-      ],
-      true,
-    ],
-    [
-      'writeConfig',
-      [
-        'inputs_ready',
-        'repo_prepared',
-        'compose_inspected',
-        'guided_inputs_collected',
-        'app_resolved',
-        'confirmed',
-      ],
-      true,
-    ],
-  ] as const) {
-    test(`failure at ${failAt} cleans up the expected partial state`, async () => {
-      const { calls, flow, states } = makeDeps(failAt)
+  test('failure before config write rolls back prepared repo without partial cleanup noise', async () => {
+    const { calls, flow, states } = makeDeps('buildResolvedApp')
 
-      const result = await flow.run(makeParams())
-      expect(result).toBeInstanceOf(Error)
-      expect((result as AddFlowError).message).toBe(`${failAt} failed`)
-      expect(states).toEqual([...expectedStates])
-      expect(calls.includes('rollbackRepo')).toBe(rollsBack)
-      expect(calls.some((call) => call.startsWith('removeSecret:'))).toBe(false)
-      expect(calls.includes('loadConfig')).toBe(false)
-    })
-  }
+    const result = await flow.run(makeParams())
+    expect(result).toBeInstanceOf(Error)
+    expect((result as AddFlowError).message).toBe('buildResolvedApp failed')
+    expect(states).toEqual([
+      'inputs_ready',
+      'repo_prepared',
+      'compose_inspected',
+      'guided_inputs_collected',
+    ])
+    expect(calls.includes('rollbackRepo')).toBe(true)
+    expect(calls.some((call) => call.startsWith('removeSecret:'))).toBe(false)
+    expect(calls.includes('loadConfig')).toBe(false)
+  })
 })

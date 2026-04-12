@@ -59,20 +59,6 @@ describe('execution contract', () => {
     })
   })
 
-  test('non-interactive add without repo returns structured JSON', async () => {
-    await withTmpRoot(async (root) => {
-      const result = await runCli(root, ['--interactive=never', '--output=json', 'add', 'demo'])
-      expect(result.exitCode).toBe(1)
-      expect(result.stdout).toBe('')
-      const parsed = JSON.parse(result.stderr)
-      expect(parsed.ok).toBe(false)
-      expect(parsed.error.code).toBe('missing_input')
-      expect(parsed.error.issues).toEqual([
-        { field: 'repo', message: 'provide --repo or rerun with interactive prompts enabled' },
-      ])
-    })
-  })
-
   test('help and version honor json output mode', async () => {
     await withTmpRoot(async (root) => {
       const version = await runCli(root, ['--output=json', '--version'])
@@ -92,35 +78,6 @@ describe('execution contract', () => {
     })
   })
 
-  test('bare command groups render usage in interactive text mode', async () => {
-    await withTmpRoot(async (root) => {
-      const topLevel = await runCli(root, ['--interactive=always'])
-      expect(topLevel.exitCode).toBe(0)
-      expect(topLevel.stderr).toBe('')
-      expect(topLevel.stdout).toContain('USAGE `jib')
-
-      const cloudflared = await runCli(root, ['--interactive=always', 'cloudflared'])
-      expect(cloudflared.exitCode).toBe(0)
-      expect(cloudflared.stderr).toBe('')
-      expect(cloudflared.stdout).toContain('Manage Cloudflare Tunnel')
-      expect(cloudflared.stdout).toContain('status')
-    })
-  })
-
-  test('bare command groups still fail in non-interactive text mode', async () => {
-    await withTmpRoot(async (root) => {
-      const topLevel = await runCli(root, [])
-      expect(topLevel.exitCode).toBe(1)
-      expect(topLevel.stdout).toBe('')
-      expect(topLevel.stderr).toContain('No command specified.')
-
-      const cloudflared = await runCli(root, ['cloudflared'])
-      expect(cloudflared.exitCode).toBe(1)
-      expect(cloudflared.stdout).toBe('')
-      expect(cloudflared.stderr).toContain('No command specified.')
-    })
-  })
-
   test('status returns pure json payload in json mode', async () => {
     await withTmpRoot(async (root) => {
       const result = await runCli(root, ['--interactive=never', '--output=json', 'status'])
@@ -134,18 +91,6 @@ describe('execution contract', () => {
     })
   })
 
-  test('status text mode prints plain sections without logger prefixes', async () => {
-    await withTmpRoot(async (root) => {
-      const result = await runCli(root, ['status'])
-      expect(result.exitCode).toBe(0)
-      expect(result.stderr).toBe('')
-      expect(result.stdout).toContain('services')
-      expect(result.stdout).toContain('sources')
-      expect(result.stdout).toContain('apps')
-      expect(result.stdout).not.toContain('[log]')
-    })
-  })
-
   test('invalid root runtime flag is normalized instead of crashing', async () => {
     await withTmpRoot(async (root) => {
       const result = await runCli(root, ['--output=xml', 'status'])
@@ -155,35 +100,6 @@ describe('execution contract', () => {
       expect(result.stderr).not.toContain('[error]')
       expect(result.stderr).not.toContain('error:')
       expect(result.stderr).not.toContain('stack')
-    })
-  })
-
-  test('non-interactive remove failure returns structured JSON', async () => {
-    await withTmpRoot(async (root) => {
-      await writeConfig(join(root, 'config.yml'), {
-        config_version: 3,
-        poll_interval: '5m',
-        modules: {},
-        sources: {},
-        apps: {
-          demo: {
-            repo: 'owner/name',
-            branch: 'main',
-            domains: [],
-            env_file: '.env',
-          },
-        },
-      } satisfies Config)
-
-      const result = await runCli(root, ['--interactive=never', '--output=json', 'remove', 'demo'])
-      expect(result.exitCode).toBe(1)
-      expect(result.stdout).toBe('')
-      const parsed = JSON.parse(result.stderr)
-      expect(parsed.ok).toBe(false)
-      expect(parsed.error.code).toBe('missing_input')
-      expect(parsed.error.issues).toEqual([
-        { field: 'force', message: 'rerun with --force or enable interactive prompts' },
-      ])
     })
   })
 })

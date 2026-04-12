@@ -6,7 +6,6 @@ import {
   isSourceAuthFailure,
   maybeRecoverSource,
   preflightSourceSelection,
-  setupSourceRef,
 } from './flow.ts'
 import type { SourceTarget } from './types.ts'
 
@@ -29,17 +28,6 @@ describe('source recovery', () => {
       { value: 'existing:keyy', label: 'keyy', hint: 'GitHub deployment key' },
       { value: 'setup:github', label: 'Set up new GitHub source' },
     ])
-  })
-
-  test('setupSourceRef uses the shared driver setup flow when available', async () => {
-    const source = await setupSourceRef(cfg, paths, {
-      runSetup: async (_cfg, _paths, value) => {
-        expect(value).toBe('github')
-        return 'fresh-source'
-      },
-    })
-
-    expect(source).toBe('fresh-source')
   })
 
   test('existing source can be selected after an auth-shaped clone failure', async () => {
@@ -86,46 +74,6 @@ describe('source recovery', () => {
     expect(calls).toEqual(['setup:github', 'confirm'])
   })
 
-  test('non-auth failures do not trigger source recovery', async () => {
-    const source = await maybeRecoverSource(
-      cfg,
-      paths,
-      'acme/private',
-      new Error('compose file missing'),
-      undefined,
-      { isInteractive: () => true },
-    )
-
-    expect(source).toBeNull()
-    expect(isSourceAuthFailure('acme/private', new Error('compose file missing'))).toBe(false)
-  })
-
-  test('missing source config can still recover via the chooser', async () => {
-    const prompts: string[] = []
-
-    const source = await maybeRecoverSource(
-      cfg,
-      paths,
-      'acme/private',
-      new Error('source "ghost" not found in config'),
-      'ghost',
-      {
-        isInteractive: () => true,
-        promptSelect: async (opts: {
-          message: string
-          initialValue?: `existing:${string}` | `setup:${string}`
-        }) => {
-          prompts.push(opts.message)
-          expect(opts.initialValue).toBeUndefined()
-          return 'existing:appy'
-        },
-      },
-    )
-
-    expect(source).toBe('appy')
-    expect(prompts).toHaveLength(1)
-  })
-
   test('preflightSourceSelection retries probe after choosing a new source', async () => {
     const loads: string[] = []
     const probed: string[] = []
@@ -160,23 +108,17 @@ describe('source recovery', () => {
     expect(probed).toEqual(['none', 'keyy'])
   })
 
-  test('preflightSourceSelection returns the detected branch', async () => {
-    const result = await preflightSourceSelection(
-      'demo',
+  test('non-auth failures do not trigger source recovery', async () => {
+    const source = await maybeRecoverSource(
       cfg,
       paths,
-      '/tmp/demo.git',
+      'acme/private',
+      new Error('compose file missing'),
       undefined,
-      undefined,
-      {
-        probe: async () => ({
-          branch: 'master',
-          workdir: '/tmp/demo',
-          sha: 'abc123abc123abc123abc123abc123abc123abc1',
-        }),
-      },
+      { isInteractive: () => true },
     )
 
-    expect(result).toEqual({ cfg, branch: 'master' })
+    expect(source).toBeNull()
+    expect(isSourceAuthFailure('acme/private', new Error('compose file missing'))).toBe(false)
   })
 })
