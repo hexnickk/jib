@@ -1,8 +1,32 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, stat } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { credsPath, ensureCredsDir, getPaths, managedComposePath, repoPath } from './paths.ts'
+import { EnsureCredsDirError, PathLookupError } from './errors.ts'
+import {
+  credsPath,
+  ensureCredsDir,
+  ensureCredsDirResult,
+  getPaths,
+  managedComposePath,
+  pathExistsResult,
+  repoPath,
+} from './paths.ts'
+
+const tempRoots: string[] = []
+
+afterEach(async () => {
+  while (tempRoots.length > 0) {
+    const root = tempRoots.pop()
+    if (root) await rm(root, { recursive: true, force: true })
+  }
+})
+
+async function createTempRoot(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), 'jib-paths-'))
+  tempRoots.push(root)
+  return root
+}
 
 describe('getPaths', () => {
   const prev = process.env.JIB_ROOT
@@ -71,7 +95,7 @@ describe('managedComposePath', () => {
 
 describe('ensureCredsDir', () => {
   test('creates group-writable setgid credential directories', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'jib-paths-'))
+    const root = await createTempRoot()
     const p = getPaths(root)
 
     const dir = await ensureCredsDir(p, 'github-app')
@@ -79,5 +103,58 @@ describe('ensureCredsDir', () => {
 
     expect(dir).toBe(join(root, 'secrets', '_jib', 'github-app'))
     expect(info.mode & 0o7777).toBe(0o2770)
+  })
+
+  test('returns typed errors when directory creation fails', async () => {
+    const root = await createTempRoot()
+    const p = getPaths(root)
+
+    await writeFile(p.secretsDir, 'blocked')
+
+    const result = await ensureCredsDirResult(p, 'github-app')
+
+    expect(result).toBeInstanceOf(EnsureCredsDirError)
+    if (result instanceof EnsureCredsDirError) {
+      expect(result.cause).toBeInstanceOf(Error)
+      expect(result.message).toContain('github-app')
+    }
+  })
+})
+
+describe('pathExistsResult', () => {
+  test('returns false for a missing path', async () => {
+    const root = await createTempRoot()
+
+    expect(await pathExistsResult(join(root, 'missing'))).toBe(false)
+  })
+
+  test('returns false when a parent path is not a directory', async () => {
+    const root = await createTempRoot()
+    const file = join(root, 'file')
+
+    await writeFile(file, 'blocked')
+
+    expect(await pathExistsResult(join(file, 'child'))).toBe(false)
+  })
+
+  test('returns typed errors for stat failures', async () => {
+    const root = await createTempRoot()
+    const parent = join(root, 'blocked')
+    const target = join(parent, 'child')
+
+    await mkdir(parent)
+    await writeFile(target, 'secret')
+    await chmod(parent, 0)
+
+    try {
+      const result = await pathExistsResult(target)
+
+      expect(result).toBeInstanceOf(PathLookupError)
+      if (result instanceof PathLookupError) {
+        expect(result.cause).toBeInstanceOf(Error)
+      }
+    } finally {
+      await chmod(parent, 0o700)
+    }
   })
 })

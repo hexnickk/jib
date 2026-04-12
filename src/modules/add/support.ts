@@ -11,11 +11,46 @@ export interface DefaultAddSupportOptions {
   claimIngress(appName: string, appCfg: App): Promise<void>
 }
 
-export class DefaultAddSupport implements AddSupport {
-  private readonly secrets: SecretsManager
+export function createDefaultAddSupport(options: DefaultAddSupportOptions): AddSupport {
+  const secrets = new SecretsManager(options.paths.secretsDir)
 
-  constructor(private readonly options: DefaultAddSupportOptions) {
-    this.secrets = new SecretsManager(options.paths.secretsDir)
+  return {
+    cloneForInspection(
+      cfg: Config,
+      appName: string,
+      target: { repo: string; branch: string; source?: string },
+    ) {
+      return cloneForInspection(cfg, options.paths, { app: appName, ...target })
+    },
+    removeCheckout(appName: string, repo: string) {
+      return removeCheckout(options.paths, appName, repo)
+    },
+    loadConfig(configFile: string) {
+      return loadConfig(configFile)
+    },
+    writeConfig(configFile: string, cfg: Config) {
+      return writeConfig(configFile, cfg)
+    },
+    upsertSecret(appName: string, entry: EnvEntry, envFile: string) {
+      return secrets.upsert(appName, entry.key, entry.value, envFile)
+    },
+    async removeSecret(appName: string, key: string, envFile: string) {
+      await secrets.remove(appName, key, envFile)
+    },
+    removeManagedCompose(appName: string) {
+      return rm(managedComposePath(options.paths, appName), { force: true })
+    },
+    claimIngress(appName: string, finalApp: App) {
+      return options.claimIngress(appName, finalApp)
+    },
+  }
+}
+
+export class DefaultAddSupport implements AddSupport {
+  private readonly support: AddSupport
+
+  constructor(options: DefaultAddSupportOptions) {
+    this.support = createDefaultAddSupport(options)
   }
 
   cloneForInspection(
@@ -23,34 +58,34 @@ export class DefaultAddSupport implements AddSupport {
     appName: string,
     target: { repo: string; branch: string; source?: string },
   ) {
-    return cloneForInspection(cfg, this.options.paths, { app: appName, ...target })
+    return this.support.cloneForInspection(cfg, appName, target)
   }
 
   removeCheckout(appName: string, repo: string) {
-    return removeCheckout(this.options.paths, appName, repo)
+    return this.support.removeCheckout(appName, repo)
   }
 
   loadConfig(configFile: string) {
-    return loadConfig(configFile)
+    return this.support.loadConfig(configFile)
   }
 
   writeConfig(configFile: string, cfg: Config) {
-    return writeConfig(configFile, cfg)
+    return this.support.writeConfig(configFile, cfg)
   }
 
   upsertSecret(appName: string, entry: EnvEntry, envFile: string) {
-    return this.secrets.upsert(appName, entry.key, entry.value, envFile)
+    return this.support.upsertSecret(appName, entry, envFile)
   }
 
-  async removeSecret(appName: string, key: string, envFile: string) {
-    await this.secrets.remove(appName, key, envFile)
+  removeSecret(appName: string, key: string, envFile: string) {
+    return this.support.removeSecret(appName, key, envFile)
   }
 
   removeManagedCompose(appName: string) {
-    return rm(managedComposePath(this.options.paths, appName), { force: true })
+    return this.support.removeManagedCompose(appName)
   }
 
   claimIngress(appName: string, finalApp: App) {
-    return this.options.claimIngress(appName, finalApp)
+    return this.support.claimIngress(appName, finalApp)
   }
 }

@@ -2,6 +2,9 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { createLogger } from '@jib/logging'
 import { LogLevels } from 'consola'
 import {
+  CliError,
+  InvalidInteractiveModeError,
+  InvalidOutputModeError,
   MissingInputError,
   configureCliRuntime,
   getCliRuntime,
@@ -36,6 +39,8 @@ describe('configureCliRuntime', () => {
     process.env.JIB_INTERACTIVE = 'never'
     process.env.JIB_OUTPUT = 'json'
     const runtime = configureCliRuntime(['--interactive=always', '--output', 'text', '--debug'])
+    expect(runtime).not.toBeInstanceOf(CliError)
+    if (runtime instanceof CliError) throw runtime
     expect(runtime.interactive).toBe('always')
     expect(runtime.output).toBe('text')
     expect(runtime.debug).toBe(true)
@@ -46,12 +51,15 @@ describe('configureCliRuntime', () => {
     process.env.JIB_NON_INTERACTIVE = '1'
     process.env.JIB_OUTPUT = 'json'
     const runtime = configureCliRuntime([])
+    expect(runtime).not.toBeInstanceOf(CliError)
+    if (runtime instanceof CliError) throw runtime
     expect(runtime.interactive).toBe('never')
     expect(runtime.output).toBe('json')
   })
 
   test('clears debug env cleanly when debug is disabled', () => {
-    configureCliRuntime(['--debug'])
+    const configured = configureCliRuntime(['--debug'])
+    expect(configured).not.toBeInstanceOf(CliError)
     expect(process.env.JIB_DEBUG).toBe('1')
 
     setCliRuntime({
@@ -62,6 +70,17 @@ describe('configureCliRuntime', () => {
       stdoutTty: true,
     })
     expect(process.env.JIB_DEBUG).toBeUndefined()
+  })
+
+  test('returns a typed error for an invalid interactive flag', () => {
+    const runtime = configureCliRuntime(['--interactive=bad'])
+    expect(runtime).toBeInstanceOf(InvalidInteractiveModeError)
+  })
+
+  test('returns a typed error for an invalid output env value', () => {
+    process.env.JIB_OUTPUT = 'yaml'
+    const runtime = configureCliRuntime([])
+    expect(runtime).toBeInstanceOf(InvalidOutputModeError)
   })
 })
 

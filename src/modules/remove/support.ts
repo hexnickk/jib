@@ -6,6 +6,7 @@ import { type Paths, managedComposePath } from '@jib/paths'
 import { SecretsManager } from '@jib/secrets'
 import { removeCheckout } from '@jib/sources'
 import { Store } from '@jib/state'
+import { RemoveWriteConfigError } from './errors.ts'
 import type { RemoveSupport } from './types.ts'
 
 export interface DefaultRemoveSupportOptions {
@@ -13,45 +14,88 @@ export interface DefaultRemoveSupportOptions {
   releaseIngress(appName: string): Promise<void>
 }
 
-export class DefaultRemoveSupport implements RemoveSupport {
-  private readonly secrets: SecretsManager
-  private readonly store: Store
+export function createRemoveSupport(options: DefaultRemoveSupportOptions): RemoveSupport {
+  const secrets = new SecretsManager(options.paths.secretsDir)
+  const store = new Store(options.paths.stateDir)
 
-  constructor(private readonly options: DefaultRemoveSupportOptions) {
-    this.secrets = new SecretsManager(options.paths.secretsDir)
-    this.store = new Store(options.paths.stateDir)
+  return {
+    releaseIngress(appName: string) {
+      return options.releaseIngress(appName)
+    },
+
+    async stopApp(cfg: Config, appName: string, quiet: boolean) {
+      const compose = composeFor(cfg, options.paths, appName)
+      await compose.down(false, { quiet })
+    },
+
+    removeCheckout(appName: string, repo: string) {
+      return removeCheckout(options.paths, appName, repo)
+    },
+
+    removeSecrets(appName: string) {
+      return secrets.removeApp(appName)
+    },
+
+    removeState(appName: string) {
+      return store.remove(appName)
+    },
+
+    removeOverride(appName: string) {
+      return rm(overridePath(options.paths.overridesDir, appName), { force: true })
+    },
+
+    removeManagedCompose(appName: string) {
+      return rm(managedComposePath(options.paths, appName), { force: true })
+    },
+
+    async writeConfig(configFile: string, cfg: Config) {
+      try {
+        await writeConfig(configFile, cfg)
+        return undefined
+      } catch (error) {
+        if (error instanceof RemoveWriteConfigError) return error
+        return new RemoveWriteConfigError(configFile, { cause: error })
+      }
+    },
+  }
+}
+
+export class DefaultRemoveSupport implements RemoveSupport {
+  private readonly support: RemoveSupport
+
+  constructor(options: DefaultRemoveSupportOptions) {
+    this.support = createRemoveSupport(options)
   }
 
   releaseIngress(appName: string) {
-    return this.options.releaseIngress(appName)
+    return this.support.releaseIngress(appName)
   }
 
-  async stopApp(cfg: Config, appName: string, quiet: boolean) {
-    const compose = composeFor(cfg, this.options.paths, appName)
-    await compose.down(false, { quiet })
+  stopApp(cfg: Config, appName: string, quiet: boolean) {
+    return this.support.stopApp(cfg, appName, quiet)
   }
 
   removeCheckout(appName: string, repo: string) {
-    return removeCheckout(this.options.paths, appName, repo)
+    return this.support.removeCheckout(appName, repo)
   }
 
   removeSecrets(appName: string) {
-    return this.secrets.removeApp(appName)
+    return this.support.removeSecrets(appName)
   }
 
   removeState(appName: string) {
-    return this.store.remove(appName)
+    return this.support.removeState(appName)
   }
 
   removeOverride(appName: string) {
-    return rm(overridePath(this.options.paths.overridesDir, appName), { force: true })
+    return this.support.removeOverride(appName)
   }
 
   removeManagedCompose(appName: string) {
-    return rm(managedComposePath(this.options.paths, appName), { force: true })
+    return this.support.removeManagedCompose(appName)
   }
 
   writeConfig(configFile: string, cfg: Config) {
-    return writeConfig(configFile, cfg)
+    return this.support.writeConfig(configFile, cfg)
   }
 }

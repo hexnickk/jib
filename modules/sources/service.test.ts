@@ -1,15 +1,42 @@
-import { describe, expect, test } from 'bun:test'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { afterEach, describe, expect, test } from 'bun:test'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { getPaths, pathExists, repoPath } from '@jib/paths'
 import { $ } from 'bun'
-import { cloneForInspection, probe, removeCheckout, resolve, syncApp } from './index.ts'
-import { SourceLocalRepoError, SourceMissingAppError } from './service.ts'
+import {
+  SourceDriverNotRegisteredError,
+  SourceLocalCheckoutError,
+  SourceLocalRepoError,
+  SourceMissingAppError,
+  SourceMissingConfigError,
+} from './errors.ts'
+import {
+  cloneForInspection,
+  probe,
+  probeSource,
+  removeCheckout,
+  resolve,
+  resolveSource,
+  syncApp,
+  syncSource,
+} from './index.ts'
+
+const tempRoots: string[] = []
+
+afterEach(async () => {
+  await Promise.all(tempRoots.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+})
+
+async function makeTempRoot(prefix: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), prefix))
+  tempRoots.push(dir)
+  return dir
+}
 
 async function makeUpstream(name: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), `${name}-`))
+  const dir = await makeTempRoot(`${name}-`)
   await $`git init -b main ${dir}`.quiet()
   await $`git -C ${dir} config user.email test@jib.local`.quiet()
   await $`git -C ${dir} config user.name test`.quiet()
@@ -20,7 +47,7 @@ async function makeUpstream(name: string): Promise<string> {
 }
 
 async function makeUpstreamOnBranch(name: string, branch: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), `${name}-`))
+  const dir = await makeTempRoot(`${name}-`)
   await $`git init -b ${branch} ${dir}`.quiet()
   await $`git -C ${dir} config user.email test@jib.local`.quiet()
   await $`git -C ${dir} config user.name test`.quiet()
@@ -50,7 +77,7 @@ function configFor(repo: string): Config {
 describe('sources service', () => {
   test('probe returns the remote sha without requiring a checkout', async () => {
     const upstream = await makeUpstream('jib-probe')
-    const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+    const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
     const result = await probe(configFor(upstream), paths, { app: 'demo' })
 
@@ -60,7 +87,7 @@ describe('sources service', () => {
 
   test('cloneForInspection and syncApp share the checkout lifecycle', async () => {
     const upstream = await makeUpstream('jib-roundtrip')
-    const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+    const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
     const workdir = repoPath(paths, 'demo', upstream)
 
@@ -76,7 +103,7 @@ describe('sources service', () => {
 
   test('probe and syncApp follow the remote default branch for a new app', async () => {
     const upstream = await makeUpstreamOnBranch('jib-master', 'master')
-    const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+    const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
     const cfg: Config = {
       config_version: 3,
@@ -100,7 +127,7 @@ describe('sources service', () => {
     await $`git -C ${upstream} commit -m release`.quiet()
     await $`git -C ${upstream} tag v2`.quiet()
 
-    const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+    const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
     const prepared = await syncApp(configFor(upstream), paths, { app: 'demo' }, 'v2')
 
@@ -108,7 +135,7 @@ describe('sources service', () => {
   })
 
   test('docker hub repo resolves to a stable local workdir without git', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+    const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
     const cfg: Config = {
       config_version: 3,
@@ -132,8 +159,8 @@ describe('sources service', () => {
     expect(prepared.sha).toBe('n8nio/n8n')
   })
 
-  test('returns typed errors for missing app and local repo resolution failures', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+  test('returns typed result errors for missing app and local repo resolution failures', async () => {
+    const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
     const cfg: Config = {
       config_version: 3,
@@ -143,9 +170,57 @@ describe('sources service', () => {
       apps: {},
     }
 
+    expect(await resolveSource(cfg, paths, { app: 'demo' })).toBeInstanceOf(SourceMissingAppError)
+    expect(await resolveSource(cfg, paths, { app: 'demo', repo: 'local' })).toBeInstanceOf(
+      SourceLocalRepoError,
+    )
+
     await expect(resolve(cfg, paths, { app: 'demo' })).rejects.toBeInstanceOf(SourceMissingAppError)
     await expect(resolve(cfg, paths, { app: 'demo', repo: 'local' })).rejects.toBeInstanceOf(
       SourceLocalRepoError,
     )
+  })
+
+  test('returns typed result errors for missing source config and driver registration', async () => {
+    const root = await makeTempRoot('jib-root-')
+    const paths = getPaths(root)
+
+    const missingSourceCfg: Config = {
+      config_version: 3,
+      poll_interval: '5m',
+      modules: {},
+      sources: {},
+      apps: {
+        demo: {
+          repo: 'acme/private',
+          branch: 'main',
+          domains: [],
+          env_file: '.env',
+          source: 'missing',
+        },
+      },
+    }
+    const missingDriverCfg: Config = {
+      ...missingSourceCfg,
+      sources: {
+        missing: { driver: 'gitlab' as unknown as 'github', type: 'app', app_id: 1 },
+      },
+    }
+
+    expect(await resolveSource(missingSourceCfg, paths, { app: 'demo' })).toBeInstanceOf(
+      SourceMissingConfigError,
+    )
+    expect(await resolveSource(missingDriverCfg, paths, { app: 'demo' })).toBeInstanceOf(
+      SourceDriverNotRegisteredError,
+    )
+  })
+
+  test('returns a typed local checkout error for a missing local repo workdir', async () => {
+    const root = await makeTempRoot('jib-root-')
+    const paths = getPaths(root)
+    const result = await syncSource(configFor('local'), paths, { app: 'demo' })
+
+    expect(result).toBeInstanceOf(SourceLocalCheckoutError)
+    expect(await probeSource(configFor('local'), paths, { app: 'demo' })).toBeNull()
   })
 })

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { StateError } from './errors.ts'
 import { emptyState } from './schema.ts'
-import { Store } from './store.ts'
+import { Store, createStateStore, loadState, saveState } from './store.ts'
 
 async function withStore<T>(fn: (store: Store, dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), 'jib-state-'))
@@ -63,5 +63,30 @@ describe('Store', () => {
       await Bun.write(join(dir, 'web.json'), '{not json')
       await expect(s.load('web')).rejects.toThrow(StateError)
     })
+  })
+})
+
+describe('loadState', () => {
+  test('returns typed error for corrupt JSON', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'jib-state-'))
+    try {
+      await Bun.write(join(dir, 'web.json'), '{not json')
+      const state = await loadState(createStateStore(dir), 'web')
+      expect(state).toBeInstanceOf(StateError)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('saveState returns typed error when the state dir cannot be created', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-state-'))
+    const blockedDir = join(root, 'blocked')
+    try {
+      await Bun.write(blockedDir, 'not a directory')
+      const error = await saveState(createStateStore(blockedDir), 'web', emptyState('web'))
+      expect(error).toBeInstanceOf(StateError)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

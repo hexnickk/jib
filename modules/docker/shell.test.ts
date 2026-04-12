@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { parseExecArgs, parseRunArgs } from './shell.ts'
+import {
+  ExecArgsMissingAppError,
+  ExecArgsMissingCommandError,
+  RunArgsMissingAppError,
+} from './errors.ts'
+import { parseExecArgs, parseExecArgsResult, parseRunArgs, parseRunArgsResult } from './shell.ts'
 
 describe('parseExecArgs', () => {
   test('app + service + -- + cmd', () => {
@@ -14,12 +19,12 @@ describe('parseExecArgs', () => {
     expect(parseExecArgs(['web', 'psql'])).toEqual({ app: 'web', service: 'psql', cmd: [] })
   })
 
-  test('app only → throws', () => {
-    expect(() => parseExecArgs(['web'])).toThrow(/command required/)
+  test('app only → result helper returns typed error', () => {
+    expect(parseExecArgsResult(['web'])).toBeInstanceOf(ExecArgsMissingCommandError)
   })
 
-  test('empty → throws', () => {
-    expect(() => parseExecArgs([])).toThrow(/missing app/)
+  test('empty → result helper returns typed error', () => {
+    expect(parseExecArgsResult([])).toBeInstanceOf(ExecArgsMissingAppError)
   })
 
   test('-- with empty before', () => {
@@ -52,7 +57,12 @@ describe('parseRunArgs', () => {
     })
   })
 
-  test('empty argv → throws', () => {
+  test('empty argv → result helper returns typed error', () => {
+    expect(parseRunArgsResult([])).toBeInstanceOf(RunArgsMissingAppError)
+  })
+
+  test('throwing wrappers still preserve current command-call behavior', () => {
+    expect(() => parseExecArgs([])).toThrow(/missing app/)
     expect(() => parseRunArgs([])).toThrow(/missing app/)
   })
 })

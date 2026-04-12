@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { type Paths, credsPath, ensureCredsDir } from '@jib/paths'
+import { CloudflaredSaveTunnelTokenError, wrapCloudflaredError } from './errors.ts'
 import { SERVICE_NAME } from './templates.ts'
 import { extractTunnelToken } from './token.ts'
 
@@ -32,20 +33,29 @@ export async function saveTunnelToken(paths: Paths, raw: string): Promise<boolea
   const token = extractTunnelToken(raw)
   if (!token) return false
 
-  const path = tunnelTokenPath(paths)
-  await ensureCredsDir(paths, 'cloudflare')
-  await writeFile(path, `TUNNEL_TOKEN=${token}\n`, { mode: 0o640 })
-  return true
+  try {
+    const path = tunnelTokenPath(paths)
+    await ensureCredsDir(paths, 'cloudflare')
+    await writeFile(path, `TUNNEL_TOKEN=${token}\n`, { mode: 0o640 })
+    return true
+  } catch (error) {
+    throw wrapCloudflaredError(error, CloudflaredSaveTunnelTokenError)
+  }
 }
 
 export async function enableCloudflaredService(
   deps: CloudflaredServiceDeps = {},
 ): Promise<CloudflaredServiceResult> {
-  const run =
-    deps.run ?? (() => Bun.$`sudo systemctl enable --now ${SERVICE_NAME}`.quiet().nothrow())
-  const result = await run()
-  return {
-    ok: result.exitCode === 0,
-    detail: result.stderr.toString().trim() || result.stdout.toString().trim(),
+  try {
+    const run =
+      deps.run ?? (() => Bun.$`sudo systemctl enable --now ${SERVICE_NAME}`.quiet().nothrow())
+    const result = await run()
+    return {
+      ok: result.exitCode === 0,
+      detail: result.stderr.toString().trim() || result.stdout.toString().trim(),
+    }
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    return { ok: false, detail }
   }
 }

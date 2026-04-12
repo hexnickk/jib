@@ -1,22 +1,17 @@
-import { JibError } from '@jib/errors'
+import { RemoveMissingAppError, RemoveWriteConfigError } from './errors.ts'
 import type { RemoveObserver, RemoveParams, RemoveResult, RemoveSupport } from './types.ts'
 
-export class RemoveMissingAppError extends JibError {
-  constructor(appName: string) {
-    super('remove_missing_app', `app "${appName}" not found in config`)
-    this.name = 'RemoveMissingAppError'
-  }
-}
+export { RemoveMissingAppError, RemoveWriteConfigError } from './errors.ts'
 
 export interface RemoveRunContext {
   support: RemoveSupport
   observer?: RemoveObserver
 }
 
-export async function runRemove(
+export async function removeApp(
   ctx: RemoveRunContext,
   params: RemoveParams,
-): Promise<RemoveResult | RemoveMissingAppError> {
+): Promise<RemoveResult | RemoveMissingAppError | RemoveWriteConfigError> {
   const appCfg = params.cfg.apps[params.appName]
   if (!appCfg) return new RemoveMissingAppError(params.appName)
 
@@ -29,7 +24,11 @@ export async function runRemove(
   )
   const nextApps = { ...params.cfg.apps }
   delete nextApps[params.appName]
-  await ctx.support.writeConfig(params.configFile, { ...params.cfg, apps: nextApps })
+  const writeResult = await ctx.support.writeConfig(params.configFile, {
+    ...params.cfg,
+    apps: nextApps,
+  })
+  if (writeResult instanceof RemoveWriteConfigError) return writeResult
 
   await runBestEffort(ctx, 'repo cleanup', () =>
     ctx.support.removeCheckout(params.appName, appCfg.repo),
@@ -41,6 +40,15 @@ export async function runRemove(
     ctx.support.removeManagedCompose(params.appName),
   )
   return { app: params.appName, removed: true }
+}
+
+export async function runRemove(
+  ctx: RemoveRunContext,
+  params: RemoveParams,
+): Promise<RemoveResult | RemoveMissingAppError> {
+  const result = await removeApp(ctx, params)
+  if (result instanceof RemoveWriteConfigError) throw result
+  return result
 }
 
 async function runBestEffort(

@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import type { App, Domain } from '@jib/config'
+import { JibError } from '@jib/errors'
+import { DockerDomainServiceNotFoundError, DockerDomainServiceRequiredError } from './errors.ts'
 import {
   type ComposeService,
   hasPublishedPorts,
@@ -18,13 +20,13 @@ const DEFAULT_COMPOSE_FILES = [
 
 export type ComposeInspectionCode = 'compose_not_found' | 'compose_parse'
 
-export class ComposeInspectionError extends Error {
+export class ComposeInspectionError extends JibError {
   constructor(
-    readonly code: ComposeInspectionCode,
+    override readonly code: ComposeInspectionCode,
     message: string,
     readonly details: { composeFiles?: string[]; availableFiles?: string[] } = {},
   ) {
-    super(message)
+    super(code, message)
     this.name = 'ComposeInspectionError'
   }
 }
@@ -34,27 +36,38 @@ export interface ComposeInspection {
   services: ComposeService[]
 }
 
+export type ResolveFromComposeError =
+  | ComposeInspectionError
+  | DockerDomainServiceRequiredError
+  | DockerDomainServiceNotFoundError
+
 export function discoverComposeFiles(workdir: string): string[] {
   return DEFAULT_COMPOSE_FILES.filter((file) => existsSync(join(workdir, file)))
 }
 
-export function inspectComposeApp(
+export function inspectComposeAppResult(
   appCfg: Pick<App, 'compose'>,
   workdir: string,
-): ComposeInspection {
-  const composeFiles = resolveComposeFiles(workdir, appCfg.compose ?? [])
+): ComposeInspection | ComposeInspectionError {
+  let composeFiles: string[]
+  try {
+    composeFiles = resolveComposeFiles(workdir, appCfg.compose ?? [])
+  } catch (error) {
+    if (error instanceof ComposeInspectionError) return error
+    throw error
+  }
   let services: ComposeService[]
   try {
     services = parseComposeServices(workdir, composeFiles)
   } catch (err) {
-    throw new ComposeInspectionError(
+    return new ComposeInspectionError(
       'compose_parse',
       `failed to parse compose file: ${err instanceof Error ? err.message : err}`,
       { composeFiles },
     )
   }
   if (services.length === 0) {
-    throw new ComposeInspectionError(
+    return new ComposeInspectionError(
       'compose_parse',
       `compose file ${composeFiles.join(', ')} has no services`,
       { composeFiles },
@@ -63,39 +76,61 @@ export function inspectComposeApp(
   return { composeFiles, services }
 }
 
+export function inspectComposeApp(
+  appCfg: Pick<App, 'compose'>,
+  workdir: string,
+): ComposeInspection {
+  const inspection = inspectComposeAppResult(appCfg, workdir)
+  if (inspection instanceof ComposeInspectionError) throw inspection
+  return inspection
+}
+
 /**
  * Parse the compose file from the prepared workdir, resolve each ingress
  * mapping's `service` + `container_port`, and surface optional warnings
  * through the caller-provided `warn` callback. No disk writes.
  */
-export function resolveFromCompose(
+export function resolveFromComposeResult(
   appCfg: App,
   workdir: string,
   opts: { warn?: (message: string) => void } = {},
-): App {
-  const inspection = inspectComposeApp(appCfg, workdir)
+): App | ResolveFromComposeError {
+  const inspection = inspectComposeAppResult(appCfg, workdir)
+  if (inspection instanceof ComposeInspectionError) return inspection
   const parsed = inspection.services
   if (appCfg.domains.length === 0) return appCfg
   const byName = new Map(parsed.map((s) => [s.name, s]))
   const single = parsed.length === 1 ? parsed[0]?.name : undefined
   const publishing = new Map<string, ComposeService>()
 
-  const nextDomains: Domain[] = appCfg.domains.map((d) => {
+  const nextDomains: Domain[] = []
+  for (const d of appCfg.domains) {
     const serviceName = d.service ?? single
     if (!serviceName) {
-      throw new Error(
-        `compose has multiple services (${parsed.map((s) => s.name).join(', ')}); specify =service in --domain for ${d.host}`,
+      return new DockerDomainServiceRequiredError(
+        d.host,
+        parsed.map((service) => service.name),
       )
     }
     const svc = byName.get(serviceName)
-    if (!svc) throw new Error(`--domain ${d.host}: compose has no service "${serviceName}"`)
+    if (!svc) return new DockerDomainServiceNotFoundError(d.host, serviceName)
     if (hasPublishedPorts(svc)) publishing.set(svc.name, svc)
     const containerPort = d.container_port ?? resolvePort(svc, opts.warn)
-    return { ...d, service: svc.name, container_port: containerPort }
-  })
+    nextDomains.push({ ...d, service: svc.name, container_port: containerPort })
+  }
 
   if (publishing.size > 0) warnPublished(publishing, nextDomains, opts.warn)
   return { ...appCfg, domains: nextDomains }
+}
+
+export function resolveFromCompose(
+  appCfg: App,
+  workdir: string,
+  opts: { warn?: (message: string) => void } = {},
+): App {
+  const resolved = resolveFromComposeResult(appCfg, workdir, opts)
+  if (isResolveFromComposeError(resolved)) throw resolved
+  return resolved
 }
 
 function resolveComposeFiles(workdir: string, composeFiles: string[]): string[] {
@@ -145,4 +180,14 @@ function warnPublished(
     )
   }
   warn('consider removing `ports:` from your compose file to avoid confusion.')
+}
+
+function isResolveFromComposeError(
+  value: App | ResolveFromComposeError,
+): value is ResolveFromComposeError {
+  return (
+    value instanceof ComposeInspectionError ||
+    value instanceof DockerDomainServiceRequiredError ||
+    value instanceof DockerDomainServiceNotFoundError
+  )
 }

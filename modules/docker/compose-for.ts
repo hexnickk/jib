@@ -3,23 +3,27 @@ import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { type Paths, repoPath } from '@jib/paths'
 import { Compose } from './compose.ts'
+import { DockerAppNotFoundError } from './errors.ts'
 import { overridePath } from './override.ts'
 
 /**
  * Build a {@link Compose} handle for `app` from loaded config + resolved
  * paths. Mirrors the Go `newCompose` helper: resolves the app's workdir,
  * stitches together declared compose files, and points at jib's managed
- * override file. Throws when the app is unknown so every caller gets a
- * consistent error message.
+ * override file.
  *
  * `--env-file` is only set if the secrets file actually exists on disk —
  * docker compose errors out when pointed at a missing file, and most apps
  * don't need secrets. `env_file: .env` at the app config level is the
  * default value of the schema, not a signal that secrets must exist.
  */
-export function composeFor(cfg: Config, paths: Paths, app: string): Compose {
+export function composeForResult(
+  cfg: Config,
+  paths: Paths,
+  app: string,
+): Compose | DockerAppNotFoundError {
   const appCfg = cfg.apps[app]
-  if (!appCfg) throw new Error(`app "${app}" not found in config`)
+  if (!appCfg) return new DockerAppNotFoundError(app)
 
   const dir = repoPath(paths, app, appCfg.repo)
   const files = (
@@ -39,4 +43,10 @@ export function composeFor(cfg: Config, paths: Paths, app: string): Compose {
   }
   if (envFile) config.envFile = envFile
   return new Compose(config)
+}
+
+export function composeFor(cfg: Config, paths: Paths, app: string): Compose {
+  const compose = composeForResult(cfg, paths, app)
+  if (compose instanceof DockerAppNotFoundError) throw compose
+  return compose
 }

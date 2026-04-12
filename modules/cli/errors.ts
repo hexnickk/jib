@@ -29,7 +29,6 @@ export class CliError extends JibError {
 
   constructor(code: string, message: string, options: CliErrorOptions = {}) {
     super(code, message, options)
-    this.name = 'CliError'
     this.details = options.details
     this.exitCode = options.exitCode ?? 1
     this.hint = options.hint
@@ -40,7 +39,22 @@ export class CliError extends JibError {
 export class MissingInputError extends CliError {
   constructor(message: string, issues: CliIssue[], options: Omit<CliErrorOptions, 'issues'> = {}) {
     super('missing_input', message, { ...options, issues })
-    this.name = 'MissingInputError'
+  }
+}
+
+export class InvalidInteractiveModeError extends CliError {
+  constructor(value: string) {
+    super('invalid_interactive_mode', `invalid --interactive value "${value}"`, {
+      hint: 'expected one of: auto, always, never',
+    })
+  }
+}
+
+export class InvalidOutputModeError extends CliError {
+  constructor(value: string) {
+    super('invalid_output_mode', `invalid --output value "${value}"`, {
+      hint: 'expected one of: text, json',
+    })
   }
 }
 

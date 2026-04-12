@@ -1,14 +1,14 @@
 /**
- * Typed error hierarchy used across jib libs. Every error carries a stable
- * `code` string so callers can switch on machine-readable identifiers instead
- * of matching on message text.
+ * Typed error base used across jib libs. Prefer specific subclasses and
+ * `instanceof` checks over matching message text. `code` remains available as
+ * machine-readable metadata when a caller needs it.
  */
 export class JibError extends Error {
   readonly code: string
 
   constructor(code: string, message: string, options?: ErrorOptions) {
     super(message, options)
-    this.name = 'JibError'
+    this.name = new.target.name
     this.code = code
   }
 }
@@ -16,6 +16,5 @@ export class JibError extends Error {
 export class ValidationError extends JibError {
   constructor(message: string, options?: ErrorOptions) {
     super('validation', message, options)
-    this.name = 'ValidationError'
   }
 }

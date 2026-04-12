@@ -4,70 +4,120 @@ import { ZodError } from 'zod'
 import { StateError } from './errors.ts'
 import { type AppState, AppStateSchema, CURRENT_SCHEMA_VERSION, emptyState } from './schema.ts'
 
-/** JSON-backed per-app state store. Writes are atomic via temp file + rename. */
-export class Store {
-  constructor(private readonly dir: string) {}
+export interface StateStore {
+  dir: string
+}
 
-  private path(app: string): string {
-    return join(this.dir, `${app}.json`)
+export function createStateStore(dir: string): StateStore {
+  return { dir }
+}
+
+function statePath(store: StateStore, app: string): string {
+  return join(store.dir, `${app}.json`)
+}
+
+export async function loadState(store: StateStore, app: string): Promise<AppState | StateError> {
+  const path = statePath(store, app)
+  let raw: string
+  try {
+    raw = await readFile(path, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return emptyState(app)
+    return new StateError(`reading state ${path}: ${(error as Error).message}`, { cause: error })
+  }
+
+  try {
+    const parsed = AppStateSchema.parse(JSON.parse(raw))
+    if (parsed.schema_version > CURRENT_SCHEMA_VERSION) {
+      return new StateError(
+        `state file ${path} has schema_version ${parsed.schema_version}, max supported ${CURRENT_SCHEMA_VERSION}`,
+      )
+    }
+    return parsed
+  } catch (error) {
+    if (error instanceof StateError) return error
+    if (error instanceof ZodError) {
+      return new StateError(`parsing state ${path}: ${error.message}`, { cause: error })
+    }
+    return new StateError(`parsing state ${path}: ${(error as Error).message}`, { cause: error })
+  }
+}
+
+export async function saveState(
+  store: StateStore,
+  app: string,
+  state: AppState,
+): Promise<StateError | undefined> {
+  const next: AppState = { ...state, schema_version: CURRENT_SCHEMA_VERSION, app }
+  const target = statePath(store, app)
+  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`
+  try {
+    await mkdir(store.dir, { recursive: true, mode: 0o750 })
+    await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o640 })
+    await rename(tmp, target)
+    return
+  } catch (error) {
+    await unlink(tmp).catch(() => undefined)
+    return new StateError(`writing state ${target}: ${(error as Error).message}`, {
+      cause: error,
+    })
+  }
+}
+
+export async function removeState(store: StateStore, app: string): Promise<StateError | undefined> {
+  const path = statePath(store, app)
+  try {
+    await rm(path, { force: true })
+    return
+  } catch (error) {
+    return new StateError(`removing state ${path}: ${(error as Error).message}`, { cause: error })
+  }
+}
+
+/**
+ * Record a failed deploy attempt in the last-deploy summary. Purely
+ * informational — jib has no auto-pinning or retry-counting logic, so
+ * nothing reads this field except a human running `cat state/<app>.json`.
+ */
+export async function recordStateFailure(
+  store: StateStore,
+  app: string,
+  errorMsg: string,
+): Promise<StateError | undefined> {
+  const state = await loadState(store, app)
+  if (state instanceof StateError) return state
+  state.last_deploy_status = 'failure'
+  state.last_deploy_error = errorMsg
+  state.last_deploy = new Date().toISOString()
+  return saveState(store, app, state)
+}
+
+/** JSON-backed per-app state store. Compatibility wrapper over the function API. */
+export class Store {
+  private readonly store: StateStore
+
+  constructor(dir: string) {
+    this.store = createStateStore(dir)
   }
 
   async load(app: string): Promise<AppState> {
-    const p = this.path(app)
-    let raw: string
-    try {
-      raw = await readFile(p, 'utf8')
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return emptyState(app)
-      throw new StateError(`reading state ${p}: ${(err as Error).message}`, { cause: err })
-    }
-    try {
-      const parsed = AppStateSchema.parse(JSON.parse(raw))
-      if (parsed.schema_version > CURRENT_SCHEMA_VERSION) {
-        throw new StateError(
-          `state file ${p} has schema_version ${parsed.schema_version}, max supported ${CURRENT_SCHEMA_VERSION}`,
-        )
-      }
-      return parsed
-    } catch (err) {
-      if (err instanceof StateError) throw err
-      if (err instanceof ZodError) {
-        throw new StateError(`parsing state ${p}: ${err.message}`, { cause: err })
-      }
-      throw new StateError(`parsing state ${p}: ${(err as Error).message}`, { cause: err })
-    }
+    const state = await loadState(this.store, app)
+    if (state instanceof StateError) throw state
+    return state
   }
 
   async save(app: string, state: AppState): Promise<void> {
-    await mkdir(this.dir, { recursive: true, mode: 0o750 })
-    const next: AppState = { ...state, schema_version: CURRENT_SCHEMA_VERSION, app }
-    const target = this.path(app)
-    const tmp = `${target}.${process.pid}.${Date.now()}.tmp`
-    try {
-      await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o640 })
-      await rename(tmp, target)
-    } catch (err) {
-      // Best-effort cleanup: if the write succeeded but `rename` failed the
-      // tmp file is still on disk and would otherwise accumulate forever.
-      await unlink(tmp).catch(() => undefined)
-      throw new StateError(`writing state ${target}: ${(err as Error).message}`, { cause: err })
-    }
+    const error = await saveState(this.store, app, state)
+    if (error) throw error
   }
 
   async remove(app: string): Promise<void> {
-    await rm(this.path(app), { force: true })
+    const error = await removeState(this.store, app)
+    if (error) throw error
   }
 
-  /**
-   * Record a failed deploy attempt in the last-deploy summary. Purely
-   * informational — jib has no auto-pinning or retry-counting logic, so
-   * nothing reads this field except a human running `cat state/<app>.json`.
-   */
   async recordFailure(app: string, errorMsg: string): Promise<void> {
-    const st = await this.load(app)
-    st.last_deploy_status = 'failure'
-    st.last_deploy_error = errorMsg
-    st.last_deploy = new Date().toISOString()
-    await this.save(app, st)
+    const error = await recordStateFailure(this.store, app, errorMsg)
+    if (error) throw error
   }
 }

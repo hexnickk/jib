@@ -4,11 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getPaths } from '@jib/paths'
 import {
+  CloudflaredSaveTunnelTokenError,
   enableCloudflaredService,
   hasTunnelToken,
   saveTunnelToken,
   tunnelTokenPath,
-} from './service.ts'
+} from './index.ts'
 
 async function withTmpPaths<T>(fn: (root: string) => Promise<T>): Promise<T> {
   const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
@@ -49,6 +50,18 @@ describe('cloudflared service helpers', () => {
     })
   })
 
+  test('saveTunnelToken wraps filesystem failures with a typed error and cause', async () => {
+    await withTmpPaths(async (root) => {
+      const paths = getPaths(root)
+      await Bun.write(join(root, 'secrets'), 'not-a-directory')
+
+      const error = await saveTunnelToken(paths, 'eyJhIjoiNzQ').catch((error: unknown) => error)
+
+      expect(error).toBeInstanceOf(CloudflaredSaveTunnelTokenError)
+      expect(error).toHaveProperty('cause')
+    })
+  })
+
   test('enableCloudflaredService reports shell failures without throwing', async () => {
     const result = await enableCloudflaredService({
       run: async () => ({
@@ -59,5 +72,15 @@ describe('cloudflared service helpers', () => {
     })
 
     expect(result).toEqual({ ok: false, detail: 'permission denied' })
+  })
+
+  test('enableCloudflaredService converts thrown runner errors into a failure result', async () => {
+    const result = await enableCloudflaredService({
+      run: async () => {
+        throw new Error('systemctl unavailable')
+      },
+    })
+
+    expect(result).toEqual({ ok: false, detail: 'systemctl unavailable' })
   })
 })

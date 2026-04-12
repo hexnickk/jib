@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { buildIngressClaim } from './service.ts'
+import { IngressMissingPortError } from './errors.ts'
+import { buildIngressClaim, claimIngress } from './service.ts'
 
 describe('ingress service', () => {
   test('buildIngressClaim maps configured domains into an ingress claim', () => {
@@ -31,14 +32,35 @@ describe('ingress service', () => {
     expect(claim).toBeNull()
   })
 
-  test('buildIngressClaim fails clearly when a domain is missing its ingress port', () => {
-    expect(() =>
-      buildIngressClaim('web', {
-        repo: 'acme/web',
-        branch: 'main',
-        domains: [{ host: 'web.example.com', ingress: 'direct' }],
-        env_file: '.env',
-      }),
-    ).toThrow('ingress port missing for app "web" domain "web.example.com"')
+  test('buildIngressClaim returns a typed error when a domain is missing its ingress port', () => {
+    const claim = buildIngressClaim('web', {
+      repo: 'acme/web',
+      branch: 'main',
+      domains: [{ host: 'web.example.com', ingress: 'direct' }],
+      env_file: '.env',
+    })
+
+    expect(claim).toBeInstanceOf(IngressMissingPortError)
+    expect(claim).toMatchObject({
+      message: 'ingress port missing for app "web" domain "web.example.com"',
+    })
+  })
+
+  test('claimIngress still fails at the boundary with the typed port error', async () => {
+    await expect(
+      claimIngress(
+        {
+          claim: async () => undefined,
+          release: async () => undefined,
+        },
+        'web',
+        {
+          repo: 'acme/web',
+          branch: 'main',
+          domains: [{ host: 'web.example.com', ingress: 'direct' }],
+          env_file: '.env',
+        },
+      ),
+    ).rejects.toBeInstanceOf(IngressMissingPortError)
   })
 })

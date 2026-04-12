@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { RemoveMissingAppError, runRemove } from './service.ts'
+import { RemoveMissingAppError, RemoveWriteConfigError } from './errors.ts'
+import {
+  RemoveMissingAppError as ServiceRemoveMissingAppError,
+  RemoveWriteConfigError as ServiceRemoveWriteConfigError,
+  removeApp,
+  runRemove,
+} from './service.ts'
 import type { RemoveSupport } from './types.ts'
 
 const cfg: Config = {
@@ -14,6 +20,11 @@ const cfg: Config = {
 }
 
 describe('runRemove', () => {
+  test('re-exports typed errors from service for compatibility', () => {
+    expect(ServiceRemoveMissingAppError).toBe(RemoveMissingAppError)
+    expect(ServiceRemoveWriteConfigError).toBe(RemoveWriteConfigError)
+  })
+
   test('best-effort steps warn and config removal still lands', async () => {
     const warnings: string[] = []
     const calls: string[] = []
@@ -44,13 +55,14 @@ describe('runRemove', () => {
       removeManagedCompose: async () => {
         calls.push('removeManagedCompose')
       },
-      writeConfig: async (_configFile, nextCfg) => {
+      writeConfig: async (_configFile, nextCfg): Promise<undefined> => {
         calls.push('writeConfig')
         written = nextCfg
+        return undefined
       },
     }
 
-    const result = await runRemove(
+    const result = await removeApp(
       {
         support,
         observer: { warn: (message) => warnings.push(message) },
@@ -93,7 +105,7 @@ describe('runRemove', () => {
       writeConfig: async () => undefined,
     }
 
-    const result = await runRemove(
+    const result = await removeApp(
       { support },
       {
         appName: 'missing',
@@ -105,5 +117,57 @@ describe('runRemove', () => {
 
     expect(result).toBeInstanceOf(RemoveMissingAppError)
     expect((result as RemoveMissingAppError).code).toBe('remove_missing_app')
+  })
+
+  test('returns a typed config write error from the primary API', async () => {
+    const support: RemoveSupport = {
+      releaseIngress: async () => undefined,
+      stopApp: async () => undefined,
+      removeCheckout: async () => undefined,
+      removeSecrets: async () => undefined,
+      removeState: async () => undefined,
+      removeOverride: async () => undefined,
+      removeManagedCompose: async () => undefined,
+      writeConfig: async (configFile) =>
+        new RemoveWriteConfigError(configFile, { cause: new Error('disk full') }),
+    }
+
+    const result = await removeApp(
+      { support },
+      {
+        appName: 'demo',
+        cfg,
+        configFile: '/tmp/config.yml',
+        quiet: true,
+      },
+    )
+
+    expect(result).toBeInstanceOf(RemoveWriteConfigError)
+    expect((result as RemoveWriteConfigError).code).toBe('remove_write_config')
+  })
+
+  test('keeps runRemove as a throwing compatibility wrapper for config write errors', async () => {
+    const support: RemoveSupport = {
+      releaseIngress: async () => undefined,
+      stopApp: async () => undefined,
+      removeCheckout: async () => undefined,
+      removeSecrets: async () => undefined,
+      removeState: async () => undefined,
+      removeOverride: async () => undefined,
+      removeManagedCompose: async () => undefined,
+      writeConfig: async (configFile) => new RemoveWriteConfigError(configFile),
+    }
+
+    await expect(
+      runRemove(
+        { support },
+        {
+          appName: 'demo',
+          cfg,
+          configFile: '/tmp/config.yml',
+          quiet: true,
+        },
+      ),
+    ).rejects.toBeInstanceOf(RemoveWriteConfigError)
   })
 })

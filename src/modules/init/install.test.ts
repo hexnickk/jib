@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { createLogger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
-import { runInstallsTx } from './install.ts'
+import { InitModuleInstallError } from './errors.ts'
+import { runInstallsTx, runInstallsTxResult } from './install.ts'
 import type { ModLike } from './registry.ts'
 import type { InitContext } from './types.ts'
 
@@ -21,12 +22,13 @@ const ctx: InitContext = {
 
 function mod(
   name: string,
-  install: ModLike['install'] = async () => undefined,
+  install?: ModLike['install'],
   uninstall?: ModLike['uninstall'],
 ): ModLike {
-  const m: ModLike = { manifest: { name }, install }
-  if (uninstall) m.uninstall = uninstall
-  return m
+  const result: ModLike = { manifest: { name } }
+  if (install) result.install = install
+  if (uninstall) result.uninstall = uninstall
+  return result
 }
 
 describe('runInstallsTx', () => {
@@ -43,7 +45,9 @@ describe('runInstallsTx', () => {
         log.push('install:c')
       }),
     ]
+
     await runInstallsTx(mods, ctx)
+
     expect(log).toEqual(['install:a', 'install:b', 'install:c'])
   })
 
@@ -82,9 +86,11 @@ describe('runInstallsTx', () => {
         log.push('install:d')
       }),
     ]
-    await expect(runInstallsTx(mods, ctx)).rejects.toThrow('c blew up')
-    // c failed mid-install, so only a and b are "installed". d never ran.
-    // Rollback visits b then a, in reverse.
+
+    const error = await runInstallsTxResult(mods, ctx)
+
+    expect(error).toBeInstanceOf(InitModuleInstallError)
+    expect(error?.message).toBe('c blew up')
     expect(log).toEqual(['install:a', 'install:b', 'install:c', 'uninstall:b', 'uninstall:a'])
   })
 
@@ -114,14 +120,18 @@ describe('runInstallsTx', () => {
         throw new Error('c blew up')
       }),
     ]
-    await expect(runInstallsTx(mods, ctx)).rejects.toThrow('c blew up')
+
+    const error = await runInstallsTxResult(mods, ctx)
+
+    expect(error).toBeInstanceOf(InitModuleInstallError)
+    expect(error?.message).toBe('c blew up')
     expect(log).toEqual(['install:a', 'install:b', 'uninstall:b:fail', 'uninstall:a'])
   })
 
   test('module with no install() is skipped and not added to the installed set', async () => {
     const log: string[] = []
     const mods = [
-      mod('noop'), // no real install
+      mod('noop'),
       mod(
         'b',
         async () => {
@@ -135,8 +145,11 @@ describe('runInstallsTx', () => {
         throw new Error('c blew up')
       }),
     ]
-    await expect(runInstallsTx(mods, ctx)).rejects.toThrow('c blew up')
-    // `noop` had no install so it isn't in the installed set; only `b` rolls back.
+
+    const error = await runInstallsTxResult(mods, ctx)
+
+    expect(error).toBeInstanceOf(InitModuleInstallError)
+    expect(error?.message).toBe('c blew up')
     expect(log).toEqual(['install:b', 'uninstall:b'])
   })
 
@@ -145,13 +158,26 @@ describe('runInstallsTx', () => {
     const mods = [
       mod('a', async () => {
         log.push('install:a')
-      }), // no uninstall
+      }),
       mod('b', async () => {
         throw new Error('b blew up')
       }),
     ]
-    await expect(runInstallsTx(mods, ctx)).rejects.toThrow('b blew up')
-    // `a` has no uninstall so nothing happens during rollback for it.
+
+    const error = await runInstallsTxResult(mods, ctx)
+
+    expect(error).toBeInstanceOf(InitModuleInstallError)
+    expect(error?.message).toBe('b blew up')
     expect(log).toEqual(['install:a'])
+  })
+
+  test('throwing wrapper preserves the typed install error', async () => {
+    const mods = [
+      mod('broken', async () => {
+        throw new Error('broken install')
+      }),
+    ]
+
+    await expect(runInstallsTx(mods, ctx)).rejects.toBeInstanceOf(InitModuleInstallError)
   })
 })

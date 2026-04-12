@@ -2,7 +2,8 @@ import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import { type SourceStatus, collectSourceStatuses } from '@jib/sources'
 import { $ } from 'bun'
-import { Store } from './store.ts'
+import { StateError } from './errors.ts'
+import { createStateStore, loadState } from './store.ts'
 
 export interface ServiceStatus {
   name: string
@@ -55,10 +56,11 @@ export async function collectSources(cfg: Config, paths: Paths): Promise<SourceS
 }
 
 export async function collectApps(cfg: Config, paths: Paths): Promise<AppStatus[]> {
-  const store = new Store(paths.stateDir)
+  const store = createStateStore(paths.stateDir)
   const results: AppStatus[] = []
   for (const [name, app] of Object.entries(cfg.apps)) {
-    const state = await store.load(name)
+    const state = await loadState(store, name)
+    if (state instanceof StateError) throw state
     const containers = await collectContainers(name)
     results.push({
       name,
@@ -77,7 +79,6 @@ async function collectContainers(app: string): Promise<ContainerStatus[]> {
   if (res.exitCode !== 0) return []
   const stdout = res.stdout.toString().trim()
   if (!stdout) return []
-  // docker compose ps --format json outputs one JSON object per line
   try {
     return stdout
       .split('\n')

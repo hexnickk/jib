@@ -1,5 +1,5 @@
 import net from 'node:net'
-import { JibError } from '@jib/errors'
+import { ConfigError, PortExhaustedError } from './errors.ts'
 
 /**
  * Minimal structural shape the allocator needs from a parsed jib config.
@@ -30,31 +30,38 @@ const DEFAULT_RANGE: [number, number] = [20000, 29999]
  * Picks the lowest free host port in the managed range for a new app domain.
  *
  * "Free" means: not currently referenced by any `domain.port` in the config
- * (including ports users manually set outside the range — we still respect
+ * (including ports users manually set outside the range - we still respect
  * them) and, if `probeHost` is set, not bound by any host process.
  *
  * Ports outside the managed range are never *handed out*, but they are
  * tracked so the allocator never hands out a duplicate.
  */
-export async function allocatePort(opts: AllocatePortOpts): Promise<number> {
+export async function allocatePortResult(
+  opts: AllocatePortOpts,
+): Promise<number | PortExhaustedError> {
   const [lo, hi] = opts.range ?? DEFAULT_RANGE
   const used = collectUsed(opts.config)
-  for (let p = lo; p <= hi; p++) {
-    if (used.has(p)) continue
-    if (opts.probeHost && !(await isPortFree(p))) continue
-    return p
+  for (let port = lo; port <= hi; port++) {
+    if (used.has(port)) continue
+    if (opts.probeHost && !(await isPortFree(port))) continue
+    return port
   }
-  throw new JibError(
-    'port-exhausted',
+  return new PortExhaustedError(
     `no free port in managed range ${lo}-${hi}: all ${hi - lo + 1} ports in use`,
   )
+}
+
+export async function allocatePort(opts: AllocatePortOpts): Promise<number> {
+  const result = await allocatePortResult(opts)
+  if (result instanceof ConfigError) throw result
+  return result
 }
 
 function collectUsed(config: PortAllocatorConfig): Set<number> {
   const used = new Set<number>()
   for (const app of Object.values(config.apps)) {
-    for (const d of app.domains) {
-      if (typeof d.port === 'number') used.add(d.port)
+    for (const domain of app.domains) {
+      if (typeof domain.port === 'number') used.add(domain.port)
     }
   }
   return used

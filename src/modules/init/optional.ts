@@ -1,7 +1,16 @@
 import { type Config, loadConfig, writeConfig } from '@jib/config'
 import { createLogger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
-import { runInstallsTx } from './install.ts'
+import {
+  type InitModuleInstallError,
+  type InitOptionalModuleError,
+  OptionalModuleChoicePersistError,
+  OptionalModuleSetupError,
+  toInitModuleInstallError,
+  toOptionalModuleChoicePersistError,
+  toOptionalModuleSetupError,
+} from './errors.ts'
+import { runInstallsTxResult } from './install.ts'
 import { type ModLike, promptOptionalModule } from './registry.ts'
 import { resolveModuleSetup } from './setup-registry.ts'
 import type { InitContext } from './types.ts'
@@ -10,6 +19,7 @@ interface OptionalModuleDeps {
   loadConfig?: typeof loadConfig
   promptOptionalModule?: typeof promptOptionalModule
   resolveModuleSetup?: typeof resolveModuleSetup
+  runInstallsTxResult?: typeof runInstallsTxResult
   writeConfig?: typeof writeConfig
 }
 
@@ -33,12 +43,29 @@ export async function persistModuleChoice(
   enabled: boolean,
   deps: OptionalModuleDeps = {},
 ): Promise<Config> {
+  const result = await persistModuleChoiceResult(configFile, name, enabled, deps)
+  if (result instanceof OptionalModuleChoicePersistError) {
+    throw result
+  }
+  return result
+}
+
+export async function persistModuleChoiceResult(
+  configFile: string,
+  name: string,
+  enabled: boolean,
+  deps: OptionalModuleDeps = {},
+): Promise<Config | OptionalModuleChoicePersistError> {
   const read = deps.loadConfig ?? loadConfig
   const write = deps.writeConfig ?? writeConfig
-  const next = await read(configFile)
-  next.modules[name] = enabled
-  await write(configFile, next)
-  return next
+  try {
+    const next = await read(configFile)
+    next.modules[name] = enabled
+    await write(configFile, next)
+    return next
+  } catch (error) {
+    return toOptionalModuleChoicePersistError(name, error)
+  }
 }
 
 export async function configureOptionalModules(
@@ -47,29 +74,83 @@ export async function configureOptionalModules(
   candidates: readonly ModLike[],
   deps: OptionalModuleDeps = {},
 ): Promise<void> {
+  const error = await configureOptionalModulesResult(config, paths, candidates, deps)
+  if (error instanceof Error) {
+    throw error
+  }
+}
+
+export async function configureOptionalModulesResult(
+  config: Config,
+  paths: Paths,
+  candidates: readonly ModLike[],
+  deps: OptionalModuleDeps = {},
+): Promise<InitOptionalModuleError | undefined> {
   const ask = deps.promptOptionalModule ?? promptOptionalModule
   const setupFor = deps.resolveModuleSetup ?? resolveModuleSetup
+  const installTx = deps.runInstallsTxResult ?? runInstallsTxResult
 
   let current = config
   for (const mod of candidates) {
     const enabled = await ask(mod)
     if (!enabled) {
-      current = await persistModuleChoice(paths.configFile, mod.manifest.name, false, deps)
+      const persisted = await persistModuleChoiceResult(
+        paths.configFile,
+        mod.manifest.name,
+        false,
+        deps,
+      )
+      if (persisted instanceof OptionalModuleChoicePersistError) {
+        return persisted
+      }
+      current = persisted
       continue
     }
 
     const ctx = initCtx(current, paths)
     const setup = setupFor(mod.manifest.name)
-    try {
-      if (mod.install) await runInstallsTx([mod], ctx)
-      if (setup) {
-        const configured = await setup(ctx)
-        if (!configured) throw new Error(`${mod.manifest.name} setup did not complete`)
+
+    if (mod.install) {
+      let installError: InitModuleInstallError | undefined
+      try {
+        installError = await installTx([mod], ctx)
+      } catch (error) {
+        await rollbackModuleInstall(mod, ctx)
+        return toInitModuleInstallError(mod.manifest.name, error)
       }
-      current = await persistModuleChoice(paths.configFile, mod.manifest.name, true, deps)
-    } catch (error) {
-      if (mod.install) await rollbackModuleInstall(mod, ctx)
-      throw error
+
+      if (installError) {
+        await rollbackModuleInstall(mod, ctx)
+        return installError
+      }
     }
+
+    if (setup) {
+      try {
+        const configured = await setup(ctx)
+        if (!configured) {
+          if (mod.install) await rollbackModuleInstall(mod, ctx)
+          return new OptionalModuleSetupError(
+            mod.manifest.name,
+            `${mod.manifest.name} setup did not complete`,
+          )
+        }
+      } catch (error) {
+        if (mod.install) await rollbackModuleInstall(mod, ctx)
+        return toOptionalModuleSetupError(mod.manifest.name, error)
+      }
+    }
+
+    const persisted = await persistModuleChoiceResult(
+      paths.configFile,
+      mod.manifest.name,
+      true,
+      deps,
+    )
+    if (persisted instanceof OptionalModuleChoicePersistError) {
+      if (mod.install) await rollbackModuleInstall(mod, ctx)
+      return persisted
+    }
+    current = persisted
   }
 }

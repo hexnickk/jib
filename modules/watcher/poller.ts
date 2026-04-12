@@ -1,9 +1,13 @@
 import { type Config, parseDuration } from '@jib/config'
-import { Engine } from '@jib/deploy'
+import { deployApp } from '@jib/deploy'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import { type ProbeSourceDeps, probe, syncApp } from '@jib/sources'
 import { Store } from '@jib/state'
+import { WatcherDeployAppError, WatcherProbeAppError, WatcherSyncAppError } from './errors.ts'
+
+type ProbeResult = Awaited<ReturnType<typeof probe>>
+type SyncResult = Awaited<ReturnType<typeof syncApp>>
 
 /**
  * Parses jib's `poll_interval` using the same duration grammar the config
@@ -16,7 +20,7 @@ export function parsePollInterval(raw: string): number {
 /**
  * Checks one app: resolves auth, ls-remotes the configured branch, and if
  * the remote SHA differs from the last-seen value, prepares and deploys it
- * directly through the shared deploy engine.
+ * directly through the shared deploy flow.
  */
 export interface PollAppDeps {
   /** Injected for tests; defaults to the real `sources.lsRemote`. */
@@ -27,6 +31,8 @@ export interface PollAppDeps {
   deployPrepared?: typeof deployPreparedApp
 }
 
+export type PollAppError = WatcherProbeAppError | WatcherSyncAppError | WatcherDeployAppError
+
 export async function pollApp(
   cfg: Config,
   paths: Paths,
@@ -34,27 +40,67 @@ export async function pollApp(
   lastSeen: Map<string, string>,
   log: Logger,
   deps: PollAppDeps = {},
-): Promise<void> {
+): Promise<PollAppError | undefined> {
   const app = cfg.apps[appName]
   if (!app || !app.repo || app.repo === 'local') return
+
+  const source = await probePollApp(cfg, paths, appName, deps)
+  if (source instanceof Error) return source
+  if (!source) return
+
+  const prev = lastSeen.get(appName) ?? ''
+  if (source.sha === prev) return
+
+  const prepared = await syncPollApp(cfg, paths, appName, deps)
+  if (prepared instanceof Error) return prepared
+
+  log.info(`${appName}: new sha ${prepared.sha.slice(0, 7)} (was ${prev.slice(0, 7) || 'none'})`)
+  let deployError: WatcherDeployAppError | undefined
   try {
-    const source = await probe(
+    deployError = await (deps.deployPrepared ?? deployPreparedApp)(
+      cfg,
+      paths,
+      appName,
+      prepared,
+      log,
+    )
+  } catch (error) {
+    return new WatcherDeployAppError(appName, error)
+  }
+  if (deployError) return deployError
+
+  lastSeen.set(appName, prepared.sha)
+}
+
+async function probePollApp(
+  cfg: Config,
+  paths: Paths,
+  appName: string,
+  deps: PollAppDeps,
+): Promise<ProbeResult | WatcherProbeAppError> {
+  try {
+    return await probe(
       cfg,
       paths,
       { app: appName },
       deps.lsRemote ? { lsRemote: deps.lsRemote } : {},
     )
-    if (!source) return
-    const prev = lastSeen.get(appName) ?? ''
-    if (source.sha === prev) return
+  } catch (error) {
+    return new WatcherProbeAppError(appName, error)
+  }
+}
 
-    const sync = deps.syncApp ?? syncApp
-    const prepared = await sync(cfg, paths, { app: appName })
-    log.info(`${appName}: new sha ${prepared.sha.slice(0, 7)} (was ${prev.slice(0, 7) || 'none'})`)
-    await (deps.deployPrepared ?? deployPreparedApp)(cfg, paths, appName, prepared, log)
-    lastSeen.set(appName, prepared.sha)
-  } catch (err) {
-    log.warn(`${appName}: poll error: ${(err as Error).message}`)
+async function syncPollApp(
+  cfg: Config,
+  paths: Paths,
+  appName: string,
+  deps: PollAppDeps,
+): Promise<SyncResult | WatcherSyncAppError> {
+  const sync = deps.syncApp ?? syncApp
+  try {
+    return await sync(cfg, paths, { app: appName })
+  } catch (error) {
+    return new WatcherSyncAppError(appName, error)
   }
 }
 
@@ -64,17 +110,18 @@ async function deployPreparedApp(
   appName: string,
   prepared: { workdir: string; sha: string },
   log: Logger,
-): Promise<void> {
-  const engine = new Engine({
-    config: cfg,
-    paths,
-    store: new Store(paths.stateDir),
-    log,
-  })
-  await engine.deploy(
+): Promise<WatcherDeployAppError | undefined> {
+  const result = await deployApp(
+    {
+      config: cfg,
+      paths,
+      store: new Store(paths.stateDir),
+      log,
+    },
     { app: appName, workdir: prepared.workdir, sha: prepared.sha, trigger: 'auto' },
     { emit: (step, message) => log.info(`${appName}: ${step}: ${message}`) },
   )
+  if (result instanceof Error) return new WatcherDeployAppError(appName, result)
 }
 
 export interface PollerDeps {
@@ -96,7 +143,8 @@ export async function runPollCycle(
 ): Promise<Map<string, string>> {
   const cfg = await deps.getConfig()
   for (const name of Object.keys(cfg.apps)) {
-    await pollApp(cfg, deps.paths, name, lastSeen, deps.log)
+    const error = await pollApp(cfg, deps.paths, name, lastSeen, deps.log)
+    if (error) deps.log.warn(`${name}: poll error: ${error.message}`)
   }
   return lastSeen
 }

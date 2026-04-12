@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { runRemove } from './service.ts'
+import { removeApp } from './service.ts'
 import type { RemoveSupport } from './types.ts'
 
 const cfg: Config = {
@@ -45,12 +45,13 @@ describe('runRemove ingress cleanup', () => {
       removeManagedCompose: async () => {
         calls.push('removeManagedCompose')
       },
-      writeConfig: async () => {
+      writeConfig: async (): Promise<undefined> => {
         calls.push('writeConfig')
+        return undefined
       },
     }
 
-    const result = await runRemove(
+    const result = await removeApp(
       {
         support,
         observer: { warn: (message) => warnings.push(message) },

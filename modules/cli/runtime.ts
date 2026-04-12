@@ -1,5 +1,5 @@
 import { ValidationError } from '@jib/errors'
-import { CliError } from './errors.ts'
+import { CliError, InvalidInteractiveModeError, InvalidOutputModeError } from './errors.ts'
 
 export type InteractiveMode = 'auto' | 'always' | 'never'
 export type OutputMode = 'text' | 'json'
@@ -11,6 +11,8 @@ export interface CliRuntime {
   stdinTty: boolean
   stdoutTty: boolean
 }
+
+export type CliRuntimeParseError = InvalidInteractiveModeError | InvalidOutputModeError
 
 let currentRuntime: CliRuntime | null = null
 
@@ -52,43 +54,65 @@ function shouldConsumeNextValue(rawArgs: string[], index: number): boolean {
 }
 
 export function parseInteractiveMode(value: string | undefined): InteractiveMode | undefined {
+  const parsed = parseInteractiveModeValue(value)
+  if (parsed instanceof InvalidInteractiveModeError) throw parsed
+  return parsed
+}
+
+function parseInteractiveModeValue(
+  value: string | undefined,
+): InteractiveMode | InvalidInteractiveModeError | undefined {
   if (value === undefined) return undefined
   if (value === 'auto' || value === 'always' || value === 'never') return value
-  throw new CliError('invalid_interactive_mode', `invalid --interactive value "${value}"`, {
-    hint: 'expected one of: auto, always, never',
-  })
+  return new InvalidInteractiveModeError(value)
 }
 
 export function parseOutputMode(value: string | undefined): OutputMode | undefined {
+  const parsed = parseOutputModeValue(value)
+  if (parsed instanceof InvalidOutputModeError) throw parsed
+  return parsed
+}
+
+function parseOutputModeValue(
+  value: string | undefined,
+): OutputMode | InvalidOutputModeError | undefined {
   if (value === undefined) return undefined
   if (value === 'text' || value === 'json') return value
-  throw new CliError('invalid_output_mode', `invalid --output value "${value}"`, {
-    hint: 'expected one of: text, json',
-  })
+  return new InvalidOutputModeError(value)
 }
 
-function defaultInteractiveMode(): InteractiveMode {
+function defaultInteractiveMode(): InteractiveMode | InvalidInteractiveModeError {
   if (process.env.JIB_NON_INTERACTIVE) return 'never'
-  return parseInteractiveMode(process.env.JIB_INTERACTIVE) ?? 'auto'
+  const interactive = parseInteractiveModeValue(process.env.JIB_INTERACTIVE)
+  if (interactive instanceof InvalidInteractiveModeError) return interactive
+  return interactive ?? 'auto'
 }
 
-function defaultOutputMode(): OutputMode {
-  return parseOutputMode(process.env.JIB_OUTPUT) ?? 'text'
+function defaultOutputMode(): OutputMode | InvalidOutputModeError {
+  const output = parseOutputModeValue(process.env.JIB_OUTPUT)
+  if (output instanceof InvalidOutputModeError) return output
+  return output ?? 'text'
 }
 
-function materializeRuntime(runtime: Partial<CliRuntime>): CliRuntime {
+function materializeRuntime(runtime: Partial<CliRuntime>): CliRuntime | CliRuntimeParseError {
+  const interactive = runtime.interactive ?? defaultInteractiveMode()
+  if (interactive instanceof InvalidInteractiveModeError) return interactive
+  const output = runtime.output ?? defaultOutputMode()
+  if (output instanceof InvalidOutputModeError) return output
   return {
-    interactive: runtime.interactive ?? defaultInteractiveMode(),
-    output: runtime.output ?? defaultOutputMode(),
+    interactive,
+    output,
     debug: runtime.debug ?? parseTruthyEnv(process.env.JIB_DEBUG),
     stdinTty: runtime.stdinTty ?? Boolean(process.stdin.isTTY),
     stdoutTty: runtime.stdoutTty ?? Boolean(process.stdout.isTTY),
   }
 }
 
-export function configureCliRuntime(rawArgs: string[]): CliRuntime {
-  const interactive = parseInteractiveMode(parseStringFlag(rawArgs, 'interactive'))
-  const output = parseOutputMode(parseStringFlag(rawArgs, 'output'))
+export function configureCliRuntime(rawArgs: string[]): CliRuntime | CliRuntimeParseError {
+  const interactive = parseInteractiveModeValue(parseStringFlag(rawArgs, 'interactive'))
+  if (interactive instanceof InvalidInteractiveModeError) return interactive
+  const output = parseOutputModeValue(parseStringFlag(rawArgs, 'output'))
+  if (output instanceof InvalidOutputModeError) return output
   const debug = parseBooleanFlag(rawArgs, 'debug')
   const next: Partial<CliRuntime> = {}
   if (interactive !== undefined) next.interactive = interactive
@@ -122,15 +146,19 @@ export function stripCliRuntimeArgs(rawArgs: string[]): string[] {
   return boundary < rawArgs.length ? [...out, ...rawArgs.slice(boundary)] : out
 }
 
-export function setCliRuntime(runtime: Partial<CliRuntime>): CliRuntime {
-  currentRuntime = materializeRuntime(runtime)
+export function setCliRuntime(runtime: Partial<CliRuntime>): CliRuntime | CliRuntimeParseError {
+  const nextRuntime = materializeRuntime(runtime)
+  if (nextRuntime instanceof CliError) return nextRuntime
+  currentRuntime = nextRuntime
   if (currentRuntime.debug) process.env.JIB_DEBUG = '1'
   else Reflect.deleteProperty(process.env, 'JIB_DEBUG')
   return currentRuntime
 }
 
 export function getCliRuntime(): CliRuntime {
-  return currentRuntime ?? materializeRuntime({})
+  const runtime = currentRuntime ?? materializeRuntime({})
+  if (runtime instanceof CliError) throw runtime
+  return runtime
 }
 
 export function canPrompt(): boolean {

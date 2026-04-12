@@ -5,9 +5,11 @@ import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import type { DockerExec, ExecResult } from '@jib/docker'
 import { createLogger } from '@jib/logging'
-import { getPaths, repoPath } from '@jib/paths'
 import { Store } from '@jib/state'
+import { getPaths, repoPath } from '../paths/paths.ts'
 import { Engine } from './engine.ts'
+import { DeployDiskSpaceError, DeployMissingAppError } from './errors.ts'
+import { deployApp } from './service.ts'
 
 function mkCfg(): Config {
   return {
@@ -27,9 +29,9 @@ function mkCfg(): Config {
 }
 
 async function mkWorkdir(): Promise<string> {
-  const d = await mkdtemp(join(tmpdir(), 'jib-workdir-'))
+  const dir = await mkdtemp(join(tmpdir(), 'jib-workdir-'))
   await writeFile(
-    join(d, 'docker-compose.yml'),
+    join(dir, 'docker-compose.yml'),
     `services:
   web:
     build:
@@ -37,19 +39,19 @@ async function mkWorkdir(): Promise<string> {
     image: nginx:alpine
 `,
   )
-  return d
+  return dir
 }
 
 async function mkImageOnlyWorkdir(): Promise<string> {
-  const d = await mkdtemp(join(tmpdir(), 'jib-image-workdir-'))
+  const dir = await mkdtemp(join(tmpdir(), 'jib-image-workdir-'))
   await writeFile(
-    join(d, 'docker-compose.yml'),
+    join(dir, 'docker-compose.yml'),
     `services:
   web:
     image: nginx:alpine
 `,
   )
-  return d
+  return dir
 }
 
 interface Call {
@@ -75,31 +77,54 @@ async function mkEnv() {
 
 const noProgress = { emit: () => {} }
 
-describe('Engine.deploy', () => {
+describe('deployApp', () => {
   test('happy path emits success + records state', async () => {
     const { paths, store, log } = await mkEnv()
     const workdir = await mkWorkdir()
     const calls: Call[] = []
-    const engine = new Engine({
-      config: mkCfg(),
-      paths,
-      store,
-      log,
-      diskFree: async () => 10 * 1024 * 1024 * 1024,
-      dockerExec: fakeExec(calls),
-    })
 
-    const res = await engine.deploy(
+    const result = await deployApp(
+      {
+        config: mkCfg(),
+        paths,
+        store,
+        log,
+        diskFree: async () => 10 * 1024 * 1024 * 1024,
+        dockerExec: fakeExec(calls),
+      },
       { app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' },
       noProgress,
     )
-    expect(res.deployedSHA).toBe('deadbeef')
+
+    expect(result instanceof Error).toBe(false)
+    if (result instanceof Error) return
+    expect(result.deployedSHA).toBe('deadbeef')
+
     const state = await store.load('demo')
     expect(state.deployed_sha).toBe('deadbeef')
     expect(state.deployed_workdir).toBe(workdir)
-    // build + up were called
-    expect(calls.some((c) => c.args.includes('build'))).toBe(true)
-    expect(calls.some((c) => c.args.includes('up'))).toBe(true)
+    expect(calls.some((call) => call.args.includes('build'))).toBe(true)
+    expect(calls.some((call) => call.args.includes('up'))).toBe(true)
+  })
+
+  test('missing app returns a typed error', async () => {
+    const { paths, store, log } = await mkEnv()
+    const workdir = await mkWorkdir()
+
+    const result = await deployApp(
+      {
+        config: mkCfg(),
+        paths,
+        store,
+        log,
+        diskFree: async () => 10 * 1024 * 1024 * 1024,
+        dockerExec: fakeExec([]),
+      },
+      { app: 'unknown', workdir, sha: 'deadbeef', trigger: 'manual' },
+      noProgress,
+    )
+
+    expect(result).toBeInstanceOf(DeployMissingAppError)
   })
 
   test('forwards build args to both build and up', async () => {
@@ -108,60 +133,73 @@ describe('Engine.deploy', () => {
     const calls: Call[] = []
     const cfg = mkCfg()
     const demo = cfg.apps.demo
-    if (!demo) throw new Error('demo app missing in test fixture')
+    expect(demo).toBeDefined()
+    if (!demo) return
     demo.build_args = { VITE_HOST_URL: 'https://demo.example.com' }
-    const engine = new Engine({
-      config: cfg,
-      paths,
-      store,
-      log,
-      diskFree: async () => 10 * 1024 * 1024 * 1024,
-      dockerExec: fakeExec(calls),
-    })
 
-    await engine.deploy({ app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' }, noProgress)
+    const result = await deployApp(
+      {
+        config: cfg,
+        paths,
+        store,
+        log,
+        diskFree: async () => 10 * 1024 * 1024 * 1024,
+        dockerExec: fakeExec(calls),
+      },
+      { app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' },
+      noProgress,
+    )
 
-    const buildCall = calls.find((c) => c.args.includes('build'))
-    const upCall = calls.find((c) => c.args.includes('up'))
+    expect(result instanceof Error).toBe(false)
+    const buildCall = calls.find((call) => call.args.includes('build'))
+    const upCall = calls.find((call) => call.args.includes('up'))
     expect(buildCall?.env).toEqual({ VITE_HOST_URL: 'https://demo.example.com' })
     expect(upCall?.env).toEqual({ VITE_HOST_URL: 'https://demo.example.com' })
   })
 
-  test('insufficient disk space throws', async () => {
+  test('insufficient disk space returns a typed error', async () => {
     const { paths, store, log } = await mkEnv()
-    const engine = new Engine({
-      config: mkCfg(),
-      paths,
-      store,
-      log,
-      diskFree: async () => 1024,
-      dockerExec: fakeExec([]),
-    })
     const workdir = await mkWorkdir()
-    await expect(
-      engine.deploy({ app: 'demo', workdir, sha: 'x', trigger: 'manual' }, noProgress),
-    ).rejects.toThrow(/insufficient disk space/)
+
+    const result = await deployApp(
+      {
+        config: mkCfg(),
+        paths,
+        store,
+        log,
+        diskFree: async () => 1024,
+        dockerExec: fakeExec([]),
+      },
+      { app: 'demo', workdir, sha: 'x', trigger: 'manual' },
+      noProgress,
+    )
+
+    expect(result).toBeInstanceOf(DeployDiskSpaceError)
   })
 
   test('build failure records the failure in last-deploy state', async () => {
     const { paths, store, log } = await mkEnv()
     const calls: Call[] = []
-    const engine = new Engine({
-      config: mkCfg(),
-      paths,
-      store,
-      log,
-      diskFree: async () => 10 * 1024 * 1024 * 1024,
-      dockerExec: async (args): Promise<ExecResult> => {
-        calls.push({ args: [...args] })
-        if (args.includes('build')) return { stdout: '', stderr: 'boom', exitCode: 1 }
-        return { stdout: '', stderr: '', exitCode: 0 }
-      },
-    })
     const workdir = await mkWorkdir()
-    await expect(
-      engine.deploy({ app: 'demo', workdir, sha: 'x', trigger: 'manual' }, noProgress),
-    ).rejects.toThrow()
+
+    const result = await deployApp(
+      {
+        config: mkCfg(),
+        paths,
+        store,
+        log,
+        diskFree: async () => 10 * 1024 * 1024 * 1024,
+        dockerExec: async (args): Promise<ExecResult> => {
+          calls.push({ args: [...args] })
+          if (args.includes('build')) return { stdout: '', stderr: 'boom', exitCode: 1 }
+          return { stdout: '', stderr: '', exitCode: 0 }
+        },
+      },
+      { app: 'demo', workdir, sha: 'x', trigger: 'manual' },
+      noProgress,
+    )
+
+    expect(result instanceof Error).toBe(true)
     const state = await store.load('demo')
     expect(state.last_deploy_status).toBe('failure')
     expect(state.last_deploy_error).toContain('boom')
@@ -178,20 +216,66 @@ describe('Engine.deploy', () => {
       domains: [],
       env_file: '.env',
     }
+
+    const result = await deployApp(
+      {
+        config: cfg,
+        paths,
+        store,
+        log,
+        diskFree: async () => 10 * 1024 * 1024 * 1024,
+        dockerExec: fakeExec(calls),
+      },
+      { app: 'demo', workdir, sha: 'worker1', trigger: 'manual' },
+      noProgress,
+    )
+
+    expect(result instanceof Error).toBe(false)
+    const override = await readFile(join(paths.overridesDir, 'demo.yml'), 'utf8')
+    expect(override).not.toContain('ports:')
+    expect(calls.some((call) => call.args.includes('up'))).toBe(true)
+  })
+
+  test('image-only compose skips the build step', async () => {
+    const { paths, store, log } = await mkEnv()
+    const workdir = await mkImageOnlyWorkdir()
+    const calls: Call[] = []
+
+    const result = await deployApp(
+      {
+        config: mkCfg(),
+        paths,
+        store,
+        log,
+        diskFree: async () => 10 * 1024 * 1024 * 1024,
+        dockerExec: fakeExec(calls),
+      },
+      { app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' },
+      noProgress,
+    )
+
+    expect(result instanceof Error).toBe(false)
+    expect(calls.some((call) => call.args.includes('build'))).toBe(false)
+    expect(calls.some((call) => call.args.includes('up'))).toBe(true)
+  })
+})
+
+describe('Engine compatibility wrapper', () => {
+  test('throws compatibility errors for existing callers', async () => {
+    const { paths, store, log } = await mkEnv()
     const engine = new Engine({
-      config: cfg,
+      config: mkCfg(),
       paths,
       store,
       log,
-      diskFree: async () => 10 * 1024 * 1024 * 1024,
-      dockerExec: fakeExec(calls),
+      diskFree: async () => 1024,
+      dockerExec: fakeExec([]),
     })
+    const workdir = await mkWorkdir()
 
-    await engine.deploy({ app: 'demo', workdir, sha: 'worker1', trigger: 'manual' }, noProgress)
-
-    const override = await readFile(join(paths.overridesDir, 'demo.yml'), 'utf8')
-    expect(override).not.toContain('ports:')
-    expect(calls.some((c) => c.args.includes('up'))).toBe(true)
+    await expect(
+      engine.deploy({ app: 'demo', workdir, sha: 'x', trigger: 'manual' }, noProgress),
+    ).rejects.toBeInstanceOf(DeployDiskSpaceError)
   })
 
   test('up refreshes stale override when app has no domains', async () => {
@@ -234,25 +318,6 @@ describe('Engine.deploy', () => {
 
     const override = await readFile(join(paths.overridesDir, 'demo.yml'), 'utf8')
     expect(override).not.toContain('ports:')
-    expect(calls.some((c) => c.args.includes('up'))).toBe(true)
-  })
-
-  test('image-only compose skips the build step', async () => {
-    const { paths, store, log } = await mkEnv()
-    const workdir = await mkImageOnlyWorkdir()
-    const calls: Call[] = []
-    const engine = new Engine({
-      config: mkCfg(),
-      paths,
-      store,
-      log,
-      diskFree: async () => 10 * 1024 * 1024 * 1024,
-      dockerExec: fakeExec(calls),
-    })
-
-    await engine.deploy({ app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' }, noProgress)
-
-    expect(calls.some((c) => c.args.includes('build'))).toBe(false)
-    expect(calls.some((c) => c.args.includes('up'))).toBe(true)
+    expect(calls.some((call) => call.args.includes('up'))).toBe(true)
   })
 })

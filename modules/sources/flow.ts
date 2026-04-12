@@ -9,14 +9,15 @@ import {
   repoSupportsSourceRecovery,
   runSourceSetup,
 } from './recovery.ts'
-import { probe } from './service.ts'
+import { probeSource } from './service.ts'
+import type { SourceProbe, SourceTarget } from './types.ts'
 
 type SourceChoice = `existing:${string}` | `setup:${string}`
 
 export interface SourceRecoveryDeps {
   isInteractive?: () => boolean
   loadConfig?: (configFile: string) => Promise<Config>
-  probe?: typeof probe
+  probe?: typeof probeSource
   promptSelect?: (opts: {
     message: string
     options: { value: SourceChoice; label: string; hint?: string }[]
@@ -103,23 +104,32 @@ export async function preflightSourceSelection(
 ): Promise<{ cfg: Config; source?: string; branch: string }> {
   let resolvedCfg = cfg
   let source = currentSource
-  const probeSource = deps.probe ?? probe
+  const runProbe = deps.probe ?? probeSource
+  const target = (): SourceTarget => ({
+    app: appName,
+    repo,
+    ...(currentBranch ? { branch: currentBranch } : {}),
+    ...(source ? { source } : {}),
+  })
+
   for (;;) {
+    let probed: Awaited<ReturnType<typeof probeSource>> | unknown
     try {
-      const probed = await probeSource(resolvedCfg, paths, {
-        app: appName,
-        repo,
-        ...(currentBranch ? { branch: currentBranch } : {}),
-        ...(source ? { source } : {}),
-      })
-      const branch = probed?.branch ?? currentBranch ?? 'main'
-      return source ? { cfg: resolvedCfg, source, branch } : { cfg: resolvedCfg, branch }
+      probed = await runProbe(resolvedCfg, paths, target())
     } catch (error) {
-      const nextSource = await maybeRecoverSource(resolvedCfg, paths, repo, error, source, deps)
-      if (!nextSource) throw error
-      source = nextSource
-      resolvedCfg = await (deps.loadConfig ?? loadConfig)(paths.configFile)
+      probed = error
     }
+
+    const probeResult = probed as SourceProbe | Error | null
+    if (!(probeResult instanceof Error)) {
+      const branch = probeResult?.branch ?? currentBranch ?? 'main'
+      return source ? { cfg: resolvedCfg, source, branch } : { cfg: resolvedCfg, branch }
+    }
+
+    const nextSource = await maybeRecoverSource(resolvedCfg, paths, repo, probed, source, deps)
+    if (!nextSource) throw probed
+    source = nextSource
+    resolvedCfg = await (deps.loadConfig ?? loadConfig)(paths.configFile)
   }
 }
 

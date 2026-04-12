@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { configureCliRuntime } from '@jib/cli'
 import { ValidationError } from '@jib/errors'
-import { assertInteractive, isInteractive } from './interactive.ts'
+import { TuiNotInteractiveError } from './errors.ts'
+import { assertInteractive, assertInteractiveResult, isInteractive } from './interactive.ts'
 
 // `isTTY` is a writable boolean on the real streams; the Node types mark it
 // optional-readonly so we narrow to a mutable shape for test-only overrides.
@@ -14,10 +15,11 @@ describe('isInteractive', () => {
   const stdoutPrev = stdout.isTTY
 
   beforeEach(() => {
-    process.env.JIB_NON_INTERACTIVE = undefined
+    Reflect.deleteProperty(process.env, 'JIB_NON_INTERACTIVE')
   })
   afterEach(() => {
-    process.env.JIB_NON_INTERACTIVE = envPrev
+    if (envPrev === undefined) Reflect.deleteProperty(process.env, 'JIB_NON_INTERACTIVE')
+    else process.env.JIB_NON_INTERACTIVE = envPrev
     stdin.isTTY = stdinPrev
     stdout.isTTY = stdoutPrev
   })
@@ -44,9 +46,20 @@ describe('isInteractive', () => {
     expect(isInteractive()).toBe(true)
   })
 
-  test('assertInteractive throws ValidationError in non-interactive mode', () => {
+  test('assertInteractiveResult returns a typed error in non-interactive mode', () => {
     process.env.JIB_NON_INTERACTIVE = '1'
     configureCliRuntime([])
-    expect(() => assertInteractive()).toThrow(ValidationError)
+
+    const error = assertInteractiveResult()
+
+    expect(error).toBeInstanceOf(TuiNotInteractiveError)
+    expect(error).toBeInstanceOf(ValidationError)
+    expect(error?.message).toBe('interactive prompts are disabled by --interactive=never')
+  })
+
+  test('assertInteractive throws TuiNotInteractiveError in non-interactive mode', () => {
+    process.env.JIB_NON_INTERACTIVE = '1'
+    configureCliRuntime([])
+    expect(() => assertInteractive()).toThrow(TuiNotInteractiveError)
   })
 })

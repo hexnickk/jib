@@ -1,8 +1,19 @@
 import { describe, expect, test } from 'bun:test'
-import { type Step, runSteps } from './run.ts'
+import { type Step, TxRollbackError, runSteps } from './run.ts'
 
 class FlowError extends Error {}
 class CancelledError extends Error {}
+
+describe('TxRollbackError', () => {
+  test('keeps the step name and original cause', () => {
+    const cause = new Error('boom')
+    const error = new TxRollbackError('sync', cause)
+
+    expect(error.stepName).toBe('sync')
+    expect(error.message).toBe('sync rollback: boom')
+    expect(error.cause).toBe(cause)
+  })
+})
 
 describe('runSteps', () => {
   test('runs steps in order without rollback on success', async () => {
@@ -142,10 +153,41 @@ describe('runSteps', () => {
       steps,
       { cancelled: false },
       () => new CancelledError(),
-      (m) => warnings.push(m),
+      (message) => warnings.push(message),
     )
 
     expect(result).toBeInstanceOf(FlowError)
     expect(warnings).toEqual(['two rollback: down two exploded', 'one rollback: down one failed'])
+  })
+
+  test('does not double-prefix rollback warnings for existing tx rollback errors', async () => {
+    const warnings: string[] = []
+    const steps: Step<object, string, FlowError>[] = [
+      {
+        name: 'one',
+        async up() {
+          return 'a'
+        },
+        async down() {
+          return new TxRollbackError('one', new Error('already wrapped'))
+        },
+      },
+      {
+        name: 'two',
+        async up() {
+          return new FlowError('boom')
+        },
+      },
+    ]
+
+    await runSteps(
+      {},
+      steps,
+      { cancelled: false },
+      () => new CancelledError(),
+      (message) => warnings.push(message),
+    )
+
+    expect(warnings).toEqual(['one rollback: already wrapped'])
   })
 })

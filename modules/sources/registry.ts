@@ -1,5 +1,6 @@
 import type { App, Config } from '@jib/config'
 import { githubDriver } from './backend/github/driver.ts'
+import { SourceDriverNotRegisteredError, SourceMissingConfigError } from './errors.ts'
 import type { SourceDriver } from './types.ts'
 
 const DRIVERS = new Map<string, SourceDriver>([[githubDriver.name, githubDriver]])
@@ -12,14 +13,18 @@ export function sourceDriver(name: string): SourceDriver | undefined {
   return DRIVERS.get(name)
 }
 
-export function resolveSourceDriver(cfg: Config, app: App): SourceDriver {
-  const name = app.source ? cfg.sources[app.source]?.driver : 'github'
+export function resolveSourceDriverResult(
+  cfg: Config,
+  app: App,
+): SourceDriver | SourceDriverNotRegisteredError | SourceMissingConfigError {
+  const sourceName = app.source
+  const name = sourceName ? cfg.sources[sourceName]?.driver : 'github'
   if (!name) {
-    throw new Error(`source "${app.source}" not found in config`)
+    return new SourceMissingConfigError(sourceName ?? 'unknown')
   }
   const driver = sourceDriver(name)
   if (!driver) {
-    throw new Error(`source driver "${name}" is not registered`)
+    return new SourceDriverNotRegisteredError(name)
   }
   return driver
 }

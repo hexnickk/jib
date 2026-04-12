@@ -8,6 +8,8 @@ import {
   ConfirmPlanError,
   InspectComposeError,
   PrepareRepoError,
+  PrepareRepoRollbackError,
+  RemoveManagedComposeError,
   ResolveAppError,
 } from './flow-errors.ts'
 import { claimIngressStep, writeConfigStep, writeSecretsStep } from './mutation-steps.ts'
@@ -71,7 +73,7 @@ const prepareRepoStep: Step<AddRunContext, { repo: string }, AddFlowError> = {
     try {
       await ctx.support.removeCheckout(ctx.params.appName, state.repo)
     } catch (cause) {
-      return new Error(cause instanceof Error ? cause.message : String(cause))
+      return new PrepareRepoRollbackError(cause)
     }
   },
 }
@@ -132,7 +134,7 @@ const resolveAppStep: Step<AddRunContext, { managedComposeWritten: boolean }, Ad
     try {
       await ctx.support.removeManagedCompose(ctx.params.appName)
     } catch (cause) {
-      return new Error(cause instanceof Error ? cause.message : String(cause))
+      return new RemoveManagedComposeError(cause)
     }
   },
 }

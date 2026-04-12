@@ -1,8 +1,8 @@
 import { createInterface } from 'node:readline'
 import * as clack from '@clack/prompts'
-import { ValidationError } from '@jib/errors'
-import { assertInteractive } from './interactive.ts'
-import { readPemBlock } from './pem.ts'
+import { TuiPromptCancelledError, TuiPromptTooManyLinesError, isTuiPemReadError } from './errors.ts'
+import { assertInteractiveResult } from './interactive.ts'
+import { readPemBlockResult } from './pem.ts'
 
 export { intro, outro, spinner, log, note } from '@clack/prompts'
 
@@ -24,13 +24,14 @@ type LinesOpts = {
 
 /**
  * Runs `fn` (a thin clack call) under interactive-mode guard and unwraps
- * clack's cancel symbol into a `ValidationError`. Every wrapper in this file
+ * clack's cancel symbol into a typed error. Every wrapper in this file
  * delegates here so the interactive/cancel/return shape lives in one place.
  */
 async function ask<T>(fn: () => Promise<T | symbol>): Promise<T> {
-  assertInteractive()
+  const interactiveError = assertInteractiveResult()
+  if (interactiveError) throw interactiveError
   const value = await fn()
-  if (clack.isCancel(value)) throw new ValidationError('cancelled')
+  if (clack.isCancel(value)) throw new TuiPromptCancelledError()
   return value as T
 }
 
@@ -73,7 +74,7 @@ async function readLine(rl: ReturnType<typeof createInterface>, prompt: string):
   return await new Promise<string>((resolve, reject) => {
     const onSigInt = () => {
       rl.removeListener('SIGINT', onSigInt)
-      reject(new ValidationError('cancelled'))
+      reject(new TuiPromptCancelledError())
     }
     rl.once('SIGINT', onSigInt)
     rl.question(prompt, (answer) => {
@@ -84,12 +85,14 @@ async function readLine(rl: ReturnType<typeof createInterface>, prompt: string):
 }
 
 export async function promptLines(opts: LinesOpts): Promise<string[]> {
-  assertInteractive()
+  const interactiveError = assertInteractiveResult()
+  if (interactiveError) throw interactiveError
+  const maxLines = opts.maxLines ?? 100
   clack.note(opts.lines.join('\n'), opts.title)
   const rl = createInterface({ input: process.stdin, output: process.stdout })
   const out: string[] = []
   try {
-    while (out.length < (opts.maxLines ?? 100)) {
+    while (out.length < maxLines) {
       const line = (await readLine(rl, `${opts.promptLabel ?? 'entry'} ${out.length + 1}> `)).trim()
       if (line.length === 0) return out
       const error = opts.validateLine?.(line)
@@ -102,7 +105,7 @@ export async function promptLines(opts: LinesOpts): Promise<string[]> {
   } finally {
     rl.close()
   }
-  throw new ValidationError(`too many lines (max ${opts.maxLines ?? 100})`)
+  throw new TuiPromptTooManyLinesError(maxLines)
 }
 
 export async function promptInt(opts: IntOpts): Promise<number> {
@@ -145,29 +148,29 @@ export function promptMultiSelect<T extends string>(opts: SelectOpts<T>): Promis
 /**
  * Read a PEM block from stdin. Collects lines until one matches
  * `-----END ... KEY-----`, then returns the full block. Uses raw
- * readline so pasted multiline text works — clack has no multiline input.
+ * readline so pasted multiline text works because clack has no multiline input.
  */
 export async function promptPEM(opts: { message: string }): Promise<string> {
-  assertInteractive()
+  const interactiveError = assertInteractiveResult()
+  if (interactiveError) throw interactiveError
   while (true) {
     clack.log.info(`${opts.message} (paste full PEM block)`)
     const rl = createInterface({ input: process.stdin })
-    let readError: unknown = null
+    let pem: Awaited<ReturnType<typeof readPemBlockResult>>
     try {
-      return await readPemBlock(rl)
-    } catch (error) {
-      readError = error
+      pem = await readPemBlockResult(rl)
     } finally {
       rl.close()
     }
 
-    if (!(readError instanceof ValidationError)) throw readError
-    clack.log.warning(readError.message)
+    if (!(pem instanceof Error)) return pem
+    if (!isTuiPemReadError(pem)) throw pem
+    clack.log.warning(pem.message)
     const retry = await promptConfirm({
       message: 'Try pasting the PEM again?',
       initialValue: true,
     })
-    if (!retry) throw readError
+    if (!retry) throw pem
   }
 }
 

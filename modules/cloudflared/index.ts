@@ -1,4 +1,9 @@
 export { default as manifest } from './manifest.ts'
+export {
+  CloudflaredInstallError,
+  CloudflaredSaveTunnelTokenError,
+  CloudflaredUninstallError,
+} from './errors.ts'
 export { install } from './install.ts'
 export { uninstall } from './uninstall.ts'
 export {

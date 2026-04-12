@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import net from 'node:net'
-import { JibError } from '@jib/errors'
-import { type PortAllocatorConfig, allocatePort } from './port-allocator.ts'
+import { PortExhaustedError } from './errors.ts'
+import { type PortAllocatorConfig, allocatePort, allocatePortResult } from './port-allocator.ts'
 
 function cfg(...portsPerApp: number[][]): PortAllocatorConfig {
   const apps: PortAllocatorConfig['apps'] = {}
   portsPerApp.forEach((ports, i) => {
-    apps[`app${i}`] = { domains: ports.map((p) => ({ port: p })) }
+    apps[`app${i}`] = { domains: ports.map((port) => ({ port })) }
   })
   return { apps }
 }
@@ -21,28 +21,29 @@ describe('allocatePort', () => {
     expect(await allocatePort({ config })).toBe(20001)
   })
 
-  test('contiguous used ports → first free after them', async () => {
+  test('contiguous used ports -> first free after them', async () => {
     const config = cfg([20000, 20001, 20002, 20003, 20004, 20005])
     expect(await allocatePort({ config, range: [20000, 20010] })).toBe(20006)
   })
 
   test('user-specified port outside range is respected but not handed out', async () => {
     const config = cfg([8080])
-    const p = await allocatePort({ config })
-    expect(p).toBe(20000)
-    // And 8080 is still tracked — an in-range request won't collide regardless.
+    const port = await allocatePort({ config })
+    expect(port).toBe(20000)
   })
 
-  test('throws port-exhausted when range is fully used', async () => {
+  test('allocatePortResult returns PortExhaustedError when range is fully used', async () => {
     const config = cfg([20000, 20001, 20002])
-    let err: unknown
-    try {
-      await allocatePort({ config, range: [20000, 20002] })
-    } catch (e) {
-      err = e
-    }
-    expect(err).toBeInstanceOf(JibError)
-    expect((err as JibError).code).toBe('port-exhausted')
+    expect(await allocatePortResult({ config, range: [20000, 20002] })).toBeInstanceOf(
+      PortExhaustedError,
+    )
+  })
+
+  test('allocatePort still throws for compatibility', async () => {
+    const config = cfg([20000, 20001, 20002])
+    await expect(allocatePort({ config, range: [20000, 20002] })).rejects.toThrow(
+      PortExhaustedError,
+    )
   })
 
   test('honors custom range bounds', async () => {
@@ -61,9 +62,9 @@ describe('allocatePort probeHost', () => {
   afterEach(async () => {
     await Promise.all(
       servers.splice(0).map(
-        (s) =>
-          new Promise<void>((r) => {
-            s.close(() => r())
+        (server) =>
+          new Promise<void>((resolve) => {
+            server.close(() => resolve())
           }),
       ),
     )
@@ -71,12 +72,12 @@ describe('allocatePort probeHost', () => {
 
   async function grabPort(): Promise<number> {
     return new Promise((resolve, reject) => {
-      const s = net.createServer()
-      s.once('error', reject)
-      s.listen(0, '127.0.0.1', () => {
-        const addr = s.address()
+      const server = net.createServer()
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', () => {
+        const addr = server.address()
         if (addr && typeof addr === 'object') {
-          servers.push(s)
+          servers.push(server)
           resolve(addr.port)
         } else {
           reject(new Error('no address'))
@@ -87,11 +88,11 @@ describe('allocatePort probeHost', () => {
 
   test('skips host-bound port and returns next free', async () => {
     const bound = await grabPort()
-    const p = await allocatePort({
+    const port = await allocatePort({
       config: { apps: {} },
       range: [bound, bound + 1],
       probeHost: true,
     })
-    expect(p).toBe(bound + 1)
+    expect(port).toBe(bound + 1)
   })
 })

@@ -1,10 +1,10 @@
 import { isDockerHubRepo } from '@jib/paths'
-import { ConfigError } from './errors.ts'
+import { ValidateConfigError } from './errors.ts'
 import type { Config } from './schema.ts'
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/
-// GitHub slug: `owner/name` — both segments [A-Za-z0-9._-], no `..`, no slashes.
+// GitHub slug: `owner/name` - both segments [A-Za-z0-9._-], no `..`, no slashes.
 const GITHUB_SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/
 const EXTERNAL_REPO_PREFIXES = ['file://', 'http://', 'https://', 'ssh://', 'git://']
 
@@ -12,7 +12,7 @@ const EXTERNAL_REPO_PREFIXES = ['file://', 'http://', 'https://', 'ssh://', 'git
  * Returns an error message if `repo` is not a supported shape, else `null`.
  * Accepted: `"local"`, `""`, an absolute path, a scheme URL, `git@host:path`,
  * or an `owner/name` GitHub slug. Rejects anything containing `..` segments
- * or embedded slashes beyond the one in the GitHub slug — those would let a
+ * or embedded slashes beyond the one in the GitHub slug - those would let a
  * maliciously-crafted config escape `$JIB_ROOT/repos/` via `repoPath`.
  */
 export function validateRepo(repo: string): string | null {
@@ -38,7 +38,7 @@ export function validateRepo(repo: string): string | null {
 /**
  * Parses a duration string like `5m`, `30s`, `1h`, `1h30m`, `1.5h`, `0s`.
  * Returns milliseconds, or `null` on parse failure. Supported units: `s`, `m`,
- * `h`. Non-negative only — `-5s`, empty strings, unit-less numbers (`5`), and
+ * `h`. Non-negative only - `-5s`, empty strings, unit-less numbers (`5`), and
  * any unknown unit all return `null`. Narrower than Go's `time.ParseDuration`
  * (no `ns`/`us`/`ms`) but covers every value jib's config actually uses.
  */
@@ -48,18 +48,18 @@ export function parseDuration(s: string): number | null {
   const re = /(\d+(?:\.\d+)?)([smh])/g
   let total = 0
   let matched = 0
-  for (const m of s.matchAll(re)) {
-    const [, n, unit] = m
+  for (const match of s.matchAll(re)) {
+    const [, n, unit] = match
     const mult = unit ? units[unit] : undefined
     if (!mult || n === undefined) return null
     total += Number.parseFloat(n) * mult
-    matched += m[0].length
+    matched += match[0].length
   }
   return matched === s.length && matched > 0 ? total : null
 }
 
-/** Runs config-level checks that zod can't express. Throws `ConfigError`. */
-export function validate(cfg: Config): void {
+/** Runs config-level checks that zod can't express. */
+export function validateConfig(cfg: Config): ValidateConfigError | undefined {
   const errs: string[] = []
 
   if (parseDuration(cfg.poll_interval) === null) {
@@ -88,14 +88,14 @@ export function validate(cfg: Config): void {
     if (app.image && app.repo !== 'local') {
       errs.push(`app '${name}': image-backed apps must use repo "local"`)
     }
-    for (const d of app.domains) {
-      if (d.host !== d.host.toLowerCase() || !DOMAIN_RE.test(d.host)) {
-        errs.push(`app '${name}': invalid hostname "${d.host}"`)
+    for (const domain of app.domains) {
+      if (domain.host !== domain.host.toLowerCase() || !DOMAIN_RE.test(domain.host)) {
+        errs.push(`app '${name}': invalid hostname "${domain.host}"`)
       }
-      if (d.ingress === 'cloudflare-tunnel') needsTunnel = true
+      if (domain.ingress === 'cloudflare-tunnel') needsTunnel = true
     }
-    for (const h of app.health ?? []) {
-      if (!h.path.startsWith('/')) {
+    for (const health of app.health ?? []) {
+      if (!health.path.startsWith('/')) {
         errs.push(`app '${name}': health check path must start with '/'`)
       }
     }
@@ -105,5 +105,11 @@ export function validate(cfg: Config): void {
     errs.push('tunnel: config required when any domain uses cloudflare-tunnel ingress')
   }
 
-  if (errs.length > 0) throw new ConfigError(errs.join('\n'))
+  return errs.length > 0 ? new ValidateConfigError(errs.join('\n')) : undefined
+}
+
+/** Runs config-level checks that zod can't express. */
+export function validate(cfg: Config): void {
+  const error = validateConfig(cfg)
+  if (error) throw error
 }

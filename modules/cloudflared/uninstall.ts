@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
+import { CloudflaredUninstallError, wrapCloudflaredError } from './errors.ts'
 import { SERVICE_NAME, UNIT_PATH } from './templates.ts'
 
 interface CloudflaredContext {
@@ -21,25 +22,30 @@ export const uninstall = async (
   ctx: CloudflaredContext,
   deps: UninstallDeps = {},
 ): Promise<void> => {
-  const log = ctx.logger
-  const dir = ctx.paths.cloudflaredDir
-  const serviceName = deps.serviceName ?? SERVICE_NAME
-  const unitPath = deps.unitPath ?? UNIT_PATH
-  const disableNow =
-    deps.disableNow ?? (() => Bun.$`sudo systemctl disable --now ${serviceName}`.nothrow().quiet())
-  const daemonReload =
-    deps.daemonReload ?? (() => Bun.$`sudo systemctl daemon-reload`.nothrow().quiet())
+  try {
+    const log = ctx.logger
+    const dir = ctx.paths.cloudflaredDir
+    const serviceName = deps.serviceName ?? SERVICE_NAME
+    const unitPath = deps.unitPath ?? UNIT_PATH
+    const disableNow =
+      deps.disableNow ??
+      (() => Bun.$`sudo systemctl disable --now ${serviceName}`.nothrow().quiet())
+    const daemonReload =
+      deps.daemonReload ?? (() => Bun.$`sudo systemctl daemon-reload`.nothrow().quiet())
 
-  log.info(`systemctl disable --now ${serviceName}`)
-  await disableNow()
+    log.info(`systemctl disable --now ${serviceName}`)
+    await disableNow()
 
-  log.info(`removing ${unitPath}`)
-  await rm(unitPath, { force: true })
+    log.info(`removing ${unitPath}`)
+    await rm(unitPath, { force: true })
 
-  const composePath = join(dir, 'docker-compose.yml')
-  log.info(`removing ${composePath}`)
-  await rm(composePath, { force: true })
+    const composePath = join(dir, 'docker-compose.yml')
+    log.info(`removing ${composePath}`)
+    await rm(composePath, { force: true })
 
-  log.info('systemctl daemon-reload')
-  await daemonReload()
+    log.info('systemctl daemon-reload')
+    await daemonReload()
+  } catch (error) {
+    throw wrapCloudflaredError(error, CloudflaredUninstallError)
+  }
 }

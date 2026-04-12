@@ -1,15 +1,25 @@
 import type { App } from '@jib/config'
+import { IngressMissingPortError } from './errors.ts'
 import type { IngressClaim, IngressOperator, IngressProgress } from './types.ts'
 
-export function buildIngressClaim(app: string, appCfg: App): IngressClaim | null {
+export function buildIngressClaim(
+  app: string,
+  appCfg: App,
+): IngressClaim | IngressMissingPortError | null {
   if (appCfg.domains.length === 0) return null
+  const domains: IngressClaim['domains'] = []
+  for (const domain of appCfg.domains) {
+    const port = getIngressPort(app, domain.host, domain.port)
+    if (port instanceof IngressMissingPortError) return port
+    domains.push({
+      host: domain.host,
+      port,
+      isTunnel: domain.ingress === 'cloudflare-tunnel',
+    })
+  }
   return {
     app,
-    domains: appCfg.domains.map((domain) => ({
-      host: domain.host,
-      port: requireIngressPort(app, domain.host, domain.port),
-      isTunnel: domain.ingress === 'cloudflare-tunnel',
-    })),
+    domains,
   }
 }
 
@@ -21,6 +31,7 @@ export async function claimIngress(
 ): Promise<void> {
   const claim = buildIngressClaim(app, appCfg)
   if (!claim) return
+  if (claim instanceof IngressMissingPortError) throw claim
   await operator.claim(claim, onProgress)
 }
 
@@ -32,7 +43,11 @@ export async function releaseIngress(
   await operator.release(app, onProgress)
 }
 
-function requireIngressPort(app: string, host: string, port: number | undefined): number {
+function getIngressPort(
+  app: string,
+  host: string,
+  port: number | undefined,
+): number | IngressMissingPortError {
   if (port !== undefined) return port
-  throw new Error(`ingress port missing for app "${app}" domain "${host}"`)
+  return new IngressMissingPortError(app, host)
 }

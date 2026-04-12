@@ -1,4 +1,5 @@
 import type { Config } from '@jib/config'
+import type { RemoveWriteConfigError } from './errors.ts'
 
 export interface RemoveParams {
   appName: string
@@ -24,5 +25,5 @@ export interface RemoveSupport {
   removeState(appName: string): Promise<void>
   removeOverride(appName: string): Promise<void>
   removeManagedCompose(appName: string): Promise<void>
-  writeConfig(configFile: string, cfg: Config): Promise<void>
+  writeConfig(configFile: string, cfg: Config): Promise<RemoveWriteConfigError | undefined>
 }

@@ -1,6 +1,6 @@
 import type { ArgsDef, CommandDef, Resolvable, SubCommandsDef } from 'citty'
 import { defineCommand, renderUsage, runCommand } from 'citty'
-import { normalizeCliError } from './errors.ts'
+import { CliError, normalizeCliError } from './errors.ts'
 import {
   canPrompt,
   configureCliRuntime,
@@ -68,6 +68,40 @@ function renderTextError(error: ReturnType<typeof normalizeCliError>): void {
   if (error.hint) writeText(process.stderr, error.hint)
 }
 
+function runtimeArgBoundary(rawArgs: string[]): number {
+  const boundary = rawArgs.indexOf('--')
+  return boundary >= 0 ? boundary : rawArgs.length
+}
+
+function prefersJsonOutput(rawArgs: string[]): boolean {
+  const boundary = runtimeArgBoundary(rawArgs)
+  for (let i = boundary - 1; i >= 0; i--) {
+    const arg = rawArgs[i]
+    if (!arg) continue
+    if (arg === '--output' && i + 1 < boundary) return rawArgs[i + 1] === 'json'
+    if (arg.startsWith('--output=')) return arg.slice('--output='.length) === 'json'
+  }
+  return process.env.JIB_OUTPUT === 'json'
+}
+
+function currentJsonOutput(): boolean {
+  try {
+    return isJsonOutput()
+  } catch {
+    return false
+  }
+}
+
+function exitWithError(error: unknown, jsonOutput = currentJsonOutput()): void {
+  const normalized = normalizeCliError(error)
+  if (jsonOutput) {
+    printJson(process.stderr, { ok: false, error: normalized })
+  } else {
+    renderTextError(normalized)
+  }
+  process.exit(normalized.exitCode)
+}
+
 function printSuccess(value: unknown): void {
   if (isJsonOutput()) {
     printJson(process.stdout, { ok: true, data: value ?? null })
@@ -94,10 +128,14 @@ export async function runCommandApp(options: CommandAppOptions): Promise<void> {
   }
   if (options.args) mainDef.args = options.args
   const main = defineCommand(mainDef)
+  const rawArgs = process.argv.slice(2)
 
   try {
-    const rawArgs = process.argv.slice(2)
-    configureCliRuntime(rawArgs)
+    const runtime = configureCliRuntime(rawArgs)
+    if (runtime instanceof CliError) {
+      exitWithError(runtime, prefersJsonOutput(rawArgs))
+      return
+    }
     const sanitizedArgs = stripCliRuntimeArgs(rawArgs)
 
     if (sanitizedArgs.includes('--help') || sanitizedArgs.includes('-h')) {
@@ -125,12 +163,6 @@ export async function runCommandApp(options: CommandAppOptions): Promise<void> {
     const { result } = await runCommand(leaf as CommandDef, { rawArgs: leafArgs })
     printSuccess(result)
   } catch (error) {
-    const normalized = normalizeCliError(error)
-    if (isJsonOutput()) {
-      printJson(process.stderr, { ok: false, error: normalized })
-    } else {
-      renderTextError(normalized)
-    }
-    process.exit(normalized.exitCode)
+    exitWithError(error)
   }
 }

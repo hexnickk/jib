@@ -3,7 +3,9 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Paths } from '@jib/paths'
 import { openDb } from '@jib/state'
-import { migrations, runJibMigrations } from './index.ts'
+import type { JibDb } from '@jib/state'
+import { type RunMigrationError, RunPendingMigrationsError, errorMessage } from './errors.ts'
+import { migrations, runJibMigrationsResult } from './index.ts'
 
 const GROUP = 'jib'
 
@@ -31,18 +33,46 @@ export function userInGroup(
   return result.stdout.toString().trim().split(/\s+/).includes(group)
 }
 
-export async function runPendingMigrations(paths: Paths): Promise<MigrationRunResult> {
+export async function runPendingMigrationsResult(
+  paths: Paths,
+): Promise<MigrationRunResult | RunMigrationError | RunPendingMigrationsError> {
   const sudoUser = process.env.SUDO_USER
   const hadJibGroup = sudoUser ? userInGroup(sudoUser) : false
-  await mkdir(paths.root, { recursive: true, mode: 0o750 })
-  await mkdir(paths.stateDir, { recursive: true, mode: 0o750 })
-  const appliedMigrations = await runJibMigrations(
-    { db: openDb(paths.stateDir), paths },
-    migrations,
-  )
+
+  try {
+    await mkdir(paths.root, { recursive: true, mode: 0o750 })
+    await mkdir(paths.stateDir, { recursive: true, mode: 0o750 })
+  } catch (error) {
+    return new RunPendingMigrationsError(
+      `failed to prepare migration directories: ${errorMessage(error)}`,
+      { cause: error instanceof Error ? error : undefined },
+    )
+  }
+
+  let db: JibDb
+  try {
+    db = openDb(paths.stateDir)
+  } catch (error) {
+    return new RunPendingMigrationsError(
+      `failed to open migration database: ${errorMessage(error)}`,
+      {
+        cause: error instanceof Error ? error : undefined,
+      },
+    )
+  }
+
+  const appliedMigrations = await runJibMigrationsResult({ db, paths }, migrations)
+  if (appliedMigrations instanceof Error) return appliedMigrations
+
   const hasJibGroup = sudoUser ? userInGroup(sudoUser) : false
   return {
     appliedMigrations,
     sessionReloadRecommended: Boolean(sudoUser && !hadJibGroup && hasJibGroup),
   }
+}
+
+export async function runPendingMigrations(paths: Paths): Promise<MigrationRunResult> {
+  const result = await runPendingMigrationsResult(paths)
+  if (result instanceof Error) throw result
+  return result
 }

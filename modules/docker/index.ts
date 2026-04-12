@@ -16,13 +16,33 @@ export {
   parseComposeServices,
 } from './parse.ts'
 export { findUnsafeBindMounts, type UnsafeBindMount } from './volume-safety.ts'
-export { composeFor } from './compose-for.ts'
+export { composeFor, composeForResult } from './compose-for.ts'
+export {
+  DockerAppHasNoServicesError,
+  DockerAppNotFoundError,
+  DockerDomainServiceNotFoundError,
+  DockerDomainServiceRequiredError,
+  DockerServiceSelectionRequiredError,
+  ExecArgsMissingAppError,
+  ExecArgsMissingCommandError,
+  RunArgsMissingAppError,
+} from './errors.ts'
 export {
   type ComposeInspection,
   type ComposeInspectionCode,
   ComposeInspectionError,
   discoverComposeFiles,
   inspectComposeApp,
+  inspectComposeAppResult,
   resolveFromCompose,
+  resolveFromComposeResult,
 } from './resolve.ts'
-export { type ExecParts, parseExecArgs, parseRunArgs, handleShell } from './shell.ts'
+export {
+  type ExecParts,
+  handleShell,
+  handleShellResult,
+  parseExecArgs,
+  parseExecArgsResult,
+  parseRunArgs,
+  parseRunArgsResult,
+} from './shell.ts'

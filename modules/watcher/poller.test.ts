@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { createLogger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
+import { WatcherDeployAppError, WatcherSyncAppError } from './errors.ts'
 import { type PollAppDeps, parsePollInterval, pollApp, runPoller } from './poller.ts'
 
 function mkCfg(overrides: Partial<Config> = {}): Config {
@@ -29,6 +30,7 @@ describe('parsePollInterval', () => {
     expect(parsePollInterval('1.5h')).toBe(5_400_000)
     expect(parsePollInterval('1h30m')).toBe(5_400_000)
   })
+
   test('defaults to 5m on garbage', () => {
     expect(parsePollInterval('nonsense')).toBe(300_000)
   })
@@ -53,16 +55,22 @@ describe('pollApp', () => {
       _paths,
       appName,
       prepared,
+      _log,
     ) => {
       deploys.push({ app: appName, ...prepared })
+      return undefined
     }
 
-    await pollApp(cfg, paths, 'demo', seen, log, { lsRemote, syncApp, deployPrepared })
+    expect(
+      await pollApp(cfg, paths, 'demo', seen, log, { lsRemote, syncApp, deployPrepared }),
+    ).toBeUndefined()
     expect(deploys).toHaveLength(1)
     expect(deploys[0]).toMatchObject({ app: 'demo', workdir: '/tmp/prepared-demo', sha })
 
-    await pollApp(cfg, paths, 'demo', seen, log, { lsRemote, syncApp, deployPrepared })
-    expect(deploys).toHaveLength(1) // unchanged
+    expect(
+      await pollApp(cfg, paths, 'demo', seen, log, { lsRemote, syncApp, deployPrepared }),
+    ).toBeUndefined()
+    expect(deploys).toHaveLength(1)
   })
 
   test('failed deploy does not mark the sha as seen', async () => {
@@ -72,7 +80,24 @@ describe('pollApp', () => {
     const log = createLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
 
-    await pollApp(cfg, paths, 'demo', seen, log, {
+    const error = await pollApp(cfg, paths, 'demo', seen, log, {
+      lsRemote: async () => sha,
+      syncApp: async () => ({ workdir: '/tmp/prepared-demo', sha }),
+      deployPrepared: async () => new WatcherDeployAppError('demo', new Error('deploy boom')),
+    })
+
+    expect(error).toBeInstanceOf(WatcherDeployAppError)
+    expect(seen.has('demo')).toBe(false)
+  })
+
+  test('thrown deploy failure returns a typed watcher error', async () => {
+    const cfg = mkCfg()
+    const paths = getPaths('/tmp/jib-root-test')
+    const seen = new Map<string, string>()
+    const log = createLogger('test')
+    const sha = 'abc123abc123abc123abc123abc123abc123abc1'
+
+    const error = await pollApp(cfg, paths, 'demo', seen, log, {
       lsRemote: async () => sha,
       syncApp: async () => ({ workdir: '/tmp/prepared-demo', sha }),
       deployPrepared: async () => {
@@ -80,6 +105,27 @@ describe('pollApp', () => {
       },
     })
 
+    expect(error).toBeInstanceOf(WatcherDeployAppError)
+    expect(error?.message).toContain('deploy boom')
+    expect(seen.has('demo')).toBe(false)
+  })
+
+  test('sync failure returns a typed watcher error', async () => {
+    const cfg = mkCfg()
+    const paths = getPaths('/tmp/jib-root-test')
+    const seen = new Map<string, string>()
+    const log = createLogger('test')
+    const sha = 'abc123abc123abc123abc123abc123abc123abc1'
+
+    const error = await pollApp(cfg, paths, 'demo', seen, log, {
+      lsRemote: async () => sha,
+      syncApp: async () => {
+        throw new Error('sync boom')
+      },
+    })
+
+    expect(error).toBeInstanceOf(WatcherSyncAppError)
+    expect(error?.message).toContain('sync boom')
     expect(seen.has('demo')).toBe(false)
   })
 })

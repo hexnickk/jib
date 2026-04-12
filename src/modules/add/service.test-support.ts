@@ -6,8 +6,8 @@ import {
   type AddFlowParams,
   type AddFlowState,
   type AddPlanner,
-  AddService,
   type AddSupport,
+  runAdd,
 } from './index.ts'
 
 const baseCfg: Config = {
@@ -174,7 +174,11 @@ export function makeDeps(
     },
   }
 
-  const flow = new AddService(support, planner, observer)
+  const flow = {
+    run(params: AddFlowParams) {
+      return runAdd({ support, planner, observer }, params)
+    },
+  }
 
   return {
     flow,

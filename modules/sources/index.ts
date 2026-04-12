@@ -4,6 +4,17 @@ export {
   preflightSourceSelection,
   setupSourceRef,
 } from './flow.ts'
+export {
+  SourceDriverNotRegisteredError,
+  SourceLocalCheckoutError,
+  SourceLocalRepoError,
+  SourceMissingAppError,
+  SourceMissingConfigError,
+  SourceProbeError,
+  SourceRemoteResolveError,
+  SourceRemoteSyncError,
+  SourceWorkdirPrepareError,
+} from './errors.ts'
 export type {
   DriverSourceStatus,
   InspectionCheckout,
@@ -17,4 +28,14 @@ export type {
   SourceStatus,
   SourceTarget,
 } from './types.ts'
-export { cloneForInspection, probe, removeCheckout, resolve, syncApp } from './service.ts'
+export {
+  cloneForInspection,
+  cloneSourceForInspection,
+  probe,
+  probeSource,
+  removeCheckout,
+  resolve,
+  resolveSource,
+  syncApp,
+  syncSource,
+} from './service.ts'

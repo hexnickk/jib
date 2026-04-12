@@ -1,5 +1,6 @@
 import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { NginxIngressReloadError } from '../../errors.ts'
 import { type ExecFn, getExec } from '../../exec.ts'
 import type { IngressClaim, IngressOperator } from '../../types.ts'
 import { nginxAppConfDir, nginxConfFilename, renderNginxSite } from './templates.ts'
@@ -35,8 +36,8 @@ export function createNginxIngressOperator(deps: NginxIngressDeps): IngressOpera
         onProgress?.({ app: claim.app, message: `writing ${claim.domains.length} config(s)` })
         await renderAndWrite(deps.nginxDir, claim, certExists)
         onProgress?.({ app: claim.app, message: 'running nginx -t + reload' })
-        const result = await reloadNginx(exec)
-        if (!result.ok) throw new Error(result.error)
+        const reloadError = await reloadNginx(exec)
+        if (reloadError) throw reloadError
         await discardStagedAppDir(staged)
       } catch (error) {
         await restoreStagedAppDir(staged)
@@ -48,8 +49,8 @@ export function createNginxIngressOperator(deps: NginxIngressDeps): IngressOpera
       if (!staged.existed) return
       try {
         onProgress?.({ app, message: `removing configs for ${app}` })
-        const result = await reloadNginx(exec)
-        if (!result.ok) throw new Error(result.error)
+        const reloadError = await reloadNginx(exec)
+        if (reloadError) throw reloadError
         await discardStagedAppDir(staged)
       } catch (error) {
         await restoreStagedAppDir(staged)
@@ -109,14 +110,14 @@ async function discardStagedAppDir(staged: StagedAppDir): Promise<void> {
   await rm(staged.backup, { recursive: true, force: true })
 }
 
-async function reloadNginx(exec: ExecFn): Promise<{ ok: true } | { ok: false; error: string }> {
+async function reloadNginx(exec: ExecFn): Promise<NginxIngressReloadError | undefined> {
   const test = await exec(['sudo', NGINX_BIN, '-t'])
-  if (!test.ok) return { ok: false, error: `nginx -t failed: ${test.stderr.trim()}` }
+  if (!test.ok) return new NginxIngressReloadError(`nginx -t failed: ${test.stderr.trim()}`)
   const reload = await exec(['sudo', 'systemctl', 'reload', 'nginx'])
   if (!reload.ok) {
-    return { ok: false, error: `systemctl reload nginx failed: ${reload.stderr.trim()}` }
+    return new NginxIngressReloadError(`systemctl reload nginx failed: ${reload.stderr.trim()}`)
   }
-  return { ok: true }
+  return undefined
 }
 
 function isMissingPathError(error: unknown): boolean {

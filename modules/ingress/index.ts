@@ -1,5 +1,6 @@
 export { getExec } from './exec.ts'
 export { createIngressOperator, defaultIngressBackend } from './backends/index.ts'
+export { IngressMissingPortError, NginxIngressReloadError } from './errors.ts'
 export { buildIngressClaim, claimIngress, releaseIngress } from './service.ts'
 export { install } from './install.ts'
 export { default as manifest } from './manifest.ts'

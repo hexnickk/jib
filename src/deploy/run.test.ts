@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { setCliRuntime } from '@jib/cli'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
-import { runDeploy } from './run.ts'
+import { DeployPrepareError } from './errors.ts'
+import { runDeploy, runDeployResult } from './run.ts'
 
 const cfg: Config = {
   config_version: 3,
@@ -58,6 +59,21 @@ describe('runDeploy', () => {
       }),
     ).rejects.toMatchObject({
       code: 'deploy_failed',
+      message: 'git clone failed',
+    })
+  })
+
+  test('returns a typed prepare error instead of throwing for expected sync failures', async () => {
+    setCliRuntime({ output: 'json' })
+    const result = await runDeployResult(cfg, paths, 'demo', undefined, 1000, {
+      sync: async () => {
+        throw new Error('git clone failed')
+      },
+    })
+
+    expect(result).toBeInstanceOf(DeployPrepareError)
+    expect(result).toMatchObject({
+      code: 'deploy_prepare_failed',
       message: 'git clone failed',
     })
   })

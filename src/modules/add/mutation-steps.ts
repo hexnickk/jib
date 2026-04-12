@@ -3,6 +3,7 @@ import { configEntriesToRuntime } from './config-entries.ts'
 import {
   type AddFlowError,
   ClaimIngressError,
+  ConfigRollbackError,
   ConfigWriteError,
   SecretWriteError,
 } from './flow-errors.ts'
@@ -35,7 +36,7 @@ export const writeConfigStep: Step<AddRunContext, { configWritten: true }, AddFl
       delete rollbackApps[ctx.params.appName]
       await ctx.support.writeConfig(ctx.params.configFile, { ...current, apps: rollbackApps })
     } catch (cause) {
-      return new Error(cause instanceof Error ? cause.message : String(cause))
+      return new ConfigRollbackError(cause)
     }
   },
 }

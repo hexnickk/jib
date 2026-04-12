@@ -1,12 +1,25 @@
-import { describe, expect, test } from 'bun:test'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { afterEach, describe, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { App } from '@jib/config'
-import { inspectComposeApp, resolveFromCompose } from './resolve.ts'
+import { DockerDomainServiceNotFoundError, DockerDomainServiceRequiredError } from './errors.ts'
+import {
+  inspectComposeApp,
+  inspectComposeAppResult,
+  resolveFromCompose,
+  resolveFromComposeResult,
+} from './resolve.ts'
+
+const tmpDirs: string[] = []
+
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
 
 function fixture(yaml: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
+  tmpDirs.push(dir)
   writeFileSync(join(dir, 'docker-compose.yml'), yaml)
   return dir
 }
@@ -47,12 +60,15 @@ describe('resolveFromCompose', () => {
     expect(out.domains[0]?.container_port).toBe(1234)
   })
 
-  test('multi-service compose without =service throws with service list', () => {
+  test('multi-service compose without =service returns a typed result error', () => {
     const dir = fixture(
       'services:\n  web:\n    image: nginx\n  api:\n    image: api\n    ports: ["3000:3000"]\n',
     )
     const app = mkApp({ domains: [{ host: 'demo.example.com', port: 20000 }] })
-    expect(() => resolveFromCompose(app, dir)).toThrow(/multiple services.*web.*api/)
+
+    const result = resolveFromComposeResult(app, dir)
+
+    expect(result).toBeInstanceOf(DockerDomainServiceRequiredError)
   })
 
   test('multi-service compose with =service routes correctly', () => {
@@ -70,12 +86,15 @@ describe('resolveFromCompose', () => {
     expect(out.domains[1]?.container_port).toBe(3000)
   })
 
-  test('unknown service name throws', () => {
+  test('unknown service name returns a typed result error', () => {
     const dir = fixture('services:\n  web:\n    image: nginx\n')
     const app = mkApp({
       domains: [{ host: 'demo.example.com', port: 20000, service: 'ghost' }],
     })
-    expect(() => resolveFromCompose(app, dir)).toThrow(/no service "ghost"/)
+
+    const result = resolveFromComposeResult(app, dir)
+
+    expect(result).toBeInstanceOf(DockerDomainServiceNotFoundError)
   })
 
   test('worker-only app with no domains only validates compose', () => {
@@ -94,6 +113,7 @@ describe('resolveFromCompose', () => {
 
   test('missing compose file produces a clean error', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
+    tmpDirs.push(dir)
     const app = mkApp({ domains: [{ host: 'demo.example.com', port: 20000 }] })
     expect(() => resolveFromCompose(app, dir)).toThrow(/no compose file found/)
   })
@@ -107,6 +127,7 @@ describe('resolveFromCompose', () => {
 
   test('inspectComposeApp discovers compose.yml when compose is omitted', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
+    tmpDirs.push(dir)
     writeFileSync(join(dir, 'compose.yml'), 'services:\n  web:\n    image: nginx\n')
 
     const inspection = inspectComposeApp({ compose: undefined }, dir)
@@ -117,6 +138,7 @@ describe('resolveFromCompose', () => {
 
   test('inspectComposeApp accepts absolute compose paths', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
+    tmpDirs.push(dir)
     const composePath = join(dir, 'managed.yml')
     writeFileSync(composePath, 'services:\n  web:\n    image: nginx\n')
 
@@ -128,9 +150,20 @@ describe('resolveFromCompose', () => {
 
   test('inspectComposeApp reports an explicit missing compose path clearly', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
+    tmpDirs.push(dir)
 
     expect(() => inspectComposeApp({ compose: ['docker-compose.yml'] }, dir)).toThrow(
       /compose file not found: docker-compose.yml/,
     )
+  })
+
+  test('inspectComposeAppResult returns a typed error for a missing compose path', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
+    tmpDirs.push(dir)
+
+    const result = inspectComposeAppResult({ compose: ['docker-compose.yml'] }, dir)
+
+    expect(result).toBeInstanceOf(Error)
+    expect(result).toMatchObject({ code: 'compose_not_found' })
   })
 })

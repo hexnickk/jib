@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadConfig } from './load.ts'
+import { ParseConfigError, ReadConfigError } from './errors.ts'
+import { loadConfig, loadConfigResult } from './load.ts'
 import type { Config } from './schema.ts'
 import { writeConfig } from './write.ts'
 
@@ -41,15 +42,20 @@ describe('loadConfig/writeConfig', () => {
     })
   })
 
-  test('throws ConfigError on missing file', async () => {
-    await expect(loadConfig('/no/such/file.yml')).rejects.toThrow(/reading config/)
+  test('loadConfigResult returns ReadConfigError on missing file', async () => {
+    const loaded = await loadConfigResult('/no/such/file.yml')
+    expect(loaded).toBeInstanceOf(ReadConfigError)
   })
 
-  test('throws ConfigError on bad YAML', async () => {
+  test('loadConfigResult returns ParseConfigError on bad YAML', async () => {
     await withTmp(async (dir) => {
       const path = join(dir, 'bad.yml')
-      await Bun.write(path, ':::::\n  not yaml')
-      await expect(loadConfig(path)).rejects.toThrow()
+      await Bun.write(path, 'foo: [bar')
+      expect(await loadConfigResult(path)).toBeInstanceOf(ParseConfigError)
     })
+  })
+
+  test('loadConfig still throws ConfigError for compatibility', async () => {
+    await expect(loadConfig('/no/such/file.yml')).rejects.toThrow(/reading config/)
   })
 })

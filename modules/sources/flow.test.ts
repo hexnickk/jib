@@ -89,7 +89,7 @@ describe('source recovery', () => {
         promptSelect: async () => 'existing:keyy',
         probe: async (_cfg: Config, _paths: Paths, target: SourceTarget) => {
           probed.push(target.source ?? 'none')
-          if (!target.source) throw new Error('git clone: Repository not found')
+          if (!target.source) return new Error('git clone: Repository not found')
           return {
             branch: 'main',
             workdir: '/tmp/demo',
@@ -106,6 +106,32 @@ describe('source recovery', () => {
     expect(result).toEqual({ cfg, source: 'keyy', branch: 'main' })
     expect(loads).toEqual([paths.configFile])
     expect(probed).toEqual(['none', 'keyy'])
+  })
+
+  test('preflightSourceSelection still recovers when the probe dependency throws', async () => {
+    const result = await preflightSourceSelection(
+      'demo',
+      cfg,
+      paths,
+      'acme/private',
+      undefined,
+      undefined,
+      {
+        isInteractive: () => true,
+        promptSelect: async () => 'existing:keyy',
+        probe: async (_cfg: Config, _paths: Paths, target: SourceTarget) => {
+          if (!target.source) throw new Error('git clone: Repository not found')
+          return {
+            branch: 'main',
+            workdir: '/tmp/demo',
+            sha: 'abc123abc123abc123abc123abc123abc123abc1',
+          }
+        },
+        loadConfig: async () => cfg,
+      },
+    )
+
+    expect(result).toEqual({ cfg, source: 'keyy', branch: 'main' })
   })
 
   test('non-auth failures do not trigger source recovery', async () => {

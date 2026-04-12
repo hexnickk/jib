@@ -6,8 +6,8 @@ import type { Config } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
 import { getPaths, managedComposePath, repoPath } from '@jib/paths'
 import { $ } from 'bun'
-import { AddService } from './service.ts'
-import { DefaultAddSupport } from './support.ts'
+import { runAdd } from './service.ts'
+import { createDefaultAddSupport } from './support.ts'
 import type { AddPlanner, GuidedInputs } from './types.ts'
 
 async function makeUpstream(): Promise<string> {
@@ -37,7 +37,7 @@ function configYaml(): string {
   ].join('\n')
 }
 
-describe('AddService with DefaultAddSupport', () => {
+describe('runAdd with createDefaultAddSupport', () => {
   test('real support rolls back checkout, secrets, config, and managed compose after late failure', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-add-root-'))
     const upstream = await makeUpstream()
@@ -81,7 +81,7 @@ describe('AddService with DefaultAddSupport', () => {
       await mkdir(paths.composeDir, { recursive: true })
       await writeFile(managedCompose, 'services:\n  web:\n    image: nginx\n')
 
-      const support = new DefaultAddSupport({
+      const support = createDefaultAddSupport({
         paths,
         claimIngress: async () => {
           throw new Error('claim ingress failed')
@@ -93,24 +93,25 @@ describe('AddService with DefaultAddSupport', () => {
         buildResolvedApp: async () => finalApp,
         confirmPlan: async () => undefined,
       }
-      const service = new AddService(support, planner)
-
-      const result = await service.run({
-        appName: 'blog',
-        args: {},
-        cfg,
-        configFile: paths.configFile,
-        inputs: {
-          repo: upstream,
-          persistPaths: [],
-          ingressDefault: 'direct',
-          parsedDomains: [],
-          configEntries: [],
-          healthChecks: [],
+      const result = await runAdd(
+        { support, planner },
+        {
+          appName: 'blog',
+          args: {},
+          cfg,
+          configFile: paths.configFile,
+          inputs: {
+            repo: upstream,
+            persistPaths: [],
+            ingressDefault: 'direct',
+            parsedDomains: [],
+            configEntries: [],
+            healthChecks: [],
+          },
+          paths,
+          draftApp: { repo: upstream, branch: 'main', domains: [], env_file: '.env' },
         },
-        paths,
-        draftApp: { repo: upstream, branch: 'main', domains: [], env_file: '.env' },
-      })
+      )
 
       expect(result).toBeInstanceOf(Error)
       expect((result as Error).message).toBe('claim ingress failed')

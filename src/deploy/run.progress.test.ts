@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { setCliRuntime } from '@jib/cli'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
-import { runDeploy } from './run.ts'
+import { DeployExecuteError, DeployTimeoutError } from './errors.ts'
+import { runDeploy, runDeployResult } from './run.ts'
 
 const cfg: Config = {
   config_version: 3,
@@ -50,6 +51,45 @@ describe('runDeploy progress and timeout', () => {
       code: 'deploy_failed',
       message: 'deploy timed out after 5ms',
       hint: 'check docker compose output, then retry `jib deploy ...`',
+    })
+  })
+
+  test('returns a typed timeout error from the result-first api', async () => {
+    setCliRuntime({ output: 'json' })
+    const result = await runDeployResult(cfg, paths, 'demo', undefined, 5, {
+      sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
+      createEngine: () =>
+        ({
+          deploy: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 50))
+            return { deployedSHA: 'deadbeef12345678', durationMs: 50 }
+          },
+        }) as never,
+    })
+
+    expect(result).toBeInstanceOf(DeployTimeoutError)
+    expect(result).toMatchObject({
+      code: 'deploy_timeout',
+      message: 'deploy timed out after 5ms',
+    })
+  })
+
+  test('returns a typed execute error when deploy throws before returning a promise', async () => {
+    setCliRuntime({ output: 'json' })
+    const result = await runDeployResult(cfg, paths, 'demo', undefined, 1000, {
+      sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
+      createEngine: () =>
+        ({
+          deploy: () => {
+            throw new Error('engine setup failed')
+          },
+        }) as never,
+    })
+
+    expect(result).toBeInstanceOf(DeployExecuteError)
+    expect(result).toMatchObject({
+      code: 'deploy_execute_failed',
+      message: 'engine setup failed',
     })
   })
 

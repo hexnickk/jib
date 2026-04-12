@@ -4,8 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
-import { install } from './install.ts'
-import { uninstall } from './uninstall.ts'
+import { CloudflaredInstallError, CloudflaredUninstallError, install, uninstall } from './index.ts'
 
 const serviceName = 'jib-cloudflared.test.service'
 
@@ -94,6 +93,75 @@ describe('cloudflared install/uninstall', () => {
       expect(
         await stat(join(paths.cloudflaredDir, 'docker-compose.yml')).catch(() => null),
       ).toBeNull()
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test('install wraps daemon reload failures with a typed error and cause', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
+    const paths = getPaths(root)
+    const cause = new Error('reload failed')
+
+    try {
+      await expect(
+        install(
+          { logger, paths },
+          {
+            unitPath,
+            daemonReload: async () => {
+              throw cause
+            },
+          },
+        ),
+      ).rejects.toMatchObject({
+        cause,
+        message: 'reload failed',
+        name: 'CloudflaredInstallError',
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test('install does not double-wrap typed install errors', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
+    const paths = getPaths(root)
+    const error = new CloudflaredInstallError('already wrapped')
+
+    try {
+      await expect(
+        install(
+          { logger, paths },
+          {
+            unitPath,
+            daemonReload: async () => {
+              throw error
+            },
+          },
+        ),
+      ).rejects.toBe(error)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test('uninstall wraps disable failures with a typed error', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
+    const paths = getPaths(root)
+
+    try {
+      await expect(
+        uninstall(
+          { logger, paths },
+          {
+            unitPath,
+            disableNow: async () => {
+              throw new Error('disable failed')
+            },
+          },
+        ),
+      ).rejects.toBeInstanceOf(CloudflaredUninstallError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { ConfigError } from './errors.ts'
+import { ValidateConfigError } from './errors.ts'
 import { ConfigSchema } from './schema.ts'
-import { parseDuration, validate, validateRepo } from './validate.ts'
+import { parseDuration, validate, validateConfig, validateRepo } from './validate.ts'
 
 describe('parseDuration', () => {
   test('parses seconds, minutes, hours', () => {
@@ -67,12 +67,12 @@ describe('validateRepo', () => {
 })
 
 describe('validate', () => {
-  test('accepts valid config', () => {
-    expect(() => validate(base())).not.toThrow()
+  test('validateConfig accepts valid config', () => {
+    expect(validateConfig(base())).toBeUndefined()
   })
 
-  test('rejects invalid poll_interval', () => {
-    expect(() => validate(base({ poll_interval: 'forever' }))).toThrow(ConfigError)
+  test('validateConfig returns typed errors for invalid configs', () => {
+    expect(validateConfig(base({ poll_interval: 'forever' }))).toBeInstanceOf(ValidateConfigError)
   })
 
   test('requires tunnel when domain uses cloudflare-tunnel', () => {
@@ -84,7 +84,9 @@ describe('validate', () => {
         },
       },
     })
-    expect(() => validate(cfg)).toThrow(/tunnel/)
+    const error = validateConfig(cfg)
+    expect(error).toBeInstanceOf(ValidateConfigError)
+    expect(error?.message).toContain('tunnel')
   })
 
   test('accepts tunnel-ingress when tunnel config present', () => {
@@ -97,7 +99,7 @@ describe('validate', () => {
         },
       },
     })
-    expect(() => validate(cfg)).not.toThrow()
+    expect(validateConfig(cfg)).toBeUndefined()
   })
 
   test('accepts app with matching source', () => {
@@ -111,7 +113,11 @@ describe('validate', () => {
         },
       },
     })
-    expect(() => validate(cfg)).not.toThrow()
+    expect(validateConfig(cfg)).toBeUndefined()
+  })
+
+  test('validate still throws for compatibility', () => {
+    expect(() => validate(base({ poll_interval: 'forever' }))).toThrow(ValidateConfigError)
   })
 
   test('rejects repo with ".." traversal', () => {
@@ -120,7 +126,7 @@ describe('validate', () => {
         web: { repo: '../../etc/passwd', domains: [{ host: 'example.com', port: 80 }] },
       },
     })
-    expect(() => validate(cfg)).toThrow(/repo/)
+    expect(validateConfig(cfg)?.message).toContain('repo')
   })
 
   test('rejects invalid app name', () => {
@@ -129,7 +135,7 @@ describe('validate', () => {
         Bad_Name: { repo: 'x/y', domains: [{ host: 'example.com', port: 80 }] },
       },
     })
-    expect(() => validate(cfg)).toThrow(/name must match/)
+    expect(validateConfig(cfg)?.message).toContain('name must match')
   })
 
   test('rejects image-backed app when repo is not local', () => {
@@ -142,6 +148,6 @@ describe('validate', () => {
         },
       },
     })
-    expect(() => validate(cfg)).toThrow(/repo "local"/)
+    expect(validateConfig(cfg)?.message).toContain('repo "local"')
   })
 })
