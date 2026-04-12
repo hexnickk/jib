@@ -6,7 +6,8 @@ export interface CloudflaredStatus {
   tunnelId: string | null
 }
 
-export function getCloudflaredStatus(config: Config): CloudflaredStatus {
+/** Reads the Cloudflare Tunnel status block from config. */
+export function cloudflaredReadStatus(config: Config): CloudflaredStatus {
   if (!config.tunnel || config.tunnel.provider !== 'cloudflare') {
     return { configured: false, tunnelId: null, accountId: null }
   }

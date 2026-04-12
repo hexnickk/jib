@@ -2,36 +2,42 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
 import { type Paths, credsPath } from '@jib/paths'
-import { CloudflaredInstallError, wrapCloudflaredError } from './errors.ts'
-import { UNIT_PATH, composeYaml, systemdUnit } from './templates.ts'
+import { CloudflaredInstallError, cloudflaredWrapError } from './errors.ts'
+import {
+  CLOUDFLARED_UNIT_PATH,
+  cloudflaredComposeYaml,
+  cloudflaredSystemdUnit,
+} from './templates.ts'
 
 interface CloudflaredContext {
   logger: Logger
   paths: Paths
 }
 
-interface InstallDeps {
-  composeYaml?: typeof composeYaml
-  systemdUnit?: typeof systemdUnit
+interface CloudflaredInstallDeps {
+  composeYaml?: typeof cloudflaredComposeYaml
+  systemdUnit?: typeof cloudflaredSystemdUnit
   unitPath?: string
   daemonReload?: () => Promise<unknown>
 }
 
 /**
  * Writes the compose file + systemd unit under `$JIB_ROOT/cloudflared/` but
- * does NOT enable or start the service. cloudflared requires a tunnel token
- * to run; the service is enabled+started only after the user provides a
- * token via `jib init` (tunnel mode) or `jib cloudflared setup`.
+ * does NOT enable or start the service. Module install hooks still throw on
+ * failure because the init hook contract is `Promise<void>`.
  */
-export const install = async (ctx: CloudflaredContext, deps: InstallDeps = {}): Promise<void> => {
+export async function cloudflaredInstall(
+  ctx: CloudflaredContext,
+  deps: CloudflaredInstallDeps = {},
+): Promise<void> {
   try {
     const log = ctx.logger
     const dir = ctx.paths.cloudflaredDir
     const tunnelEnvPath = credsPath(ctx.paths, 'cloudflare', 'tunnel.env')
     const vars = { cloudflaredDir: dir, tunnelEnvPath }
-    const renderCompose = deps.composeYaml ?? composeYaml
-    const renderUnit = deps.systemdUnit ?? systemdUnit
-    const unitPath = deps.unitPath ?? UNIT_PATH
+    const renderCompose = deps.composeYaml ?? cloudflaredComposeYaml
+    const renderUnit = deps.systemdUnit ?? cloudflaredSystemdUnit
+    const unitPath = deps.unitPath ?? CLOUDFLARED_UNIT_PATH
     const daemonReload = deps.daemonReload ?? (() => Bun.$`sudo systemctl daemon-reload`.quiet())
 
     log.info(`creating ${dir}`)
@@ -46,10 +52,7 @@ export const install = async (ctx: CloudflaredContext, deps: InstallDeps = {}): 
 
     log.info('systemctl daemon-reload')
     await daemonReload()
-    // NOT enabled — cloudflared can't run without a tunnel token. The token
-    // is stored by `jib init` or `jib cloudflared setup`, which also
-    // enables + starts the service.
   } catch (error) {
-    throw wrapCloudflaredError(error, CloudflaredInstallError)
+    throw cloudflaredWrapError(error, CloudflaredInstallError)
   }
 }

@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { SERVICE_NAME, UNIT_PATH, composeYaml, systemdUnit } from './templates.ts'
+import {
+  CLOUDFLARED_SERVICE_NAME,
+  CLOUDFLARED_UNIT_PATH,
+  cloudflaredComposeYaml,
+  cloudflaredSystemdUnit,
+} from './templates.ts'
 
 const vars = {
   cloudflaredDir: '/opt/jib/cloudflared',
@@ -7,18 +12,17 @@ const vars = {
 }
 
 describe('cloudflared templates', () => {
-  test('composeYaml uses env_file, NOT a volume mount (CLAUDE.md secrets rule)', () => {
-    const out = composeYaml(vars)
+  test('cloudflaredComposeYaml uses env_file, NOT a volume mount (CLAUDE.md secrets rule)', () => {
+    const out = cloudflaredComposeYaml(vars)
     expect(out).toContain('env_file:')
     expect(out).toContain(vars.tunnelEnvPath)
-    // No raw volume mount of the secret file.
     expect(out).not.toMatch(/volumes:\s*\n\s*-\s*.*tunnel\.env/)
     expect(out).toContain('image: cloudflare/cloudflared:latest')
     expect(out).toContain('network_mode: host')
   })
 
-  test('systemdUnit templates the cloudflared dir into ExecStart/ExecStop', () => {
-    const out = systemdUnit(vars)
+  test('cloudflaredSystemdUnit templates the cloudflared dir into ExecStart/ExecStop', () => {
+    const out = cloudflaredSystemdUnit(vars)
     expect(out).toContain('/opt/jib/cloudflared/docker-compose.yml')
     expect(out).toContain('ExecStart=')
     expect(out).toContain('ExecStop=')
@@ -29,12 +33,12 @@ describe('cloudflared templates', () => {
       cloudflaredDir: '/srv/jib/cloudflared',
       tunnelEnvPath: '/srv/jib/secrets/_jib/cloudflare/tunnel.env',
     }
-    expect(composeYaml(custom)).toContain('/srv/jib/secrets/_jib/cloudflare/tunnel.env')
-    expect(systemdUnit(custom)).toContain('/srv/jib/cloudflared/docker-compose.yml')
+    expect(cloudflaredComposeYaml(custom)).toContain('/srv/jib/secrets/_jib/cloudflare/tunnel.env')
+    expect(cloudflaredSystemdUnit(custom)).toContain('/srv/jib/cloudflared/docker-compose.yml')
   })
 
   test('service name + unit path constants are stable', () => {
-    expect(SERVICE_NAME).toBe('jib-cloudflared.service')
-    expect(UNIT_PATH).toBe('/etc/systemd/system/jib-cloudflared.service')
+    expect(CLOUDFLARED_SERVICE_NAME).toBe('jib-cloudflared.service')
+    expect(CLOUDFLARED_UNIT_PATH).toBe('/etc/systemd/system/jib-cloudflared.service')
   })
 })

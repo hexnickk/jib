@@ -1,54 +1,62 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { type Paths, credsPath, ensureCredsDir } from '@jib/paths'
-import { CloudflaredSaveTunnelTokenError, wrapCloudflaredError } from './errors.ts'
-import { SERVICE_NAME } from './templates.ts'
-import { extractTunnelToken } from './token.ts'
+import { CloudflaredSaveTunnelTokenError, cloudflaredWrapError } from './errors.ts'
+import { CLOUDFLARED_SERVICE_NAME } from './templates.ts'
+import { cloudflaredExtractTunnelToken } from './token.ts'
 
-interface CommandResultLike {
+interface ShellCommandResultLike {
   exitCode: number
   stderr: { toString(): string }
   stdout: { toString(): string }
 }
 
-interface CloudflaredServiceDeps {
-  run?: () => Promise<CommandResultLike>
+interface CloudflaredEnableServiceDeps {
+  run?: () => Promise<ShellCommandResultLike>
 }
 
-export interface CloudflaredServiceResult {
+export interface CloudflaredEnableServiceResult {
   detail: string
   ok: boolean
 }
 
-export function tunnelTokenPath(paths: Paths): string {
+/** Returns the env-file path that stores the tunnel token for cloudflared. */
+export function cloudflaredTunnelTokenPath(paths: Paths): string {
   return credsPath(paths, 'cloudflare', 'tunnel.env')
 }
 
-export function hasTunnelToken(paths: Paths): boolean {
-  const path = tunnelTokenPath(paths)
+/** Reports whether a non-empty tunnel token has already been saved. */
+export function cloudflaredHasTunnelToken(paths: Paths): boolean {
+  const path = cloudflaredTunnelTokenPath(paths)
   return existsSync(path) && readFileSync(path, 'utf8').trim().length > 0
 }
 
-export async function saveTunnelToken(paths: Paths, raw: string): Promise<boolean> {
-  const token = extractTunnelToken(raw)
+/** Persists the normalized tunnel token, or returns a typed write error. */
+export async function cloudflaredSaveTunnelToken(
+  paths: Paths,
+  raw: string,
+): Promise<boolean | CloudflaredSaveTunnelTokenError> {
+  const token = cloudflaredExtractTunnelToken(raw)
   if (!token) return false
 
   try {
-    const path = tunnelTokenPath(paths)
+    const path = cloudflaredTunnelTokenPath(paths)
     await ensureCredsDir(paths, 'cloudflare')
     await writeFile(path, `TUNNEL_TOKEN=${token}\n`, { mode: 0o640 })
     return true
   } catch (error) {
-    throw wrapCloudflaredError(error, CloudflaredSaveTunnelTokenError)
+    return cloudflaredWrapError(error, CloudflaredSaveTunnelTokenError)
   }
 }
 
-export async function enableCloudflaredService(
-  deps: CloudflaredServiceDeps = {},
-): Promise<CloudflaredServiceResult> {
+/** Enables and starts the systemd unit without surfacing runner exceptions. */
+export async function cloudflaredEnableService(
+  deps: CloudflaredEnableServiceDeps = {},
+): Promise<CloudflaredEnableServiceResult> {
   try {
     const run =
-      deps.run ?? (() => Bun.$`sudo systemctl enable --now ${SERVICE_NAME}`.quiet().nothrow())
+      deps.run ??
+      (() => Bun.$`sudo systemctl enable --now ${CLOUDFLARED_SERVICE_NAME}`.quiet().nothrow())
     const result = await run()
     return {
       ok: result.exitCode === 0,

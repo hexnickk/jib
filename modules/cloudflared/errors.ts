@@ -1,4 +1,4 @@
-interface CloudflaredErrorType<T extends Error> {
+interface CloudflaredErrorCtor<T extends Error> {
   new (message: string, options?: ErrorOptions): T
 }
 
@@ -23,9 +23,10 @@ export class CloudflaredSaveTunnelTokenError extends Error {
   }
 }
 
-export function wrapCloudflaredError<T extends Error>(
+/** Reuses an existing typed error or wraps an unknown failure once. */
+export function cloudflaredWrapError<T extends Error>(
   error: unknown,
-  ErrorType: CloudflaredErrorType<T>,
+  ErrorType: CloudflaredErrorCtor<T>,
 ): T {
   if (error instanceof ErrorType) return error
 

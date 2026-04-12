@@ -9,7 +9,7 @@ export interface CloudflaredTemplateVars {
   tunnelEnvPath: string
 }
 
-export function composeYaml(vars: CloudflaredTemplateVars): string {
+export function cloudflaredComposeYaml(vars: CloudflaredTemplateVars): string {
   return `# Managed by jib (modules/cloudflared) — do not edit.
 # The tunnel token is passed as an environment variable via env_file (never
 # as a volume mount). \`jib cloudflared setup\` writes the env file.
@@ -26,7 +26,7 @@ services:
 `
 }
 
-export function systemdUnit(vars: CloudflaredTemplateVars): string {
+export function cloudflaredSystemdUnit(vars: CloudflaredTemplateVars): string {
   return `[Unit]
 Description=Jib Cloudflared Tunnel (via docker compose)
 After=docker.service
@@ -43,5 +43,5 @@ WantedBy=multi-user.target
 `
 }
 
-export const UNIT_PATH = '/etc/systemd/system/jib-cloudflared.service'
-export const SERVICE_NAME = 'jib-cloudflared.service'
+export const CLOUDFLARED_UNIT_PATH = '/etc/systemd/system/jib-cloudflared.service'
+export const CLOUDFLARED_SERVICE_NAME = 'jib-cloudflared.service'

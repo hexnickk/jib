@@ -1,16 +1,20 @@
-export { default as manifest } from './manifest.ts'
+export const manifest = {
+  name: 'cloudflared',
+  description: 'Cloudflare Tunnel daemon (optional)',
+} satisfies { name: string; required?: boolean; description?: string }
+
 export {
   CloudflaredInstallError,
   CloudflaredSaveTunnelTokenError,
   CloudflaredUninstallError,
 } from './errors.ts'
-export { install } from './install.ts'
-export { uninstall } from './uninstall.ts'
+export { cloudflaredInstall } from './install.ts'
+export { cloudflaredUninstall } from './uninstall.ts'
 export {
-  enableCloudflaredService,
-  hasTunnelToken,
-  saveTunnelToken,
-  tunnelTokenPath,
+  cloudflaredEnableService,
+  cloudflaredHasTunnelToken,
+  cloudflaredSaveTunnelToken,
+  cloudflaredTunnelTokenPath,
 } from './service.ts'
-export { getCloudflaredStatus } from './status.ts'
-export { extractTunnelToken } from './token.ts'
+export { cloudflaredReadStatus } from './status.ts'
+export { cloudflaredExtractTunnelToken } from './token.ts'

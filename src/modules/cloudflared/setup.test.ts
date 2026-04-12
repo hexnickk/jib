@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'bun:test'
+import { CloudflaredSaveTunnelTokenError } from '@jib-module/cloudflared'
 import { getPaths } from '@jib/paths'
 import {
   CloudflaredSetupPromptError,
   CloudflaredSetupSaveTokenError,
   CloudflaredStartError,
 } from './errors.ts'
-import { runCloudflaredSetup, runCloudflaredSetupResult } from './setup.ts'
+import { cloudflaredRunSetup, cloudflaredRunSetupResult } from './setup.ts'
 
 function createLogger() {
   const messages: string[] = []
@@ -23,11 +24,11 @@ function createLogger() {
   }
 }
 
-describe('runCloudflaredSetupResult', () => {
+describe('cloudflaredRunSetupResult', () => {
   const paths = getPaths('/tmp/jib-cloudflared-setup')
 
   test('returns typed prompt errors when replacement confirmation fails', async () => {
-    const result = await runCloudflaredSetupResult(paths, {
+    const result = await cloudflaredRunSetupResult(paths, {
       hasToken: () => true,
       promptConfirm: async () => {
         throw new Error('stdin unavailable')
@@ -42,7 +43,7 @@ describe('runCloudflaredSetupResult', () => {
 
   test('returns a skipped result for invalid token input', async () => {
     const logger = createLogger()
-    const result = await runCloudflaredSetupResult(paths, {
+    const result = await cloudflaredRunSetupResult(paths, {
       hasToken: () => false,
       logger,
       promptPassword: async () => 'not-a-token',
@@ -54,13 +55,11 @@ describe('runCloudflaredSetupResult', () => {
   })
 
   test('returns typed save errors when token persistence fails', async () => {
-    const result = await runCloudflaredSetupResult(paths, {
+    const result = await cloudflaredRunSetupResult(paths, {
       hasToken: () => false,
       logger: createLogger(),
       promptPassword: async () => 'eyJhIjoiNzQ',
-      saveToken: async () => {
-        throw new Error('disk full')
-      },
+      saveToken: async () => new CloudflaredSaveTunnelTokenError('disk full'),
     })
 
     expect(result).toBeInstanceOf(CloudflaredSetupSaveTokenError)
@@ -71,7 +70,7 @@ describe('runCloudflaredSetupResult', () => {
   })
 
   test('returns typed start errors when cloudflared does not start', async () => {
-    const result = await runCloudflaredSetupResult(paths, {
+    const result = await cloudflaredRunSetupResult(paths, {
       hasToken: () => true,
       promptConfirm: async () => false,
       enableService: async () => ({ ok: false, detail: 'permission denied' }),
@@ -84,13 +83,13 @@ describe('runCloudflaredSetupResult', () => {
   })
 })
 
-describe('runCloudflaredSetup', () => {
+describe('cloudflaredRunSetup', () => {
   const paths = getPaths('/tmp/jib-cloudflared-setup')
 
   test('keeps the boolean wrapper behavior for existing callers', async () => {
     const logger = createLogger()
 
-    const ok = await runCloudflaredSetup(paths, {
+    const ok = await cloudflaredRunSetup(paths, {
       hasToken: () => false,
       logger,
       promptPassword: async () => 'eyJhIjoiNzQ',
@@ -110,7 +109,7 @@ describe('runCloudflaredSetup', () => {
   test('logs typed failures as warnings and returns false', async () => {
     const logger = createLogger()
 
-    const ok = await runCloudflaredSetup(paths, {
+    const ok = await cloudflaredRunSetup(paths, {
       hasToken: () => true,
       promptConfirm: async () => {
         throw new Error('cancelled')
@@ -127,7 +126,7 @@ describe('runCloudflaredSetup', () => {
   test('does not print setup instructions when keeping an existing token', async () => {
     const logger = createLogger()
 
-    const ok = await runCloudflaredSetup(paths, {
+    const ok = await cloudflaredRunSetup(paths, {
       hasToken: () => true,
       promptConfirm: async () => false,
       logger,
@@ -141,7 +140,7 @@ describe('runCloudflaredSetup', () => {
   test('renders setup instructions in the wrapper for token-stage failures', async () => {
     const logger = createLogger()
 
-    const ok = await runCloudflaredSetup(paths, {
+    const ok = await cloudflaredRunSetup(paths, {
       hasToken: () => false,
       logger,
       promptPassword: async () => {

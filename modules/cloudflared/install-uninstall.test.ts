@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
-import { CloudflaredInstallError, CloudflaredUninstallError, install, uninstall } from './index.ts'
+import {
+  CloudflaredInstallError,
+  CloudflaredUninstallError,
+  cloudflaredInstall,
+  cloudflaredUninstall,
+} from './index.ts'
 
 const serviceName = 'jib-cloudflared.test.service'
 
@@ -30,13 +35,13 @@ afterEach(async () => {
 })
 
 describe('cloudflared install/uninstall', () => {
-  test('install writes managed files and triggers daemon reload', async () => {
+  test('cloudflaredInstall writes managed files and triggers daemon reload', async () => {
     const calls: string[] = []
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
 
     try {
-      await install(
+      await cloudflaredInstall(
         { logger, paths },
         {
           unitPath,
@@ -61,7 +66,7 @@ describe('cloudflared install/uninstall', () => {
     }
   })
 
-  test('uninstall disables the service, removes managed files, and reloads systemd', async () => {
+  test('cloudflaredUninstall disables the service, removes managed files, and reloads systemd', async () => {
     const calls: string[] = []
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
@@ -74,7 +79,7 @@ describe('cloudflared install/uninstall', () => {
       )
       await Bun.write(unitPath, 'unit')
 
-      await uninstall(
+      await cloudflaredUninstall(
         { logger, paths },
         {
           serviceName,
@@ -98,14 +103,14 @@ describe('cloudflared install/uninstall', () => {
     }
   })
 
-  test('install wraps daemon reload failures with a typed error and cause', async () => {
+  test('cloudflaredInstall wraps daemon reload failures with a typed error and cause', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
     const cause = new Error('reload failed')
 
     try {
       await expect(
-        install(
+        cloudflaredInstall(
           { logger, paths },
           {
             unitPath,
@@ -124,14 +129,14 @@ describe('cloudflared install/uninstall', () => {
     }
   })
 
-  test('install does not double-wrap typed install errors', async () => {
+  test('cloudflaredInstall does not double-wrap typed install errors', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
     const error = new CloudflaredInstallError('already wrapped')
 
     try {
       await expect(
-        install(
+        cloudflaredInstall(
           { logger, paths },
           {
             unitPath,
@@ -146,13 +151,13 @@ describe('cloudflared install/uninstall', () => {
     }
   })
 
-  test('uninstall wraps disable failures with a typed error', async () => {
+  test('cloudflaredUninstall wraps disable failures with a typed error', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
 
     try {
       await expect(
-        uninstall(
+        cloudflaredUninstall(
           { logger, paths },
           {
             unitPath,

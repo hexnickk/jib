@@ -5,10 +5,10 @@ import { join } from 'node:path'
 import { getPaths } from '@jib/paths'
 import {
   CloudflaredSaveTunnelTokenError,
-  enableCloudflaredService,
-  hasTunnelToken,
-  saveTunnelToken,
-  tunnelTokenPath,
+  cloudflaredEnableService,
+  cloudflaredHasTunnelToken,
+  cloudflaredSaveTunnelToken,
+  cloudflaredTunnelTokenPath,
 } from './index.ts'
 
 async function withTmpPaths<T>(fn: (root: string) => Promise<T>): Promise<T> {
@@ -21,49 +21,54 @@ async function withTmpPaths<T>(fn: (root: string) => Promise<T>): Promise<T> {
 }
 
 describe('cloudflared service helpers', () => {
-  test('hasTunnelToken returns false before a token is saved', async () => {
+  test('cloudflaredHasTunnelToken returns false before a token is saved', async () => {
     await withTmpPaths(async (root) => {
-      expect(hasTunnelToken(getPaths(root))).toBe(false)
+      expect(cloudflaredHasTunnelToken(getPaths(root))).toBe(false)
     })
   })
 
-  test('saveTunnelToken writes the normalized env file', async () => {
+  test('cloudflaredSaveTunnelToken writes the normalized env file', async () => {
     await withTmpPaths(async (root) => {
       const paths = getPaths(root)
 
-      const saved = await saveTunnelToken(paths, 'cloudflared tunnel run --token eyJhIjoiNzQ')
+      const saved = await cloudflaredSaveTunnelToken(
+        paths,
+        'cloudflared tunnel run --token eyJhIjoiNzQ',
+      )
 
       expect(saved).toBe(true)
-      expect(hasTunnelToken(paths)).toBe(true)
-      expect(await readFile(tunnelTokenPath(paths), 'utf8')).toBe('TUNNEL_TOKEN=eyJhIjoiNzQ\n')
+      expect(cloudflaredHasTunnelToken(paths)).toBe(true)
+      expect(await readFile(cloudflaredTunnelTokenPath(paths), 'utf8')).toBe(
+        'TUNNEL_TOKEN=eyJhIjoiNzQ\n',
+      )
       expect((await stat(join(root, 'secrets', '_jib', 'cloudflare'))).mode & 0o7777).toBe(0o2770)
     })
   })
 
-  test('saveTunnelToken skips blank or invalid cloudflared commands', async () => {
+  test('cloudflaredSaveTunnelToken skips blank or invalid cloudflared commands', async () => {
     await withTmpPaths(async (root) => {
       const paths = getPaths(root)
 
-      expect(await saveTunnelToken(paths, '')).toBe(false)
-      expect(await saveTunnelToken(paths, 'cloudflared service install')).toBe(false)
-      expect(hasTunnelToken(paths)).toBe(false)
+      expect(await cloudflaredSaveTunnelToken(paths, '')).toBe(false)
+      expect(await cloudflaredSaveTunnelToken(paths, 'cloudflared service install')).toBe(false)
+      expect(cloudflaredHasTunnelToken(paths)).toBe(false)
     })
   })
 
-  test('saveTunnelToken wraps filesystem failures with a typed error and cause', async () => {
+  test('cloudflaredSaveTunnelToken returns a typed filesystem error', async () => {
     await withTmpPaths(async (root) => {
       const paths = getPaths(root)
       await Bun.write(join(root, 'secrets'), 'not-a-directory')
 
-      const error = await saveTunnelToken(paths, 'eyJhIjoiNzQ').catch((error: unknown) => error)
+      const result = await cloudflaredSaveTunnelToken(paths, 'eyJhIjoiNzQ')
 
-      expect(error).toBeInstanceOf(CloudflaredSaveTunnelTokenError)
-      expect(error).toHaveProperty('cause')
+      expect(result).toBeInstanceOf(CloudflaredSaveTunnelTokenError)
+      expect(result).toHaveProperty('cause')
     })
   })
 
-  test('enableCloudflaredService reports shell failures without throwing', async () => {
-    const result = await enableCloudflaredService({
+  test('cloudflaredEnableService reports shell failures without throwing', async () => {
+    const result = await cloudflaredEnableService({
       run: async () => ({
         exitCode: 1,
         stdout: Buffer.from(''),
@@ -74,8 +79,8 @@ describe('cloudflared service helpers', () => {
     expect(result).toEqual({ ok: false, detail: 'permission denied' })
   })
 
-  test('enableCloudflaredService converts thrown runner errors into a failure result', async () => {
-    const result = await enableCloudflaredService({
+  test('cloudflaredEnableService converts thrown runner errors into a failure result', async () => {
+    const result = await cloudflaredEnableService({
       run: async () => {
         throw new Error('systemctl unavailable')
       },

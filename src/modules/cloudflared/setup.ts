@@ -1,4 +1,9 @@
-import { enableCloudflaredService, hasTunnelToken, saveTunnelToken } from '@jib-module/cloudflared'
+import {
+  CloudflaredSaveTunnelTokenError,
+  cloudflaredEnableService,
+  cloudflaredHasTunnelToken,
+  cloudflaredSaveTunnelToken,
+} from '@jib-module/cloudflared'
 import type { Paths } from '@jib/paths'
 import { log, promptConfirm, promptPassword } from '@jib/tui'
 import {
@@ -14,12 +19,12 @@ interface CloudflaredSetupLogger {
 }
 
 interface CloudflaredSetupDeps {
-  enableService?: typeof enableCloudflaredService
-  hasToken?: typeof hasTunnelToken
+  enableService?: typeof cloudflaredEnableService
+  hasToken?: typeof cloudflaredHasTunnelToken
   logger?: CloudflaredSetupLogger
   promptConfirm?: typeof promptConfirm
   promptPassword?: typeof promptPassword
-  saveToken?: typeof saveTunnelToken
+  saveToken?: typeof cloudflaredSaveTunnelToken
 }
 
 interface CloudflaredSetupConfigured {
@@ -39,23 +44,25 @@ export type CloudflaredSetupResult =
   | CloudflaredSetupSaveTokenError
   | CloudflaredStartError
 
-export async function runCloudflaredSetup(
+/** Keeps the existing boolean setup contract for interactive callers. */
+export async function cloudflaredRunSetup(
   paths: Paths,
   deps: CloudflaredSetupDeps = {},
 ): Promise<boolean> {
-  const result = await runCloudflaredSetupResult(paths, deps)
-  return renderCloudflaredSetupResult(result, deps.logger ?? log)
+  const result = await cloudflaredRunSetupResult(paths, deps)
+  return renderSetupResult(result, deps.logger ?? log)
 }
 
-export async function runCloudflaredSetupResult(
+/** Runs tunnel setup and returns a structured outcome for CLI callers. */
+export async function cloudflaredRunSetupResult(
   paths: Paths,
   deps: CloudflaredSetupDeps = {},
 ): Promise<CloudflaredSetupResult> {
-  const hasToken = deps.hasToken ?? hasTunnelToken
+  const hasToken = deps.hasToken ?? cloudflaredHasTunnelToken
   const confirm = deps.promptConfirm ?? promptConfirm
   const password = deps.promptPassword ?? promptPassword
-  const saveToken = deps.saveToken ?? saveTunnelToken
-  const enableService = deps.enableService ?? enableCloudflaredService
+  const saveToken = deps.saveToken ?? cloudflaredSaveTunnelToken
+  const enableService = deps.enableService ?? cloudflaredEnableService
 
   if (hasToken(paths)) {
     try {
@@ -63,7 +70,7 @@ export async function runCloudflaredSetupResult(
         message: 'Existing tunnel token found. Replace it?',
         initialValue: false,
       })
-      if (!replace) return startCloudflaredService(true, enableService)
+      if (!replace) return startService(true, enableService)
     } catch (error) {
       return new CloudflaredSetupPromptError('replace', error)
     }
@@ -78,18 +85,18 @@ export async function runCloudflaredSetupResult(
     return new CloudflaredSetupPromptError('token', error)
   }
 
-  try {
-    if (!(await saveToken(paths, raw))) return { status: 'skipped', reason: 'invalid_token' }
-  } catch (error) {
-    return new CloudflaredSetupSaveTokenError(error)
+  const saveTokenResult = await saveToken(paths, raw)
+  if (saveTokenResult instanceof CloudflaredSaveTunnelTokenError) {
+    return new CloudflaredSetupSaveTokenError(saveTokenResult)
   }
+  if (!saveTokenResult) return { status: 'skipped', reason: 'invalid_token' }
 
-  return startCloudflaredService(false, enableService)
+  return startService(false, enableService)
 }
 
-async function startCloudflaredService(
+async function startService(
   keptExisting: boolean,
-  enableService: typeof enableCloudflaredService,
+  enableService: typeof cloudflaredEnableService,
 ): Promise<CloudflaredSetupConfigured | CloudflaredStartError> {
   try {
     const started = await enableService()
@@ -104,7 +111,8 @@ async function startCloudflaredService(
   }
 }
 
-function renderCloudflaredSetupResult(
+/** Turns the structured setup result into the existing user-facing log flow. */
+function renderSetupResult(
   result: CloudflaredSetupResult,
   logger: CloudflaredSetupLogger,
 ): boolean {
@@ -112,6 +120,7 @@ function renderCloudflaredSetupResult(
     logger.info('Create a tunnel at dash.cloudflare.com → Zero Trust → Tunnels,')
     logger.info('then paste the install command or just the token.')
   }
+
   if (
     result instanceof CloudflaredSetupPromptError ||
     result instanceof CloudflaredSetupSaveTokenError
@@ -119,23 +128,28 @@ function renderCloudflaredSetupResult(
     logger.warning(`tunnel token setup skipped: ${result.message}`)
     return false
   }
+
   if (result instanceof CloudflaredStartError) {
     logger.warning(result.message)
     return false
   }
+
   if (result.status === 'skipped') {
     logger.warning('tunnel token setup skipped: input did not contain a tunnel token')
     return false
   }
+
   if (result.keptExisting) {
     logger.success('keeping existing tunnel token')
     return true
   }
+
   logger.success('tunnel token saved')
   logger.success('cloudflared started')
   return true
 }
 
+/** Decides whether the setup banner still helps after a partial failure. */
 function shouldShowSetupIntro(result: CloudflaredSetupResult): boolean {
   if (result instanceof CloudflaredSetupSaveTokenError) return true
   if (result instanceof CloudflaredSetupPromptError) return result.step === 'token'
@@ -143,3 +157,7 @@ function shouldShowSetupIntro(result: CloudflaredSetupResult): boolean {
   if (result.status === 'skipped') return true
   return !result.keptExisting
 }
+
+// Compatibility aliases for callers outside this slice.
+export const runCloudflaredSetup = cloudflaredRunSetup
+export const runCloudflaredSetupResult = cloudflaredRunSetupResult

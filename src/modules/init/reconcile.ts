@@ -1,4 +1,4 @@
-import { hasTunnelToken } from '@jib-module/cloudflared'
+import { cloudflaredHasTunnelToken } from '@jib-module/cloudflared'
 import { type Config, writeConfig } from '@jib/config'
 import type { Paths } from '@jib/paths'
 
@@ -9,7 +9,7 @@ interface ReconcileDeps {
 export function inferredOptionalModules(config: Config, paths: Paths): Record<string, true> {
   const inferred: Record<string, true> = {}
 
-  if (config.modules.cloudflared === undefined && hasTunnelToken(paths)) {
+  if (config.modules.cloudflared === undefined && cloudflaredHasTunnelToken(paths)) {
     inferred.cloudflared = true
   }
 
