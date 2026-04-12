@@ -5,7 +5,7 @@ import { createIngressOperator, releaseIngress } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
 import type { DeployRunResult } from '../../deploy/run.ts'
-import { DefaultRemoveSupport, RemoveService } from '../remove/index.ts'
+import { DefaultRemoveSupport, RemoveMissingAppError, runRemove } from '../remove/index.ts'
 import type { AddFlowResult } from './types.ts'
 
 export interface InterruptTrap {
@@ -81,14 +81,17 @@ export async function rollbackAddedApp(
     apps: { ...originalCfg.apps, [app]: finalApp },
   }))
   if (!cfg.apps[app]) return
-  const service = new RemoveService(
-    new DefaultRemoveSupport({
-      paths,
-      releaseIngress: (appName) => releaseIngress(createIngressOperator(paths), appName),
-    }),
-    { warn: (message) => isTextOutput() && consola.warn(message) },
+  const result = await runRemove(
+    {
+      support: new DefaultRemoveSupport({
+        paths,
+        releaseIngress: (appName) => releaseIngress(createIngressOperator(paths), appName),
+      }),
+      observer: { warn: (message) => isTextOutput() && consola.warn(message) },
+    },
+    { appName: app, cfg, configFile: paths.configFile, quiet: !isTextOutput() },
   )
-  await service.run({ appName: app, cfg, configFile: paths.configFile, quiet: !isTextOutput() })
+  if (result instanceof RemoveMissingAppError) return
 }
 
 export function trapInterrupt(): InterruptTrap {

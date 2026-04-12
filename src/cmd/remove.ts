@@ -5,7 +5,7 @@ import type { Paths } from '@jib/paths'
 import { promptConfirm, spinner } from '@jib/tui'
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { DefaultRemoveSupport, RemoveService } from '../modules/remove/index.ts'
+import { DefaultRemoveSupport, RemoveMissingAppError, runRemove } from '../modules/remove/index.ts'
 
 /** `jib remove <app>` — prompt in the CLI, then delegate teardown to the remove module. */
 
@@ -18,7 +18,6 @@ export default defineCommand({
   async run({ args }) {
     applyCliArgs(args)
     const { cfg, paths } = await loadAppOrExit(args.app)
-    // loadAppOrExit guarantees cfg.apps[args.app] exists.
     const appCfg = cfg.apps[args.app] as NonNullable<(typeof cfg.apps)[string]>
 
     if (!args.force) {
@@ -38,23 +37,26 @@ export default defineCommand({
       }
     }
 
-    const service = new RemoveService(
-      new DefaultRemoveSupport({
-        paths,
-        releaseIngress: (appName) => releaseIngressForRemove(paths, appName),
-      }),
+    const result = await runRemove(
       {
-        warn: (message) => {
-          if (isTextOutput()) consola.warn(message)
+        support: new DefaultRemoveSupport({
+          paths,
+          releaseIngress: (appName) => releaseIngressForRemove(paths, appName),
+        }),
+        observer: {
+          warn: (message) => {
+            if (isTextOutput()) consola.warn(message)
+          },
         },
       },
+      {
+        appName: args.app,
+        cfg,
+        configFile: paths.configFile,
+        quiet: !isTextOutput(),
+      },
     )
-    await service.run({
-      appName: args.app,
-      cfg,
-      configFile: paths.configFile,
-      quiet: !isTextOutput(),
-    })
+    if (result instanceof RemoveMissingAppError) throw result
     if (isTextOutput()) consola.success(`removed ${args.app}`)
     return { app: args.app, removed: true }
   },

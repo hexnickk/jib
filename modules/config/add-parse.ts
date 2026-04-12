@@ -1,4 +1,5 @@
 import type { App, Config, Domain } from '@jib/config'
+import { ConfigError } from './errors.ts'
 import { allocatePort } from './port-allocator.ts'
 
 export interface ParsedDomain {
@@ -15,39 +16,42 @@ export function parseDomain(raw: string, fallback: string): ParsedDomain {
   const pairs = new Map<string, string>()
   for (const part of raw.split(',')) {
     const eq = part.indexOf('=')
-    if (eq < 1) throw new Error(`invalid --domain "${raw}" (expected key=value pairs)`)
+    if (eq < 1) throw new ConfigError(`invalid --domain "${raw}" (expected key=value pairs)`)
     pairs.set(part.slice(0, eq), part.slice(eq + 1))
   }
   const host = pairs.get('host')
-  if (!host) throw new Error(`invalid --domain "${raw}" (missing required "host" key)`)
+  if (!host) throw new ConfigError(`invalid --domain "${raw}" (missing required "host" key)`)
   const out: ParsedDomain = { host }
   const portStr = pairs.get('port')
   if (portStr !== undefined) {
     const container_port = Number(portStr)
-    if (!Number.isInteger(container_port) || container_port < 1 || container_port > 65535)
-      throw new Error(`invalid port in --domain "${raw}" (expected integer 1-65535)`)
+    if (!Number.isInteger(container_port) || container_port < 1 || container_port > 65535) {
+      throw new ConfigError(`invalid port in --domain "${raw}" (expected integer 1-65535)`)
+    }
     out.container_port = container_port
   }
   const service = pairs.get('service')
   if (service) out.service = service
   const ingress = pairs.get('ingress') ?? fallback
-  if (ingress && !VALID_INGRESS.has(ingress))
-    throw new Error(
+  if (ingress && !VALID_INGRESS.has(ingress)) {
+    throw new ConfigError(
       `invalid ingress "${ingress}" in --domain "${raw}" (expected direct|cloudflare-tunnel)`,
     )
-  if (ingress && ingress !== 'direct')
+  }
+  if (ingress && ingress !== 'direct') {
     out.ingress = ingress as Exclude<ParsedDomain['ingress'], undefined>
+  }
   return out
 }
 
 /** Parse `/path:port` into a health check entry. */
 export function parseHealth(raw: string): { path: string; port: number } {
   const idx = raw.lastIndexOf(':')
-  if (idx < 1) throw new Error(`invalid --health "${raw}" (expected /path:port)`)
+  if (idx < 1) throw new ConfigError(`invalid --health "${raw}" (expected /path:port)`)
   const path = raw.slice(0, idx)
   const port = Number(raw.slice(idx + 1))
-  if (!path.startsWith('/')) throw new Error(`--health path must start with '/'`)
-  if (!Number.isInteger(port)) throw new Error(`invalid port in --health "${raw}"`)
+  if (!path.startsWith('/')) throw new ConfigError(`--health path must start with '/'`)
+  if (!Number.isInteger(port)) throw new ConfigError(`invalid port in --health "${raw}"`)
   return { path, port }
 }
 

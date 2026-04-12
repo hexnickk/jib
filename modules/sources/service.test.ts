@@ -5,7 +5,8 @@ import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { getPaths, pathExists, repoPath } from '@jib/paths'
 import { $ } from 'bun'
-import { cloneForInspection, probe, removeCheckout, syncApp } from './index.ts'
+import { cloneForInspection, probe, removeCheckout, resolve, syncApp } from './index.ts'
+import { SourceLocalRepoError, SourceMissingAppError } from './service.ts'
 
 async function makeUpstream(name: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), `${name}-`))
@@ -129,5 +130,22 @@ describe('sources service', () => {
     expect(probed).toBeNull()
     expect(prepared.workdir).toBe(repoPath(paths, 'demo', 'local'))
     expect(prepared.sha).toBe('n8nio/n8n')
+  })
+
+  test('returns typed errors for missing app and local repo resolution failures', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+    const paths = getPaths(root)
+    const cfg: Config = {
+      config_version: 3,
+      poll_interval: '5m',
+      modules: {},
+      sources: {},
+      apps: {},
+    }
+
+    await expect(resolve(cfg, paths, { app: 'demo' })).rejects.toBeInstanceOf(SourceMissingAppError)
+    await expect(resolve(cfg, paths, { app: 'demo', repo: 'local' })).rejects.toBeInstanceOf(
+      SourceLocalRepoError,
+    )
   })
 })

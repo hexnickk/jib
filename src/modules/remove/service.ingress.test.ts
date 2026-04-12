@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { RemoveService } from './service.ts'
+import { runRemove } from './service.ts'
 import type { RemoveSupport } from './types.ts'
 
 const cfg: Config = {
@@ -18,7 +18,7 @@ const cfg: Config = {
   },
 }
 
-describe('RemoveService ingress cleanup', () => {
+describe('runRemove ingress cleanup', () => {
   test('attempts ingress release before removal and warns on failure', async () => {
     const warnings: string[] = []
     const calls: string[] = []
@@ -50,14 +50,18 @@ describe('RemoveService ingress cleanup', () => {
       },
     }
 
-    const result = await new RemoveService(support, {
-      warn: (message) => warnings.push(message),
-    }).run({
-      appName: 'demo',
-      cfg,
-      configFile: '/tmp/config.yml',
-      quiet: true,
-    })
+    const result = await runRemove(
+      {
+        support,
+        observer: { warn: (message) => warnings.push(message) },
+      },
+      {
+        appName: 'demo',
+        cfg,
+        configFile: '/tmp/config.yml',
+        quiet: true,
+      },
+    )
 
     expect(result).toEqual({ app: 'demo', removed: true })
     expect(calls).toEqual([

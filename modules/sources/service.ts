@@ -14,10 +14,24 @@ import type {
   SourceTarget,
 } from './types.ts'
 
+export class SourceMissingAppError extends JibError {
+  constructor(app: string) {
+    super('source_missing_app', `app "${app}" not found in config`)
+    this.name = 'SourceMissingAppError'
+  }
+}
+
+export class SourceLocalRepoError extends JibError {
+  constructor(app: string) {
+    super('source_local_repo', `app "${app}" uses a local repo and has no remote source`)
+    this.name = 'SourceLocalRepoError'
+  }
+}
+
 function resolveApp(cfg: Config, target: SourceTarget): App {
   const existing = cfg.apps[target.app]
   if (existing) return existing
-  if (!target.repo) throw new Error(`app "${target.app}" not found in config`)
+  if (!target.repo) throw new SourceMissingAppError(target.app)
   const image = dockerHubImage(target.repo)
   return {
     repo: image ? 'local' : target.repo,
@@ -38,7 +52,7 @@ export async function resolve(
   const existing = cfg.apps[target.app]
   const app = resolveApp(cfg, target)
   if (app.repo === 'local') {
-    throw new Error(`app "${target.app}" uses a local repo and has no remote source`)
+    throw new SourceLocalRepoError(target.app)
   }
   const workdir = repoPath(paths, target.app, app.repo)
   const driver = resolveSourceDriver(cfg, app)
