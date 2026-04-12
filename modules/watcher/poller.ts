@@ -2,32 +2,19 @@ import { type Config, configParseDuration } from '@jib/config'
 import { deployApp } from '@jib/deploy'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
-import { type ProbeSourceDeps, probe, syncApp } from '@jib/sources'
+import { type ProbeSourceDeps, sourcesProbe, sourcesSync } from '@jib/sources'
 import { Store } from '@jib/state'
 import { WatcherDeployAppError, WatcherProbeAppError, WatcherSyncAppError } from './errors.ts'
 
-type ProbeResult = Awaited<ReturnType<typeof probe>>
-type SyncResult = Awaited<ReturnType<typeof syncApp>>
-
-/**
- * Parses jib's `poll_interval` using the same duration grammar the config
- * validator accepts. Falls back to 5 minutes only for invalid raw strings.
- */
+/** Parses `poll_interval`, defaulting to 5 minutes only for invalid raw strings. */
 export function parsePollInterval(raw: string): number {
   return configParseDuration(raw) ?? 5 * 60_000
 }
 
-/**
- * Checks one app: resolves auth, ls-remotes the configured branch, and if
- * the remote SHA differs from the last-seen value, prepares and deploys it
- * directly through the shared deploy flow.
- */
+/** Checks one app and deploys when the remote SHA changes. */
 export interface PollAppDeps {
-  /** Injected for tests; defaults to the real `sources.lsRemote`. */
   lsRemote?: ProbeSourceDeps['lsRemote']
-  /** Injected for tests; defaults to the shared sources sync path. */
-  syncApp?: typeof syncApp
-  /** Injected for tests; defaults to the shared deploy path. */
+  syncApp?: typeof sourcesSync
   deployPrepared?: typeof deployPreparedApp
 }
 
@@ -77,14 +64,15 @@ async function probePollApp(
   paths: Paths,
   appName: string,
   deps: PollAppDeps,
-): Promise<ProbeResult | WatcherProbeAppError> {
+): Promise<WatcherProbeAppError | { branch: string; workdir: string; sha: string } | null> {
   try {
-    return await probe(
+    const result = await sourcesProbe(
       cfg,
       paths,
       { app: appName },
       deps.lsRemote ? { lsRemote: deps.lsRemote } : {},
     )
+    return result instanceof Error ? new WatcherProbeAppError(appName, result) : result
   } catch (error) {
     return new WatcherProbeAppError(appName, error)
   }
@@ -95,10 +83,11 @@ async function syncPollApp(
   paths: Paths,
   appName: string,
   deps: PollAppDeps,
-): Promise<SyncResult | WatcherSyncAppError> {
-  const sync = deps.syncApp ?? syncApp
+): Promise<WatcherSyncAppError | { workdir: string; sha: string }> {
+  const sync = deps.syncApp ?? sourcesSync
   try {
-    return await sync(cfg, paths, { app: appName })
+    const result = await sync(cfg, paths, { app: appName })
+    return result instanceof Error ? new WatcherSyncAppError(appName, result) : result
   } catch (error) {
     return new WatcherSyncAppError(appName, error)
   }
@@ -128,15 +117,10 @@ export interface PollerDeps {
   paths: Paths
   getConfig: () => Promise<Config> | Config
   log: Logger
-  /** Injected for tests — defaults to an abort-aware `setTimeout`. */
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>
 }
 
-/**
- * Long-running polling loop. Exits cleanly when `abort` fires. Held in memory
- * only — the `lastSeen` map is reset on restart, which matches the Go
- * watcher's behavior.
- */
+/** Long-running polling loop. Exits cleanly when `abort` fires. */
 export async function runPollCycle(
   deps: PollerDeps,
   lastSeen: Map<string, string> = new Map(),

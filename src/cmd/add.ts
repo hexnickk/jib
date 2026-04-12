@@ -2,7 +2,7 @@ import { CliError, cliIsTextOutput } from '@jib/cli'
 import { type App, type Config, ConfigError, configLoad, configLoadContext } from '@jib/config'
 import { claimIngress, createIngressOperator } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
-import { buildSourceChoices, preflightSourceSelection, runSourceSetup } from '@jib/sources'
+import { sourcesBuildChoices, sourcesPreflightSelection, sourcesRunSetup } from '@jib/sources'
 import { isInteractive, promptConfirm, promptSelect, spinner } from '@jib/tui'
 import { consola } from 'consola'
 import { DEFAULT_TIMEOUT_MS, runDeploy } from '../deploy/run.ts'
@@ -27,6 +27,7 @@ import {
 import type { AddCommandArgv } from './add-args.ts'
 import { addCommandOptions } from './add-args.ts'
 import type { CliCommand } from './command.ts'
+
 const cliAddCommand = {
   command: 'add [app]',
   describe: 'Register and deploy a new app',
@@ -49,10 +50,11 @@ const cliAddCommand = {
       if (reloaded instanceof ConfigError) return reloaded
       cfg = reloaded
     }
+
     const inputs = await gatherAddInputs(args)
     const planner = createAddPlanner()
     const interrupt = trapInterrupt()
-    const preflight = await preflightSourceSelection(
+    const preflight = await sourcesPreflightSelection(
       appName,
       cfg,
       paths,
@@ -61,6 +63,8 @@ const cliAddCommand = {
       typeof args.branch === 'string' ? args.branch : undefined,
       { isInteractive, promptConfirm, promptSelect },
     )
+    if (preflight instanceof Error) return preflight
+
     const flowArgs: { source?: string; branch?: string } = {
       branch: preflight.branch,
       ...(preflight.source ? { source: preflight.source } : {}),
@@ -74,6 +78,7 @@ const cliAddCommand = {
       planner,
       inspection.observer,
     )
+
     try {
       const { addResult, deployResult } = await runAddSequence(
         async () => {
@@ -140,11 +145,12 @@ async function addClaimIngress(paths: Paths, app: string, appCfg: App): Promise<
 }
 
 export interface AddChooseInitialSourceDeps {
-  buildSourceChoices?: typeof buildSourceChoices
+  buildSourceChoices?: typeof sourcesBuildChoices
   isInteractive?: typeof isInteractive
   promptSelect?: typeof promptSelect
-  runSourceSetup?: typeof runSourceSetup
+  runSourceSetup?: typeof sourcesRunSetup
 }
+
 /** Chooses the initial source, prompting only when the caller did not provide one. */
 export async function addChooseInitialSource(
   cfg: Config,
@@ -154,19 +160,22 @@ export async function addChooseInitialSource(
 ): Promise<{ value?: string; created: boolean }> {
   const interactive = deps.isInteractive ?? isInteractive
   const select = deps.promptSelect ?? promptSelect
-  const sourceChoices = deps.buildSourceChoices ?? buildSourceChoices
-  const setupSource = deps.runSourceSetup ?? runSourceSetup
-  if (currentSource || !interactive())
+  const buildSourceChoices = deps.buildSourceChoices ?? sourcesBuildChoices
+  const runSourceSetup = deps.runSourceSetup ?? sourcesRunSetup
+  if (currentSource || !interactive()) {
     return currentSource ? { value: currentSource, created: false } : { created: false }
-  const options = sourceChoices(cfg)
+  }
+
+  const options = buildSourceChoices(cfg)
   if (options.length === 0) return { created: false }
+
   const choice = await select({
     message: 'Source for this app?',
     options: [{ value: 'none', label: 'None', hint: 'Public repo or local path' }, ...options],
   })
   if (choice === 'none') return { created: false }
   if (choice.startsWith('setup:')) {
-    const created = await setupSource(cfg, paths, choice.slice('setup:'.length))
+    const created = await runSourceSetup(cfg, paths, choice.slice('setup:'.length))
     if (!created) throw new CliError('cancelled', 'source setup did not complete; add cancelled')
     return { value: created, created: true }
   }
@@ -207,4 +216,5 @@ function createInspectionObserver() {
     },
   }
 }
+
 export default cliAddCommand

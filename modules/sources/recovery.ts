@@ -4,7 +4,7 @@ import type { Paths } from '@jib/paths'
 import { sourceDriver, sourceDrivers } from './registry.ts'
 import type { SourceSelectOption, SourceSetupOption, SourceStatus } from './types.ts'
 
-export function configuredSourceOptions(cfg: Config): SourceSelectOption[] {
+export function sourcesConfiguredOptions(cfg: Config): SourceSelectOption[] {
   return Object.entries(cfg.sources).map(([name, source]) => {
     const driver = sourceDriver(source.driver)
     return {
@@ -15,21 +15,22 @@ export function configuredSourceOptions(cfg: Config): SourceSelectOption[] {
   })
 }
 
-export function availableSourceSetupOptions(): SourceSetupOption[] {
+export function sourcesAvailableSetupOptions(): SourceSetupOption[] {
   return sourceDrivers().flatMap((driver) =>
     driver.setup ? [{ value: driver.name, label: driver.setupLabel ?? driver.name }] : [],
   )
 }
 
-export function repoSupportsSourceRecovery(repo: string): boolean {
+export function sourcesRepoSupportsRecovery(repo: string): boolean {
   return sourceDrivers().some((driver) => driver.supportsRepo(repo))
 }
 
-export function isSourceAuthFailure(repo: string, error: unknown): boolean {
+export function sourcesRepoHasAuthFailure(repo: string, error: unknown): boolean {
   return sourceDrivers().some((driver) => driver.supportsRepo(repo) && driver.isAuthFailure(error))
 }
 
-export async function runSourceSetup(
+/** Runs the selected source-driver setup flow and returns the created source name, if any. */
+export async function sourcesRunSetup(
   cfg: Config,
   paths: Paths,
   value: string,
@@ -39,7 +40,7 @@ export async function runSourceSetup(
   return driver.setup({ config: cfg, logger: createLogger('sources'), paths })
 }
 
-export async function collectSourceStatuses(cfg: Config, paths: Paths): Promise<SourceStatus[]> {
+export async function sourcesCollectStatuses(cfg: Config, paths: Paths): Promise<SourceStatus[]> {
   const results: SourceStatus[] = []
   for (const [name, source] of Object.entries(cfg.sources)) {
     const driver = sourceDriver(source.driver)

@@ -8,7 +8,6 @@
     ".": "./index.ts"
   },
   "dependencies": {
-    "@jib/cli": "workspace:*",
     "@jib/config": "workspace:*",
     "@jib/errors": "workspace:*",
     "@jib/logging": "workspace:*",

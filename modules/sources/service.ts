@@ -22,7 +22,11 @@ import type {
   SourceTarget,
 } from './types.ts'
 
-function resolveApp(cfg: Config, target: SourceTarget): App | SourceMissingAppError {
+/**
+ * Resolves the app config for a source operation, synthesizing a temporary app
+ * when callers pass `repo` directly for a not-yet-configured app.
+ */
+function resolveTargetApp(cfg: Config, target: SourceTarget): App | SourceMissingAppError {
   const existing = cfg.apps[target.app]
   if (existing) return existing
   if (!target.repo) return new SourceMissingAppError(target.app)
@@ -37,19 +41,15 @@ function resolveApp(cfg: Config, target: SourceTarget): App | SourceMissingAppEr
   }
 }
 
-function unwrapSourceResult<T>(result: T | Error): T {
-  if (result instanceof Error) throw result
-  return result
-}
-
-export async function resolveSource(
+/** Resolves remote metadata for a source target without creating a checkout. */
+export async function sourcesResolve(
   cfg: Config,
   paths: Paths,
   target: SourceTarget,
   ref?: string,
 ): Promise<ResolvedSource | Error> {
   const existing = cfg.apps[target.app]
-  const app = resolveApp(cfg, target)
+  const app = resolveTargetApp(cfg, target)
   if (app instanceof Error) return app
   if (app.repo === 'local') return new SourceLocalRepoError(target.app)
   const workdir = repoPath(paths, target.app, app.repo)
@@ -75,22 +75,14 @@ export async function resolveSource(
   }
 }
 
-export async function resolve(
-  cfg: Config,
-  paths: Paths,
-  target: SourceTarget,
-  ref?: string,
-): Promise<ResolvedSource> {
-  return unwrapSourceResult(await resolveSource(cfg, paths, target, ref))
-}
-
-export async function syncSource(
+/** Ensures the local workdir is ready for inspection or deploy and returns the pinned SHA. */
+export async function sourcesSync(
   cfg: Config,
   paths: Paths,
   target: SourceTarget,
   ref?: string,
 ): Promise<PreparedSource | Error> {
-  const app = resolveApp(cfg, target)
+  const app = resolveTargetApp(cfg, target)
   if (app instanceof Error) return app
 
   if (app.image) {
@@ -116,7 +108,7 @@ export async function syncSource(
     }
   }
 
-  const source = await resolveSource(cfg, paths, target, ref)
+  const source = await sourcesResolve(cfg, paths, target, ref)
   if (source instanceof Error) return source
 
   try {
@@ -131,44 +123,29 @@ export async function syncSource(
   }
 }
 
-export async function syncApp(
-  cfg: Config,
-  paths: Paths,
-  target: SourceTarget,
-  ref?: string,
-): Promise<PreparedSource> {
-  return unwrapSourceResult(await syncSource(cfg, paths, target, ref))
-}
-
-export async function cloneSourceForInspection(
+/** Prepares a checkout for compose inspection and returns the inspection workdir. */
+export async function sourcesCloneForInspection(
   cfg: Config,
   paths: Paths,
   target: SourceTarget,
 ): Promise<InspectionCheckout | Error> {
-  const prepared = await syncSource(cfg, paths, target)
+  const prepared = await sourcesSync(cfg, paths, target)
   if (prepared instanceof Error) return prepared
   return { workdir: prepared.workdir }
 }
 
-export async function cloneForInspection(
-  cfg: Config,
-  paths: Paths,
-  target: SourceTarget,
-): Promise<InspectionCheckout> {
-  return unwrapSourceResult(await cloneSourceForInspection(cfg, paths, target))
-}
-
-export async function probeSource(
+/** Resolves the remote SHA for a source target without mutating the local checkout. */
+export async function sourcesProbe(
   cfg: Config,
   paths: Paths,
   target: SourceTarget,
   deps: ProbeSourceDeps = {},
 ): Promise<SourceProbe | Error | null> {
-  const app = resolveApp(cfg, target)
+  const app = resolveTargetApp(cfg, target)
   if (app instanceof Error) return app
   if (app.repo === 'local') return null
 
-  const source = await resolveSource(cfg, paths, target)
+  const source = await sourcesResolve(cfg, paths, target)
   if (source instanceof Error) return source
   const lsRemote = deps.lsRemote ?? git.lsRemote
 
@@ -180,18 +157,11 @@ export async function probeSource(
   }
 }
 
-export async function probe(
-  cfg: Config,
+export async function sourcesRemoveCheckout(
   paths: Paths,
-  target: SourceTarget,
-  deps: ProbeSourceDeps = {},
-): Promise<SourceProbe | null> {
-  const result = await probeSource(cfg, paths, target, deps)
-  if (result instanceof Error) throw result
-  return result
-}
-
-export async function removeCheckout(paths: Paths, app: string, repo: string): Promise<void> {
+  app: string,
+  repo: string,
+): Promise<void> {
   const workdir = repoPath(paths, app, repo)
   await rm(workdir, { recursive: true, force: true })
 }

@@ -4,12 +4,12 @@ import { ensureCredsDir } from '@jib/paths'
 import { log, note, promptInt, promptPEM, promptSelect, promptString } from '@jib/tui'
 import type { SourceSetupContext } from '../../types.ts'
 import { appPemPath } from './auth.ts'
-import { addGitHubAppSource, addGitHubKeySource, sourceNameAvailable } from './config-edit.ts'
+import { githubAddAppSource, githubAddKeySource, githubValidateSourceName } from './config-edit.ts'
 import { deployKeyPaths, generateDeployKey } from './keygen.ts'
 
 interface SetupDeps {
-  addGitHubAppSource?: typeof addGitHubAppSource
-  addGitHubKeySource?: typeof addGitHubKeySource
+  githubAddAppSource?: typeof githubAddAppSource
+  githubAddKeySource?: typeof githubAddKeySource
   ensureCredsDir?: typeof ensureCredsDir
   generateDeployKey?: typeof generateDeployKey
   loadConfig?: typeof configLoad
@@ -18,16 +18,21 @@ interface SetupDeps {
   promptInt?: typeof promptInt
   promptPEM?: typeof promptPEM
   promptString?: typeof promptString
-  sourceNameAvailable?: typeof sourceNameAvailable
+  githubValidateSourceName?: typeof githubValidateSourceName
   writeFile?: typeof writeFile
 }
 
+function githubSetupFail(uiLog: typeof log, error: unknown): null {
+  uiLog.warning(`setup failed: ${error instanceof Error ? error.message : String(error)}`)
+  uiLog.info('you can retry later: jib sources setup')
+  return null
+}
+
 /**
- * Interactive GitHub source setup, shared between `jib sources setup`
- * and auth-recovery prompts. Prompts the user to
- * choose between SSH deploy key, GitHub App, or skip.
+ * Interactive GitHub source setup shared between `jib sources setup` and
+ * auth-recovery prompts.
  */
-export async function setup(ctx: SourceSetupContext): Promise<string | null> {
+export async function githubSetup(ctx: SourceSetupContext): Promise<string | null> {
   const choice = await promptSelect<'key' | 'app' | 'skip'>({
     message: 'Set up a git source ref? (needed for private repos)',
     options: [
@@ -36,29 +41,35 @@ export async function setup(ctx: SourceSetupContext): Promise<string | null> {
       { value: 'skip', label: 'Skip — public repos only or set up later' },
     ],
   })
-  if (choice === 'key') return await setupDeployKey(ctx)
-  if (choice === 'app') return await setupGitHubApp(ctx)
+  if (choice === 'key') return githubSetupDeployKey(ctx)
+  if (choice === 'app') return githubSetupApp(ctx)
   return null
 }
 
-export async function setupDeployKey(
+export async function githubSetupDeployKey(
   ctx: SourceSetupContext,
   deps: SetupDeps = {},
 ): Promise<string | null> {
+  const uiLog = deps.log ?? log
   try {
     const promptForString = deps.promptString ?? promptString
     const load = deps.loadConfig ?? configLoad
-    const ensureSourceNameAvailable = deps.sourceNameAvailable ?? sourceNameAvailable
+    const validateSourceName = deps.githubValidateSourceName ?? githubValidateSourceName
     const generateKey = deps.generateDeployKey ?? generateDeployKey
-    const addKeySource = deps.addGitHubKeySource ?? addGitHubKeySource
-    const uiLog = deps.log ?? log
+    const addKeySource = deps.githubAddKeySource ?? githubAddKeySource
     const uiNote = deps.note ?? note
+
     const name = await promptForString({ message: 'Source name (e.g. my-org-key)' })
     const cfg = await load(ctx.paths.configFile)
-    if (cfg instanceof ConfigError) throw cfg
-    ensureSourceNameAvailable(cfg, name)
+    if (cfg instanceof ConfigError) return githubSetupFail(uiLog, cfg)
+
+    const nameError = validateSourceName(cfg, name)
+    if (nameError) return githubSetupFail(uiLog, nameError)
+
     const pubKey = await generateKey(name, ctx.paths)
-    await addKeySource(ctx.paths.configFile, name)
+    const writeError = await addKeySource(ctx.paths.configFile, name)
+    if (writeError instanceof Error) return githubSetupFail(uiLog, writeError)
+
     const keyPaths = deployKeyPaths(ctx.paths, name)
     uiLog.success(`GitHub source "${name}" added to config`)
     uiNote(
@@ -72,45 +83,46 @@ export async function setupDeployKey(
       'Deploy Key',
     )
     return name
-  } catch (err) {
-    const uiLog = deps.log ?? log
-    uiLog.warning(`key setup failed: ${err instanceof Error ? err.message : String(err)}`)
-    uiLog.info('you can retry later: jib sources setup')
-    return null
+  } catch (error) {
+    return githubSetupFail(uiLog, error)
   }
 }
 
-export async function setupGitHubApp(
+export async function githubSetupApp(
   ctx: SourceSetupContext,
   deps: SetupDeps = {},
 ): Promise<string | null> {
+  const uiLog = deps.log ?? log
   try {
     const promptForString = deps.promptString ?? promptString
     const load = deps.loadConfig ?? configLoad
-    const ensureSourceNameAvailable = deps.sourceNameAvailable ?? sourceNameAvailable
-    const uiLog = deps.log ?? log
+    const validateSourceName = deps.githubValidateSourceName ?? githubValidateSourceName
     const promptForInt = deps.promptInt ?? promptInt
     const promptForPEM = deps.promptPEM ?? promptPEM
     const ensureDir = deps.ensureCredsDir ?? ensureCredsDir
     const write = deps.writeFile ?? writeFile
-    const addAppSource = deps.addGitHubAppSource ?? addGitHubAppSource
+    const addAppSource = deps.githubAddAppSource ?? githubAddAppSource
+
     const name = await promptForString({ message: 'Source name (e.g. my-org)' })
     const cfg = await load(ctx.paths.configFile)
-    if (cfg instanceof ConfigError) throw cfg
-    ensureSourceNameAvailable(cfg, name)
+    if (cfg instanceof ConfigError) return githubSetupFail(uiLog, cfg)
+
+    const nameError = validateSourceName(cfg, name)
+    if (nameError) return githubSetupFail(uiLog, nameError)
+
     uiLog.info('create the app at github.com → Settings → Developer settings → GitHub Apps')
     const appId = await promptForInt({ message: 'GitHub App ID', min: 1 })
     const pem = await promptForPEM({ message: 'Private key PEM' })
     const pemPath = appPemPath(ctx.paths, name)
     await ensureDir(ctx.paths, 'github-app')
     await write(pemPath, pem, { mode: 0o640 })
-    await addAppSource(ctx.paths.configFile, name, appId)
+
+    const writeError = await addAppSource(ctx.paths.configFile, name, appId)
+    if (writeError instanceof Error) return githubSetupFail(uiLog, writeError)
+
     uiLog.success(`source "${name}" (GitHub App ${appId}) created`)
     return name
-  } catch (err) {
-    const uiLog = deps.log ?? log
-    uiLog.warning(`app setup failed: ${err instanceof Error ? err.message : String(err)}`)
-    uiLog.info('you can retry later: jib sources setup')
-    return null
+  } catch (error) {
+    return githubSetupFail(uiLog, error)
   }
 }

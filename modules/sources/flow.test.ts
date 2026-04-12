@@ -2,10 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { type Paths, getPaths } from '@jib/paths'
 import {
-  buildSourceChoices,
-  isSourceAuthFailure,
-  maybeRecoverSource,
-  preflightSourceSelection,
+  sourcesBuildChoices,
+  sourcesIsAuthFailure,
+  sourcesMaybeRecover,
+  sourcesPreflightSelection,
 } from './flow.ts'
 import type { SourceTarget } from './types.ts'
 
@@ -23,7 +23,7 @@ const cfg = {
 
 describe('source recovery', () => {
   test('lists existing sources before setup options', () => {
-    expect(buildSourceChoices(cfg)).toEqual([
+    expect(sourcesBuildChoices(cfg)).toEqual([
       { value: 'existing:appy', label: 'appy', hint: 'GitHub App' },
       { value: 'existing:keyy', label: 'keyy', hint: 'GitHub deployment key' },
       { value: 'setup:github', label: 'Set up new GitHub source' },
@@ -31,7 +31,7 @@ describe('source recovery', () => {
   })
 
   test('existing source can be selected after an auth-shaped clone failure', async () => {
-    const source = await maybeRecoverSource(
+    const source = await sourcesMaybeRecover(
       cfg,
       paths,
       'acme/private',
@@ -49,7 +49,7 @@ describe('source recovery', () => {
   test('new deploy-key setup can create a source and confirm retry', async () => {
     const calls: string[] = []
 
-    const source = await maybeRecoverSource(
+    const source = await sourcesMaybeRecover(
       cfg,
       paths,
       'acme/private',
@@ -74,10 +74,10 @@ describe('source recovery', () => {
     expect(calls).toEqual(['setup:github', 'confirm'])
   })
 
-  test('preflightSourceSelection retries probe after choosing a new source', async () => {
+  test('sourcesPreflightSelection retries probe after choosing a new source', async () => {
     const loads: string[] = []
     const probed: string[] = []
-    const result = await preflightSourceSelection(
+    const result = await sourcesPreflightSelection(
       'demo',
       cfg,
       paths,
@@ -108,8 +108,8 @@ describe('source recovery', () => {
     expect(probed).toEqual(['none', 'keyy'])
   })
 
-  test('preflightSourceSelection still recovers when the probe dependency throws', async () => {
-    const result = await preflightSourceSelection(
+  test('sourcesPreflightSelection still recovers when the probe dependency throws', async () => {
+    const result = await sourcesPreflightSelection(
       'demo',
       cfg,
       paths,
@@ -135,7 +135,7 @@ describe('source recovery', () => {
   })
 
   test('non-auth failures do not trigger source recovery', async () => {
-    const source = await maybeRecoverSource(
+    const source = await sourcesMaybeRecover(
       cfg,
       paths,
       'acme/private',
@@ -145,6 +145,6 @@ describe('source recovery', () => {
     )
 
     expect(source).toBeNull()
-    expect(isSourceAuthFailure('acme/private', new Error('compose file missing'))).toBe(false)
+    expect(sourcesIsAuthFailure('acme/private', new Error('compose file missing'))).toBe(false)
   })
 })

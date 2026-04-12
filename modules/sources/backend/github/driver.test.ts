@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { App, Config } from '@jib/config'
-import { cloneURL } from './driver.ts'
+import { githubCloneUrl } from './driver.ts'
 
 const cfg = {
   config_version: 3,
@@ -25,14 +25,14 @@ function app(source?: string): App {
 
 describe('GitHub source driver', () => {
   test('public GitHub slugs default to anonymous HTTPS', () => {
-    expect(cloneURL(app(), cfg)).toBe('https://github.com/acme/site.git')
+    expect(githubCloneUrl(app(), cfg)).toBe('https://github.com/acme/site.git')
   })
 
   test('deploy-key sources use SSH', () => {
-    expect(cloneURL(app('keyy'), cfg)).toBe('git@github.com:acme/site.git')
+    expect(githubCloneUrl(app('keyy'), cfg)).toBe('git@github.com:acme/site.git')
   })
 
   test('GitHub App sources use HTTPS', () => {
-    expect(cloneURL(app('appy'), cfg)).toBe('https://github.com/acme/site.git')
+    expect(githubCloneUrl(app('appy'), cfg)).toBe('https://github.com/acme/site.git')
   })
 })

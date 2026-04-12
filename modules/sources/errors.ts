@@ -65,3 +65,15 @@ export class SourceProbeError extends JibError {
     super('source_probe', `failed to probe source for app "${app}" at ref "${ref}"`, options)
   }
 }
+
+export class SourceSetupSelectionRequiredError extends JibError {
+  constructor() {
+    super('missing_input', 'missing source setup selection; rerun with interactive prompts enabled')
+  }
+}
+
+export class SourceSetupCancelledError extends JibError {
+  constructor(message: string) {
+    super('cancelled', message)
+  }
+}

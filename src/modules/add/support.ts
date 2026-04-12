@@ -3,7 +3,7 @@ import { configLoad, configWrite } from '@jib/config'
 import type { App, Config } from '@jib/config'
 import { type Paths, managedComposePath } from '@jib/paths'
 import { SecretsManager } from '@jib/secrets'
-import { cloneForInspection, removeCheckout } from '@jib/sources'
+import { sourcesCloneForInspection, sourcesRemoveCheckout } from '@jib/sources'
 import type { AddSupport, EnvEntry } from './types.ts'
 
 export interface DefaultAddSupportOptions {
@@ -15,15 +15,20 @@ export function createDefaultAddSupport(options: DefaultAddSupportOptions): AddS
   const secrets = new SecretsManager(options.paths.secretsDir)
 
   return {
-    cloneForInspection(
+    async cloneForInspection(
       cfg: Config,
       appName: string,
       target: { repo: string; branch: string; source?: string },
     ) {
-      return cloneForInspection(cfg, options.paths, { app: appName, ...target })
+      const result = await sourcesCloneForInspection(cfg, options.paths, {
+        app: appName,
+        ...target,
+      })
+      if (result instanceof Error) throw result
+      return result
     },
     removeCheckout(appName: string, repo: string) {
-      return removeCheckout(options.paths, appName, repo)
+      return sourcesRemoveCheckout(options.paths, appName, repo)
     },
     loadConfig(configFile: string) {
       return configLoad(configFile).then((result) => {

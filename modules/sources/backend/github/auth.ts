@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import type { App, Config } from '@jib/config'
 import { JibError } from '@jib/errors'
 import { type Paths, credsPath } from '@jib/paths'
-import { getGitHubSource } from './config-edit.ts'
+import { githubGetSource } from './config-edit.ts'
 import { findInstallationForOrg } from './installation.ts'
 import { generateInstallationToken } from './jwt.ts'
 import { deployKeyPaths } from './keygen.ts'
@@ -38,7 +38,7 @@ export async function refreshAuth(
   app: App,
   paths: Paths,
 ): Promise<AuthResult> {
-  const source = getGitHubSource(cfg, sourceName)
+  const source = githubGetSource(cfg, sourceName)
   if (!source) {
     throw new JibError('github.auth', `source "${sourceName}" not found in config`)
   }

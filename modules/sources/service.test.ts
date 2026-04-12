@@ -13,14 +13,11 @@ import {
   SourceMissingConfigError,
 } from './errors.ts'
 import {
-  cloneForInspection,
-  probe,
-  probeSource,
-  removeCheckout,
-  resolve,
-  resolveSource,
-  syncApp,
-  syncSource,
+  sourcesCloneForInspection,
+  sourcesProbe,
+  sourcesRemoveCheckout,
+  sourcesResolve,
+  sourcesSync,
 } from './index.ts'
 
 const tempRoots: string[] = []
@@ -74,34 +71,47 @@ function configFor(repo: string): Config {
   }
 }
 
+function expectSourceValue<T>(result: T | Error | null | undefined): T {
+  if (result instanceof Error) throw result
+  if (result == null) throw new Error('expected source result')
+  return result
+}
+
 describe('sources service', () => {
   test('probe returns the remote sha without requiring a checkout', async () => {
     const upstream = await makeUpstream('jib-probe')
     const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
-    const result = await probe(configFor(upstream), paths, { app: 'demo' })
+    const result = expectSourceValue(
+      await sourcesProbe(configFor(upstream), paths, { app: 'demo' }),
+    )
 
-    expect(result?.sha).toMatch(/^[0-9a-f]{40}$/)
-    expect(result?.workdir).toBe(repoPath(paths, 'demo', upstream))
+    expect(result.sha).toMatch(/^[0-9a-f]{40}$/)
+    expect(result.workdir).toBe(repoPath(paths, 'demo', upstream))
   })
 
-  test('cloneForInspection and syncApp share the checkout lifecycle', async () => {
+  test('sourcesCloneForInspection and sourcesSync share the checkout lifecycle', async () => {
     const upstream = await makeUpstream('jib-roundtrip')
     const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
     const workdir = repoPath(paths, 'demo', upstream)
 
-    const checkout = await cloneForInspection(configFor(upstream), paths, { app: 'demo' })
+    const checkout = expectSourceValue(
+      await sourcesCloneForInspection(configFor(upstream), paths, { app: 'demo' }),
+    )
     expect(checkout.workdir).toBe(workdir)
-    const prepared = await syncApp(configFor(upstream), paths, { app: 'demo' }, 'main')
+
+    const prepared = expectSourceValue(
+      await sourcesSync(configFor(upstream), paths, { app: 'demo' }, 'main'),
+    )
     expect(prepared.workdir).toBe(workdir)
     expect(await pathExists(workdir)).toBe(true)
 
-    await removeCheckout(paths, 'demo', upstream)
+    await sourcesRemoveCheckout(paths, 'demo', upstream)
     expect(await pathExists(workdir)).toBe(false)
   })
 
-  test('probe and syncApp follow the remote default branch for a new app', async () => {
+  test('probe and sourcesSync follow the remote default branch for a new app', async () => {
     const upstream = await makeUpstreamOnBranch('jib-master', 'master')
     const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
@@ -113,14 +123,18 @@ describe('sources service', () => {
       apps: {},
     }
 
-    const probed = await probe(cfg, paths, { app: 'demo', repo: upstream })
-    const prepared = await syncApp(cfg, paths, { app: 'demo', repo: upstream })
+    const probed = expectSourceValue(
+      await sourcesProbe(cfg, paths, { app: 'demo', repo: upstream }),
+    )
+    const prepared = expectSourceValue(
+      await sourcesSync(cfg, paths, { app: 'demo', repo: upstream }),
+    )
 
-    expect(probed?.branch).toBe('master')
+    expect(probed.branch).toBe('master')
     expect(prepared.sha).toMatch(/^[0-9a-f]{40}$/)
   })
 
-  test('syncApp accepts a tag ref', async () => {
+  test('sourcesSync accepts a tag ref', async () => {
     const upstream = await makeUpstream('jib-tag')
     await writeFile(join(upstream, 'RELEASE'), 'v2\n')
     await $`git -C ${upstream} add RELEASE`.quiet()
@@ -129,7 +143,9 @@ describe('sources service', () => {
 
     const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
-    const prepared = await syncApp(configFor(upstream), paths, { app: 'demo' }, 'v2')
+    const prepared = expectSourceValue(
+      await sourcesSync(configFor(upstream), paths, { app: 'demo' }, 'v2'),
+    )
 
     expect(prepared.sha).toMatch(/^[0-9a-f]{40}$/)
   })
@@ -145,14 +161,16 @@ describe('sources service', () => {
       apps: {},
     }
 
-    const probed = await probe(cfg, paths, {
+    const probed = await sourcesProbe(cfg, paths, {
       app: 'demo',
       repo: 'https://hub.docker.com/r/n8nio/n8n',
     })
-    const prepared = await syncApp(cfg, paths, {
-      app: 'demo',
-      repo: 'https://hub.docker.com/r/n8nio/n8n',
-    })
+    const prepared = expectSourceValue(
+      await sourcesSync(cfg, paths, {
+        app: 'demo',
+        repo: 'https://hub.docker.com/r/n8nio/n8n',
+      }),
+    )
 
     expect(probed).toBeNull()
     expect(prepared.workdir).toBe(repoPath(paths, 'demo', 'local'))
@@ -170,13 +188,8 @@ describe('sources service', () => {
       apps: {},
     }
 
-    expect(await resolveSource(cfg, paths, { app: 'demo' })).toBeInstanceOf(SourceMissingAppError)
-    expect(await resolveSource(cfg, paths, { app: 'demo', repo: 'local' })).toBeInstanceOf(
-      SourceLocalRepoError,
-    )
-
-    await expect(resolve(cfg, paths, { app: 'demo' })).rejects.toBeInstanceOf(SourceMissingAppError)
-    await expect(resolve(cfg, paths, { app: 'demo', repo: 'local' })).rejects.toBeInstanceOf(
+    expect(await sourcesResolve(cfg, paths, { app: 'demo' })).toBeInstanceOf(SourceMissingAppError)
+    expect(await sourcesResolve(cfg, paths, { app: 'demo', repo: 'local' })).toBeInstanceOf(
       SourceLocalRepoError,
     )
   })
@@ -207,10 +220,10 @@ describe('sources service', () => {
       },
     }
 
-    expect(await resolveSource(missingSourceCfg, paths, { app: 'demo' })).toBeInstanceOf(
+    expect(await sourcesResolve(missingSourceCfg, paths, { app: 'demo' })).toBeInstanceOf(
       SourceMissingConfigError,
     )
-    expect(await resolveSource(missingDriverCfg, paths, { app: 'demo' })).toBeInstanceOf(
+    expect(await sourcesResolve(missingDriverCfg, paths, { app: 'demo' })).toBeInstanceOf(
       SourceDriverNotRegisteredError,
     )
   })
@@ -218,9 +231,9 @@ describe('sources service', () => {
   test('returns a typed local checkout error for a missing local repo workdir', async () => {
     const root = await makeTempRoot('jib-root-')
     const paths = getPaths(root)
-    const result = await syncSource(configFor('local'), paths, { app: 'demo' })
+    const result = await sourcesSync(configFor('local'), paths, { app: 'demo' })
 
     expect(result).toBeInstanceOf(SourceLocalCheckoutError)
-    expect(await probeSource(configFor('local'), paths, { app: 'demo' })).toBeNull()
+    expect(await sourcesProbe(configFor('local'), paths, { app: 'demo' })).toBeNull()
   })
 })

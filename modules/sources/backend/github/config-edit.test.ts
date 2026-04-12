@@ -4,10 +4,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigError, configLoad } from '@jib/config'
 import {
-  addGitHubAppSource,
-  addGitHubKeySource,
-  getGitHubSource,
-  sourceNameAvailable,
+  GitHubSourceAlreadyExistsError,
+  githubAddAppSource,
+  githubAddKeySource,
+  githubGetSource,
+  githubValidateSourceName,
 } from './config-edit.ts'
 
 function expectLoadedConfig(result: Awaited<ReturnType<typeof configLoad>>) {
@@ -40,22 +41,22 @@ describe('config-edit', () => {
   test('round-trips a key source', async () => {
     const p = await seedConfig({ withProviderRef: true })
     const cfg = expectLoadedConfig(await configLoad(p))
-    expect(getGitHubSource(cfg, 'gh-key')).toEqual({ driver: 'github', type: 'key' })
-    expect(() => sourceNameAvailable(cfg, 'gh-key')).toThrow(/already exists/)
+    expect(githubGetSource(cfg, 'gh-key')).toEqual({ driver: 'github', type: 'key' })
+    expect(githubValidateSourceName(cfg, 'gh-key')).toBeInstanceOf(GitHubSourceAlreadyExistsError)
   })
 
-  test('addGitHubKeySource writes a new entry', async () => {
+  test('githubAddKeySource writes a new entry', async () => {
     const p = await seedConfig()
-    await addGitHubKeySource(p, 'fresh')
+    expect(await githubAddKeySource(p, 'fresh')).toBeUndefined()
     const cfg = expectLoadedConfig(await configLoad(p))
-    expect(getGitHubSource(cfg, 'fresh')).toEqual({ driver: 'github', type: 'key' })
+    expect(githubGetSource(cfg, 'fresh')).toEqual({ driver: 'github', type: 'key' })
   })
 
   test('round-trips an app source', async () => {
     const p = await seedConfig()
-    await addGitHubAppSource(p, 'gh-app', 42)
+    expect(await githubAddAppSource(p, 'gh-app', 42)).toBeUndefined()
     const cfg = expectLoadedConfig(await configLoad(p))
-    expect(getGitHubSource(cfg, 'gh-app')).toEqual({
+    expect(githubGetSource(cfg, 'gh-app')).toEqual({
       driver: 'github',
       type: 'app',
       app_id: 42,

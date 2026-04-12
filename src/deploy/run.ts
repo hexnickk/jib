@@ -1,7 +1,7 @@
 import { CliError, cliIsTextOutput } from '@jib/cli'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
-import { syncApp } from '@jib/sources'
+import { sourcesSync } from '@jib/sources'
 import { spinner } from '@jib/tui'
 import { createDeployEngine } from './engine.ts'
 import {
@@ -30,7 +30,7 @@ export interface DeployRunResult {
 interface DeployRunDeps {
   createEngine?: typeof createDeployEngine
   createSpinner?: () => DeploySpinner
-  sync?: typeof syncApp
+  sync?: typeof sourcesSync
 }
 
 export async function runDeploy(
@@ -59,7 +59,7 @@ export async function runDeployResult(
   const prepareSpin = showProgress ? createSpin() : null
 
   prepareSpin?.start(`[1/2] preparing ${app}`)
-  const ready = await syncDeployApp(cfg, paths, app, ref, deps.sync ?? syncApp)
+  const ready = await syncDeployApp(cfg, paths, app, ref, deps.sync ?? sourcesSync)
   if (ready instanceof DeployPrepareError) {
     prepareSpin?.stop(`[1/2] failed to prepare ${app}`)
     return ready
@@ -96,10 +96,13 @@ async function syncDeployApp(
   paths: Paths,
   app: string,
   ref: string | undefined,
-  sync: typeof syncApp,
-) {
+  sync: typeof sourcesSync,
+): Promise<DeployPrepareError | { workdir: string; sha: string }> {
   try {
-    return await sync(cfg, paths, { app }, ref)
+    const result = await sync(cfg, paths, { app }, ref)
+    return result instanceof Error
+      ? new DeployPrepareError(result.message, { cause: result })
+      : result
   } catch (error) {
     return new DeployPrepareError(toErrorMessage(error), { cause: toErrorCause(error) })
   }
@@ -116,7 +119,7 @@ function deployFailureHint(error: unknown): string {
 function createDeployPromise(
   engine: ReturnType<typeof createDeployEngine>,
   app: string,
-  ready: Awaited<ReturnType<typeof syncApp>>,
+  ready: { workdir: string; sha: string },
   deploySpin: DeploySpinner | null,
 ) {
   try {

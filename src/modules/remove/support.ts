@@ -4,7 +4,7 @@ import type { Config } from '@jib/config'
 import { composeFor, overridePath } from '@jib/docker'
 import { type Paths, managedComposePath } from '@jib/paths'
 import { SecretsManager } from '@jib/secrets'
-import { removeCheckout } from '@jib/sources'
+import { sourcesRemoveCheckout } from '@jib/sources'
 import { Store } from '@jib/state'
 import { RemoveWriteConfigError } from './errors.ts'
 import type { RemoveSupport } from './types.ts'
@@ -29,7 +29,7 @@ export function createRemoveSupport(options: DefaultRemoveSupportOptions): Remov
     },
 
     removeCheckout(appName: string, repo: string) {
-      return removeCheckout(options.paths, appName, repo)
+      return sourcesRemoveCheckout(options.paths, appName, repo)
     },
 
     removeSecrets(appName: string) {

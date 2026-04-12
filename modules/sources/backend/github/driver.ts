@@ -6,7 +6,7 @@ import type { DriverSourceStatus, ResolvedDriverSource, SourceDriver } from '../
 import { appPemPath, applyAuth, refreshAuth } from './auth.ts'
 import { deployKeyPaths } from './keygen.ts'
 import { httpsCloneURL, sshCloneURL } from './remote-url.ts'
-import { setup as setupGitHubSource } from './setup.ts'
+import { githubSetup } from './setup.ts'
 
 const AUTH_FAILURE_SNIPPETS = [
   'Permission denied (publickey)',
@@ -17,13 +17,13 @@ const AUTH_FAILURE_SNIPPETS = [
   'not found in config',
 ]
 
-export function cloneURL(app: App, cfg: Config): string {
+export function githubCloneUrl(app: App, cfg: Config): string {
   if (isExternalRepoURL(app.repo)) return app.repo
   const sourceType = app.source ? cfg.sources[app.source]?.type : undefined
   return sourceType === 'key' ? sshCloneURL(app.repo) : httpsCloneURL(app.repo)
 }
 
-export async function resolveGitHubSource(
+export async function githubResolveSource(
   cfg: Config,
   app: App,
   paths: Paths,
@@ -31,7 +31,8 @@ export async function resolveGitHubSource(
   const external = isExternalRepoURL(app.repo)
   const auth = !external && app.source ? await refreshAuth(app.source, cfg, app, paths) : undefined
   const env = auth?.sshKeyPath ? configureSSHKey(auth.sshKeyPath) : {}
-  const url = auth?.token && !external ? httpsCloneURL(app.repo, auth.token) : cloneURL(app, cfg)
+  const url =
+    auth?.token && !external ? httpsCloneURL(app.repo, auth.token) : githubCloneUrl(app, cfg)
 
   return {
     applyAuth: external
@@ -75,8 +76,8 @@ async function describeGitHubStatus(
 export const githubDriver: SourceDriver = {
   name: 'github',
   setupLabel: 'GitHub source',
-  setup: setupGitHubSource,
-  resolve: resolveGitHubSource,
+  setup: githubSetup,
+  resolve: githubResolveSource,
   supportsRepo: supportsGitHubRepo,
   isAuthFailure: isGitHubAuthFailure,
   describe: describeGitHubSource,

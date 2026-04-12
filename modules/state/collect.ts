@@ -1,6 +1,6 @@
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
-import { type SourceStatus, collectSourceStatuses } from '@jib/sources'
+import { type SourceStatus, sourcesCollectStatuses } from '@jib/sources'
 import { $ } from 'bun'
 import { StateError } from './errors.ts'
 import { createStateStore, loadState } from './store.ts'
@@ -52,7 +52,7 @@ async function checkUnit(name: string): Promise<ServiceStatus> {
 }
 
 export async function collectSources(cfg: Config, paths: Paths): Promise<SourceStatus[]> {
-  return collectSourceStatuses(cfg, paths)
+  return sourcesCollectStatuses(cfg, paths)
 }
 
 export async function collectApps(cfg: Config, paths: Paths): Promise<AppStatus[]> {

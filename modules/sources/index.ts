@@ -1,9 +1,5 @@
-export { collectSourceStatuses, runSourceSetup } from './recovery.ts'
-export {
-  buildSourceChoices,
-  preflightSourceSelection,
-  setupSourceRef,
-} from './flow.ts'
+export { sourcesCollectStatuses, sourcesRunSetup } from './recovery.ts'
+export { sourcesBuildChoices, sourcesPreflightSelection, sourcesSetupRef } from './flow.ts'
 export {
   SourceDriverNotRegisteredError,
   SourceLocalCheckoutError,
@@ -13,6 +9,8 @@ export {
   SourceProbeError,
   SourceRemoteResolveError,
   SourceRemoteSyncError,
+  SourceSetupCancelledError,
+  SourceSetupSelectionRequiredError,
   SourceWorkdirPrepareError,
 } from './errors.ts'
 export type {
@@ -29,13 +27,9 @@ export type {
   SourceTarget,
 } from './types.ts'
 export {
-  cloneForInspection,
-  cloneSourceForInspection,
-  probe,
-  probeSource,
-  removeCheckout,
-  resolve,
-  resolveSource,
-  syncApp,
-  syncSource,
+  sourcesCloneForInspection,
+  sourcesProbe,
+  sourcesRemoveCheckout,
+  sourcesResolve,
+  sourcesSync,
 } from './service.ts'
