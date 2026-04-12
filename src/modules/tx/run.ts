@@ -2,10 +2,12 @@ export interface CancelSignal {
   readonly cancelled: boolean
 }
 
+type NonErrorState<T> = T extends Error ? never : T
+
 export interface Step<Ctx, State, Err extends Error> {
   readonly name: string
-  up(ctx: Ctx, signal: CancelSignal): Promise<State | Err>
-  down?(ctx: Ctx, state: State): Promise<undefined | Error>
+  up(ctx: Ctx, signal: CancelSignal): Promise<NonErrorState<State> | Err>
+  down?(ctx: Ctx, state: NonErrorState<State>): Promise<undefined | Error>
 }
 
 export async function runSteps<Ctx, Err extends Error>(
