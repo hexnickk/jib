@@ -1,14 +1,12 @@
-import { managedComposePath } from '@jib/paths'
-import { cleanupFailedAdd } from './cleanup.ts'
-import { configEntriesToRuntime } from './config-entries.ts'
-import { normalizeAddError } from './errors.ts'
+import { runSteps } from '../tx/run.ts'
+import { CancelledAddError } from './flow-errors.ts'
+import { type AddRunContext, buildAddSteps } from './steps.ts'
 import type {
   AddFlowObserver,
+  AddFlowOutcome,
   AddFlowParams,
-  AddFlowResult,
   AddPlanner,
   AddSupport,
-  CleanupState,
 } from './types.ts'
 
 export class AddService {
@@ -18,72 +16,29 @@ export class AddService {
     private readonly observer: AddFlowObserver = {},
   ) {}
 
-  async run(params: AddFlowParams): Promise<AddFlowResult> {
-    const cleanup: CleanupState = {
-      preparedRepo: false,
-      configWritten: false,
-      finalEnvFile: '.env',
-      writtenSecretKeys: [],
-      managedComposeWritten: false,
+  async run(params: AddFlowParams): Promise<AddFlowOutcome> {
+    const ctx: AddRunContext = {
+      params,
+      support: this.support,
+      planner: this.planner,
+      observer: this.observer,
+      inspection: { composeFiles: [], services: [] },
+      workdir: '',
+      guided: { domains: [], configEntries: [] },
+      finalApp: params.draftApp,
+      secretsWritten: 0,
     }
 
     this.observer.onStateChange?.('inputs_ready')
 
-    try {
-      const { workdir } = await this.support.cloneForInspection(params.cfg, params.appName, {
-        repo: params.inputs.repo,
-        branch: params.draftApp.branch,
-        ...(params.args.source ? { source: params.args.source } : {}),
-      })
-      cleanup.preparedRepo = true
-      this.observer.onStateChange?.('repo_prepared')
-
-      const inspection = await this.planner.inspectCompose(params.draftApp, workdir)
-      this.observer.onStateChange?.('compose_inspected')
-
-      const guided = await this.planner.collectGuidedInputs(params.inputs, inspection.services)
-      this.observer.onStateChange?.('guided_inputs_collected')
-
-      const finalApp = await this.planner.buildResolvedApp(
-        params.cfg,
-        params.paths,
-        params.appName,
-        workdir,
-        params.args,
-        params.inputs,
-        inspection,
-        guided,
-      )
-      cleanup.managedComposeWritten =
-        finalApp.compose?.includes(managedComposePath(params.paths, params.appName)) ?? false
-      this.observer.onStateChange?.('app_resolved')
-
-      await this.planner.confirmPlan(params.appName, inspection, finalApp, guided.configEntries)
-      this.observer.onStateChange?.('confirmed')
-
-      const finalCfg = {
-        ...params.cfg,
-        apps: { ...params.cfg.apps, [params.appName]: finalApp },
-      }
-      await this.support.writeConfig(params.configFile, finalCfg)
-      cleanup.configWritten = true
-      cleanup.finalEnvFile = finalApp.env_file
-      this.observer.onStateChange?.('config_written')
-
-      const runtimeEntries = configEntriesToRuntime(guided.configEntries)
-      for (const entry of runtimeEntries) {
-        await this.support.upsertSecret(params.appName, entry, finalApp.env_file)
-        cleanup.writtenSecretKeys.push(entry.key)
-      }
-      this.observer.onStateChange?.('secrets_written')
-
-      await this.support.claimIngress(params.appName, finalApp)
-      this.observer.onStateChange?.('routes_claimed')
-
-      return { finalApp, secretsWritten: runtimeEntries.length }
-    } catch (error) {
-      await cleanupFailedAdd(params, this.support, this.observer, cleanup)
-      throw normalizeAddError(error, params.appName, params.configFile)
-    }
+    const error = await runSteps(
+      ctx,
+      buildAddSteps(),
+      params.signal ?? { cancelled: false },
+      () => new CancelledAddError(),
+      this.observer.warn,
+    )
+    if (error) return error
+    return { finalApp: ctx.finalApp, secretsWritten: ctx.secretsWritten }
   }
 }

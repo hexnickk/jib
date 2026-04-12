@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import type { AddFlowError } from './flow-errors.ts'
+import { CancelledAddError } from './flow-errors.ts'
 import { finalApp, makeDeps, makeParams } from './service.test-support.ts'
 
 describe('add flow state machine', () => {
@@ -30,6 +32,23 @@ describe('add flow state machine', () => {
       'upsertSecret:PUBLIC_URL',
       'claimRoutes',
     ])
+  })
+
+  test('cancellation after config write rolls back completed steps', async () => {
+    const { calls, flow, states } = makeDeps()
+
+    const result = await flow.run({
+      ...makeParams(),
+      signal: {
+        get cancelled() {
+          return states.includes('config_written')
+        },
+      },
+    })
+
+    expect(result).toBeInstanceOf(CancelledAddError)
+    expect(calls).toContain('rollbackRepo')
+    expect(calls).toContain('loadConfig')
   })
 
   for (const [failAt, expectedStates, rollsBack] of [
@@ -68,7 +87,9 @@ describe('add flow state machine', () => {
     test(`failure at ${failAt} cleans up the expected partial state`, async () => {
       const { calls, flow, states } = makeDeps(failAt)
 
-      await expect(flow.run(makeParams())).rejects.toThrow(`${failAt} failed`)
+      const result = await flow.run(makeParams())
+      expect(result).toBeInstanceOf(Error)
+      expect((result as AddFlowError).message).toBe(`${failAt} failed`)
       expect(states).toEqual([...expectedStates])
       expect(calls.includes('rollbackRepo')).toBe(rollsBack)
       expect(calls.some((call) => call.startsWith('removeSecret:'))).toBe(false)

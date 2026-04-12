@@ -7,7 +7,9 @@ describe('add flow rollback', () => {
     for (const failAt of ['writeSecondSecret', 'claimRoutes'] as const) {
       const { calls, flow, warnings, writtenConfigs } = makeDeps(failAt, true)
 
-      await expect(flow.run(makeParams())).rejects.toThrow(`${failAt} failed`)
+      const result = await flow.run(makeParams())
+      expect(result).toBeInstanceOf(Error)
+      expect((result as Error).message).toBe(`${failAt} failed`)
       expect(calls).toContain('rollbackRepo')
       expect(calls).toContain('loadConfig')
       expect(calls).toContain('removeSecret:APP_KEY')
@@ -33,14 +35,18 @@ describe('add flow rollback', () => {
     } satisfies App
     const { calls, flow } = makeDeps('claimRoutes', false, false, false, managedApp)
 
-    await expect(flow.run(makeParams())).rejects.toThrow('claimRoutes failed')
+    const result = await flow.run(makeParams())
+    expect(result).toBeInstanceOf(Error)
+    expect((result as Error).message).toBe('claimRoutes failed')
     expect(calls).toContain('removeManagedCompose:blog')
   })
 
   test('cleanup falls back to the original snapshot when reloading config fails', async () => {
     const { flow, warnings, writtenConfigs } = makeDeps('claimRoutes', false, true)
 
-    await expect(flow.run(makeParams())).rejects.toThrow('claimRoutes failed')
+    const result = await flow.run(makeParams())
+    expect(result).toBeInstanceOf(Error)
+    expect((result as Error).message).toBe('claimRoutes failed')
     expect(
       warnings.some((warning) => warning.includes('config cleanup load: loadConfig failed')),
     ).toBe(true)
@@ -51,7 +57,9 @@ describe('add flow rollback', () => {
   test('cleanup keeps going when repo rollback itself fails', async () => {
     const { calls, flow, warnings, writtenConfigs } = makeDeps('claimRoutes', true, false, true)
 
-    await expect(flow.run(makeParams())).rejects.toThrow('claimRoutes failed')
+    const result = await flow.run(makeParams())
+    expect(result).toBeInstanceOf(Error)
+    expect((result as Error).message).toBe('claimRoutes failed')
     expect(calls).toContain('rollbackRepo')
     expect(calls).toContain('loadConfig')
     expect(calls).toContain('removeSecret:APP_KEY')

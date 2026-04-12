@@ -10,11 +10,13 @@ import { consola } from 'consola'
 import { DEFAULT_TIMEOUT_MS, runDeploy } from '../deploy/run.ts'
 import {
   AddService,
+  CancelledAddError,
   DefaultAddSupport,
   RolledBackAddError,
   buildDraftApp,
   createAddPlanner,
   gatherAddInputs,
+  normalizeAddError,
   resolveAddAppName,
   runAddSequence,
 } from '../modules/add/index.ts'
@@ -53,7 +55,7 @@ export default defineCommand({
       branch: preflight.branch,
       ...(preflight.source ? { source: preflight.source } : {}),
     }
-    const inspection = createInspectionObserver(interrupt)
+    const inspection = createInspectionObserver()
     const addService = new AddService(
       new DefaultAddSupport({
         paths,
@@ -65,8 +67,8 @@ export default defineCommand({
 
     try {
       const { addResult, deployResult } = await runAddSequence(
-        () =>
-          addService.run({
+        async () => {
+          const result = await addService.run({
             appName,
             args: flowArgs,
             cfg: preflight.cfg,
@@ -74,7 +76,16 @@ export default defineCommand({
             inputs,
             paths,
             draftApp: buildDraftApp(flowArgs, inputs),
-          }),
+            signal: {
+              get cancelled() {
+                return interrupt.interrupted
+              },
+            },
+          })
+          if (result instanceof CancelledAddError) throw result
+          if (result instanceof Error) throw normalizeAddError(result, appName, paths.configFile)
+          return result
+        },
         (result) =>
           runDeploy(
             { ...preflight.cfg, apps: { ...preflight.cfg.apps, [appName]: result.finalApp } },
@@ -90,6 +101,7 @@ export default defineCommand({
       return renderAddResult(appName, inputs.repo, addResult, deployResult)
     } catch (error) {
       inspection.fail()
+      if (error instanceof CancelledAddError) throw new CliError('cancelled', error.message)
       if (error instanceof RolledBackAddError) {
         const original = interrupt.interrupted
           ? new CliError('cancelled', 'add cancelled')
@@ -155,13 +167,12 @@ export async function chooseInitialSource(
     : { created: false }
 }
 
-function createInspectionObserver(interrupt: ReturnType<typeof trapInterrupt>) {
+function createInspectionObserver() {
   const spin = isTextOutput() ? spinner() : null
   let active = false
   return {
     observer: {
       onStateChange: (state: string) => {
-        if (interrupt.interrupted) throw new CliError('cancelled', 'add cancelled')
         if (!spin) return
         if (state === 'inputs_ready') {
           active = true

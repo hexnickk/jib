@@ -95,23 +95,24 @@ describe('AddService with DefaultAddSupport', () => {
       }
       const service = new AddService(support, planner)
 
-      await expect(
-        service.run({
-          appName: 'blog',
-          args: {},
-          cfg,
-          configFile: paths.configFile,
-          inputs: {
-            repo: upstream,
-            ingressDefault: 'direct',
-            parsedDomains: [],
-            configEntries: [],
-            healthChecks: [],
-          },
-          paths,
-          draftApp: { repo: upstream, branch: 'main', domains: [], env_file: '.env' },
-        }),
-      ).rejects.toThrow('claim ingress failed')
+      const result = await service.run({
+        appName: 'blog',
+        args: {},
+        cfg,
+        configFile: paths.configFile,
+        inputs: {
+          repo: upstream,
+          ingressDefault: 'direct',
+          parsedDomains: [],
+          configEntries: [],
+          healthChecks: [],
+        },
+        paths,
+        draftApp: { repo: upstream, branch: 'main', domains: [], env_file: '.env' },
+      })
+
+      expect(result).toBeInstanceOf(Error)
+      expect((result as Error).message).toBe('claim ingress failed')
 
       expect(await stat(managedCompose).catch(() => null)).toBeNull()
       expect(await stat(repoPath(paths, 'blog', upstream)).catch(() => null)).toBeNull()

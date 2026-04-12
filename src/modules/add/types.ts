@@ -2,6 +2,7 @@ import type { App, Config, Domain, HealthCheck, ParsedDomain } from '@jib/config
 import type { ComposeInspection, ComposeService } from '@jib/docker'
 import type { Paths } from '@jib/paths'
 import type { InspectionCheckout } from '@jib/sources'
+import type { AddFlowError } from './flow-errors.ts'
 
 export type EnvEntry = { key: string; value: string }
 
@@ -44,9 +45,11 @@ export interface AddFlowParams {
   inputs: AddInputs
   paths: Paths
   draftApp: App
+  signal?: { readonly cancelled: boolean }
 }
 
 export type AddFlowResult = { finalApp: App; secretsWritten: number }
+export type AddFlowOutcome = AddFlowResult | AddFlowError
 
 export interface AddPlanner {
   inspectCompose(draftApp: App, workdir: string): Promise<ComposeInspection>
@@ -87,12 +90,4 @@ export interface AddSupport {
   removeSecret(appName: string, key: string, envFile: string): Promise<void>
   removeManagedCompose(appName: string): Promise<void>
   claimIngress(appName: string, finalApp: App): Promise<void>
-}
-
-export interface CleanupState {
-  preparedRepo: boolean
-  configWritten: boolean
-  finalEnvFile: string
-  writtenSecretKeys: string[]
-  managedComposeWritten: boolean
 }
