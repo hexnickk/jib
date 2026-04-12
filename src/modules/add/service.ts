@@ -1,3 +1,4 @@
+import { managedComposePath } from '@jib/paths'
 import { cleanupFailedAdd } from './cleanup.ts'
 import { configEntriesToRuntime } from './config-entries.ts'
 import { normalizeAddError } from './errors.ts'
@@ -23,6 +24,7 @@ export class AddService {
       configWritten: false,
       finalEnvFile: '.env',
       writtenSecretKeys: [],
+      managedComposeWritten: false,
     }
 
     this.observer.onStateChange?.('inputs_ready')
@@ -44,6 +46,7 @@ export class AddService {
 
       const finalApp = await this.planner.buildResolvedApp(
         params.cfg,
+        params.paths,
         params.appName,
         workdir,
         params.args,
@@ -51,6 +54,8 @@ export class AddService {
         inspection,
         guided,
       )
+      cleanup.managedComposeWritten =
+        finalApp.compose?.includes(managedComposePath(params.paths, params.appName)) ?? false
       this.observer.onStateChange?.('app_resolved')
 
       await this.planner.confirmPlan(params.appName, inspection, finalApp, guided.configEntries)

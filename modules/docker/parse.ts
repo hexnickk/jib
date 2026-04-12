@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 
 /**
@@ -47,7 +47,7 @@ export function parseComposeServices(
   const merged = new Map<string, RawService>()
 
   for (const f of files) {
-    const data = readFileSync(join(repoDir, f), 'utf8')
+    const data = readFileSync(isAbsolute(f) ? f : join(repoDir, f), 'utf8')
     const cf = (parseYaml(data) ?? {}) as RawComposeFile
     for (const [name, svc] of Object.entries(cf.services ?? {})) {
       const existing = merged.get(name) ?? {}

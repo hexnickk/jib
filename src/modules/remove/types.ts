@@ -23,5 +23,6 @@ export interface RemoveSupport {
   removeSecrets(appName: string): Promise<void>
   removeState(appName: string): Promise<void>
   removeOverride(appName: string): Promise<void>
+  removeManagedCompose(appName: string): Promise<void>
   writeConfig(configFile: string, cfg: Config): Promise<void>
 }

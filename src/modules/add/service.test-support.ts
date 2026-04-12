@@ -1,5 +1,6 @@
 import type { App, Config } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
+import { getPaths, managedComposePath } from '@jib/paths'
 import {
   type AddFlowObserver,
   type AddFlowParams,
@@ -18,6 +19,8 @@ const baseCfg: Config = {
     existing: { repo: 'owner/existing', branch: 'main', domains: [], env_file: '.env' },
   },
 }
+
+const paths = getPaths('/tmp/jib-add-test')
 
 const draftApp: App = {
   repo: 'owner/blog',
@@ -66,6 +69,7 @@ export function makeParams(): AddFlowParams {
       configEntries: [],
       healthChecks: [],
     },
+    paths,
     draftApp,
   }
 }
@@ -83,6 +87,7 @@ export function makeDeps(
   injectConcurrentConfigChange = false,
   failLoadConfig = false,
   failRollbackRepo = false,
+  appOverride: App = finalApp,
 ) {
   const calls: string[] = []
   const states: AddFlowState[] = []
@@ -130,6 +135,9 @@ export function makeDeps(
     removeSecret: async (_appName, key) => {
       calls.push(`removeSecret:${key}`)
     },
+    removeManagedCompose: async (appName) => {
+      calls.push(`removeManagedCompose:${appName}`)
+    },
     claimIngress: async () => {
       calls.push('claimRoutes')
       if (failAt === 'claimRoutes') throw new Error('claimRoutes failed')
@@ -149,7 +157,7 @@ export function makeDeps(
     buildResolvedApp: async () => {
       calls.push('buildResolvedApp')
       if (failAt === 'buildResolvedApp') throw new Error('buildResolvedApp failed')
-      return finalApp
+      return appOverride
     },
     confirmPlan: async () => {
       calls.push('confirmPlan')
@@ -167,5 +175,12 @@ export function makeDeps(
 
   const flow = new AddService(support, planner, observer)
 
-  return { flow, calls, states, warnings, writtenConfigs }
+  return {
+    flow,
+    calls,
+    states,
+    warnings,
+    writtenConfigs,
+    managedCompose: managedComposePath(paths, 'blog'),
+  }
 }

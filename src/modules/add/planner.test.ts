@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { App } from '@jib/config'
+import type { App, Config } from '@jib/config'
+import { getPaths, managedComposePath } from '@jib/paths'
 import { GENERATED_COMPOSE_FILE } from './compose-scaffold.ts'
 import { createAddPlanner } from './planner.ts'
 
@@ -11,6 +12,14 @@ const draftApp: App = {
   branch: 'main',
   domains: [],
   env_file: '.env',
+}
+
+const cfg: Config = {
+  config_version: 3,
+  poll_interval: '5m',
+  modules: {},
+  sources: {},
+  apps: {},
 }
 
 describe('createAddPlanner', () => {
@@ -32,6 +41,39 @@ describe('createAddPlanner', () => {
     expect(inspection.composeFiles).toEqual([GENERATED_COMPOSE_FILE])
     expect(inspection.services.map((service) => service.name)).toEqual(['app'])
     expect(inspection.services[0]?.expose).toEqual(['3000'])
+  })
+
+  test('persists generated compose outside the repo when building the final app', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'jib-planner-paths-'))
+    const workdir = mkdtempSync(join(tmpdir(), 'jib-planner-'))
+    const paths = getPaths(root)
+    writeFileSync(
+      join(workdir, GENERATED_COMPOSE_FILE),
+      'services:\n  app:\n    build:\n      context: .\n',
+    )
+
+    const planner = createAddPlanner()
+    const app = await planner.buildResolvedApp(
+      cfg,
+      paths,
+      'demo',
+      workdir,
+      {},
+      {
+        repo: 'owner/demo',
+        ingressDefault: 'direct',
+        parsedDomains: [],
+        configEntries: [],
+        healthChecks: [],
+      },
+      {
+        composeFiles: [GENERATED_COMPOSE_FILE],
+        services: [{ name: 'app', ports: [], expose: [], envRefs: [], buildArgRefs: [] }],
+      },
+      { domains: [], configEntries: [] },
+    )
+
+    expect(app.compose).toEqual([managedComposePath(paths, 'demo')])
   })
 
   test('falls back to prompting for compose paths when scaffold is declined', async () => {

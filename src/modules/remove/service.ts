@@ -29,6 +29,9 @@ export class RemoveService {
     await this.runBestEffort('secrets cleanup', () => this.support.removeSecrets(params.appName))
     await this.runBestEffort('state cleanup', () => this.support.removeState(params.appName))
     await this.runBestEffort('override cleanup', () => this.support.removeOverride(params.appName))
+    await this.runBestEffort('managed compose cleanup', () =>
+      this.support.removeManagedCompose(params.appName),
+    )
     return { app: params.appName, removed: true }
   }
 

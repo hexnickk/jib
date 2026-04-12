@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import type { App } from '@jib/config'
 import { makeDeps, makeParams } from './service.test-support.ts'
 
 describe('add flow rollback', () => {
@@ -18,6 +19,22 @@ describe('add flow rollback', () => {
       expect(rollbackConfig?.apps.worker).toBeDefined()
       expect(rollbackConfig?.apps.existing).toBeDefined()
     }
+  })
+
+  test('cleanup removes a managed compose file written during add', async () => {
+    const base = makeDeps()
+    const managedApp = {
+      repo: 'owner/blog',
+      branch: 'main',
+      compose: [base.managedCompose],
+      services: ['web'],
+      domains: [{ host: 'blog.example.com', service: 'web', port: 20000, container_port: 80 }],
+      env_file: '.env',
+    } satisfies App
+    const { calls, flow } = makeDeps('claimRoutes', false, false, false, managedApp)
+
+    await expect(flow.run(makeParams())).rejects.toThrow('claimRoutes failed')
+    expect(calls).toContain('removeManagedCompose:blog')
   })
 
   test('cleanup falls back to the original snapshot when reloading config fails', async () => {

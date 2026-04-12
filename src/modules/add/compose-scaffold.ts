@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { copyFile, mkdir } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { type Paths, managedComposePath } from '@jib/paths'
 
 export const GENERATED_COMPOSE_FILE = 'docker-compose.generated.yml'
 
@@ -15,6 +17,18 @@ export function scaffoldComposeFromDockerfile(workdir: string): string | null {
     renderGeneratedCompose(parseDockerfileExpose(dockerfile)),
   )
   return GENERATED_COMPOSE_FILE
+}
+
+export async function persistGeneratedCompose(
+  paths: Paths,
+  app: string,
+  workdir: string,
+): Promise<string> {
+  const source = join(workdir, GENERATED_COMPOSE_FILE)
+  const target = managedComposePath(paths, app)
+  await mkdir(dirname(target), { recursive: true, mode: 0o750 })
+  await copyFile(source, target)
+  return target
 }
 
 export function parseDockerfileExpose(dockerfile: string): number | undefined {

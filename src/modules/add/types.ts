@@ -1,5 +1,6 @@
 import type { App, Config, Domain, HealthCheck, ParsedDomain } from '@jib/config'
 import type { ComposeInspection, ComposeService } from '@jib/docker'
+import type { Paths } from '@jib/paths'
 import type { InspectionCheckout } from '@jib/sources'
 
 export type EnvEntry = { key: string; value: string }
@@ -41,6 +42,7 @@ export interface AddFlowParams {
   cfg: Config
   configFile: string
   inputs: AddInputs
+  paths: Paths
   draftApp: App
 }
 
@@ -51,6 +53,7 @@ export interface AddPlanner {
   collectGuidedInputs(inputs: AddInputs, services: ComposeService[]): Promise<GuidedInputs>
   buildResolvedApp(
     cfg: Config,
+    paths: Paths,
     appName: string,
     workdir: string,
     args: { source?: string; branch?: string },
@@ -82,6 +85,7 @@ export interface AddSupport {
   writeConfig(configFile: string, cfg: Config): Promise<void>
   upsertSecret(appName: string, entry: EnvEntry, envFile: string): Promise<void>
   removeSecret(appName: string, key: string, envFile: string): Promise<void>
+  removeManagedCompose(appName: string): Promise<void>
   claimIngress(appName: string, finalApp: App): Promise<void>
 }
 
@@ -90,4 +94,5 @@ export interface CleanupState {
   configWritten: boolean
   finalEnvFile: string
   writtenSecretKeys: string[]
+  managedComposeWritten: boolean
 }

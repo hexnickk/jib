@@ -14,6 +14,16 @@ export async function cleanupFailedAdd(
     }
   }
 
+  if (state.managedComposeWritten) {
+    try {
+      await support.removeManagedCompose(params.appName)
+    } catch (error) {
+      observer.warn?.(
+        `managed compose cleanup: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+  }
+
   for (const key of state.writtenSecretKeys) {
     try {
       await support.removeSecret(params.appName, key, state.finalEnvFile)

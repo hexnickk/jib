@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import type { App, Domain } from '@jib/config'
 import {
   type ComposeService,
@@ -100,7 +100,9 @@ export function resolveFromCompose(
 
 function resolveComposeFiles(workdir: string, composeFiles: string[]): string[] {
   if (composeFiles.length > 0) {
-    const missing = composeFiles.filter((file) => !existsSync(join(workdir, file)))
+    const missing = composeFiles.filter(
+      (file) => !existsSync(isAbsolute(file) ? file : join(workdir, file)),
+    )
     if (missing.length > 0) {
       throw new ComposeInspectionError(
         'compose_not_found',

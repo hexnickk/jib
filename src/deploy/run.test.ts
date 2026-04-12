@@ -22,6 +22,7 @@ const paths: Paths = {
   locksDir: '/opt/jib/locks',
   nginxDir: '/opt/jib/nginx',
   overridesDir: '/opt/jib/overrides',
+  composeDir: '/opt/jib/compose',
   reposDir: '/opt/jib/repos',
   secretsDir: '/opt/jib/secrets',
   stateDir: '/opt/jib/state',

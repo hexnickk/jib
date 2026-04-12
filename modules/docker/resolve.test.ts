@@ -115,6 +115,17 @@ describe('resolveFromCompose', () => {
     expect(inspection.services.map((service) => service.name)).toEqual(['web'])
   })
 
+  test('inspectComposeApp accepts absolute compose paths', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
+    const composePath = join(dir, 'managed.yml')
+    writeFileSync(composePath, 'services:\n  web:\n    image: nginx\n')
+
+    const inspection = inspectComposeApp({ compose: [composePath] }, dir)
+
+    expect(inspection.composeFiles).toEqual([composePath])
+    expect(inspection.services.map((service) => service.name)).toEqual(['web'])
+  })
+
   test('inspectComposeApp reports an explicit missing compose path clearly', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
 

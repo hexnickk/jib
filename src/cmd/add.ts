@@ -72,6 +72,7 @@ export default defineCommand({
             cfg: preflight.cfg,
             configFile: paths.configFile,
             inputs,
+            paths,
             draftApp: buildDraftApp(flowArgs, inputs),
           }),
         (result) =>

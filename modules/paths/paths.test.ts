@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtemp, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { credsPath, ensureCredsDir, getPaths, repoPath } from './paths.ts'
+import { credsPath, ensureCredsDir, getPaths, managedComposePath, repoPath } from './paths.ts'
 
 describe('getPaths', () => {
   const prev = process.env.JIB_ROOT
@@ -22,6 +22,7 @@ describe('getPaths', () => {
     expect(p.locksDir).toBe('/opt/jib/locks')
     expect(p.secretsDir).toBe('/opt/jib/secrets')
     expect(p.overridesDir).toBe('/opt/jib/overrides')
+    expect(p.composeDir).toBe('/opt/jib/compose')
     expect(p.reposDir).toBe('/opt/jib/repos')
     expect(p.repoRoot).toBe('/opt/jib/src')
     expect(p.nginxDir).toBe('/opt/jib/nginx')
@@ -58,6 +59,13 @@ describe('credsPath', () => {
   test('groups by kind and name', () => {
     const p = getPaths('/opt/jib')
     expect(credsPath(p, 'github-app', 'prod.pem')).toBe('/opt/jib/secrets/_jib/github-app/prod.pem')
+  })
+})
+
+describe('managedComposePath', () => {
+  test('uses a predictable jib-managed location', () => {
+    const p = getPaths('/opt/jib')
+    expect(managedComposePath(p, 'demo')).toBe('/opt/jib/compose/demo.yml')
   })
 })
 

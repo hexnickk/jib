@@ -7,9 +7,15 @@ import {
   inspectComposeApp,
   resolveFromCompose,
 } from '@jib/docker'
+import type { Paths } from '@jib/paths'
 import { isInteractive, note, promptConfirm, promptString } from '@jib/tui'
 import { consola } from 'consola'
-import { canScaffoldCompose, scaffoldComposeFromDockerfile } from './compose-scaffold.ts'
+import {
+  GENERATED_COMPOSE_FILE,
+  canScaffoldCompose,
+  persistGeneratedCompose,
+  scaffoldComposeFromDockerfile,
+} from './compose-scaffold.ts'
 import { configEntriesToBuildArgs } from './config-entries.ts'
 import {
   mergeGuidedServiceAnswers,
@@ -128,6 +134,7 @@ async function collectGuidedInputs(
 
 async function buildResolvedApp(
   cfg: Config,
+  paths: Paths,
   appName: string,
   workdir: string,
   args: { source?: string; branch?: string },
@@ -137,6 +144,7 @@ async function buildResolvedApp(
 ): Promise<App> {
   const domains = await assignPorts(cfg, appName, guided.domains)
   const buildArgs = configEntriesToBuildArgs(guided.configEntries)
+  const composeFiles = await persistComposeFiles(paths, appName, workdir, inspection.composeFiles)
   return resolveFromCompose(
     parseApp({
       repo: inputs.repo,
@@ -144,13 +152,27 @@ async function buildResolvedApp(
       domains,
       env_file: '.env',
       services: inspection.services.map((service) => service.name),
-      compose: inspection.composeFiles,
+      compose: composeFiles,
       ...(args.source ? { source: args.source } : {}),
       ...(inputs.healthChecks.length > 0 ? { health: inputs.healthChecks } : {}),
       ...(buildArgs ? { build_args: buildArgs } : {}),
     }),
     workdir,
     isTextOutput() ? { warn: (message) => consola.warn(message) } : {},
+  )
+}
+
+async function persistComposeFiles(
+  paths: Paths,
+  appName: string,
+  workdir: string,
+  composeFiles: string[],
+): Promise<string[]> {
+  if (!composeFiles.includes(GENERATED_COMPOSE_FILE)) return composeFiles
+  return await Promise.all(
+    composeFiles.map((file) =>
+      file === GENERATED_COMPOSE_FILE ? persistGeneratedCompose(paths, appName, workdir) : file,
+    ),
   )
 }
 

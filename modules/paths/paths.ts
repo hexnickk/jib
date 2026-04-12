@@ -8,6 +8,7 @@ export interface Paths {
   locksDir: string
   secretsDir: string
   overridesDir: string
+  composeDir: string
   reposDir: string
   repoRoot: string
   nginxDir: string
@@ -31,6 +32,7 @@ export function getPaths(root?: string): Paths {
     locksDir: join(base, 'locks'),
     secretsDir: join(base, 'secrets'),
     overridesDir: join(base, 'overrides'),
+    composeDir: join(base, 'compose'),
     reposDir: join(base, 'repos'),
     repoRoot: join(base, 'src'),
     nginxDir: join(base, 'nginx'),
@@ -76,6 +78,11 @@ export function repoPath(paths: Paths, app: string, repo: string): string {
  */
 export function credsPath(paths: Paths, kind: string, name: string): string {
   return join(paths.secretsDir, '_jib', kind, name)
+}
+
+/** Deterministic path for an app's jib-managed generated compose file. */
+export function managedComposePath(paths: Paths, app: string): string {
+  return join(paths.composeDir, `${app}.yml`)
 }
 
 /**

@@ -1,6 +1,7 @@
+import { rm } from 'node:fs/promises'
 import { loadConfig, writeConfig } from '@jib/config'
 import type { App, Config } from '@jib/config'
-import type { Paths } from '@jib/paths'
+import { type Paths, managedComposePath } from '@jib/paths'
 import { SecretsManager } from '@jib/secrets'
 import { cloneForInspection, removeCheckout } from '@jib/sources'
 import type { AddSupport, EnvEntry } from './types.ts'
@@ -43,6 +44,10 @@ export class DefaultAddSupport implements AddSupport {
 
   async removeSecret(appName: string, key: string, envFile: string) {
     await this.secrets.remove(appName, key, envFile)
+  }
+
+  removeManagedCompose(appName: string) {
+    return rm(managedComposePath(this.options.paths, appName), { force: true })
   }
 
   claimIngress(appName: string, finalApp: App) {

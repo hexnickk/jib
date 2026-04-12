@@ -41,6 +41,9 @@ describe('RemoveService', () => {
       removeOverride: async () => {
         calls.push('removeOverride')
       },
+      removeManagedCompose: async () => {
+        calls.push('removeManagedCompose')
+      },
       writeConfig: async (_configFile, nextCfg) => {
         calls.push('writeConfig')
         written = nextCfg
@@ -64,6 +67,7 @@ describe('RemoveService', () => {
       'removeSecrets',
       'removeState',
       'removeOverride',
+      'removeManagedCompose',
     ])
     expect(warnings).toEqual([
       'compose down: down failed',
