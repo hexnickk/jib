@@ -33,9 +33,11 @@ describe('github keygen helpers', () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-keygen-'))
     const paths = getPaths(root)
     ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = ((
-      _parts: TemplateStringsArray,
+      parts: TemplateStringsArray,
       ...values: string[]
     ) => {
+      const command = parts.join(' ')
+      if (!command.includes('ssh-keygen -t ed25519 -f')) return fakeShell()
       const privateKey = values[0]
       if (!privateKey) throw new Error('private key path missing in test shell stub')
       const publicKey = `${privateKey}.pub`
