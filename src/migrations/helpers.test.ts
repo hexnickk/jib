@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { buildSudoersContent } from './index.ts'
+import { buildSudoersContent } from './helpers.ts'
 
 describe('buildSudoersContent', () => {
   test('includes nginx validation and reload privileges', () => {
