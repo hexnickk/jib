@@ -39,13 +39,10 @@ describe('runDeploy progress and timeout', () => {
     await expect(
       runDeploy(cfg, paths, 'demo', undefined, 5, {
         sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
-        createEngine: () =>
-          ({
-            deploy: async () => {
-              await new Promise((resolve) => setTimeout(resolve, 50))
-              return { deployedSHA: 'deadbeef12345678', durationMs: 50 }
-            },
-          }) as never,
+        deployPrepared: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50))
+          return { deployedSHA: 'deadbeef12345678', durationMs: 50 }
+        },
       }),
     ).rejects.toMatchObject({
       code: 'deploy_failed',
@@ -58,13 +55,10 @@ describe('runDeploy progress and timeout', () => {
     cliSetRuntime({ output: 'json' })
     const result = await runDeployResult(cfg, paths, 'demo', undefined, 5, {
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
-      createEngine: () =>
-        ({
-          deploy: async () => {
-            await new Promise((resolve) => setTimeout(resolve, 50))
-            return { deployedSHA: 'deadbeef12345678', durationMs: 50 }
-          },
-        }) as never,
+      deployPrepared: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        return { deployedSHA: 'deadbeef12345678', durationMs: 50 }
+      },
     })
 
     expect(result).toBeInstanceOf(DeployTimeoutError)
@@ -78,12 +72,9 @@ describe('runDeploy progress and timeout', () => {
     cliSetRuntime({ output: 'json' })
     const result = await runDeployResult(cfg, paths, 'demo', undefined, 1000, {
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
-      createEngine: () =>
-        ({
-          deploy: () => {
-            throw new Error('engine setup failed')
-          },
-        }) as never,
+      deployPrepared: () => {
+        throw new Error('engine setup failed')
+      },
     })
 
     expect(result).toBeInstanceOf(DeployExecuteError)
@@ -111,17 +102,11 @@ describe('runDeploy progress and timeout', () => {
     const result = await runDeploy(cfg, paths, 'demo', undefined, 1000, {
       createSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
-      createEngine: () =>
-        ({
-          deploy: async (
-            _target: unknown,
-            progress: { emit(step: string, message: string): void },
-          ) => {
-            progress.emit('build', 'pulling base image')
-            progress.emit('health', 'waiting for /ready')
-            return { deployedSHA: 'deadbeef12345678', durationMs: 42 }
-          },
-        }) as never,
+      deployPrepared: async (_deps, _target, progress) => {
+        progress.emit('build', 'pulling base image')
+        progress.emit('health', 'waiting for /ready')
+        return { deployedSHA: 'deadbeef12345678', durationMs: 42 }
+      },
     })
 
     expect(result.sha).toBe('deadbeef12345678')

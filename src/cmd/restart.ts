@@ -1,8 +1,8 @@
 import { cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
-import { restartApp } from '@jib/deploy'
+import { deployRestartApp } from '@jib/deploy'
 import { consola } from 'consola'
-import { createDeployDeps } from '../deploy/engine.ts'
+import { deployCreateDeps } from '../deploy/deps.ts'
 import type { CliCommand } from './command.ts'
 
 const cliRestartCommand = {
@@ -12,7 +12,10 @@ const cliRestartCommand = {
     const appName = String(args.app)
     const loaded = await configLoadAppContext(appName)
     if (loaded instanceof Error) return loaded
-    const result = await restartApp(createDeployDeps(loaded.cfg, loaded.paths, 'restart'), appName)
+    const result = await deployRestartApp(
+      deployCreateDeps(loaded.cfg, loaded.paths, 'restart'),
+      appName,
+    )
     if (result) return result
     if (cliIsTextOutput()) consola.success(`restarted ${appName}`)
     return { app: appName, state: 'restarted' as const }

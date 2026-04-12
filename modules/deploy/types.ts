@@ -17,7 +17,7 @@ import type {
 
 export const MIN_DISK_BYTES = 2 * 1024 * 1024 * 1024
 
-export interface EngineDeps {
+export interface DeployDeps {
   config: Config
   paths: Paths
   store: import('@jib/state').Store

@@ -2,11 +2,10 @@ import type { App } from '@jib/config'
 import type { OverrideService } from '@jib/docker'
 
 /**
- * Group ingress mappings by target compose service and build the
- * `OverrideService[]` list the deploy flow passes to `writeOverride`. Only
- * services targeted by ingress receive a jib-managed `ports:` replacement.
+ * Groups ingress mappings by compose service and returns the jib-managed
+ * override payload used during deploy.
  */
-export function buildOverrideServices(
+export function deployBuildOverrideServices(
   parsed: { name: string }[],
   domains: App['domains'],
 ): OverrideService[] {

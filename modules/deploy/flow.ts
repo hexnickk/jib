@@ -4,25 +4,26 @@ import type { AppState } from '@jib/state'
 import { repoPath } from '../paths/paths.ts'
 import { DeployDiskSpaceError, DeployHealthCheckError, DeployMissingAppError } from './errors.ts'
 import {
-  coerceDeployError,
-  linkSecrets,
-  newCompose,
-  readDiskFree,
-  readState,
-  syncOverride,
-  writeState,
+  deployCoerceError,
+  deployLinkSecrets,
+  deployNewCompose,
+  deployReadDiskFree,
+  deployReadState,
+  deploySyncOverride,
+  deployWriteState,
 } from './support.ts'
 import {
   type DeployCmd,
+  type DeployDeps,
   type DeployError,
   type DeployResult,
-  type EngineDeps,
   MIN_DISK_BYTES,
   type ProgressCtx,
 } from './types.ts'
 
-export async function runDeployFlow(
-  deps: EngineDeps,
+/** Executes the deploy steps after the app config has already been resolved. */
+export async function deployRunFlow(
+  deps: DeployDeps,
   cmd: DeployCmd,
   appCfg: App,
   progress: ProgressCtx,
@@ -30,21 +31,21 @@ export async function runDeployFlow(
   const start = Date.now()
 
   progress.emit('disk', 'checking disk space')
-  const free = await readDiskFree(deps, cmd.workdir)
+  const free = await deployReadDiskFree(deps, cmd.workdir)
   if (free instanceof Error) return free
   if (free < MIN_DISK_BYTES) return new DeployDiskSpaceError(free)
 
-  const prevState = await readState(deps.store, cmd.app)
+  const prevState = await deployReadState(deps.store, cmd.app)
   if (prevState instanceof Error) return prevState
 
-  const overrideError = await syncOverride(deps, cmd.app, appCfg, cmd.workdir)
+  const overrideError = await deploySyncOverride(deps, cmd.app, appCfg, cmd.workdir)
   if (overrideError) return overrideError
 
-  const secretsError = await linkSecrets(deps, cmd.app, appCfg, cmd.workdir)
+  const secretsError = await deployLinkSecrets(deps, cmd.app, appCfg, cmd.workdir)
   if (secretsError) return secretsError
 
   try {
-    const compose = newCompose(deps, cmd.app, appCfg, cmd.workdir)
+    const compose = deployNewCompose(deps, cmd.app, appCfg, cmd.workdir)
     const buildArgs = appCfg.build_args ?? {}
     if (hasBuildServices(cmd.workdir, appCfg.compose ?? [])) {
       progress.emit('build', `building ${cmd.app}`)
@@ -76,24 +77,25 @@ export async function runDeployFlow(
       last_deploy_status: 'success',
       last_deploy_error: '',
     }
-    const saveError = await writeState(deps.store, cmd.app, next)
+    const saveError = await deployWriteState(deps.store, cmd.app, next)
     if (saveError) return saveError
     return { deployedSHA: cmd.sha, durationMs: Date.now() - start }
   } catch (error) {
-    return coerceDeployError(error)
+    return deployCoerceError(error)
   }
 }
 
-export async function resolveAppCompose(
-  deps: EngineDeps,
+/** Resolves one configured app into a compose runner with overrides and secrets applied. */
+export async function deployResolveAppCompose(
+  deps: DeployDeps,
   appName: string,
-): Promise<DeployError | { appCfg: App; compose: ReturnType<typeof newCompose> }> {
+): Promise<DeployError | { appCfg: App; compose: ReturnType<typeof deployNewCompose> }> {
   const appCfg = deps.config.apps[appName]
   if (!appCfg) return new DeployMissingAppError(appName)
   const workdir = repoPath(deps.paths, appName, appCfg.repo)
-  const overrideError = await syncOverride(deps, appName, appCfg, workdir)
+  const overrideError = await deploySyncOverride(deps, appName, appCfg, workdir)
   if (overrideError) return overrideError
-  const secretsError = await linkSecrets(deps, appName, appCfg, workdir)
+  const secretsError = await deployLinkSecrets(deps, appName, appCfg, workdir)
   if (secretsError) return secretsError
-  return { appCfg, compose: newCompose(deps, appName, appCfg, workdir) }
+  return { appCfg, compose: deployNewCompose(deps, appName, appCfg, workdir) }
 }

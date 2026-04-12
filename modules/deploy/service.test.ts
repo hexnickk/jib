@@ -7,9 +7,8 @@ import type { DockerExec, ExecResult } from '@jib/docker'
 import { createLogger } from '@jib/logging'
 import { Store } from '@jib/state'
 import { getPaths, repoPath } from '../paths/paths.ts'
-import { Engine } from './engine.ts'
 import { DeployDiskSpaceError, DeployMissingAppError } from './errors.ts'
-import { deployApp } from './service.ts'
+import { deployApp, deployUpApp } from './service.ts'
 
 function mkCfg(): Config {
   return {
@@ -259,26 +258,8 @@ describe('deployApp', () => {
     expect(calls.some((call) => call.args.includes('up'))).toBe(true)
   })
 })
-
-describe('Engine compatibility wrapper', () => {
-  test('throws compatibility errors for existing callers', async () => {
-    const { paths, store, log } = await mkEnv()
-    const engine = new Engine({
-      config: mkCfg(),
-      paths,
-      store,
-      log,
-      diskFree: async () => 1024,
-      dockerExec: fakeExec([]),
-    })
-    const workdir = await mkWorkdir()
-
-    await expect(
-      engine.deploy({ app: 'demo', workdir, sha: 'x', trigger: 'manual' }, noProgress),
-    ).rejects.toBeInstanceOf(DeployDiskSpaceError)
-  })
-
-  test('up refreshes stale override when app has no domains', async () => {
+describe('deployUpApp', () => {
+  test('refreshes stale override when app has no domains', async () => {
     const { paths, store, log } = await mkEnv()
     const cfg = mkCfg()
     cfg.apps.demo = {
@@ -306,16 +287,19 @@ describe('Engine compatibility wrapper', () => {
 `,
     )
     const calls: Call[] = []
-    const engine = new Engine({
-      config: cfg,
-      paths,
-      store,
-      log,
-      dockerExec: fakeExec(calls),
-    })
 
-    await engine.up('demo')
+    const result = await deployUpApp(
+      {
+        config: cfg,
+        paths,
+        store,
+        log,
+        dockerExec: fakeExec(calls),
+      },
+      'demo',
+    )
 
+    expect(result).toBeUndefined()
     const override = await readFile(join(paths.overridesDir, 'demo.yml'), 'utf8')
     expect(override).not.toContain('ports:')
     expect(calls.some((call) => call.args.includes('up'))).toBe(true)

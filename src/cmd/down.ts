@@ -1,8 +1,8 @@
 import { cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
-import { downApp } from '@jib/deploy'
+import { deployDownApp } from '@jib/deploy'
 import { consola } from 'consola'
-import { createDeployDeps } from '../deploy/engine.ts'
+import { deployCreateDeps } from '../deploy/deps.ts'
 import type { CliCommand } from './command.ts'
 
 const cliDownCommand = {
@@ -12,7 +12,7 @@ const cliDownCommand = {
     const appName = String(args.app)
     const loaded = await configLoadAppContext(appName)
     if (loaded instanceof Error) return loaded
-    const result = await downApp(createDeployDeps(loaded.cfg, loaded.paths, 'down'), appName)
+    const result = await deployDownApp(deployCreateDeps(loaded.cfg, loaded.paths, 'down'), appName)
     if (result) return result
     if (cliIsTextOutput()) consola.success(`stopped ${appName}`)
     return { app: appName, state: 'stopped' as const }

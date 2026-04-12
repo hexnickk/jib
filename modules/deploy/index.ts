@@ -1,12 +1,3 @@
-export { Engine } from './engine.ts'
-export {
-  MIN_DISK_BYTES,
-  deployApp,
-  downApp,
-  restartApp,
-  upApp,
-} from './service.ts'
-export { buildOverrideServices } from './override.ts'
 export {
   DeployDiskCheckError,
   DeployDiskSpaceError,
@@ -18,4 +9,6 @@ export {
   DeploySecretsLinkError,
   DeployUnexpectedError,
 } from './errors.ts'
-export type { DeployCmd, DeployError, DeployResult, EngineDeps, ProgressCtx } from './service.ts'
+export { MIN_DISK_BYTES } from './types.ts'
+export { deployApp, deployDownApp, deployRestartApp, deployUpApp } from './service.ts'
+export type { DeployCmd, DeployDeps, DeployError, DeployResult, ProgressCtx } from './types.ts'

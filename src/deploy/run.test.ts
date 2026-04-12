@@ -34,10 +34,7 @@ describe('runDeploy', () => {
     cliSetRuntime({ output: 'json' })
     const result = await runDeploy(cfg, paths, 'demo', undefined, 1000, {
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
-      createEngine: () =>
-        ({
-          deploy: async () => ({ deployedSHA: 'deadbeef12345678', durationMs: 42 }),
-        }) as never,
+      deployPrepared: async () => ({ deployedSHA: 'deadbeef12345678', durationMs: 42 }),
     })
 
     expect(result).toEqual({
@@ -83,12 +80,9 @@ describe('runDeploy', () => {
     await expect(
       runDeploy(cfg, paths, 'demo', undefined, 1000, {
         sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
-        createEngine: () =>
-          ({
-            deploy: async () => {
-              throw new Error("EACCES: permission denied, open '/opt/jib/overrides/demo.yml'")
-            },
-          }) as never,
+        deployPrepared: async () => {
+          throw new Error("EACCES: permission denied, open '/opt/jib/overrides/demo.yml'")
+        },
       }),
     ).rejects.toMatchObject({
       code: 'deploy_failed',

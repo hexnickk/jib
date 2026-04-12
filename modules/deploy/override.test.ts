@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import type { Domain } from '@jib/config'
-import { buildOverrideServices } from './override.ts'
+import { deployBuildOverrideServices } from './override.ts'
 
 const parsed = (...names: string[]) => names.map((name) => ({ name }))
 
-describe('buildOverrideServices', () => {
+describe('deployBuildOverrideServices', () => {
   test('single-service compose: domain port maps to that service', () => {
     const domains: Domain[] = [{ host: 'demo.example.com', port: 20000, container_port: 80 }]
-    const out = buildOverrideServices(parsed('web'), domains)
+    const out = deployBuildOverrideServices(parsed('web'), domains)
     expect(out).toEqual([{ name: 'web', ports: [{ host: 20000, container: 80 }] }])
   })
 
@@ -17,7 +17,7 @@ describe('buildOverrideServices', () => {
       { host: 'b.example.com', port: 20001, container_port: 3000, service: 'api' },
       { host: 'c.example.com', port: 20002, container_port: 443, service: 'web' },
     ]
-    const out = buildOverrideServices(parsed('web', 'api'), domains)
+    const out = deployBuildOverrideServices(parsed('web', 'api'), domains)
     expect(out).toEqual([
       {
         name: 'web',
@@ -37,18 +37,18 @@ describe('buildOverrideServices', () => {
     const domains: Domain[] = [
       { host: 'a.example.com', port: 20000, container_port: 80, service: 'web' },
     ]
-    const out = buildOverrideServices(parsed('web', 'worker'), domains)
+    const out = deployBuildOverrideServices(parsed('web', 'worker'), domains)
     expect(out).toEqual([{ name: 'web', ports: [{ host: 20000, container: 80 }] }])
   })
 
   test('domain without container_port is silently dropped → service absent', () => {
     const domains: Domain[] = [{ host: 'a.example.com', port: 20000 }]
-    const out = buildOverrideServices(parsed('web'), domains)
+    const out = deployBuildOverrideServices(parsed('web'), domains)
     expect(out).toEqual([])
   })
 
   test('no domains: override is empty (user compose untouched)', () => {
-    const out = buildOverrideServices(parsed('web', 'api'), [])
+    const out = deployBuildOverrideServices(parsed('web', 'api'), [])
     expect(out).toEqual([])
   })
 })

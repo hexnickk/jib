@@ -1,9 +1,10 @@
 import { CliError, cliIsTextOutput } from '@jib/cli'
 import type { Config } from '@jib/config'
+import { type DeployError, type DeployResult, deployApp } from '@jib/deploy'
 import type { Paths } from '@jib/paths'
 import { sourcesSync } from '@jib/sources'
 import { spinner } from '@jib/tui'
-import { createDeployEngine } from './engine.ts'
+import { deployCreateDeps } from './deps.ts'
 import {
   DeployExecuteError,
   DeployPrepareError,
@@ -28,11 +29,13 @@ export interface DeployRunResult {
 }
 
 interface DeployRunDeps {
-  createEngine?: typeof createDeployEngine
+  createDeps?: typeof deployCreateDeps
   createSpinner?: () => DeploySpinner
+  deployPrepared?: typeof deployApp
   sync?: typeof sourcesSync
 }
 
+/** Runs prepare + deploy and throws a CLI-facing error at the command boundary on failure. */
 export async function runDeploy(
   cfg: Config,
   paths: Paths,
@@ -46,6 +49,7 @@ export async function runDeploy(
   return result
 }
 
+/** Runs prepare + deploy and returns typed workflow errors instead of throwing. */
 export async function runDeployResult(
   cfg: Config,
   paths: Paths,
@@ -66,19 +70,32 @@ export async function runDeployResult(
   }
   prepareSpin?.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
 
-  const engine = (deps.createEngine ?? createDeployEngine)(cfg, paths)
   const deploySpin = showProgress ? createSpin() : null
   deploySpin?.start(`[2/2] deploying ${app}`)
-  const deployPromise = createDeployPromise(engine, app, ready, deploySpin)
+  const deployPromise = startDeployPreparedApp(
+    deps.createDeps ?? deployCreateDeps,
+    deps.deployPrepared ?? deployApp,
+    cfg,
+    paths,
+    app,
+    ready,
+    deploySpin,
+  )
   if (deployPromise instanceof Error) {
     deploySpin?.stop(`[2/2] failed to deploy ${app}`)
     return deployPromise
   }
+
   const deployed = await deployWithTimeout(deployPromise, timeoutMs)
-  if (deployed instanceof Error) {
+  if (deployed instanceof DeployTimeoutError || deployed instanceof DeployExecuteError) {
     deploySpin?.stop(`[2/2] failed to deploy ${app}`)
     return deployed
   }
+  if (deployed instanceof Error) {
+    deploySpin?.stop(`[2/2] failed to deploy ${app}`)
+    return new DeployExecuteError(deployed.message, { cause: deployed })
+  }
+
   deploySpin?.stop(
     `[2/2] ${app} deployed @ ${deployed.deployedSHA.slice(0, 8)} (${deployed.durationMs}ms)`,
   )
@@ -116,14 +133,19 @@ function deployFailureHint(error: unknown): string {
   return 'check docker compose output, then retry `jib deploy ...`'
 }
 
-function createDeployPromise(
-  engine: ReturnType<typeof createDeployEngine>,
+/** Starts the deploy action for one prepared workdir and converts setup throw-paths into typed errors. */
+function startDeployPreparedApp(
+  createDeps: typeof deployCreateDeps,
+  runDeployApp: typeof deployApp,
+  cfg: Config,
+  paths: Paths,
   app: string,
   ready: { workdir: string; sha: string },
   deploySpin: DeploySpinner | null,
-) {
+): DeployExecuteError | Promise<DeployError | DeployResult> {
   try {
-    return engine.deploy(
+    return runDeployApp(
+      createDeps(cfg, paths),
       { app, workdir: ready.workdir, sha: ready.sha, trigger: 'manual' },
       { emit: (step, message) => deploySpin?.message(`${step}: ${message}`) },
     )

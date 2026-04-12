@@ -13,10 +13,16 @@ import {
   DeploySecretsLinkError,
   DeployUnexpectedError,
 } from './errors.ts'
-import { buildOverrideServices } from './override.ts'
-import type { EngineDeps } from './types.ts'
+import { deployBuildOverrideServices } from './override.ts'
+import type { DeployDeps } from './types.ts'
 
-export function newCompose(deps: EngineDeps, app: string, appCfg: App, workdir: string): Compose {
+/** Creates the compose runner for one app, including jib-managed override wiring. */
+export function deployNewCompose(
+  deps: DeployDeps,
+  app: string,
+  appCfg: App,
+  workdir: string,
+): Compose {
   const files =
     appCfg.compose && appCfg.compose.length > 0 ? appCfg.compose : ['docker-compose.yml']
   return new Compose({
@@ -28,16 +34,17 @@ export function newCompose(deps: EngineDeps, app: string, appCfg: App, workdir: 
   })
 }
 
-export async function syncOverride(
-  deps: EngineDeps,
+/** Regenerates the jib-managed compose override file for one app. */
+export async function deploySyncOverride(
+  deps: DeployDeps,
   app: string,
   appCfg: App,
   workdir: string,
 ): Promise<DeployOverrideSyncError | JibError | undefined> {
-  const result = await runOrReturnError(
+  const result = await deployRunOrReturnError(
     async () => {
       const parsed = parseComposeServices(workdir, appCfg.compose ?? [])
-      const services = buildOverrideServices(parsed, appCfg.domains)
+      const services = deployBuildOverrideServices(parsed, appCfg.domains)
       await writeOverride(deps.paths.overridesDir, app, services)
     },
     (message, options) => new DeployOverrideSyncError(message, options),
@@ -45,8 +52,9 @@ export async function syncOverride(
   return result instanceof Error ? result : undefined
 }
 
-export async function linkSecrets(
-  deps: EngineDeps,
+/** Symlinks the managed env file into the prepared workdir when one exists. */
+export async function deployLinkSecrets(
+  deps: DeployDeps,
   app: string,
   appCfg: App,
   workdir: string,
@@ -61,7 +69,7 @@ export async function linkSecrets(
     return new DeploySecretsLinkError(messageOf(error), { cause: error })
   }
 
-  const result = await runOrReturnError(
+  const result = await deployRunOrReturnError(
     async () => {
       const dest = join(workdir, envName)
       await unlink(dest).catch(() => undefined)
@@ -72,11 +80,12 @@ export async function linkSecrets(
   return result instanceof Error ? result : undefined
 }
 
-export async function readDiskFree(
-  deps: EngineDeps,
+/** Reads free disk space for the target workdir, using the injected override when present. */
+export async function deployReadDiskFree(
+  deps: DeployDeps,
   path: string,
 ): Promise<DeployDiskCheckError | number> {
-  return runOrReturnError(
+  return deployRunOrReturnError(
     async () => {
       if (deps.diskFree) return deps.diskFree(path)
       const res = await $`df -B1 --output=avail ${path}`.quiet().nothrow()
@@ -88,61 +97,68 @@ export async function readDiskFree(
   )
 }
 
-export async function acquireDeployLock(
-  deps: EngineDeps,
+/** Acquires the non-blocking deploy lock for one app. */
+export async function deployAcquireLock(
+  deps: DeployDeps,
   app: string,
 ): Promise<(() => Promise<void>) | DeployLockAcquireError | JibError> {
-  return runOrReturnError(
+  return deployRunOrReturnError(
     () => acquire(deps.paths.locksDir, app, { blocking: false }),
     (message, options) => new DeployLockAcquireError(app, message, options),
   )
 }
 
-export async function releaseDeployLock(
+/** Releases a previously acquired deploy lock. */
+export async function deployReleaseLock(
   app: string,
   release: () => Promise<void>,
 ): Promise<DeployLockReleaseError | JibError | undefined> {
-  const result = await runOrReturnError(
+  const result = await deployRunOrReturnError(
     () => release(),
     (message, options) => new DeployLockReleaseError(app, message, options),
   )
   return result instanceof Error ? result : undefined
 }
 
-export async function readState(store: Store, app: string): Promise<AppState | JibError> {
-  return runOrReturnError(() => store.load(app))
+/** Loads the persisted deploy state for one app. */
+export async function deployReadState(store: Store, app: string): Promise<AppState | JibError> {
+  return deployRunOrReturnError(() => store.load(app))
 }
 
-export async function writeState(
+/** Persists updated deploy state for one app. */
+export async function deployWriteState(
   store: Store,
   app: string,
   state: AppState,
 ): Promise<JibError | undefined> {
-  const result = await runOrReturnError(() => store.save(app, state))
+  const result = await deployRunOrReturnError(() => store.save(app, state))
   return result instanceof Error ? result : undefined
 }
 
-export async function recordDeployFailure(
-  deps: EngineDeps,
+/** Records a failed deploy message in app state without throwing. */
+export async function deployRecordFailure(
+  deps: DeployDeps,
   app: string,
   message: string,
 ): Promise<JibError | undefined> {
-  const result = await runOrReturnError(() => deps.store.recordFailure(app, message))
+  const result = await deployRunOrReturnError(() => deps.store.recordFailure(app, message))
   return result instanceof Error ? result : undefined
 }
 
-export async function runOrReturnError<T, E extends JibError = JibError>(
+/** Runs an async deploy helper and converts thrown failures into returned typed errors. */
+export async function deployRunOrReturnError<T, E extends JibError = JibError>(
   run: () => Promise<T>,
   fallback?: (message: string, options?: ErrorOptions) => E,
 ): Promise<E | JibError | T> {
   try {
     return await run()
   } catch (error) {
-    return coerceDeployError(error, fallback)
+    return deployCoerceError(error, fallback)
   }
 }
 
-export function coerceDeployError<E extends JibError = JibError>(
+/** Normalizes unknown thrown values into deploy-scoped typed errors. */
+export function deployCoerceError<E extends JibError = JibError>(
   error: unknown,
   fallback?: (message: string, options?: ErrorOptions) => E,
 ): E | JibError {
