@@ -2,15 +2,13 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { createLogger } from '@jib/logging'
 import { LogLevels } from 'consola'
 import {
-  CliError,
   InvalidInteractiveModeError,
   InvalidOutputModeError,
-  MissingInputError,
-  configureCliRuntime,
-  getCliRuntime,
-  normalizeCliError,
-  setCliRuntime,
-  stripCliRuntimeArgs,
+  cliApplyRuntimeArgv,
+  cliCreateMissingInputError,
+  cliNormalizeError,
+  cliReadRuntime,
+  cliSetRuntime,
 } from './index.ts'
 
 const envSnapshot = {
@@ -25,7 +23,7 @@ afterEach(() => {
   process.env.JIB_INTERACTIVE = envSnapshot.JIB_INTERACTIVE
   process.env.JIB_OUTPUT = envSnapshot.JIB_OUTPUT
   process.env.JIB_DEBUG = envSnapshot.JIB_DEBUG
-  setCliRuntime({
+  cliSetRuntime({
     interactive: 'auto',
     output: 'text',
     debug: false,
@@ -34,59 +32,70 @@ afterEach(() => {
   })
 })
 
-describe('configureCliRuntime', () => {
-  test('prefers explicit flags over env defaults', () => {
+describe('cliApplyRuntimeArgv', () => {
+  test('prefers explicit argv over env defaults', () => {
     process.env.JIB_INTERACTIVE = 'never'
     process.env.JIB_OUTPUT = 'json'
-    const runtime = configureCliRuntime(['--interactive=always', '--output', 'text', '--debug'])
-    expect(runtime).not.toBeInstanceOf(CliError)
-    if (runtime instanceof CliError) throw runtime
+    const runtime = cliApplyRuntimeArgv({ interactive: 'always', output: 'text', debug: true })
+    expect(runtime).not.toBeInstanceOf(Error)
+    if (runtime instanceof Error) throw runtime
     expect(runtime.interactive).toBe('always')
     expect(runtime.output).toBe('text')
     expect(runtime.debug).toBe(true)
-    expect(getCliRuntime().debug).toBe(true)
+
+    const current = cliReadRuntime()
+    expect(current).not.toBeInstanceOf(Error)
+    if (current instanceof Error) throw current
+    expect(current.debug).toBe(true)
   })
 
-  test('respects env defaults when flags are absent', () => {
+  test('respects env defaults when argv omits runtime flags', () => {
     process.env.JIB_NON_INTERACTIVE = '1'
     process.env.JIB_OUTPUT = 'json'
-    const runtime = configureCliRuntime([])
-    expect(runtime).not.toBeInstanceOf(CliError)
-    if (runtime instanceof CliError) throw runtime
+    const runtime = cliSetRuntime({ stdinTty: true, stdoutTty: true })
+    expect(runtime).not.toBeInstanceOf(Error)
+    if (runtime instanceof Error) throw runtime
     expect(runtime.interactive).toBe('never')
     expect(runtime.output).toBe('json')
   })
 
   test('clears debug env cleanly when debug is disabled', () => {
-    const configured = configureCliRuntime(['--debug'])
-    expect(configured).not.toBeInstanceOf(CliError)
-    expect(process.env.JIB_DEBUG).toBe('1')
-
-    setCliRuntime({
-      debug: false,
+    const enabled = cliSetRuntime({
       interactive: 'auto',
       output: 'text',
+      debug: true,
       stdinTty: true,
       stdoutTty: true,
     })
+    expect(enabled).not.toBeInstanceOf(Error)
+    expect(process.env.JIB_DEBUG).toBe('1')
+
+    const disabled = cliSetRuntime({
+      interactive: 'auto',
+      output: 'text',
+      debug: false,
+      stdinTty: true,
+      stdoutTty: true,
+    })
+    expect(disabled).not.toBeInstanceOf(Error)
     expect(process.env.JIB_DEBUG).toBeUndefined()
   })
 
-  test('returns a typed error for an invalid interactive flag', () => {
-    const runtime = configureCliRuntime(['--interactive=bad'])
-    expect(runtime).toBeInstanceOf(InvalidInteractiveModeError)
+  test('returns a typed error for an invalid interactive mode', () => {
+    expect(cliApplyRuntimeArgv({ interactive: 'bad' })).toBeInstanceOf(InvalidInteractiveModeError)
   })
 
   test('returns a typed error for an invalid output env value', () => {
     process.env.JIB_OUTPUT = 'yaml'
-    const runtime = configureCliRuntime([])
-    expect(runtime).toBeInstanceOf(InvalidOutputModeError)
+    expect(cliSetRuntime({ stdinTty: true, stdoutTty: true })).toBeInstanceOf(
+      InvalidOutputModeError,
+    )
   })
 })
 
 describe('createLogger', () => {
   test('reflects runtime debug changes', () => {
-    setCliRuntime({
+    cliSetRuntime({
       interactive: 'auto',
       output: 'text',
       debug: false,
@@ -95,7 +104,7 @@ describe('createLogger', () => {
     })
     expect(createLogger('test').level).toBe(LogLevels.warn)
 
-    setCliRuntime({
+    cliSetRuntime({
       interactive: 'auto',
       output: 'text',
       debug: true,
@@ -106,44 +115,10 @@ describe('createLogger', () => {
   })
 })
 
-describe('stripCliRuntimeArgs', () => {
-  test('removes root runtime args and keeps command args intact', () => {
-    expect(
-      stripCliRuntimeArgs([
-        '--output=json',
-        '--debug',
-        'add',
-        'demo',
-        '--interactive',
-        'never',
-        '--repo',
-        'owner/name',
-      ]),
-    ).toEqual(['add', 'demo', '--repo', 'owner/name'])
-  })
-
-  test('preserves args after -- for passthrough commands', () => {
-    expect(
-      stripCliRuntimeArgs([
-        'exec',
-        'demo',
-        '--output=json',
-        '--',
-        'node',
-        '-e',
-        'process.argv',
-        '--output',
-        'json',
-        '--debug',
-      ]),
-    ).toEqual(['exec', 'demo', '--', 'node', '-e', 'process.argv', '--output', 'json', '--debug'])
-  })
-})
-
-describe('normalizeCliError', () => {
+describe('cliNormalizeError', () => {
   test('preserves structured missing-input details', () => {
-    const normalized = normalizeCliError(
-      new MissingInputError('missing required input', [
+    const normalized = cliNormalizeError(
+      cliCreateMissingInputError('missing required input', [
         { field: 'repo', message: 'provide --repo or rerun interactively' },
       ]),
     )

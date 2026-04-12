@@ -1,4 +1,4 @@
-import { CliError, isDebugEnabled, isTextOutput } from '@jib/cli'
+import { CliError, cliIsDebugEnabled, cliIsTextOutput } from '@jib/cli'
 import { type App, type Config, type Domain, assignPorts } from '@jib/config'
 import {
   type ComposeInspection,
@@ -80,7 +80,7 @@ async function inspectComposeWithPrompts(
           },
         )
       }
-      if (isDebugEnabled()) {
+      if (cliIsDebugEnabled()) {
         consola.info(`compose files: ${inspection.composeFiles.join(', ')}`)
         consola.info(`services: ${inspection.services.map((service) => service.name).join(', ')}`)
       }
@@ -91,7 +91,7 @@ async function inspectComposeWithPrompts(
         error.code === 'compose_not_found' &&
         (deps.isInteractive ?? isInteractive)()
       ) {
-        if (isTextOutput())
+        if (cliIsTextOutput())
           (deps.note ?? note)(composeNotFoundMessage(workdir, compose), 'Compose file')
         if (
           (!compose || compose.length === 0) &&
@@ -174,7 +174,7 @@ async function buildResolvedApp(
       ...(buildArgs ? { build_args: buildArgs } : {}),
     }),
     workdir,
-    isTextOutput() ? { warn: (message) => consola.warn(message) } : {},
+    cliIsTextOutput() ? { warn: (message) => consola.warn(message) } : {},
   )
 }
 
@@ -198,7 +198,7 @@ async function confirmAddPlan(
   finalApp: App,
   configEntries: ConfigEntry[],
 ): Promise<void> {
-  if (!isTextOutput()) return
+  if (!cliIsTextOutput()) return
   consola.box(
     renderAddPlanSummary({
       app: appName,

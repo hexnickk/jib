@@ -18,7 +18,9 @@ This file describes how agents should work in this repo.
 
 # Code style
 
-- Prefer plain function modules with names like `moduleAction(ctx, params)`.
+- Functions should have short comments explaining what they do, what they return, and any important side effects. Add a small example only when the call contract is subtle.
+- Prefer plain function modules. Exported functions should start with the module name, e.g. `cliRunApp()`, `cliCanPrompt()`, `cliCheckRootHost()`.
+- Private helpers can use shorter local names when the surrounding file already makes the module obvious.
 - Avoid service classes unless there is a clear reason they are simpler.
 - For expected failures, return typed custom error classes instead of throwing.
 - `throw` needs clear justification. If an underlying library throws, `try {}` / `catch {}` is acceptable, but convert it into returned typed errors.

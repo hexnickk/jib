@@ -1,7 +1,20 @@
-import { withCliArgs } from '@jib/cli'
+export interface AddCommandArgv {
+  app?: string
+  source?: string
+  branch?: string
+  repo?: string
+  backend?: string
+  ingress?: string
+  compose?: string
+  persist?: string | string[]
+  domain?: string | string[]
+  env?: string | string[]
+  'build-arg'?: string | string[]
+  'build-env'?: string | string[]
+  health?: string | string[]
+}
 
-export const addCommandArgs = withCliArgs({
-  app: { type: 'positional', required: false },
+export const addCommandOptions = {
   repo: {
     type: 'string',
     description:
@@ -35,4 +48,4 @@ export const addCommandArgs = withCliArgs({
     description: 'KEY=VALUE for both runtime .env and app.build_args (repeatable)',
   },
   health: { type: 'string', description: '/path:port (repeatable via comma)' },
-})
+} as const

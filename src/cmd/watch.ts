@@ -1,17 +1,16 @@
 import { runPollCycle, runPoller } from '@jib-module/watcher'
-import { applyCliArgs, withCliArgs } from '@jib/cli'
 import { loadConfig } from '@jib/config'
 import { createLogger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
-import { defineCommand } from 'citty'
+import type { CliCommand } from './command.ts'
 
-export default defineCommand({
-  meta: { name: 'watch', description: 'Poll repos and auto-deploy changed apps' },
-  args: withCliArgs({
+const cliWatchCommand = {
+  command: 'watch',
+  describe: 'Poll repos and auto-deploy changed apps',
+  builder: {
     once: { type: 'boolean', description: 'Run one poll cycle and exit' },
-  }),
-  async run({ args }) {
-    applyCliArgs(args)
+  },
+  async run(args) {
     const paths = getPaths()
     const log = createLogger('watch')
     const getConfig = () => loadConfig(paths.configFile)
@@ -27,4 +26,6 @@ export default defineCommand({
     process.once('SIGINT', shutdown)
     await runPoller({ paths, getConfig, log }, abort.signal)
   },
-})
+} satisfies CliCommand
+
+export default cliWatchCommand

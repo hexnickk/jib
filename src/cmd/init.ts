@@ -1,17 +1,14 @@
 import {
   CliError,
-  applyCliArgs,
-  canPrompt,
-  ensureLinux,
-  ensureRoot,
-  isTextOutput,
-  missingInput,
-  withCliArgs,
+  cliCanPrompt,
+  cliCheckLinuxHost,
+  cliCheckRootHost,
+  cliCreateMissingInputError,
+  cliIsTextOutput,
 } from '@jib/cli'
 import { loadConfig } from '@jib/config'
 import { getPaths } from '@jib/paths'
 import { intro, note, outro } from '@jib/tui'
-import { defineCommand } from 'citty'
 import { hasBootstrapState } from '../migrations/service.ts'
 import { configureOptionalModules } from '../modules/init/optional.ts'
 import { reconcileOptionalModules } from '../modules/init/reconcile.ts'
@@ -21,30 +18,37 @@ import {
   pendingOptionalModuleNames,
   unseenOptionalModules,
 } from '../modules/init/registry.ts'
+import type { CliCommand } from './command.ts'
 
-function ensureMigrated(rootReady: boolean): void {
-  if (rootReady) return
-  throw new CliError('migrate_required', 'jib is not bootstrapped yet', {
+/** Returns a typed error until the machine has completed the bootstrap migration. */
+function initCheckMigration(rootReady: boolean): CliError | undefined {
+  if (rootReady) return undefined
+  return new CliError('migrate_required', 'jib is not bootstrapped yet', {
     hint: 'run `sudo jib migrate` first',
   })
 }
 
-export default defineCommand({
-  meta: { name: 'init', description: 'Configure optional modules' },
-  args: withCliArgs({
+const cliInitCommand = {
+  command: 'init',
+  describe: 'Configure optional modules',
+  builder: {
     check: {
       type: 'boolean',
       description: 'Print pending optional module setup without making changes',
     },
-  }),
-  async run({ args }) {
-    applyCliArgs(args)
-    ensureLinux('init')
-    if (!args.check) ensureRoot('init')
+  },
+  async run(args) {
+    const linuxError = cliCheckLinuxHost('init')
+    if (linuxError) return linuxError
+    if (!args.check) {
+      const rootError = cliCheckRootHost('init')
+      if (rootError) return rootError
+    }
 
     const paths = getPaths()
-    ensureMigrated(hasBootstrapState(paths))
-    if (isTextOutput()) intro('jib init')
+    const migrationError = initCheckMigration(hasBootstrapState(paths))
+    if (migrationError) return migrationError
+    if (cliIsTextOutput()) intro('jib init')
 
     if (args.check) {
       let config = await loadConfig(paths.configFile)
@@ -52,7 +56,7 @@ export default defineCommand({
         writeConfig: async () => undefined,
       })
       const pending = pendingOptionalModuleNames(config)
-      if (isTextOutput()) {
+      if (cliIsTextOutput()) {
         if (pending.length === 0) {
           note('No optional modules are waiting for setup.', 'Optional modules')
           outro('nothing to do')
@@ -72,7 +76,7 @@ export default defineCommand({
     const unseen = unseenOptionalModules(config)
 
     if (unseen.length === 0) {
-      if (isTextOutput()) {
+      if (cliIsTextOutput()) {
         note('No optional modules are waiting for setup.', 'Optional modules')
         outro('nothing to do')
       }
@@ -82,15 +86,15 @@ export default defineCommand({
       }
     }
 
-    if (isTextOutput()) {
+    if (cliIsTextOutput()) {
       note(
         `Choose which optional pieces you want Jib to manage now.\n${describeModules(unseen).join('\n')}`,
         'Optional modules',
       )
     }
 
-    if (!canPrompt()) {
-      missingInput(
+    if (!cliCanPrompt()) {
+      return cliCreateMissingInputError(
         'missing optional module choices for jib init',
         unseen.map((mod) => ({
           field: `modules.${mod.manifest.name}`,
@@ -102,7 +106,7 @@ export default defineCommand({
 
     await configureOptionalModules(config, paths, unseen)
     const finalConfig = await loadConfig(paths.configFile)
-    if (isTextOutput()) {
+    if (cliIsTextOutput()) {
       outro('modules configured')
       note('Next: run `jib status` to confirm services are healthy.', 'Next steps')
     }
@@ -112,4 +116,6 @@ export default defineCommand({
       optionalModulesPending: unseenOptionalModules(finalConfig).map((mod) => mod.manifest.name),
     }
   },
-})
+} satisfies CliCommand
+
+export default cliInitCommand

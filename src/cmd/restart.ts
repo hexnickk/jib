@@ -1,22 +1,22 @@
-import { applyCliArgs, withCliArgs } from '@jib/cli'
-import { loadAppOrExit } from '@jib/config'
-import { defineCommand } from 'citty'
+import { cliIsTextOutput } from '@jib/cli'
+import { loadAppOrExitResult } from '@jib/config'
+import { restartApp } from '@jib/deploy'
 import { consola } from 'consola'
-import { createDeployEngine } from '../deploy/engine.ts'
+import { createDeployDeps } from '../deploy/engine.ts'
+import type { CliCommand } from './command.ts'
 
-export default defineCommand({
-  meta: { name: 'restart', description: 'Restart containers without redeploying' },
-  args: withCliArgs({ app: { type: 'positional', required: true } }),
-  async run({ args }) {
-    try {
-      applyCliArgs(args)
-      const { cfg, paths } = await loadAppOrExit(args.app)
-      await createDeployEngine(cfg, paths, 'restart').restart(args.app)
-      consola.success(`restarted ${args.app}`)
-    } catch (err) {
-      consola.error(err instanceof Error ? err.message : String(err))
-      consola.info('check running containers: docker ps --filter label=com.docker.compose.project')
-      process.exit(1)
-    }
+const cliRestartCommand = {
+  command: 'restart <app>',
+  describe: 'Restart containers without redeploying',
+  async run(args) {
+    const appName = String(args.app)
+    const loaded = await loadAppOrExitResult(appName)
+    if (loaded instanceof Error) return loaded
+    const result = await restartApp(createDeployDeps(loaded.cfg, loaded.paths, 'restart'), appName)
+    if (result) return result
+    if (cliIsTextOutput()) consola.success(`restarted ${appName}`)
+    return { app: appName, state: 'restarted' as const }
   },
-})
+} satisfies CliCommand
+
+export default cliRestartCommand

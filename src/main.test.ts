@@ -74,7 +74,7 @@ describe('execution contract', () => {
       expect(help.stderr).toBe('')
       const parsedHelp = JSON.parse(help.stdout)
       expect(parsedHelp.ok).toBe(true)
-      expect(parsedHelp.data.usage).toContain('USAGE `jib')
+      expect(parsedHelp.data.usage).toContain('jib <command>')
     })
   })
 
@@ -88,6 +88,20 @@ describe('execution contract', () => {
       expect(Array.isArray(parsed.data.services)).toBe(true)
       expect(Array.isArray(parsed.data.sources)).toBe(true)
       expect(Array.isArray(parsed.data.apps)).toBe(true)
+    })
+  })
+
+  test('exec and run accept passthrough arguments instead of rejecting the app positional', async () => {
+    await withTmpRoot(async (root) => {
+      const execResult = await runCli(root, ['exec', 'demo', '--', 'echo', 'ok'])
+      expect(execResult.exitCode).toBe(1)
+      expect(execResult.stderr).toContain('app "demo" not found in config')
+      expect(execResult.stderr).not.toContain('Unknown argument: demo')
+
+      const runResult = await runCli(root, ['run', 'demo', '--', 'echo', 'ok'])
+      expect(runResult.exitCode).toBe(1)
+      expect(runResult.stderr).toContain('app "demo" not found in config')
+      expect(runResult.stderr).not.toContain('Unknown argument: demo')
     })
   })
 

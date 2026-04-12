@@ -1,4 +1,4 @@
-import { canPrompt, promptBlockReason } from '@jib/cli'
+import { cliCanPrompt, cliDescribePromptBlock } from '@jib/cli'
 import { TuiNotInteractiveError } from './errors.ts'
 
 /**
@@ -6,11 +6,12 @@ import { TuiNotInteractiveError } from './errors.ts'
  * the CLI runtime allows prompting.
  */
 export function isInteractive(): boolean {
-  return canPrompt()
+  return cliCanPrompt()
 }
 
+/** Returns the typed non-interactive error instead of throwing it. */
 export function assertInteractiveResult(): TuiNotInteractiveError | undefined {
-  const reason = promptBlockReason()
+  const reason = cliDescribePromptBlock()
   return reason ? new TuiNotInteractiveError(reason) : undefined
 }
 

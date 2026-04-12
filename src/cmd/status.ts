@@ -1,4 +1,4 @@
-import { isTextOutput } from '@jib/cli'
+import { cliIsTextOutput } from '@jib/cli'
 import { loadAppConfig } from '@jib/config'
 import {
   type AppStatus,
@@ -8,8 +8,9 @@ import {
   collectServices,
   collectSources,
 } from '@jib/state'
-import { defineCommand } from 'citty'
+import type { CliCommand } from './command.ts'
 
+/** Renders a human-readable relative time for the status screen. */
 function timeAgo(iso: string): string {
   if (!iso) return ''
   const ms = Date.now() - new Date(iso).getTime()
@@ -21,18 +22,21 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`
 }
 
+/** Writes a single line to stdout for the text status view. */
 function printLine(line = ''): void {
   process.stdout.write(`${line}\n`)
 }
 
+/** Prints the systemd-level services section in text mode. */
 function printServices(services: ServiceStatus[]): void {
   printLine('services')
-  for (const s of services) {
-    const icon = s.active ? '●' : '○'
-    printLine(`  ${icon} ${s.name.padEnd(18)} ${s.status}`)
+  for (const service of services) {
+    const icon = service.active ? '●' : '○'
+    printLine(`  ${icon} ${service.name.padEnd(18)} ${service.status}`)
   }
 }
 
+/** Prints the configured sources section in text mode. */
 function printSources(sources: SourceStatus[]): void {
   if (sources.length === 0) {
     printLine()
@@ -47,6 +51,7 @@ function printSources(sources: SourceStatus[]): void {
   }
 }
 
+/** Prints the app deployment overview in text mode. */
 function printApps(apps: AppStatus[]): void {
   if (apps.length === 0) {
     printLine()
@@ -63,28 +68,31 @@ function printApps(apps: AppStatus[]): void {
     const deployInfo = app.lastDeploy ? `${deployState}  ${sha}  ${ago}` : `${deployState}  ${sha}`
     printLine(`  ${app.name}`)
     printLine(`    deploy:   ${deployInfo}`)
-    for (const c of app.containers) {
-      printLine(`    service:  ${c.service.padEnd(16)} ${c.state}  ${c.status}`)
+    for (const container of app.containers) {
+      printLine(
+        `    service:  ${container.service.padEnd(16)} ${container.state}  ${container.status}`,
+      )
     }
     if (app.domains.length > 0) {
-      for (const d of app.domains) printLine(`    ingress:  ${d.host} -> :${d.port ?? '?'}`)
+      for (const domain of app.domains)
+        printLine(`    ingress:  ${domain.host} -> :${domain.port ?? '?'}`)
     }
   })
 }
 
-export default defineCommand({
-  meta: { name: 'status', description: 'Show server status: services, sources, apps' },
+const cliStatusCommand = {
+  command: 'status',
+  describe: 'Show server status: services, sources, apps',
   async run() {
     const { cfg, paths } = await loadAppConfig()
     const hasCloudflared = cfg.modules?.cloudflared === true
-
     const [services, sources, apps] = await Promise.all([
       collectServices(hasCloudflared),
       collectSources(cfg, paths),
       collectApps(cfg, paths),
     ])
 
-    if (isTextOutput()) {
+    if (cliIsTextOutput()) {
       printServices(services)
       printSources(sources)
       printApps(apps)
@@ -93,4 +101,6 @@ export default defineCommand({
 
     return { services, sources, apps }
   },
-})
+} satisfies CliCommand
+
+export default cliStatusCommand

@@ -1,8 +1,11 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { CliError } from '@jib/cli'
 import type { Config } from '@jib/config'
 import { getPaths } from '@jib/paths'
-import { chooseInitialSource } from './add.ts'
+import { addChooseInitialSource } from './add.ts'
 
 const cfg = {
   config_version: 3,
@@ -12,14 +15,24 @@ const cfg = {
   apps: {},
 } as Config
 
+const tempDirs: string[] = []
 const selectSetup = async <T extends string>(): Promise<T> => 'setup:github' as T
 
-describe('chooseInitialSource', () => {
-  test('cancels add when source setup does not complete', async () => {
-    const paths = getPaths('/tmp/jib-add-test')
+/** Creates an isolated temp workspace for add command tests. */
+function createAddTestPaths() {
+  const dir = mkdtempSync(join(tmpdir(), 'jib-add-test-'))
+  tempDirs.push(dir)
+  return getPaths(dir)
+}
 
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { force: true, recursive: true })
+})
+
+describe('addChooseInitialSource', () => {
+  test('cancels add when source setup does not complete', async () => {
     await expect(
-      chooseInitialSource(cfg, paths, undefined, {
+      addChooseInitialSource(cfg, createAddTestPaths(), undefined, {
         isInteractive: () => true,
         buildSourceChoices: () => [{ value: 'setup:github', label: 'Set up new GitHub source' }],
         promptSelect: selectSetup,
@@ -32,10 +45,8 @@ describe('chooseInitialSource', () => {
   })
 
   test('returns a newly created source when setup succeeds', async () => {
-    const paths = getPaths('/tmp/jib-add-test')
-
     await expect(
-      chooseInitialSource(cfg, paths, undefined, {
+      addChooseInitialSource(cfg, createAddTestPaths(), undefined, {
         isInteractive: () => true,
         buildSourceChoices: () => [{ value: 'setup:github', label: 'Set up new GitHub source' }],
         promptSelect: selectSetup,
@@ -45,10 +56,8 @@ describe('chooseInitialSource', () => {
   })
 
   test('uses an existing source without prompting when one was provided', async () => {
-    const paths = getPaths('/tmp/jib-add-test')
-
     await expect(
-      chooseInitialSource(cfg, paths, 'existing-source', {
+      addChooseInitialSource(cfg, createAddTestPaths(), 'existing-source', {
         isInteractive: () => false,
       }),
     ).resolves.toEqual({ value: 'existing-source', created: false })

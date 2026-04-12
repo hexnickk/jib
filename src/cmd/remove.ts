@@ -1,77 +1,71 @@
-import { applyCliArgs, canPrompt, isTextOutput, missingInput, withCliArgs } from '@jib/cli'
+import { cliCanPrompt, cliCreateMissingInputError, cliIsTextOutput } from '@jib/cli'
 import { loadAppOrExit } from '@jib/config'
 import { createIngressOperator, releaseIngress } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { promptConfirm, spinner } from '@jib/tui'
-import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { DefaultRemoveSupport, RemoveMissingAppError, runRemove } from '../modules/remove/index.ts'
+import type { CliCommand } from './command.ts'
 
-/** `jib remove <app>` — prompt in the CLI, then delegate teardown to the remove module. */
-
-export default defineCommand({
-  meta: { name: 'remove', description: 'Remove an app completely' },
-  args: withCliArgs({
-    app: { type: 'positional', required: true },
+const cliRemoveCommand = {
+  command: 'remove <app>',
+  describe: 'Remove an app completely',
+  builder: {
     force: { type: 'boolean', description: 'Skip confirmation prompt' },
-  }),
-  async run({ args }) {
-    applyCliArgs(args)
-    const { cfg, paths } = await loadAppOrExit(args.app)
-    const appCfg = cfg.apps[args.app] as NonNullable<(typeof cfg.apps)[string]>
+  },
+  async run(args) {
+    const appName = String(args.app)
+    const { cfg, paths } = await loadAppOrExit(appName)
+    const appCfg = cfg.apps[appName] as NonNullable<(typeof cfg.apps)[string]>
 
     if (!args.force) {
-      if (!canPrompt()) {
-        missingInput('missing required confirmation for jib remove', [
+      if (!cliCanPrompt()) {
+        return cliCreateMissingInputError('missing required confirmation for jib remove', [
           { field: 'force', message: 'rerun with --force or enable interactive prompts' },
         ])
       }
       const ingressSummary =
         appCfg.domains.length > 0 ? ` (${appCfg.domains.map((d) => d.host).join(', ')})` : ''
       const ok = await promptConfirm({
-        message: `Remove app "${args.app}"${ingressSummary}?`,
+        message: `Remove app "${appName}"${ingressSummary}?`,
         initialValue: false,
       })
-      if (!ok) {
-        return { app: args.app, removed: false }
-      }
+      if (!ok) return { app: appName, removed: false }
     }
 
     const result = await runRemove(
       {
         support: new DefaultRemoveSupport({
           paths,
-          releaseIngress: (appName) => releaseIngressForRemove(paths, appName),
+          releaseIngress: (nextAppName) => removeReleaseIngress(paths, nextAppName),
         }),
         observer: {
           warn: (message) => {
-            if (isTextOutput()) consola.warn(message)
+            if (cliIsTextOutput()) consola.warn(message)
           },
         },
       },
-      {
-        appName: args.app,
-        cfg,
-        configFile: paths.configFile,
-        quiet: !isTextOutput(),
-      },
+      { appName, cfg, configFile: paths.configFile, quiet: !cliIsTextOutput() },
     )
-    if (result instanceof RemoveMissingAppError) throw result
-    if (isTextOutput()) consola.success(`removed ${args.app}`)
-    return { app: args.app, removed: true }
+    if (result instanceof RemoveMissingAppError) return result
+    if (cliIsTextOutput()) consola.success(`removed ${appName}`)
+    return { app: appName, removed: true }
   },
-})
+} satisfies CliCommand
 
-async function releaseIngressForRemove(paths: Paths, app: string): Promise<void> {
-  const s = isTextOutput() ? spinner() : null
-  s?.start(`releasing ingress for ${app}`)
+/** Releases managed ingress while mirroring progress through the CLI spinner. */
+async function removeReleaseIngress(paths: Paths, app: string): Promise<void> {
+  const progress = cliIsTextOutput() ? spinner() : null
+  progress?.start(`releasing ingress for ${app}`)
   try {
-    await releaseIngress(createIngressOperator(paths), app, (progress) =>
-      s?.message(progress.message),
+    await releaseIngress(createIngressOperator(paths), app, (update) =>
+      progress?.message(update.message),
     )
-    s?.stop('ingress released')
+    progress?.stop('ingress released')
   } catch (error) {
-    s?.stop('ingress release failed')
+    progress?.stop('ingress release failed')
     throw error
   }
 }
+
+export default cliRemoveCommand

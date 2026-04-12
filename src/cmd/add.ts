@@ -1,11 +1,10 @@
-import { CliError, applyCliArgs, isTextOutput } from '@jib/cli'
+import { CliError, cliIsTextOutput } from '@jib/cli'
 import { loadAppConfig, loadConfig } from '@jib/config'
 import type { App } from '@jib/config'
 import { claimIngress, createIngressOperator } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { buildSourceChoices, preflightSourceSelection, runSourceSetup } from '@jib/sources'
 import { isInteractive, promptConfirm, promptSelect, spinner } from '@jib/tui'
-import { defineCommand } from 'citty'
 import { consola } from 'consola'
 import { DEFAULT_TIMEOUT_MS, runDeploy } from '../deploy/run.ts'
 import {
@@ -26,19 +25,25 @@ import {
   rollbackAddedApp,
   trapInterrupt,
 } from '../modules/add/runtime.ts'
-import { addCommandArgs } from './add-args.ts'
-
-export default defineCommand({
-  meta: { name: 'add', description: 'Register and deploy a new app' },
-  args: addCommandArgs,
-  async run({ args }) {
-    applyCliArgs(args)
-
+import type { AddCommandArgv } from './add-args.ts'
+import { addCommandOptions } from './add-args.ts'
+import type { CliCommand } from './command.ts'
+const cliAddCommand = {
+  command: 'add [app]',
+  describe: 'Register and deploy a new app',
+  builder: addCommandOptions,
+  async run(args) {
     let { cfg, paths } = await loadAppConfig()
-    const appName = await resolveAddAppName(args.app, cfg.apps)
-    const source = await chooseInitialSource(cfg, paths, args.source)
+    const appName = await resolveAddAppName(
+      typeof args.app === 'string' ? args.app : undefined,
+      cfg.apps,
+    )
+    const source = await addChooseInitialSource(
+      cfg,
+      paths,
+      typeof args.source === 'string' ? args.source : undefined,
+    )
     if (source.created) cfg = await loadConfig(paths.configFile)
-
     const inputs = await gatherAddInputs(args)
     const planner = createAddPlanner()
     const interrupt = trapInterrupt()
@@ -48,7 +53,7 @@ export default defineCommand({
       paths,
       inputs.repo,
       source.value,
-      args.branch,
+      typeof args.branch === 'string' ? args.branch : undefined,
       { isInteractive, promptConfirm, promptSelect },
     )
     const flowArgs: { source?: string; branch?: string } = {
@@ -59,12 +64,11 @@ export default defineCommand({
     const addService = new AddService(
       new DefaultAddSupport({
         paths,
-        claimIngress: (appName, finalApp) => claimIngressForAdd(paths, appName, finalApp),
+        claimIngress: (nextAppName, finalApp) => addClaimIngress(paths, nextAppName, finalApp),
       }),
       planner,
       inspection.observer,
     )
-
     try {
       const { addResult, deployResult } = await runAddSequence(
         async () => {
@@ -101,55 +105,54 @@ export default defineCommand({
       return renderAddResult(appName, inputs.repo, addResult, deployResult)
     } catch (error) {
       inspection.fail()
-      if (error instanceof CancelledAddError) throw new CliError('cancelled', error.message)
+      if (error instanceof CancelledAddError) return new CliError('cancelled', error.message)
       if (error instanceof RolledBackAddError) {
         const original = interrupt.interrupted
           ? new CliError('cancelled', 'add cancelled')
           : error.original
-        throw normalizeAddDeployError(original, appName, paths.configFile)
+        return normalizeAddDeployError(original, appName, paths.configFile)
       }
       throw error
     } finally {
       interrupt.dispose()
     }
   },
-})
+} satisfies CliCommand<AddCommandArgv>
 
-async function claimIngressForAdd(paths: Paths, app: string, appCfg: App): Promise<void> {
-  const s = isTextOutput() ? spinner() : null
-  s?.start(`claiming ingress for ${app}`)
+/** Claims ingress for a newly added app while keeping spinner updates local to the command. */
+async function addClaimIngress(paths: Paths, app: string, appCfg: App): Promise<void> {
+  const progress = cliIsTextOutput() ? spinner() : null
+  progress?.start(`claiming ingress for ${app}`)
   try {
-    await claimIngress(createIngressOperator(paths), app, appCfg, (progress) =>
-      s?.message(progress.message),
+    await claimIngress(createIngressOperator(paths), app, appCfg, (update) =>
+      progress?.message(update.message),
     )
-    s?.stop('ingress ready')
+    progress?.stop('ingress ready')
   } catch (error) {
-    s?.stop('ingress failed')
+    progress?.stop('ingress failed')
     throw error
   }
 }
 
-export interface ChooseInitialSourceDeps {
+export interface AddChooseInitialSourceDeps {
   buildSourceChoices?: typeof buildSourceChoices
   isInteractive?: typeof isInteractive
   promptSelect?: typeof promptSelect
   runSourceSetup?: typeof runSourceSetup
 }
-
-export async function chooseInitialSource(
+/** Chooses the initial source, prompting only when the caller did not provide one. */
+export async function addChooseInitialSource(
   cfg: Awaited<ReturnType<typeof loadAppConfig>>['cfg'],
   paths: Paths,
   currentSource?: string,
-  deps: ChooseInitialSourceDeps = {},
+  deps: AddChooseInitialSourceDeps = {},
 ): Promise<{ value?: string; created: boolean }> {
   const interactive = deps.isInteractive ?? isInteractive
   const select = deps.promptSelect ?? promptSelect
   const sourceChoices = deps.buildSourceChoices ?? buildSourceChoices
   const setupSource = deps.runSourceSetup ?? runSourceSetup
-
-  if (currentSource || !interactive()) {
+  if (currentSource || !interactive())
     return currentSource ? { value: currentSource, created: false } : { created: false }
-  }
   const options = sourceChoices(cfg)
   if (options.length === 0) return { created: false }
   const choice = await select({
@@ -167,36 +170,36 @@ export async function chooseInitialSource(
     : { created: false }
 }
 
+/** Creates spinner-backed inspection callbacks for the add flow. */
 function createInspectionObserver() {
-  const spin = isTextOutput() ? spinner() : null
+  const progress = cliIsTextOutput() ? spinner() : null
   let active = false
   return {
     observer: {
       onStateChange: (state: string) => {
-        if (!spin) return
+        if (!progress) return
         if (state === 'inputs_ready') {
           active = true
-          spin.start('preparing repo')
+          progress.start('preparing repo')
         }
-        if (state === 'repo_prepared') spin.message('inspecting docker-compose')
+        if (state === 'repo_prepared') progress.message('inspecting docker-compose')
         if (state === 'compose_inspected' && active) {
           active = false
-          spin.stop('compose inspected')
+          progress.stop('compose inspected')
         }
       },
-      warn: (message: string) => {
-        if (isTextOutput()) consola.warn(message)
-      },
+      warn: (message: string) => cliIsTextOutput() && consola.warn(message),
     },
     stop: () => {
-      if (!spin || !active) return
+      if (!progress || !active) return
       active = false
-      spin.stop('compose inspected')
+      progress.stop('compose inspected')
     },
     fail: () => {
-      if (!spin || !active) return
+      if (!progress || !active) return
       active = false
-      spin.stop('inspection failed')
+      progress.stop('inspection failed')
     },
   }
 }
+export default cliAddCommand

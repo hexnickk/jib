@@ -2,19 +2,19 @@ import { loadConfig } from '@jib/config'
 import { getPaths } from '@jib/paths'
 import { setupSourceRef } from '@jib/sources'
 import { promptSelect } from '@jib/tui'
-import { defineCommand } from 'citty'
+import type { CliCommand } from './command.ts'
 
-const setupCmd = defineCommand({
-  meta: { name: 'setup', description: 'Set up a git source ref' },
-  async run() {
-    const paths = getPaths()
-    const config = await loadConfig(paths.configFile)
-    const source = await setupSourceRef(config, paths, { promptSelect })
-    return { ok: source !== null, ...(source ? { source } : {}) }
+const cliSourcesCommands = [
+  {
+    command: 'sources setup',
+    describe: 'Set up a git source ref',
+    async run() {
+      const paths = getPaths()
+      const config = await loadConfig(paths.configFile)
+      const source = await setupSourceRef(config, paths, { promptSelect })
+      return { ok: source !== null, ...(source ? { source } : {}) }
+    },
   },
-})
+] satisfies CliCommand[]
 
-export default defineCommand({
-  meta: { name: 'sources', description: 'Manage git source refs' },
-  subCommands: { setup: setupCmd },
-})
+export default cliSourcesCommands

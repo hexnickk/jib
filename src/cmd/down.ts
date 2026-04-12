@@ -1,22 +1,22 @@
-import { applyCliArgs, withCliArgs } from '@jib/cli'
-import { loadAppOrExit } from '@jib/config'
-import { defineCommand } from 'citty'
+import { cliIsTextOutput } from '@jib/cli'
+import { loadAppOrExitResult } from '@jib/config'
+import { downApp } from '@jib/deploy'
 import { consola } from 'consola'
-import { createDeployEngine } from '../deploy/engine.ts'
+import { createDeployDeps } from '../deploy/engine.ts'
+import type { CliCommand } from './command.ts'
 
-export default defineCommand({
-  meta: { name: 'down', description: 'Stop containers without removing app from config' },
-  args: withCliArgs({ app: { type: 'positional', required: true } }),
-  async run({ args }) {
-    try {
-      applyCliArgs(args)
-      const { cfg, paths } = await loadAppOrExit(args.app)
-      await createDeployEngine(cfg, paths, 'down').down(args.app)
-      consola.success(`stopped ${args.app}`)
-    } catch (err) {
-      consola.error(err instanceof Error ? err.message : String(err))
-      consola.info('check running containers: docker ps --filter label=com.docker.compose.project')
-      process.exit(1)
-    }
+const cliDownCommand = {
+  command: 'down <app>',
+  describe: 'Stop containers without removing app from config',
+  async run(args) {
+    const appName = String(args.app)
+    const loaded = await loadAppOrExitResult(appName)
+    if (loaded instanceof Error) return loaded
+    const result = await downApp(createDeployDeps(loaded.cfg, loaded.paths, 'down'), appName)
+    if (result) return result
+    if (cliIsTextOutput()) consola.success(`stopped ${appName}`)
+    return { app: appName, state: 'stopped' as const }
   },
-})
+} satisfies CliCommand
+
+export default cliDownCommand

@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test'
-import { CliError, normalizeCliError } from '@jib/cli'
+import { CliError, cliNormalizeError } from '@jib/cli'
 import { PrepareRepoError } from './flow-errors.ts'
 import { normalizeAddError } from './index.ts'
 import { normalizeAddDeployError } from './runtime.ts'
 
 describe('add command error normalization', () => {
   test('unexpected add failures keep the retry-safe rollback hint', () => {
-    const normalized = normalizeCliError(
+    const normalized = cliNormalizeError(
       normalizeAddError(
         new PrepareRepoError(new Error('clone failed')),
         'blog',
@@ -19,7 +19,7 @@ describe('add command error normalization', () => {
   })
 
   test('deploy-specific hints are preserved alongside rollback guidance', () => {
-    const normalized = normalizeCliError(
+    const normalized = cliNormalizeError(
       normalizeAddDeployError(
         new CliError('deploy_failed', 'permission denied', {
           hint: 'repair /opt/jib ownership and permissions',

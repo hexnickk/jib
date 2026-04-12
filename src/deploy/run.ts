@@ -1,4 +1,4 @@
-import { CliError, isTextOutput } from '@jib/cli'
+import { CliError, cliIsTextOutput } from '@jib/cli'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import { syncApp } from '@jib/sources'
@@ -54,7 +54,7 @@ export async function runDeployResult(
   timeoutMs = DEFAULT_TIMEOUT_MS,
   deps: DeployRunDeps = {},
 ): Promise<DeployRunError | DeployRunResult> {
-  const showProgress = isTextOutput()
+  const showProgress = cliIsTextOutput()
   const createSpin = deps.createSpinner ?? spinner
   const prepareSpin = showProgress ? createSpin() : null
 

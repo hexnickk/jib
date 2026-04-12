@@ -1,4 +1,4 @@
-import { CliError, isTextOutput } from '@jib/cli'
+import { CliError, cliIsTextOutput } from '@jib/cli'
 import { loadConfig } from '@jib/config'
 import type { App, Config } from '@jib/config'
 import { createIngressOperator, releaseIngress } from '@jib/ingress'
@@ -20,10 +20,10 @@ export function renderAddResult(
   deploy: DeployRunResult,
 ) {
   const { finalApp, secretsWritten } = result
-  if (secretsWritten > 0 && isTextOutput()) {
+  if (secretsWritten > 0 && cliIsTextOutput()) {
     consola.success(`${secretsWritten} secret(s) set for ${app}`)
   }
-  if (isTextOutput()) {
+  if (cliIsTextOutput()) {
     consola.success(`${app} deployed @ ${deploy.sha.slice(0, 8)} (${deploy.durationMs}ms)`)
     const ingress =
       finalApp.domains.length > 0
@@ -87,9 +87,9 @@ export async function rollbackAddedApp(
         paths,
         releaseIngress: (appName) => releaseIngress(createIngressOperator(paths), appName),
       }),
-      observer: { warn: (message) => isTextOutput() && consola.warn(message) },
+      observer: { warn: (message) => cliIsTextOutput() && consola.warn(message) },
     },
-    { appName: app, cfg, configFile: paths.configFile, quiet: !isTextOutput() },
+    { appName: app, cfg, configFile: paths.configFile, quiet: !cliIsTextOutput() },
   )
   if (result instanceof RemoveMissingAppError) return
 }

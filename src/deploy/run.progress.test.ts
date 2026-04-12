@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { setCliRuntime } from '@jib/cli'
+import { cliSetRuntime } from '@jib/cli'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import { DeployExecuteError, DeployTimeoutError } from './errors.ts'
@@ -30,12 +30,12 @@ const paths: Paths = {
 }
 
 afterEach(() => {
-  setCliRuntime({ output: 'json' })
+  cliSetRuntime({ output: 'json' })
 })
 
 describe('runDeploy progress and timeout', () => {
   test('times out slow deploys with a deploy_failed cli error', async () => {
-    setCliRuntime({ output: 'json' })
+    cliSetRuntime({ output: 'json' })
     await expect(
       runDeploy(cfg, paths, 'demo', undefined, 5, {
         sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
@@ -55,7 +55,7 @@ describe('runDeploy progress and timeout', () => {
   })
 
   test('returns a typed timeout error from the result-first api', async () => {
-    setCliRuntime({ output: 'json' })
+    cliSetRuntime({ output: 'json' })
     const result = await runDeployResult(cfg, paths, 'demo', undefined, 5, {
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       createEngine: () =>
@@ -75,7 +75,7 @@ describe('runDeploy progress and timeout', () => {
   })
 
   test('returns a typed execute error when deploy throws before returning a promise', async () => {
-    setCliRuntime({ output: 'json' })
+    cliSetRuntime({ output: 'json' })
     const result = await runDeployResult(cfg, paths, 'demo', undefined, 1000, {
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       createEngine: () =>
@@ -94,7 +94,7 @@ describe('runDeploy progress and timeout', () => {
   })
 
   test('text mode reports spinner start, progress, and stop messages in order', async () => {
-    setCliRuntime({ output: 'text' })
+    cliSetRuntime({ output: 'text' })
     const events: string[] = []
     const createSpinner = () => ({
       start(value: string) {

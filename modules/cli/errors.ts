@@ -58,7 +58,13 @@ export class InvalidOutputModeError extends CliError {
   }
 }
 
-export function normalizeCliError(error: unknown): NormalizedCliError {
+/** Creates a typed error for commands that are missing required interactive input. */
+export function cliCreateMissingInputError(message: string, issues: CliIssue[]): MissingInputError {
+  return new MissingInputError(message, issues)
+}
+
+/** Normalizes thrown or returned failures into the CLI response shape. */
+export function cliNormalizeError(error: unknown): NormalizedCliError {
   if (error instanceof CliError) {
     return {
       code: error.code,

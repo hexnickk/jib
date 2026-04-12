@@ -14,7 +14,7 @@ import { parseComposeServices } from './parse.ts'
 
 /**
  * Shared arg parsing and service resolution for `jib exec` and `jib run`.
- * citty's flag parser eats `--`, so both commands parse from `rawArgs`.
+ * Both commands parse the raw argv tail directly so `--` passthrough stays intact.
  */
 
 export interface ExecParts {

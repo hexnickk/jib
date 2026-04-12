@@ -1,24 +1,25 @@
 import { existsSync } from 'node:fs'
-import { applyCliArgs, ensureLinux, ensureRoot, isTextOutput, withCliArgs } from '@jib/cli'
+import { cliCheckLinuxHost, cliCheckRootHost, cliIsTextOutput } from '@jib/cli'
 import { getPaths } from '@jib/paths'
 import { intro, note, outro } from '@jib/tui'
-import { defineCommand } from 'citty'
 import { runPendingMigrations } from '../migrations/service.ts'
+import type { CliCommand } from './command.ts'
 
-export default defineCommand({
-  meta: { name: 'migrate', description: 'Run automatic server migrations' },
-  args: withCliArgs({}),
-  async run({ args }) {
-    applyCliArgs(args)
-    ensureLinux('migrate')
-    ensureRoot('migrate')
+const cliMigrateCommand = {
+  command: 'migrate',
+  describe: 'Run automatic server migrations',
+  async run() {
+    const linuxError = cliCheckLinuxHost('migrate')
+    if (linuxError) return linuxError
+    const rootError = cliCheckRootHost('migrate')
+    if (rootError) return rootError
 
     const paths = getPaths()
     const configExisted = existsSync(paths.configFile)
-    if (isTextOutput()) intro('jib migrate')
+    if (cliIsTextOutput()) intro('jib migrate')
 
     const result = await runPendingMigrations(paths)
-    if (isTextOutput()) {
+    if (cliIsTextOutput()) {
       outro(
         result.appliedMigrations.length > 0
           ? `applied ${result.appliedMigrations.length} migration(s)`
@@ -34,4 +35,6 @@ export default defineCommand({
 
     return { ...result, configExisted }
   },
-})
+} satisfies CliCommand
+
+export default cliMigrateCommand

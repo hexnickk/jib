@@ -8,8 +8,6 @@
     ".": "./index.ts"
   },
   "dependencies": {
-    "@jib/errors": "workspace:*",
-    "@jib/logging": "workspace:*",
-    "citty": "*"
+    "@jib/errors": "workspace:*"
   }
 }

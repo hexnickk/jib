@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { setCliRuntime } from '@jib/cli'
+import { cliSetRuntime } from '@jib/cli'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import { DeployPrepareError } from './errors.ts'
@@ -31,7 +31,7 @@ const paths: Paths = {
 
 describe('runDeploy', () => {
   test('returns prepared and deployed shas on success', async () => {
-    setCliRuntime({ output: 'json' })
+    cliSetRuntime({ output: 'json' })
     const result = await runDeploy(cfg, paths, 'demo', undefined, 1000, {
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       createEngine: () =>
@@ -50,7 +50,7 @@ describe('runDeploy', () => {
   })
 
   test('wraps source prep failures as deploy_failed', async () => {
-    setCliRuntime({ output: 'json' })
+    cliSetRuntime({ output: 'json' })
     await expect(
       runDeploy(cfg, paths, 'demo', undefined, 1000, {
         sync: async () => {
@@ -64,7 +64,7 @@ describe('runDeploy', () => {
   })
 
   test('returns a typed prepare error instead of throwing for expected sync failures', async () => {
-    setCliRuntime({ output: 'json' })
+    cliSetRuntime({ output: 'json' })
     const result = await runDeployResult(cfg, paths, 'demo', undefined, 1000, {
       sync: async () => {
         throw new Error('git clone failed')
@@ -79,7 +79,7 @@ describe('runDeploy', () => {
   })
 
   test('permission failures hint to repair the managed tree', async () => {
-    setCliRuntime({ output: 'json' })
+    cliSetRuntime({ output: 'json' })
     await expect(
       runDeploy(cfg, paths, 'demo', undefined, 1000, {
         sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
