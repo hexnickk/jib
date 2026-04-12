@@ -1,7 +1,8 @@
+import { mkdir } from 'node:fs/promises'
 import { rm } from 'node:fs/promises'
 import type { App, Config } from '@jib/config'
 import { JibError } from '@jib/errors'
-import { type Paths, pathExists, repoPath } from '@jib/paths'
+import { type Paths, dockerHubImage, pathExists, repoPath } from '@jib/paths'
 import * as git from './git.ts'
 import { resolveSourceDriver } from './registry.ts'
 import type {
@@ -17,11 +18,13 @@ function resolveApp(cfg: Config, target: SourceTarget): App {
   const existing = cfg.apps[target.app]
   if (existing) return existing
   if (!target.repo) throw new Error(`app "${target.app}" not found in config`)
+  const image = dockerHubImage(target.repo)
   return {
-    repo: target.repo,
+    repo: image ? 'local' : target.repo,
     branch: target.branch ?? 'main',
     domains: [],
     env_file: '.env',
+    ...(image ? { image } : {}),
     ...(target.source ? { source: target.source } : {}),
   }
 }
@@ -61,6 +64,11 @@ export async function syncApp(
   ref?: string,
 ): Promise<PreparedSource> {
   const app = resolveApp(cfg, target)
+  if (app.image) {
+    const workdir = repoPath(paths, target.app, app.repo)
+    await mkdir(workdir, { recursive: true, mode: 0o750 })
+    return { workdir, sha: app.image }
+  }
   if (app.repo === 'local') {
     const workdir = repoPath(paths, target.app, app.repo)
     if (!(await pathExists(workdir)) || !(await git.isRepo(workdir))) {

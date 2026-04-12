@@ -1,6 +1,7 @@
 import type { ComposeInspection } from '@jib/docker'
 import { managedComposePath } from '@jib/paths'
 import type { Step } from '../tx/run.ts'
+import { prepareDockerHubWorkdir } from './dockerhub.ts'
 import {
   type AddFlowError,
   CollectGuidedInputsError,
@@ -53,9 +54,15 @@ const prepareRepoStep: Step<AddRunContext, { repo: string }, AddFlowError> = {
         branch: ctx.params.draftApp.branch,
         ...(ctx.params.args.source ? { source: ctx.params.args.source } : {}),
       })
+      await prepareDockerHubWorkdir(
+        ctx.params.paths,
+        ctx.params.appName,
+        ctx.params.inputs.repo,
+        ctx.params.inputs.persistPaths,
+      )
       ctx.workdir = workdir
       ctx.observer.onStateChange?.('repo_prepared')
-      return { repo: ctx.params.inputs.repo }
+      return { repo: ctx.params.draftApp.image ? 'local' : ctx.params.inputs.repo }
     } catch (cause) {
       return new PrepareRepoError(cause)
     }

@@ -1,3 +1,4 @@
+import { isDockerHubRepo } from '@jib/paths'
 import { ConfigError } from './errors.ts'
 import type { Config } from './schema.ts'
 
@@ -18,12 +19,20 @@ export function validateRepo(repo: string): string | null {
   if (repo === '' || repo === 'local') return null
   if (repo.includes('..')) return 'contains ".." path segment'
   if (repo.startsWith('/')) return null
+  if (repo.startsWith('https://hub.docker.com/')) {
+    return isDockerHubRepo(repo) ? null : 'must point to a Docker Hub repository page'
+  }
+  if (repo.startsWith('docker://') || repo.startsWith('dockerhub://')) {
+    return isDockerHubRepo(repo)
+      ? null
+      : 'must include a valid image ref after docker:// or dockerhub://'
+  }
   if (repo.startsWith('git@') && /^git@[^:\s]+:[^\s]+$/.test(repo)) return null
   for (const prefix of EXTERNAL_REPO_PREFIXES) {
     if (repo.startsWith(prefix)) return null
   }
   if (GITHUB_SLUG_RE.test(repo)) return null
-  return 'must be "local", "owner/name", an absolute path, or a file://, http(s)://, ssh://, git://, or git@host: URL'
+  return 'must be "local", "owner/name", docker://image, dockerhub://image, a Docker Hub URL, an absolute path, or a file://, http(s)://, ssh://, git://, or git@host: URL'
 }
 
 /**
@@ -75,6 +84,9 @@ export function validate(cfg: Config): void {
     if (repoErr) errs.push(`app '${name}': repo "${app.repo}" ${repoErr}`)
     if (app.source && app.repo !== 'local' && !sourceNames.has(app.source)) {
       errs.push(`app '${name}': source "${app.source}" not found in sources`)
+    }
+    if (app.image && app.repo !== 'local') {
+      errs.push(`app '${name}': image-backed apps must use repo "local"`)
     }
     for (const d of app.domains) {
       if (d.host !== d.host.toLowerCase() || !DOMAIN_RE.test(d.host)) {

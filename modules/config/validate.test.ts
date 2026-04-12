@@ -40,6 +40,9 @@ describe('validateRepo', () => {
       '',
       'local',
       'hexnickk/jib',
+      'docker://n8nio/n8n',
+      'dockerhub://n8nio/n8n:latest',
+      'https://hub.docker.com/r/n8nio/n8n',
       'file:///tmp/foo',
       'https://example.com/foo.git',
       'git@github.com:owner/name.git',
@@ -50,7 +53,14 @@ describe('validateRepo', () => {
   })
 
   test('rejects traversal and malformed repo inputs', () => {
-    for (const repo of ['../../etc', 'owner/..', 'a/b/c', 'not a repo']) {
+    for (const repo of [
+      '../../etc',
+      'owner/..',
+      'a/b/c',
+      'docker://bad ref',
+      'https://hub.docker.com/not-a-repo-page',
+      'not a repo',
+    ]) {
       expect(validateRepo(repo)).not.toBeNull()
     }
   })
@@ -120,5 +130,18 @@ describe('validate', () => {
       },
     })
     expect(() => validate(cfg)).toThrow(/name must match/)
+  })
+
+  test('rejects image-backed app when repo is not local', () => {
+    const cfg = base({
+      apps: {
+        web: {
+          repo: 'owner/web',
+          image: 'n8nio/n8n',
+          domains: [{ host: 'example.com', port: 80 }],
+        },
+      },
+    })
+    expect(() => validate(cfg)).toThrow(/repo "local"/)
   })
 })

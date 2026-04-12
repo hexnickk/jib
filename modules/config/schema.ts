@@ -41,6 +41,7 @@ export const PreDeployHookSchema = z.object({
 
 export const AppSchema = z.object({
   repo: z.string().min(1),
+  image: z.string().min(1).optional(),
   source: z.string().optional(),
   branch: z.string().default('main'),
   compose: StringOrSlice.optional(),

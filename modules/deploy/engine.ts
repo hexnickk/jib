@@ -8,6 +8,7 @@ import {
   type OverrideService,
   allHealthy,
   checkHealth,
+  hasBuildServices,
   overridePath,
   parseComposeServices,
   writeOverride,
@@ -144,8 +145,10 @@ export class Engine {
       const compose = this.newCompose(cmd.app, appCfg, cmd.workdir)
       const buildArgs = appCfg.build_args ?? {}
 
-      progress.emit('build', `building ${cmd.app}`)
-      await compose.build(buildArgs)
+      if (hasBuildServices(cmd.workdir, appCfg.compose ?? [])) {
+        progress.emit('build', `building ${cmd.app}`)
+        await compose.build(buildArgs)
+      }
 
       for (const hook of appCfg.pre_deploy ?? []) {
         progress.emit('pre_deploy', `running ${hook.service}`)

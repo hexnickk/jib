@@ -32,6 +32,20 @@ async function mkWorkdir(): Promise<string> {
     join(d, 'docker-compose.yml'),
     `services:
   web:
+    build:
+      context: .
+    image: nginx:alpine
+`,
+  )
+  return d
+}
+
+async function mkImageOnlyWorkdir(): Promise<string> {
+  const d = await mkdtemp(join(tmpdir(), 'jib-image-workdir-'))
+  await writeFile(
+    join(d, 'docker-compose.yml'),
+    `services:
+  web:
     image: nginx:alpine
 `,
   )
@@ -220,6 +234,25 @@ describe('Engine.deploy', () => {
 
     const override = await readFile(join(paths.overridesDir, 'demo.yml'), 'utf8')
     expect(override).not.toContain('ports:')
+    expect(calls.some((c) => c.args.includes('up'))).toBe(true)
+  })
+
+  test('image-only compose skips the build step', async () => {
+    const { paths, store, log } = await mkEnv()
+    const workdir = await mkImageOnlyWorkdir()
+    const calls: Call[] = []
+    const engine = new Engine({
+      config: mkCfg(),
+      paths,
+      store,
+      log,
+      diskFree: async () => 10 * 1024 * 1024 * 1024,
+      dockerExec: fakeExec(calls),
+    })
+
+    await engine.deploy({ app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' }, noProgress)
+
+    expect(calls.some((c) => c.args.includes('build'))).toBe(false)
     expect(calls.some((c) => c.args.includes('up'))).toBe(true)
   })
 })

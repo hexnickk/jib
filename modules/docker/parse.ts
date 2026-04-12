@@ -73,6 +73,16 @@ export function parseComposeServices(
   return out
 }
 
+export function hasBuildServices(repoDir: string, composeFiles: string[] = []): boolean {
+  const files = composeFiles.length > 0 ? composeFiles : ['docker-compose.yml']
+  for (const f of files) {
+    const data = readFileSync(isAbsolute(f) ? f : join(repoDir, f), 'utf8')
+    const cf = (parseYaml(data) ?? {}) as RawComposeFile
+    if (Object.values(cf.services ?? {}).some((service) => service.build !== undefined)) return true
+  }
+  return false
+}
+
 /**
  * Infer the port exposed *inside* the container for a service. Priority:
  *   1. first entry in `ports:` (container side of `host:container`)

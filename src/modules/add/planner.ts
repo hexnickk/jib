@@ -4,9 +4,11 @@ import {
   type ComposeInspection,
   ComposeInspectionError,
   discoverComposeFiles,
+  findUnsafeBindMounts,
   inspectComposeApp,
   resolveFromCompose,
 } from '@jib/docker'
+import { dockerHubImage } from '@jib/paths'
 import type { Paths } from '@jib/paths'
 import { isInteractive, note, promptConfirm, promptString } from '@jib/tui'
 import { consola } from 'consola'
@@ -66,6 +68,18 @@ async function inspectComposeWithPrompts(
   for (;;) {
     try {
       const inspection = inspectComposeApp({ compose }, workdir)
+      const bindMounts = findUnsafeBindMounts(workdir, inspection.composeFiles)
+      if (bindMounts.length > 0) {
+        throw new CliError(
+          'compose_inspection_failed',
+          `host bind mounts are not supported by jib add: ${bindMounts
+            .map((mount) => `${mount.service} -> ${mount.source}`)
+            .join(', ')}`,
+          {
+            hint: 'replace bind mounts with named volumes so app storage stays isolated per jib app',
+          },
+        )
+      }
       if (isDebugEnabled()) {
         consola.info(`compose files: ${inspection.composeFiles.join(', ')}`)
         consola.info(`services: ${inspection.services.map((service) => service.name).join(', ')}`)
@@ -145,9 +159,11 @@ async function buildResolvedApp(
   const domains = await assignPorts(cfg, appName, guided.domains)
   const buildArgs = configEntriesToBuildArgs(guided.configEntries)
   const composeFiles = await persistComposeFiles(paths, appName, workdir, inspection.composeFiles)
+  const image = dockerHubImage(inputs.repo)
   return resolveFromCompose(
     parseApp({
-      repo: inputs.repo,
+      repo: image ? 'local' : inputs.repo,
+      ...(image ? { image } : {}),
       branch: args.branch ?? 'main',
       domains,
       env_file: '.env',

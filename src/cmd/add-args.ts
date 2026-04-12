@@ -4,7 +4,12 @@ export const addCommandArgs = withCliArgs({
   app: { type: 'positional', required: false },
   repo: {
     type: 'string',
-    description: 'Git repo: "owner/name", "local", file:// URL, http(s):// URL, or absolute path',
+    description:
+      'Git repo, Docker Hub repo, or local path: "owner/name", docker://image, Docker Hub URL, "local", file:// URL, http(s):// URL, or absolute path',
+  },
+  backend: {
+    type: 'string',
+    description: 'Interpret owner/name shorthand as github|dockerhub|other',
   },
   source: { type: 'string', description: 'Configured source ref name' },
   branch: { type: 'string', description: 'Git branch to track (defaults to the repo default)' },
@@ -14,6 +19,10 @@ export const addCommandArgs = withCliArgs({
     description: 'Default ingress: direct|cloudflare-tunnel',
   },
   compose: { type: 'string', description: 'Compose file (comma-separated)' },
+  persist: {
+    type: 'string',
+    description: 'Container path to persist via named volume (repeatable, comma-separated)',
+  },
   domain: {
     type: 'string',
     description:

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { CliError } from '@jib/cli'
 import type { App, Config } from '@jib/config'
 import { getPaths, managedComposePath } from '@jib/paths'
 import { GENERATED_COMPOSE_FILE } from './compose-scaffold.ts'
@@ -61,6 +62,7 @@ describe('createAddPlanner', () => {
       {},
       {
         repo: 'owner/demo',
+        persistPaths: [],
         ingressDefault: 'direct',
         parsedDomains: [],
         configEntries: [],
@@ -92,5 +94,17 @@ describe('createAddPlanner', () => {
 
     expect(inspection.composeFiles).toEqual(['compose.yml'])
     expect(inspection.services.map((service) => service.name)).toEqual(['web'])
+  })
+
+  test('rejects compose files with host bind mounts', async () => {
+    const workdir = mkdtempSync(join(tmpdir(), 'jib-planner-'))
+    writeFileSync(
+      join(workdir, 'docker-compose.yml'),
+      'services:\n  web:\n    image: nginx\n    volumes:\n      - /data/sqlite:/data/sqlite\n',
+    )
+
+    const planner = createAddPlanner()
+
+    await expect(planner.inspectCompose(draftApp, workdir)).rejects.toBeInstanceOf(CliError)
   })
 })

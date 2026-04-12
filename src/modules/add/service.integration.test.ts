@@ -102,6 +102,7 @@ describe('AddService with DefaultAddSupport', () => {
         configFile: paths.configFile,
         inputs: {
           repo: upstream,
+          persistPaths: [],
           ingressDefault: 'direct',
           parsedDomains: [],
           configEntries: [],

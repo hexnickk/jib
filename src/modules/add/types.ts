@@ -14,6 +14,7 @@ export interface ConfigEntry extends EnvEntry {
 
 export interface AddInputs {
   repo: string
+  persistPaths: string[]
   ingressDefault: string
   composeRaw?: string[]
   parsedDomains: ParsedDomain[]

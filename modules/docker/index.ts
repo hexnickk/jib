@@ -10,10 +10,12 @@ export {
 } from './override.ts'
 export {
   type ComposeService,
+  hasBuildServices,
   hasPublishedPorts,
   inferContainerPort,
   parseComposeServices,
 } from './parse.ts'
+export { findUnsafeBindMounts, type UnsafeBindMount } from './volume-safety.ts'
 export { composeFor } from './compose-for.ts'
 export {
   type ComposeInspection,

@@ -64,6 +64,7 @@ export function makeParams(): AddFlowParams {
     configFile: '/tmp/config.yml',
     inputs: {
       repo: 'owner/blog',
+      persistPaths: [],
       ingressDefault: 'direct',
       parsedDomains: [],
       configEntries: [],

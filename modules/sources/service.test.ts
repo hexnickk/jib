@@ -105,4 +105,29 @@ describe('sources service', () => {
 
     expect(prepared.sha).toMatch(/^[0-9a-f]{40}$/)
   })
+
+  test('docker hub repo resolves to a stable local workdir without git', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
+    const paths = getPaths(root)
+    const cfg: Config = {
+      config_version: 3,
+      poll_interval: '5m',
+      modules: {},
+      sources: {},
+      apps: {},
+    }
+
+    const probed = await probe(cfg, paths, {
+      app: 'demo',
+      repo: 'https://hub.docker.com/r/n8nio/n8n',
+    })
+    const prepared = await syncApp(cfg, paths, {
+      app: 'demo',
+      repo: 'https://hub.docker.com/r/n8nio/n8n',
+    })
+
+    expect(probed).toBeNull()
+    expect(prepared.workdir).toBe(repoPath(paths, 'demo', 'local'))
+    expect(prepared.sha).toBe('n8nio/n8n')
+  })
 })
