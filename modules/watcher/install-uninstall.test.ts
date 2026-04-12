@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
 
-const unitPath = '/tmp/jib-watcher.test.service'
 const serviceName = 'jib-watcher.test.service'
 const originalDollar = Bun.$
 
@@ -30,7 +29,12 @@ const logger = {
   box() {},
 } as unknown as Logger
 
-beforeEach(() => {
+let unitPath = ''
+let testRoot = ''
+
+beforeEach(async () => {
+  testRoot = await mkdtemp(join(tmpdir(), 'jib-watcher-test-'))
+  unitPath = join(testRoot, 'jib-watcher.service')
   mock.module('./templates.ts', () => ({
     UNIT_PATH: unitPath,
     SERVICE_NAME: serviceName,
@@ -42,7 +46,7 @@ beforeEach(() => {
 afterEach(async () => {
   mock.restore()
   ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = originalDollar
-  await rm(unitPath, { force: true })
+  await rm(testRoot, { recursive: true, force: true })
 })
 
 describe('watcher install/uninstall', () => {
@@ -55,11 +59,14 @@ describe('watcher install/uninstall', () => {
     const { install } = await import('./install.ts')
     const root = await mkdtemp(join(tmpdir(), 'jib-watcher-'))
 
-    await install({ logger, paths: getPaths(root) })
+    try {
+      await install({ logger, paths: getPaths(root) })
 
-    expect(calls).toEqual(['daemon-reload', 'enable'])
-    expect(await readFile(unitPath, 'utf8')).toContain(`Environment=JIB_ROOT=${root}`)
-    await rm(root, { recursive: true, force: true })
+      expect(calls).toEqual(['daemon-reload', 'enable'])
+      expect(await readFile(unitPath, 'utf8')).toContain(`Environment=JIB_ROOT=${root}`)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   test('uninstall disables the service, removes the unit, and reloads systemd', async () => {
