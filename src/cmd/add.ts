@@ -1,6 +1,5 @@
 import { CliError, cliIsTextOutput } from '@jib/cli'
-import { loadAppConfig, loadConfig } from '@jib/config'
-import type { App } from '@jib/config'
+import { type App, type Config, ConfigError, configLoad, configLoadContext } from '@jib/config'
 import { claimIngress, createIngressOperator } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { buildSourceChoices, preflightSourceSelection, runSourceSetup } from '@jib/sources'
@@ -33,7 +32,9 @@ const cliAddCommand = {
   describe: 'Register and deploy a new app',
   builder: addCommandOptions,
   async run(args) {
-    let { cfg, paths } = await loadAppConfig()
+    const loaded = await configLoadContext()
+    if (loaded instanceof ConfigError) return loaded
+    let { cfg, paths } = loaded
     const appName = await resolveAddAppName(
       typeof args.app === 'string' ? args.app : undefined,
       cfg.apps,
@@ -43,7 +44,11 @@ const cliAddCommand = {
       paths,
       typeof args.source === 'string' ? args.source : undefined,
     )
-    if (source.created) cfg = await loadConfig(paths.configFile)
+    if (source.created) {
+      const reloaded = await configLoad(paths.configFile)
+      if (reloaded instanceof ConfigError) return reloaded
+      cfg = reloaded
+    }
     const inputs = await gatherAddInputs(args)
     const planner = createAddPlanner()
     const interrupt = trapInterrupt()
@@ -142,7 +147,7 @@ export interface AddChooseInitialSourceDeps {
 }
 /** Chooses the initial source, prompting only when the caller did not provide one. */
 export async function addChooseInitialSource(
-  cfg: Awaited<ReturnType<typeof loadAppConfig>>['cfg'],
+  cfg: Config,
   paths: Paths,
   currentSource?: string,
   deps: AddChooseInitialSourceDeps = {},

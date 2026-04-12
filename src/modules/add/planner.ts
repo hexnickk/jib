@@ -1,5 +1,5 @@
 import { CliError, cliIsDebugEnabled, cliIsTextOutput } from '@jib/cli'
-import { type App, type Config, type Domain, assignPorts } from '@jib/config'
+import { type App, type Config, type Domain, configAssignPorts } from '@jib/config'
 import {
   type ComposeInspection,
   ComposeInspectionError,
@@ -156,7 +156,8 @@ async function buildResolvedApp(
   inspection: ComposeInspection,
   guided: { domains: Domain[]; configEntries: ConfigEntry[] },
 ): Promise<App> {
-  const domains = await assignPorts(cfg, appName, guided.domains)
+  const domains = await configAssignPorts(cfg, appName, guided.domains)
+  if (domains instanceof Error) throw domains
   const buildArgs = configEntriesToBuildArgs(guided.configEntries)
   const composeFiles = await persistComposeFiles(paths, appName, workdir, inspection.composeFiles)
   const image = dockerHubImage(inputs.repo)

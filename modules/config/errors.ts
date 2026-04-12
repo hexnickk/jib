@@ -24,6 +24,6 @@ export class PortExhaustedError extends ConfigError {}
 
 export class MissingConfigAppError extends ValidationError {}
 
-export function errorMessage(error: unknown): string {
+export function configErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }

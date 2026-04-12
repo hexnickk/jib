@@ -15,7 +15,7 @@ const EXTERNAL_REPO_PREFIXES = ['file://', 'http://', 'https://', 'ssh://', 'git
  * or embedded slashes beyond the one in the GitHub slug - those would let a
  * maliciously-crafted config escape `$JIB_ROOT/repos/` via `repoPath`.
  */
-export function validateRepo(repo: string): string | null {
+export function configValidateRepo(repo: string): string | null {
   if (repo === '' || repo === 'local') return null
   if (repo.includes('..')) return 'contains ".." path segment'
   if (repo.startsWith('/')) return null
@@ -42,7 +42,7 @@ export function validateRepo(repo: string): string | null {
  * any unknown unit all return `null`. Narrower than Go's `time.ParseDuration`
  * (no `ns`/`us`/`ms`) but covers every value jib's config actually uses.
  */
-export function parseDuration(s: string): number | null {
+export function configParseDuration(s: string): number | null {
   if (!s) return null
   const units: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000 }
   const re = /(\d+(?:\.\d+)?)([smh])/g
@@ -59,10 +59,10 @@ export function parseDuration(s: string): number | null {
 }
 
 /** Runs config-level checks that zod can't express. */
-export function validateConfig(cfg: Config): ValidateConfigError | undefined {
+export function configValidate(cfg: Config): ValidateConfigError | undefined {
   const errs: string[] = []
 
-  if (parseDuration(cfg.poll_interval) === null) {
+  if (configParseDuration(cfg.poll_interval) === null) {
     errs.push(`poll_interval: invalid duration "${cfg.poll_interval}"`)
   }
 
@@ -80,7 +80,7 @@ export function validateConfig(cfg: Config): ValidateConfigError | undefined {
   let needsTunnel = false
   for (const [name, app] of Object.entries(cfg.apps)) {
     if (!APP_NAME_RE.test(name)) errs.push(`app '${name}': name must match [a-z0-9-]+`)
-    const repoErr = validateRepo(app.repo)
+    const repoErr = configValidateRepo(app.repo)
     if (repoErr) errs.push(`app '${name}': repo "${app.repo}" ${repoErr}`)
     if (app.source && app.repo !== 'local' && !sourceNames.has(app.source)) {
       errs.push(`app '${name}': source "${app.source}" not found in sources`)
@@ -106,10 +106,4 @@ export function validateConfig(cfg: Config): ValidateConfigError | undefined {
   }
 
   return errs.length > 0 ? new ValidateConfigError(errs.join('\n')) : undefined
-}
-
-/** Runs config-level checks that zod can't express. */
-export function validate(cfg: Config): void {
-  const error = validateConfig(cfg)
-  if (error) throw error
 }

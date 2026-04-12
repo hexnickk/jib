@@ -1,5 +1,5 @@
 import { cliIsTextOutput } from '@jib/cli'
-import { loadAppOrExit } from '@jib/config'
+import { configLoadAppContext } from '@jib/config'
 import { consola } from 'consola'
 import { DEFAULT_TIMEOUT_MS, runDeploy } from '../deploy/run.ts'
 import type { CliCommand } from './command.ts'
@@ -17,7 +17,9 @@ const cliDeployCommand = {
   },
   async run(args) {
     const appName = String(args.app)
-    const { cfg, paths } = await loadAppOrExit(appName)
+    const loaded = await configLoadAppContext(appName)
+    if (loaded instanceof Error) return loaded
+    const { cfg, paths } = loaded
     const timeoutMs = Number(args.timeout) || DEFAULT_TIMEOUT_MS
     const result = await runDeploy(
       cfg,

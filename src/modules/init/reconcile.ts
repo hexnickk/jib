@@ -1,9 +1,9 @@
 import { cloudflaredHasTunnelToken } from '@jib-module/cloudflared'
-import { type Config, writeConfig } from '@jib/config'
+import { type Config, configWrite } from '@jib/config'
 import type { Paths } from '@jib/paths'
 
 interface ReconcileDeps {
-  writeConfig?: typeof writeConfig
+  writeConfig?: (configFile: string, config: Config) => Promise<undefined | Error>
 }
 
 export function inferredOptionalModules(config: Config, paths: Paths): Record<string, true> {
@@ -20,7 +20,7 @@ export async function reconcileOptionalModules(
   config: Config,
   paths: Paths,
   deps: ReconcileDeps = {},
-): Promise<Config> {
+): Promise<Config | Error> {
   const inferred = inferredOptionalModules(config, paths)
   if (Object.keys(inferred).length === 0) return config
 
@@ -31,6 +31,7 @@ export async function reconcileOptionalModules(
       ...inferred,
     },
   }
-  await (deps.writeConfig ?? writeConfig)(paths.configFile, next)
+  const writeResult = await (deps.writeConfig ?? configWrite)(paths.configFile, next)
+  if (writeResult instanceof Error) return writeResult
   return next
 }

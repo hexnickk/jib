@@ -2,10 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ParseConfigError, ReadConfigError } from './errors.ts'
-import { loadConfig, loadConfigResult } from './load.ts'
+import { ConfigError, ParseConfigError, ReadConfigError } from './errors.ts'
+import { configLoad } from './load.ts'
 import type { Config } from './schema.ts'
-import { writeConfig } from './write.ts'
+import { configWrite } from './write.ts'
 
 async function withTmp<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), 'jib-cfg-'))
@@ -16,7 +16,7 @@ async function withTmp<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   }
 }
 
-describe('loadConfig/writeConfig', () => {
+describe('configLoad/configWrite', () => {
   test('round-trips a full config', async () => {
     await withTmp(async (dir) => {
       const path = join(dir, 'config.yml')
@@ -34,28 +34,28 @@ describe('loadConfig/writeConfig', () => {
           },
         },
       }
-      await writeConfig(path, cfg)
-      const loaded = await loadConfig(path)
+      expect(await configWrite(path, cfg)).toBeUndefined()
+      const loaded = await configLoad(path)
+      expect(loaded).not.toBeInstanceOf(ConfigError)
+      if (loaded instanceof ConfigError) {
+        throw loaded
+      }
       expect(loaded.poll_interval).toBe('2m')
       expect(loaded.apps.web?.repo).toBe('hexnickk/web')
       expect(loaded.apps.web?.domains[0]?.host).toBe('example.com')
     })
   })
 
-  test('loadConfigResult returns ReadConfigError on missing file', async () => {
-    const loaded = await loadConfigResult('/no/such/file.yml')
+  test('configLoad returns ReadConfigError on missing file', async () => {
+    const loaded = await configLoad('/no/such/file.yml')
     expect(loaded).toBeInstanceOf(ReadConfigError)
   })
 
-  test('loadConfigResult returns ParseConfigError on bad YAML', async () => {
+  test('configLoad returns ParseConfigError on bad YAML', async () => {
     await withTmp(async (dir) => {
       const path = join(dir, 'bad.yml')
       await Bun.write(path, 'foo: [bar')
-      expect(await loadConfigResult(path)).toBeInstanceOf(ParseConfigError)
+      expect(await configLoad(path)).toBeInstanceOf(ParseConfigError)
     })
-  })
-
-  test('loadConfig still throws ConfigError for compatibility', async () => {
-    await expect(loadConfig('/no/such/file.yml')).rejects.toThrow(/reading config/)
   })
 })

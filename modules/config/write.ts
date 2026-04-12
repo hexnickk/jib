@@ -1,19 +1,19 @@
 import { chmod, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { stringify } from 'yaml'
-import { ConfigError, SerializeConfigError, WriteConfigError, errorMessage } from './errors.ts'
+import { SerializeConfigError, WriteConfigError, configErrorMessage } from './errors.ts'
 import type { Config } from './schema.ts'
 
 /** Serializes `config` to YAML and writes it atomically (temp file + rename). */
-export async function writeConfigResult(
+export async function configWrite(
   filePath: string,
   config: Config,
-): Promise<undefined | ConfigError> {
+): Promise<undefined | SerializeConfigError | WriteConfigError> {
   let yaml: string
   try {
     yaml = stringify(config)
   } catch (error) {
-    return new SerializeConfigError(`marshaling config: ${errorMessage(error)}`, {
+    return new SerializeConfigError(`marshaling config: ${configErrorMessage(error)}`, {
       cause: error,
     })
   }
@@ -26,20 +26,14 @@ export async function writeConfigResult(
       const info = await stat(filePath)
       await chmod(tmp, info.mode & 0o777)
     } catch {
-      // original doesn't exist; keep 0640
+      // original does not exist yet; keep 0640
     }
     await rename(tmp, filePath)
-    return
+    return undefined
   } catch (error) {
     await unlink(tmp).catch(() => undefined)
-    return new WriteConfigError(`writing config ${filePath}: ${errorMessage(error)}`, {
+    return new WriteConfigError(`writing config ${filePath}: ${configErrorMessage(error)}`, {
       cause: error,
     })
   }
-}
-
-/** Serializes `config` to YAML and writes it atomically (temp file + rename). */
-export async function writeConfig(filePath: string, config: Config): Promise<void> {
-  const result = await writeConfigResult(filePath, config)
-  if (result instanceof ConfigError) throw result
 }

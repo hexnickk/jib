@@ -6,7 +6,7 @@ import {
   cliCreateMissingInputError,
   cliIsTextOutput,
 } from '@jib/cli'
-import { loadConfig } from '@jib/config'
+import { configLoad } from '@jib/config'
 import { getPaths } from '@jib/paths'
 import { intro, note, outro } from '@jib/tui'
 import { hasBootstrapState } from '../migrations/service.ts'
@@ -51,10 +51,13 @@ const cliInitCommand = {
     if (cliIsTextOutput()) intro('jib init')
 
     if (args.check) {
-      let config = await loadConfig(paths.configFile)
-      config = await reconcileOptionalModules(config, paths, {
+      let config = await configLoad(paths.configFile)
+      if (config instanceof Error) return config
+      const reconciled = await reconcileOptionalModules(config, paths, {
         writeConfig: async () => undefined,
       })
+      if (reconciled instanceof Error) return reconciled
+      config = reconciled
       const pending = pendingOptionalModuleNames(config)
       if (cliIsTextOutput()) {
         if (pending.length === 0) {
@@ -71,8 +74,11 @@ const cliInitCommand = {
       }
     }
 
-    let config = await loadConfig(paths.configFile)
-    config = await reconcileOptionalModules(config, paths)
+    let config = await configLoad(paths.configFile)
+    if (config instanceof Error) return config
+    const reconciled = await reconcileOptionalModules(config, paths)
+    if (reconciled instanceof Error) return reconciled
+    config = reconciled
     const unseen = unseenOptionalModules(config)
 
     if (unseen.length === 0) {
@@ -105,7 +111,8 @@ const cliInitCommand = {
     }
 
     await configureOptionalModules(config, paths, unseen)
-    const finalConfig = await loadConfig(paths.configFile)
+    const finalConfig = await configLoad(paths.configFile)
+    if (finalConfig instanceof Error) return finalConfig
     if (cliIsTextOutput()) {
       outro('modules configured')
       note('Next: run `jib status` to confirm services are healthy.', 'Next steps')

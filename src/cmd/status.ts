@@ -1,5 +1,5 @@
 import { cliIsTextOutput } from '@jib/cli'
-import { loadAppConfig } from '@jib/config'
+import { configLoadContext } from '@jib/config'
 import {
   type AppStatus,
   type ServiceStatus,
@@ -84,7 +84,9 @@ const cliStatusCommand = {
   command: 'status',
   describe: 'Show server status: services, sources, apps',
   async run() {
-    const { cfg, paths } = await loadAppConfig()
+    const loaded = await configLoadContext()
+    if (loaded instanceof Error) return loaded
+    const { cfg, paths } = loaded
     const hasCloudflared = cfg.modules?.cloudflared === true
     const [services, sources, apps] = await Promise.all([
       collectServices(hasCloudflared),

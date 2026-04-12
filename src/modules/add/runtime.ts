@@ -1,5 +1,5 @@
 import { CliError, cliIsTextOutput } from '@jib/cli'
-import { loadConfig } from '@jib/config'
+import { configLoad } from '@jib/config'
 import type { App, Config } from '@jib/config'
 import { createIngressOperator, releaseIngress } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
@@ -76,10 +76,14 @@ export async function rollbackAddedApp(
   originalCfg: Config,
   finalApp: App,
 ): Promise<void> {
-  const cfg = await loadConfig(paths.configFile).catch(() => ({
-    ...originalCfg,
-    apps: { ...originalCfg.apps, [app]: finalApp },
-  }))
+  const cfgResult = await configLoad(paths.configFile)
+  const cfg =
+    cfgResult instanceof Error
+      ? {
+          ...originalCfg,
+          apps: { ...originalCfg.apps, [app]: finalApp },
+        }
+      : cfgResult
   if (!cfg.apps[app]) return
   const result = await runRemove(
     {

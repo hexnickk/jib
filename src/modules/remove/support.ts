@@ -1,5 +1,5 @@
 import { rm } from 'node:fs/promises'
-import { writeConfig } from '@jib/config'
+import { configWrite } from '@jib/config'
 import type { Config } from '@jib/config'
 import { composeFor, overridePath } from '@jib/docker'
 import { type Paths, managedComposePath } from '@jib/paths'
@@ -49,13 +49,10 @@ export function createRemoveSupport(options: DefaultRemoveSupportOptions): Remov
     },
 
     async writeConfig(configFile: string, cfg: Config) {
-      try {
-        await writeConfig(configFile, cfg)
-        return undefined
-      } catch (error) {
-        if (error instanceof RemoveWriteConfigError) return error
-        return new RemoveWriteConfigError(configFile, { cause: error })
-      }
+      const result = await configWrite(configFile, cfg)
+      if (!result) return undefined
+      if (result instanceof RemoveWriteConfigError) return result
+      return new RemoveWriteConfigError(configFile, { cause: result })
     },
   }
 }

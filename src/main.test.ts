@@ -2,20 +2,22 @@ import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { writeConfig } from '@jib/config'
+import { configWrite } from '@jib/config'
 import type { Config } from '@jib/config'
 
 async function withTmpRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
   const root = await mkdtemp(join(tmpdir(), 'jib-exec-contract-'))
   try {
     await mkdir(root, { recursive: true })
-    await writeConfig(join(root, 'config.yml'), {
-      config_version: 3,
-      poll_interval: '5m',
-      modules: {},
-      sources: {},
-      apps: {},
-    } satisfies Config)
+    expect(
+      await configWrite(join(root, 'config.yml'), {
+        config_version: 3,
+        poll_interval: '5m',
+        modules: {},
+        sources: {},
+        apps: {},
+      } satisfies Config),
+    ).toBeUndefined()
     return await fn(root)
   } finally {
     await rm(root, { recursive: true, force: true })
@@ -107,20 +109,22 @@ describe('execution contract', () => {
 
   test('status renders apps as labeled text blocks in text mode', async () => {
     await withTmpRoot(async (root) => {
-      await writeConfig(join(root, 'config.yml'), {
-        config_version: 3,
-        poll_interval: '5m',
-        modules: {},
-        sources: {},
-        apps: {
-          demo: {
-            repo: 'acme/demo',
-            branch: 'main',
-            env_file: '.env',
-            domains: [{ host: 'demo.example.com', port: 20000 }],
+      expect(
+        await configWrite(join(root, 'config.yml'), {
+          config_version: 3,
+          poll_interval: '5m',
+          modules: {},
+          sources: {},
+          apps: {
+            demo: {
+              repo: 'acme/demo',
+              branch: 'main',
+              env_file: '.env',
+              domains: [{ host: 'demo.example.com', port: 20000 }],
+            },
           },
-        },
-      } satisfies Config)
+        } satisfies Config),
+      ).toBeUndefined()
 
       const result = await runCli(root, ['--interactive=never', 'status'])
       expect(result.exitCode).toBe(0)

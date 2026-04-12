@@ -1,5 +1,5 @@
 import { cliIsTextOutput } from '@jib/cli'
-import { loadAppOrExitResult } from '@jib/config'
+import { configLoadAppContext } from '@jib/config'
 import { restartApp } from '@jib/deploy'
 import { consola } from 'consola'
 import { createDeployDeps } from '../deploy/engine.ts'
@@ -10,7 +10,7 @@ const cliRestartCommand = {
   describe: 'Restart containers without redeploying',
   async run(args) {
     const appName = String(args.app)
-    const loaded = await loadAppOrExitResult(appName)
+    const loaded = await configLoadAppContext(appName)
     if (loaded instanceof Error) return loaded
     const result = await restartApp(createDeployDeps(loaded.cfg, loaded.paths, 'restart'), appName)
     if (result) return result

@@ -1,6 +1,6 @@
 import { cloudflaredReadStatus } from '@jib-module/cloudflared'
 import { cliIsTextOutput } from '@jib/cli'
-import { loadConfig } from '@jib/config'
+import { configLoad } from '@jib/config'
 import { getPaths } from '@jib/paths'
 import { cloudflaredRunSetup, cloudflaredRunSetupResult } from '../modules/cloudflared/setup.ts'
 import type { CliCommand } from './command.ts'
@@ -33,7 +33,8 @@ const cliCloudflaredCommands = [
     describe: 'Show Cloudflare Tunnel status',
     async run() {
       const paths = getPaths()
-      const config = await loadConfig(paths.configFile)
+      const config = await configLoad(paths.configFile)
+      if (config instanceof Error) return config
       const status = cloudflaredReadStatus(config)
       if (cliIsTextOutput()) {
         writeCloudflaredStatusText(status)

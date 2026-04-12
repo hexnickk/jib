@@ -1,5 +1,4 @@
-import type { App } from '@jib/config'
-import { loadAppOrExit } from '@jib/config'
+import { type App, ConfigError, MissingConfigAppError, configLoadAppContext } from '@jib/config'
 import { type Paths, repoPath } from '@jib/paths'
 import { composeForResult } from './compose-for.ts'
 import {
@@ -65,7 +64,7 @@ export function parseRunArgs(raw: string[]): ExecParts {
 }
 
 type ResolveServiceError = DockerAppHasNoServicesError | DockerServiceSelectionRequiredError
-export type HandleShellError = DockerAppNotFoundError | ResolveServiceError
+export type HandleShellError = ConfigError | DockerAppNotFoundError | ResolveServiceError
 
 function resolveServiceResult(
   requested: string,
@@ -88,7 +87,10 @@ export async function handleShellResult(
   parts: ExecParts,
   mode: 'exec' | 'run',
 ): Promise<HandleShellError | undefined> {
-  const { cfg, paths } = await loadAppOrExit(parts.app)
+  const loaded = await configLoadAppContext(parts.app)
+  if (loaded instanceof MissingConfigAppError) return new DockerAppNotFoundError(parts.app)
+  if (loaded instanceof ConfigError) return loaded
+  const { cfg, paths } = loaded
   const appCfg = cfg.apps[parts.app]
   if (!appCfg) return new DockerAppNotFoundError(parts.app)
   const service = resolveServiceResult(parts.service, parts.app, appCfg, paths)
@@ -102,6 +104,7 @@ export async function handleShellResult(
 
 export async function handleShell(parts: ExecParts, mode: 'exec' | 'run'): Promise<void> {
   const result = await handleShellResult(parts, mode)
+  if (result instanceof ConfigError) throw result
   if (result instanceof DockerAppNotFoundError) throw result
   if (result instanceof DockerAppHasNoServicesError) throw result
   if (result instanceof DockerServiceSelectionRequiredError) throw result

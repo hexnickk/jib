@@ -1,10 +1,5 @@
-import {
-  ConfigError,
-  ParseDomainArgError,
-  ParseHealthArgError,
-  PortExhaustedError,
-} from './errors.ts'
-import { allocatePortResult } from './port-allocator.ts'
+import { ParseDomainArgError, ParseHealthArgError, PortExhaustedError } from './errors.ts'
+import { configAllocatePort } from './port-allocator.ts'
 import type { App, Config, Domain } from './schema.ts'
 
 export interface ParsedDomain {
@@ -17,7 +12,7 @@ export interface ParsedDomain {
 const VALID_INGRESS = new Set(['direct', 'cloudflare-tunnel'])
 
 /** Parse `host=<domain>[,port=<n>][,service=<name>][,ingress=direct|cloudflare-tunnel]`. */
-export function parseDomainResult(
+export function configParseDomain(
   raw: string,
   fallback: string,
 ): ParsedDomain | ParseDomainArgError {
@@ -60,15 +55,8 @@ export function parseDomainResult(
   return out
 }
 
-/** Parse `host=<domain>[,port=<n>][,service=<name>][,ingress=direct|cloudflare-tunnel]`. */
-export function parseDomain(raw: string, fallback: string): ParsedDomain {
-  const parsed = parseDomainResult(raw, fallback)
-  if (parsed instanceof ConfigError) throw parsed
-  return parsed
-}
-
 /** Parse `/path:port` into a health check entry. */
-export function parseHealthResult(
+export function configParseHealth(
   raw: string,
 ): { path: string; port: number } | ParseHealthArgError {
   const idx = raw.lastIndexOf(':')
@@ -83,14 +71,7 @@ export function parseHealthResult(
   return { path, port }
 }
 
-/** Parse `/path:port` into a health check entry. */
-export function parseHealth(raw: string): { path: string; port: number } {
-  const parsed = parseHealthResult(raw)
-  if (parsed instanceof ConfigError) throw parsed
-  return parsed
-}
-
-export function toArray(value: string | string[] | undefined): string[] {
+export function configToArray(value: string | string[] | undefined): string[] {
   if (value === undefined) return []
   return Array.isArray(value) ? value : [value]
 }
@@ -100,7 +81,7 @@ export function toArray(value: string | string[] | undefined): string[] {
  * allocation re-reads the partially-filled config so two fresh domains in
  * the same `add` never collide.
  */
-export async function assignPortsResult(
+export async function configAssignPorts(
   cfg: Config,
   app: string,
   domains: Domain[],
@@ -116,7 +97,7 @@ export async function assignPortsResult(
     if (domain.port !== undefined) {
       out.push(domain)
     } else {
-      const allocated = await allocatePortResult({ config: scratch, probeHost: true })
+      const allocated = await configAllocatePort({ config: scratch, probeHost: true })
       if (allocated instanceof PortExhaustedError) return allocated
       out.push({ ...domain, port: allocated })
     }
@@ -124,15 +105,4 @@ export async function assignPortsResult(
     scratch.apps[app] = { ...current, domains: [...out] }
   }
   return out
-}
-
-/**
- * Assigns a host port to every ingress mapping that lacks one. Each
- * allocation re-reads the partially-filled config so two fresh domains in
- * the same `add` never collide.
- */
-export async function assignPorts(cfg: Config, app: string, domains: Domain[]): Promise<Domain[]> {
-  const assigned = await assignPortsResult(cfg, app, domains)
-  if (assigned instanceof ConfigError) throw assigned
-  return assigned
 }

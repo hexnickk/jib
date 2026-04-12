@@ -1,5 +1,5 @@
 import { runPollCycle, runPoller } from '@jib-module/watcher'
-import { loadConfig } from '@jib/config'
+import { configLoad } from '@jib/config'
 import { createLogger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
 import type { CliCommand } from './command.ts'
@@ -13,7 +13,11 @@ const cliWatchCommand = {
   async run(args) {
     const paths = getPaths()
     const log = createLogger('watch')
-    const getConfig = () => loadConfig(paths.configFile)
+    const getConfig = async () => {
+      const config = await configLoad(paths.configFile)
+      if (config instanceof Error) throw config
+      return config
+    }
 
     if (args.once) {
       await runPollCycle({ paths, getConfig, log })

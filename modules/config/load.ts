@@ -2,22 +2,22 @@ import { readFile } from 'node:fs/promises'
 import { parse } from 'yaml'
 import { ZodError } from 'zod'
 import {
-  ConfigError,
+  type ConfigError,
   ParseConfigError,
   ReadConfigError,
   ValidateConfigError,
-  errorMessage,
+  configErrorMessage,
 } from './errors.ts'
 import { type Config, ConfigSchema } from './schema.ts'
-import { validateConfig } from './validate.ts'
+import { configValidate } from './validate.ts'
 
 /** Reads `filePath`, parses YAML, runs zod + domain validation. */
-export async function loadConfigResult(filePath: string): Promise<Config | ConfigError> {
+export async function configLoad(filePath: string): Promise<Config | ConfigError> {
   let raw: string
   try {
     raw = await readFile(filePath, 'utf8')
   } catch (error) {
-    return new ReadConfigError(`reading config ${filePath}: ${errorMessage(error)}`, {
+    return new ReadConfigError(`reading config ${filePath}: ${configErrorMessage(error)}`, {
       cause: error,
     })
   }
@@ -26,7 +26,7 @@ export async function loadConfigResult(filePath: string): Promise<Config | Confi
   try {
     doc = parse(raw)
   } catch (error) {
-    return new ParseConfigError(`parsing config ${filePath}: ${errorMessage(error)}`, {
+    return new ParseConfigError(`parsing config ${filePath}: ${configErrorMessage(error)}`, {
       cause: error,
     })
   }
@@ -41,17 +41,10 @@ export async function loadConfigResult(filePath: string): Promise<Config | Confi
       )
       return new ValidateConfigError(lines.join('\n'), { cause: error })
     }
-    return new ValidateConfigError(`validating config ${filePath}: ${errorMessage(error)}`, {
+    return new ValidateConfigError(`validating config ${filePath}: ${configErrorMessage(error)}`, {
       cause: error,
     })
   }
 
-  return validateConfig(cfg) ?? cfg
-}
-
-/** Reads `filePath`, parses YAML, runs zod + domain validation. */
-export async function loadConfig(filePath: string): Promise<Config> {
-  const loaded = await loadConfigResult(filePath)
-  if (loaded instanceof ConfigError) throw loaded
-  return loaded
+  return configValidate(cfg) ?? cfg
 }

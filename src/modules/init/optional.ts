@@ -1,4 +1,4 @@
-import { type Config, loadConfig, writeConfig } from '@jib/config'
+import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
 import { createLogger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import {
@@ -16,11 +16,11 @@ import { resolveModuleSetup } from './setup-registry.ts'
 import type { InitContext } from './types.ts'
 
 interface OptionalModuleDeps {
-  loadConfig?: typeof loadConfig
+  loadConfig?: (configFile: string) => Promise<Config | ConfigError>
   promptOptionalModule?: typeof promptOptionalModule
   resolveModuleSetup?: typeof resolveModuleSetup
   runInstallsTxResult?: typeof runInstallsTxResult
-  writeConfig?: typeof writeConfig
+  writeConfig?: (configFile: string, config: Config) => Promise<undefined | Error>
 }
 
 function initCtx(config: Config, paths: Paths): InitContext {
@@ -56,12 +56,18 @@ export async function persistModuleChoiceResult(
   enabled: boolean,
   deps: OptionalModuleDeps = {},
 ): Promise<Config | OptionalModuleChoicePersistError> {
-  const read = deps.loadConfig ?? loadConfig
-  const write = deps.writeConfig ?? writeConfig
+  const read = deps.loadConfig ?? configLoad
+  const write = deps.writeConfig ?? configWrite
   try {
     const next = await read(configFile)
+    if (next instanceof ConfigError) {
+      return toOptionalModuleChoicePersistError(name, next)
+    }
     next.modules[name] = enabled
-    await write(configFile, next)
+    const writeResult = await write(configFile, next)
+    if (writeResult instanceof Error) {
+      return toOptionalModuleChoicePersistError(name, writeResult)
+    }
     return next
   } catch (error) {
     return toOptionalModuleChoicePersistError(name, error)

@@ -1,4 +1,4 @@
-import { loadConfig } from '@jib/config'
+import { configLoad } from '@jib/config'
 import { createLogger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import type { JibDb } from '@jib/state'
@@ -17,6 +17,7 @@ export interface JibMigration {
 
 /** Build an init context from a MigrationContext. Safe from migration 0003+. */
 export async function initCtx(mctx: MigrationContext): Promise<InitContext> {
-  const config = await loadConfig(mctx.paths.configFile)
+  const config = await configLoad(mctx.paths.configFile)
+  if (config instanceof Error) throw config
   return { config, logger: createLogger('init'), paths: mctx.paths }
 }

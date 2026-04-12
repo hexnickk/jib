@@ -1,12 +1,14 @@
 import { CliError, cliIsTextOutput } from '@jib/cli'
-import { loadAppConfig } from '@jib/config'
+import { configLoadContext } from '@jib/config'
 import { SecretsManager } from '@jib/secrets'
 import { consola } from 'consola'
 import type { CliCommand } from './command.ts'
 
 /** Loads the shared secrets command context from the managed config. */
 async function loadSecretsContext() {
-  const { cfg, paths } = await loadAppConfig()
+  const loaded = await configLoadContext()
+  if (loaded instanceof Error) return loaded
+  const { cfg, paths } = loaded
   const manager = new SecretsManager(paths.secretsDir)
   return { cfg, paths, manager }
 }
@@ -18,7 +20,9 @@ const cliSecretsCommands = [
     async run(args) {
       const appName = String(args.app)
       const pair = String(args.pair)
-      const { cfg, manager } = await loadSecretsContext()
+      const loaded = await loadSecretsContext()
+      if (loaded instanceof Error) return loaded
+      const { cfg, manager } = loaded
       const appCfg = cfg.apps[appName]
       if (!appCfg) return new CliError('missing_app', `app "${appName}" not found in config`)
       const separator = pair.indexOf('=')
@@ -37,7 +41,9 @@ const cliSecretsCommands = [
     describe: 'Show secrets for an app (or all apps)',
     async run(args) {
       const requestedApp = typeof args.app === 'string' ? args.app : undefined
-      const { cfg, manager } = await loadSecretsContext()
+      const loaded = await loadSecretsContext()
+      if (loaded instanceof Error) return loaded
+      const { cfg, manager } = loaded
       const apps = requestedApp ? [requestedApp] : Object.keys(cfg.apps).sort()
       if (apps.length === 0) {
         if (cliIsTextOutput()) consola.log('no apps configured')
@@ -86,7 +92,9 @@ const cliSecretsCommands = [
     async run(args) {
       const appName = String(args.app)
       const key = String(args.key)
-      const { cfg, manager } = await loadSecretsContext()
+      const loaded = await loadSecretsContext()
+      if (loaded instanceof Error) return loaded
+      const { cfg, manager } = loaded
       const appCfg = cfg.apps[appName]
       if (!appCfg) return new CliError('missing_app', `app "${appName}" not found in config`)
       const removed = await manager.remove(appName, key, appCfg.env_file)

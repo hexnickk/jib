@@ -5,10 +5,10 @@ import {
   type Domain,
   type HealthCheck,
   type ParsedDomain,
-  parseDomain,
-  parseHealth,
-  toArray,
-  validateRepo,
+  configParseDomain,
+  configParseHealth,
+  configToArray,
+  configValidateRepo,
 } from '@jib/config'
 import { ValidationError } from '@jib/errors'
 import { dockerHubImage } from '@jib/paths'
@@ -82,20 +82,20 @@ export async function gatherAddInputs(
     repo = await prompt(repoPrompt(backend))
   }
   repo = normalizeRepo(repo, backend)
-  const repoErr = validateRepo(repo)
+  const repoErr = configValidateRepo(repo)
   if (repoErr) throw new ValidationError(`--repo "${repo}" ${repoErr}`)
   const ingressDefault = args.ingress ?? 'direct'
   const composeRaw = args.compose ? splitCommaValues(args.compose) : undefined
-  const persistPaths = await resolvePersistPaths(repo, toArray(args.persist), {
+  const persistPaths = await resolvePersistPaths(repo, configToArray(args.persist), {
     interactive,
     promptOptional,
   })
-  const parsedDomains = parseDomains(toArray(args.domain), ingressDefault)
-  const healthChecks = parseChecks(toArray(args.health))
+  const parsedDomains = parseDomains(configToArray(args.domain), ingressDefault)
+  const healthChecks = parseChecks(configToArray(args.health))
   const configEntries = parseConfigEntries(
-    toArray(args.env),
-    toArray(args['build-arg']),
-    toArray(args['build-env']),
+    configToArray(args.env),
+    configToArray(args['build-arg']),
+    configToArray(args['build-env']),
   )
   return {
     repo,
@@ -215,19 +215,23 @@ export function parseApp(appObj: Partial<App> & { repo: string; domains: Domain[
 }
 
 function parseDomains(rawDomains: string[], ingressDefault: string): ParsedDomain[] {
-  try {
-    return rawDomains.map((domain) => parseDomain(domain, ingressDefault))
-  } catch (error) {
-    throw new ValidationError(error instanceof Error ? error.message : String(error))
+  const parsed: ParsedDomain[] = []
+  for (const domain of rawDomains) {
+    const result = configParseDomain(domain, ingressDefault)
+    if (result instanceof Error) throw new ValidationError(result.message)
+    parsed.push(result)
   }
+  return parsed
 }
 
 function parseChecks(rawHealth: string[]): HealthCheck[] {
-  try {
-    return rawHealth.flatMap((h) => h.split(',')).map(parseHealth)
-  } catch (error) {
-    throw new ValidationError(error instanceof Error ? error.message : String(error))
+  const parsed: HealthCheck[] = []
+  for (const entry of rawHealth.flatMap((value) => value.split(','))) {
+    const result = configParseHealth(entry)
+    if (result instanceof Error) throw new ValidationError(result.message)
+    parsed.push(result)
   }
+  return parsed
 }
 
 function parseConfigEntries(runtime: string[], build: string[], both: string[]): ConfigEntry[] {

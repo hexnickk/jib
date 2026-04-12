@@ -1,4 +1,4 @@
-import { type Config, parseDuration } from '@jib/config'
+import { type Config, configParseDuration } from '@jib/config'
 import { deployApp } from '@jib/deploy'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
@@ -14,7 +14,7 @@ type SyncResult = Awaited<ReturnType<typeof syncApp>>
  * validator accepts. Falls back to 5 minutes only for invalid raw strings.
  */
 export function parsePollInterval(raw: string): number {
-  return parseDuration(raw) ?? 5 * 60_000
+  return configParseDuration(raw) ?? 5 * 60_000
 }
 
 /**

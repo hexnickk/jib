@@ -1,27 +1,27 @@
 import { describe, expect, test } from 'bun:test'
 import { ValidateConfigError } from './errors.ts'
 import { ConfigSchema } from './schema.ts'
-import { parseDuration, validate, validateConfig, validateRepo } from './validate.ts'
+import { configParseDuration, configValidate, configValidateRepo } from './validate.ts'
 
-describe('parseDuration', () => {
+describe('configParseDuration', () => {
   test('parses seconds, minutes, hours', () => {
-    expect(parseDuration('30s')).toBe(30_000)
-    expect(parseDuration('5m')).toBe(300_000)
-    expect(parseDuration('1h')).toBe(3_600_000)
+    expect(configParseDuration('30s')).toBe(30_000)
+    expect(configParseDuration('5m')).toBe(300_000)
+    expect(configParseDuration('1h')).toBe(3_600_000)
   })
   test('parses compound durations', () => {
-    expect(parseDuration('1h30m')).toBe(5_400_000)
+    expect(configParseDuration('1h30m')).toBe(5_400_000)
   })
   test('accepts 0 and decimals', () => {
-    expect(parseDuration('0s')).toBe(0)
-    expect(parseDuration('1.5h')).toBe(5_400_000)
+    expect(configParseDuration('0s')).toBe(0)
+    expect(configParseDuration('1.5h')).toBe(5_400_000)
   })
   test('rejects bad input', () => {
-    expect(parseDuration('')).toBeNull()
-    expect(parseDuration('5')).toBeNull()
-    expect(parseDuration('5x')).toBeNull()
-    expect(parseDuration('abc')).toBeNull()
-    expect(parseDuration('-5s')).toBeNull()
+    expect(configParseDuration('')).toBeNull()
+    expect(configParseDuration('5')).toBeNull()
+    expect(configParseDuration('5x')).toBeNull()
+    expect(configParseDuration('abc')).toBeNull()
+    expect(configParseDuration('-5s')).toBeNull()
   })
 })
 
@@ -34,7 +34,7 @@ const base = (overrides: Record<string, unknown> = {}) =>
     ...overrides,
   })
 
-describe('validateRepo', () => {
+describe('configValidateRepo', () => {
   test('accepts canonical repo inputs', () => {
     for (const repo of [
       '',
@@ -48,7 +48,7 @@ describe('validateRepo', () => {
       'git@github.com:owner/name.git',
       '/srv/repos/app',
     ]) {
-      expect(validateRepo(repo)).toBeNull()
+      expect(configValidateRepo(repo)).toBeNull()
     }
   })
 
@@ -61,18 +61,18 @@ describe('validateRepo', () => {
       'https://hub.docker.com/not-a-repo-page',
       'not a repo',
     ]) {
-      expect(validateRepo(repo)).not.toBeNull()
+      expect(configValidateRepo(repo)).not.toBeNull()
     }
   })
 })
 
-describe('validate', () => {
-  test('validateConfig accepts valid config', () => {
-    expect(validateConfig(base())).toBeUndefined()
+describe('configValidate', () => {
+  test('configValidate accepts valid config', () => {
+    expect(configValidate(base())).toBeUndefined()
   })
 
-  test('validateConfig returns typed errors for invalid configs', () => {
-    expect(validateConfig(base({ poll_interval: 'forever' }))).toBeInstanceOf(ValidateConfigError)
+  test('configValidate returns typed errors for invalid configs', () => {
+    expect(configValidate(base({ poll_interval: 'forever' }))).toBeInstanceOf(ValidateConfigError)
   })
 
   test('requires tunnel when domain uses cloudflare-tunnel', () => {
@@ -84,7 +84,7 @@ describe('validate', () => {
         },
       },
     })
-    const error = validateConfig(cfg)
+    const error = configValidate(cfg)
     expect(error).toBeInstanceOf(ValidateConfigError)
     expect(error?.message).toContain('tunnel')
   })
@@ -99,7 +99,7 @@ describe('validate', () => {
         },
       },
     })
-    expect(validateConfig(cfg)).toBeUndefined()
+    expect(configValidate(cfg)).toBeUndefined()
   })
 
   test('accepts app with matching source', () => {
@@ -113,11 +113,7 @@ describe('validate', () => {
         },
       },
     })
-    expect(validateConfig(cfg)).toBeUndefined()
-  })
-
-  test('validate still throws for compatibility', () => {
-    expect(() => validate(base({ poll_interval: 'forever' }))).toThrow(ValidateConfigError)
+    expect(configValidate(cfg)).toBeUndefined()
   })
 
   test('rejects repo with ".." traversal', () => {
@@ -126,7 +122,7 @@ describe('validate', () => {
         web: { repo: '../../etc/passwd', domains: [{ host: 'example.com', port: 80 }] },
       },
     })
-    expect(validateConfig(cfg)?.message).toContain('repo')
+    expect(configValidate(cfg)?.message).toContain('repo')
   })
 
   test('rejects invalid app name', () => {
@@ -135,7 +131,7 @@ describe('validate', () => {
         Bad_Name: { repo: 'x/y', domains: [{ host: 'example.com', port: 80 }] },
       },
     })
-    expect(validateConfig(cfg)?.message).toContain('name must match')
+    expect(configValidate(cfg)?.message).toContain('name must match')
   })
 
   test('rejects image-backed app when repo is not local', () => {
@@ -148,6 +144,6 @@ describe('validate', () => {
         },
       },
     })
-    expect(validateConfig(cfg)?.message).toContain('repo "local"')
+    expect(configValidate(cfg)?.message).toContain('repo "local"')
   })
 })

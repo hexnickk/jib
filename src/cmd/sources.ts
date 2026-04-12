@@ -1,4 +1,4 @@
-import { loadConfig } from '@jib/config'
+import { configLoad } from '@jib/config'
 import { getPaths } from '@jib/paths'
 import { setupSourceRef } from '@jib/sources'
 import { promptSelect } from '@jib/tui'
@@ -10,7 +10,8 @@ const cliSourcesCommands = [
     describe: 'Set up a git source ref',
     async run() {
       const paths = getPaths()
-      const config = await loadConfig(paths.configFile)
+      const config = await configLoad(paths.configFile)
+      if (config instanceof Error) return config
       const source = await setupSourceRef(config, paths, { promptSelect })
       return { ok: source !== null, ...(source ? { source } : {}) }
     },

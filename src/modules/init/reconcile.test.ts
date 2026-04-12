@@ -2,9 +2,15 @@ import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type Config, loadConfig, writeConfig } from '@jib/config'
+import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
 import { credsPath, getPaths } from '@jib/paths'
 import { inferredOptionalModules, reconcileOptionalModules } from './reconcile.ts'
+
+async function readConfig(file: string): Promise<Config> {
+  const result = await configLoad(file)
+  if (result instanceof ConfigError) throw result
+  return result
+}
 
 async function withTmpConfig<T>(fn: (cfg: Config, root: string) => Promise<T>): Promise<T> {
   const root = await mkdtemp(join(tmpdir(), 'jib-init-reconcile-'))
@@ -17,7 +23,7 @@ async function withTmpConfig<T>(fn: (cfg: Config, root: string) => Promise<T>): 
   } satisfies Config
   try {
     await mkdir(root, { recursive: true })
-    await writeConfig(join(root, 'config.yml'), config)
+    expect(await configWrite(join(root, 'config.yml'), config)).toBeUndefined()
     return await fn(config, root)
   } finally {
     await rm(root, { recursive: true, force: true })
@@ -35,6 +41,7 @@ describe('reconcileOptionalModules', () => {
       expect(inferredOptionalModules(cfg, paths)).toEqual({ cloudflared: true })
 
       const next = await reconcileOptionalModules(cfg, paths)
+      if (next instanceof Error) throw next
       expect(next.modules).toEqual({ cloudflared: true })
     })
   })
@@ -48,14 +55,16 @@ describe('reconcileOptionalModules', () => {
 
       const writes: Config[] = []
       const next = await reconcileOptionalModules(cfg, paths, {
-        writeConfig: async (_file, updated) => {
+        writeConfig: async (_file: string, updated: Config) => {
           writes.push(structuredClone(updated))
+          return undefined
         },
       })
 
+      if (next instanceof Error) throw next
       expect(next.modules).toEqual({ cloudflared: true })
       expect(writes).toHaveLength(1)
-      expect((await loadConfig(paths.configFile)).modules).toEqual({})
+      expect((await readConfig(paths.configFile)).modules).toEqual({})
     })
   })
 

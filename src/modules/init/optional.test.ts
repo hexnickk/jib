@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type Config, loadConfig, writeConfig } from '@jib/config'
+import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
 import { getPaths } from '@jib/paths'
 import {
   InitModuleInstallError,
@@ -17,6 +17,12 @@ import {
 } from './optional.ts'
 import type { ModLike } from './registry.ts'
 
+async function readConfig(file: string): Promise<Config> {
+  const result = await configLoad(file)
+  if (result instanceof ConfigError) throw result
+  return result
+}
+
 async function withTmpConfig<T>(fn: (cfg: Config, root: string) => Promise<T>): Promise<T> {
   const root = await mkdtemp(join(tmpdir(), 'jib-init-optional-'))
   const config = {
@@ -28,7 +34,7 @@ async function withTmpConfig<T>(fn: (cfg: Config, root: string) => Promise<T>): 
   } satisfies Config
   try {
     await mkdir(root, { recursive: true })
-    await writeConfig(join(root, 'config.yml'), config)
+    expect(await configWrite(join(root, 'config.yml'), config)).toBeUndefined()
     return await fn(config, root)
   } finally {
     await rm(root, { recursive: true, force: true })
@@ -43,13 +49,15 @@ describe('optional module configuration', () => {
   test('persistModuleChoice preserves unrelated config edits', async () => {
     await withTmpConfig(async (_, root) => {
       const file = join(root, 'config.yml')
-      await writeConfig(file, {
-        config_version: 3,
-        poll_interval: '5m',
-        modules: {},
-        sources: { demo: { driver: 'github', type: 'key' } },
-        apps: {},
-      } satisfies Config)
+      expect(
+        await configWrite(file, {
+          config_version: 3,
+          poll_interval: '5m',
+          modules: {},
+          sources: { demo: { driver: 'github', type: 'key' } },
+          apps: {},
+        } satisfies Config),
+      ).toBeUndefined()
 
       const updated = await persistModuleChoice(file, 'cloudflared', true)
       expect(updated.modules.cloudflared).toBe(true)
@@ -81,15 +89,15 @@ describe('optional module configuration', () => {
         resolveModuleSetup: (name) =>
           name === 'source-auth'
             ? async (ctx) => {
-                const next = await loadConfig(ctx.paths.configFile)
+                const next = await readConfig(ctx.paths.configFile)
                 next.sources.demo = { driver: 'github', type: 'key' }
-                await writeConfig(ctx.paths.configFile, next)
+                expect(await configWrite(ctx.paths.configFile, next)).toBeUndefined()
                 return true
               }
             : undefined,
       })
 
-      const final = await loadConfig(paths.configFile)
+      const final = await readConfig(paths.configFile)
       expect(final.modules).toEqual({ 'source-auth': true })
       expect(final.sources.demo).toEqual({ driver: 'github', type: 'key' })
     })
@@ -123,7 +131,7 @@ describe('optional module configuration', () => {
       expect(error.message).toBe('cloudflared setup did not complete')
       expect(calls).toEqual(['install', 'uninstall'])
 
-      const final = await loadConfig(paths.configFile)
+      const final = await readConfig(paths.configFile)
       expect(final.modules).toEqual({})
     })
   })
@@ -144,7 +152,7 @@ describe('optional module configuration', () => {
       }
       expect(error.message).toBe('cloudflared setup did not complete')
 
-      const final = await loadConfig(paths.configFile)
+      const final = await readConfig(paths.configFile)
       expect(final.modules).toEqual({})
     })
   })
@@ -160,9 +168,9 @@ describe('optional module configuration', () => {
         resolveModuleSetup: (name) =>
           name === 'source-auth'
             ? async (ctx) => {
-                const next = await loadConfig(ctx.paths.configFile)
+                const next = await readConfig(ctx.paths.configFile)
                 next.sources.demo = { driver: 'github', type: 'key' }
-                await writeConfig(ctx.paths.configFile, next)
+                expect(await configWrite(ctx.paths.configFile, next)).toBeUndefined()
                 throw new Error('stop after saving source')
               }
             : undefined,
@@ -174,7 +182,7 @@ describe('optional module configuration', () => {
       }
       expect(error.message).toBe('stop after saving source')
 
-      const final = await loadConfig(paths.configFile)
+      const final = await readConfig(paths.configFile)
       expect(final.modules).toEqual({ cloudflared: true })
       expect(final.sources.demo).toEqual({ driver: 'github', type: 'key' })
     })

@@ -1,5 +1,5 @@
 import { rm } from 'node:fs/promises'
-import { loadConfig, writeConfig } from '@jib/config'
+import { configLoad, configWrite } from '@jib/config'
 import type { App, Config } from '@jib/config'
 import { type Paths, managedComposePath } from '@jib/paths'
 import { SecretsManager } from '@jib/secrets'
@@ -26,10 +26,15 @@ export function createDefaultAddSupport(options: DefaultAddSupportOptions): AddS
       return removeCheckout(options.paths, appName, repo)
     },
     loadConfig(configFile: string) {
-      return loadConfig(configFile)
+      return configLoad(configFile).then((result) => {
+        if (result instanceof Error) throw result
+        return result
+      })
     },
     writeConfig(configFile: string, cfg: Config) {
-      return writeConfig(configFile, cfg)
+      return configWrite(configFile, cfg).then((result) => {
+        if (result instanceof Error) throw result
+      })
     },
     upsertSecret(appName: string, entry: EnvEntry, envFile: string) {
       return secrets.upsert(appName, entry.key, entry.value, envFile)

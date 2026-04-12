@@ -1,5 +1,5 @@
 import { cliCanPrompt, cliCreateMissingInputError, cliIsTextOutput } from '@jib/cli'
-import { loadAppOrExit } from '@jib/config'
+import { configLoadAppContext } from '@jib/config'
 import { createIngressOperator, releaseIngress } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { promptConfirm, spinner } from '@jib/tui'
@@ -15,7 +15,9 @@ const cliRemoveCommand = {
   },
   async run(args) {
     const appName = String(args.app)
-    const { cfg, paths } = await loadAppOrExit(appName)
+    const loaded = await configLoadAppContext(appName)
+    if (loaded instanceof Error) return loaded
+    const { cfg, paths } = loaded
     const appCfg = cfg.apps[appName] as NonNullable<(typeof cfg.apps)[string]>
 
     if (!args.force) {

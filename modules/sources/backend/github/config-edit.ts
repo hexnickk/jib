@@ -1,4 +1,4 @@
-import { type Config, type GitHubSource, loadConfig, writeConfig } from '@jib/config'
+import { type Config, ConfigError, type GitHubSource, configLoad, configWrite } from '@jib/config'
 import { JibError } from '@jib/errors'
 
 /**
@@ -7,9 +7,11 @@ import { JibError } from '@jib/errors'
  * YAML round-trip is handled by `@jib/config` and preserves schema v3 shape.
  */
 async function editConfig(path: string, edit: (cfg: Config) => void): Promise<void> {
-  const cfg = await loadConfig(path)
+  const cfg = await configLoad(path)
+  if (cfg instanceof ConfigError) throw cfg
   edit(cfg)
-  await writeConfig(path, cfg)
+  const writeResult = await configWrite(path, cfg)
+  if (writeResult instanceof Error) throw writeResult
 }
 
 /** Look up a GitHub source ref by name, returning `undefined` if absent. */

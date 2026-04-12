@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises'
-import { loadConfig } from '@jib/config'
+import { ConfigError, configLoad } from '@jib/config'
 import { ensureCredsDir } from '@jib/paths'
 import { log, note, promptInt, promptPEM, promptSelect, promptString } from '@jib/tui'
 import type { SourceSetupContext } from '../../types.ts'
@@ -12,7 +12,7 @@ interface SetupDeps {
   addGitHubKeySource?: typeof addGitHubKeySource
   ensureCredsDir?: typeof ensureCredsDir
   generateDeployKey?: typeof generateDeployKey
-  loadConfig?: typeof loadConfig
+  loadConfig?: typeof configLoad
   log?: typeof log
   note?: typeof note
   promptInt?: typeof promptInt
@@ -47,7 +47,7 @@ export async function setupDeployKey(
 ): Promise<string | null> {
   try {
     const promptForString = deps.promptString ?? promptString
-    const load = deps.loadConfig ?? loadConfig
+    const load = deps.loadConfig ?? configLoad
     const ensureSourceNameAvailable = deps.sourceNameAvailable ?? sourceNameAvailable
     const generateKey = deps.generateDeployKey ?? generateDeployKey
     const addKeySource = deps.addGitHubKeySource ?? addGitHubKeySource
@@ -55,6 +55,7 @@ export async function setupDeployKey(
     const uiNote = deps.note ?? note
     const name = await promptForString({ message: 'Source name (e.g. my-org-key)' })
     const cfg = await load(ctx.paths.configFile)
+    if (cfg instanceof ConfigError) throw cfg
     ensureSourceNameAvailable(cfg, name)
     const pubKey = await generateKey(name, ctx.paths)
     await addKeySource(ctx.paths.configFile, name)
@@ -85,7 +86,7 @@ export async function setupGitHubApp(
 ): Promise<string | null> {
   try {
     const promptForString = deps.promptString ?? promptString
-    const load = deps.loadConfig ?? loadConfig
+    const load = deps.loadConfig ?? configLoad
     const ensureSourceNameAvailable = deps.sourceNameAvailable ?? sourceNameAvailable
     const uiLog = deps.log ?? log
     const promptForInt = deps.promptInt ?? promptInt
@@ -95,6 +96,7 @@ export async function setupGitHubApp(
     const addAppSource = deps.addGitHubAppSource ?? addGitHubAppSource
     const name = await promptForString({ message: 'Source name (e.g. my-org)' })
     const cfg = await load(ctx.paths.configFile)
+    if (cfg instanceof ConfigError) throw cfg
     ensureSourceNameAvailable(cfg, name)
     uiLog.info('create the app at github.com → Settings → Developer settings → GitHub Apps')
     const appId = await promptForInt({ message: 'GitHub App ID', min: 1 })

@@ -1,6 +1,5 @@
 import { CliError } from '@jib/cli'
-import { loadConfig } from '@jib/config'
-import type { Config } from '@jib/config'
+import { type Config, ConfigError, configLoad } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import {
   availableSourceSetupOptions,
@@ -16,7 +15,7 @@ type SourceChoice = `existing:${string}` | `setup:${string}`
 
 export interface SourceRecoveryDeps {
   isInteractive?: () => boolean
-  loadConfig?: (configFile: string) => Promise<Config>
+  loadConfig?: (configFile: string) => Promise<Config | ConfigError>
   probe?: typeof probeSource
   promptSelect?: (opts: {
     message: string
@@ -129,7 +128,9 @@ export async function preflightSourceSelection(
     const nextSource = await maybeRecoverSource(resolvedCfg, paths, repo, probed, source, deps)
     if (!nextSource) throw probed
     source = nextSource
-    resolvedCfg = await (deps.loadConfig ?? loadConfig)(paths.configFile)
+    const reloaded = await (deps.loadConfig ?? configLoad)(paths.configFile)
+    if (reloaded instanceof ConfigError) throw reloaded
+    resolvedCfg = reloaded
   }
 }
 

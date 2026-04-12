@@ -1,5 +1,5 @@
 import net from 'node:net'
-import { ConfigError, PortExhaustedError } from './errors.ts'
+import { PortExhaustedError } from './errors.ts'
 
 /**
  * Minimal structural shape the allocator needs from a parsed jib config.
@@ -36,14 +36,14 @@ const DEFAULT_RANGE: [number, number] = [20000, 29999]
  * Ports outside the managed range are never *handed out*, but they are
  * tracked so the allocator never hands out a duplicate.
  */
-export async function allocatePortResult(
+export async function configAllocatePort(
   opts: AllocatePortOpts,
 ): Promise<number | PortExhaustedError> {
   const [lo, hi] = opts.range ?? DEFAULT_RANGE
-  const used = collectUsed(opts.config)
+  const used = configCollectUsedPorts(opts.config)
   for (let port = lo; port <= hi; port++) {
     if (used.has(port)) continue
-    if (opts.probeHost && !(await isPortFree(port))) continue
+    if (opts.probeHost && !(await configIsPortFree(port))) continue
     return port
   }
   return new PortExhaustedError(
@@ -51,13 +51,7 @@ export async function allocatePortResult(
   )
 }
 
-export async function allocatePort(opts: AllocatePortOpts): Promise<number> {
-  const result = await allocatePortResult(opts)
-  if (result instanceof ConfigError) throw result
-  return result
-}
-
-function collectUsed(config: PortAllocatorConfig): Set<number> {
+function configCollectUsedPorts(config: PortAllocatorConfig): Set<number> {
   const used = new Set<number>()
   for (const app of Object.values(config.apps)) {
     for (const domain of app.domains) {
@@ -73,7 +67,7 @@ function collectUsed(config: PortAllocatorConfig): Set<number> {
  * privileged port) is caught and treated as "port not free" so the allocator
  * can fall through to the next candidate instead of exploding.
  */
-export async function isPortFree(port: number, host = '127.0.0.1'): Promise<boolean> {
+async function configIsPortFree(port: number, host = '127.0.0.1'): Promise<boolean> {
   return new Promise((resolve) => {
     const server = net.createServer()
     server.once('error', () => resolve(false))
