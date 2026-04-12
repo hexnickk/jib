@@ -91,6 +91,31 @@ describe('execution contract', () => {
     })
   })
 
+  test('status renders apps as labeled text blocks in text mode', async () => {
+    await withTmpRoot(async (root) => {
+      await writeConfig(join(root, 'config.yml'), {
+        config_version: 3,
+        poll_interval: '5m',
+        modules: {},
+        sources: {},
+        apps: {
+          demo: {
+            repo: 'acme/demo',
+            branch: 'main',
+            env_file: '.env',
+            domains: [{ host: 'demo.example.com', port: 20000 }],
+          },
+        },
+      } satisfies Config)
+
+      const result = await runCli(root, ['--interactive=never', 'status'])
+      expect(result.exitCode).toBe(0)
+      expect(result.stderr).toBe('')
+      expect(result.stdout).toContain('apps\n  demo\n    deploy:   unknown  never deployed')
+      expect(result.stdout).toContain('    ingress:  demo.example.com -> :20000')
+    })
+  })
+
   test('invalid root runtime flag is normalized instead of crashing', async () => {
     await withTmpRoot(async (root) => {
       const result = await runCli(root, ['--output=xml', 'status'])

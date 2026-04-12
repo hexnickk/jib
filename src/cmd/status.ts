@@ -55,21 +55,21 @@ function printApps(apps: AppStatus[]): void {
   }
   printLine()
   printLine('apps')
-  for (const app of apps) {
-    const running = app.containers.some((c) => c.state === 'running')
-    const icon = running ? '●' : '○'
+  apps.forEach((app, index) => {
+    if (index > 0) printLine()
     const sha = app.sha ? app.sha.slice(0, 7) : 'never deployed'
     const ago = timeAgo(app.lastDeploy)
     const deployState = app.lastDeployStatus || 'unknown'
     const deployInfo = app.lastDeploy ? `${deployState}  ${sha}  ${ago}` : `${deployState}  ${sha}`
-    printLine(`  ${icon} ${app.name.padEnd(18)} ${deployInfo}`)
+    printLine(`  ${app.name}`)
+    printLine(`    deploy:   ${deployInfo}`)
     for (const c of app.containers) {
-      printLine(`    ${c.service.padEnd(16)} ${c.state}  ${c.status}`)
+      printLine(`    service:  ${c.service.padEnd(16)} ${c.state}  ${c.status}`)
     }
     if (app.domains.length > 0) {
-      for (const d of app.domains) printLine(`    ingress ${d.host} → :${d.port ?? '?'}`)
+      for (const d of app.domains) printLine(`    ingress:  ${d.host} -> :${d.port ?? '?'}`)
     }
-  }
+  })
 }
 
 export default defineCommand({
