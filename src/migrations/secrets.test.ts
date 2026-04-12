@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getPaths } from '@jib/paths'
-import { repairManagedSecretsTree } from './secrets.ts'
+import { repairManagedSecretsTree } from './0011_repair_managed_secret_permissions.ts'
 
 describe('repairManagedSecretsTree', () => {
   test('restores managed secret directory modes without touching file contents', async () => {
