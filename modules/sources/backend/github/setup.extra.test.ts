@@ -1,16 +1,11 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { describe, expect, test } from 'bun:test'
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getPaths } from '@jib/paths'
+import { setupDeployKey, setupGitHubApp } from './setup.ts'
 
-beforeEach(() => {
-  mock.restore()
-})
-
-afterEach(() => {
-  mock.restore()
-})
+const noop = () => undefined
 
 describe('github setup flows', () => {
   test('setupDeployKey adds the source and shows the generated public key', async () => {
@@ -18,42 +13,42 @@ describe('github setup flows', () => {
     const logs: string[] = []
     const root = await mkdtemp(join(tmpdir(), 'jib-gh-setup-'))
     const paths = getPaths(root)
-
-    mock.module('@jib/config', () => ({
-      loadConfig: async () => ({
-        config_version: 3,
-        poll_interval: '5m',
-        modules: {},
-        sources: {},
-        apps: {},
-      }),
-    }))
-    mock.module('@jib/tui', () => ({
-      log: {
-        success: (message: string) => logs.push(`success:${message}`),
-        warning: (message: string) => logs.push(`warning:${message}`),
-        info: (message: string) => logs.push(`info:${message}`),
+    const uiLog = {
+      message: noop,
+      info: (message: string) => {
+        logs.push(`info:${message}`)
       },
-      note: (message: string) => notes.push(message),
-      promptInt: async () => 1,
-      promptPEM: async () => 'pem',
-      promptSelect: async () => 'skip',
-      promptString: async () => 'demo-key',
-    }))
-    mock.module('./config-edit.ts', () => ({
-      addGitHubAppSource: async () => undefined,
-      addGitHubKeySource: async (_configFile: string, name: string) => {
-        logs.push(`added:${name}`)
+      success: (message: string) => {
+        logs.push(`success:${message}`)
       },
-      sourceNameAvailable: () => undefined,
-    }))
-    mock.module('./keygen.ts', () => ({
-      deployKeyPaths: () => ({ privateKey: '/tmp/demo-key', publicKey: '/tmp/demo-key.pub' }),
-      generateDeployKey: async () => 'ssh-ed25519 AAAA test',
-    }))
+      step: noop,
+      warn: noop,
+      warning: (message: string) => {
+        logs.push(`warning:${message}`)
+      },
+      error: noop,
+    }
 
-    const { setupDeployKey } = await import('./setup.ts')
-    const result = await setupDeployKey({ config: {} as never, logger: {} as never, paths })
+    const result = await setupDeployKey(
+      { config: {} as never, logger: {} as never, paths },
+      {
+        loadConfig: async () => ({
+          config_version: 3,
+          poll_interval: '5m',
+          modules: {},
+          sources: {},
+          apps: {},
+        }),
+        log: uiLog,
+        note: (message = '') => notes.push(message),
+        promptString: async () => 'demo-key',
+        sourceNameAvailable: () => undefined,
+        addGitHubKeySource: async (_configFile: string, name: string) => {
+          logs.push(`added:${name}`)
+        },
+        generateDeployKey: async () => 'ssh-ed25519 AAAA test',
+      },
+    )
 
     expect(result).toBe('demo-key')
     expect(logs).toContain('added:demo-key')
@@ -65,38 +60,43 @@ describe('github setup flows', () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-gh-app-'))
     const paths = getPaths(root)
     const writes: string[] = []
-
-    mock.module('@jib/config', () => ({
-      loadConfig: async () => ({
-        config_version: 3,
-        poll_interval: '5m',
-        modules: {},
-        sources: {},
-        apps: {},
-      }),
-    }))
-    mock.module('@jib/tui', () => ({
-      log: {
-        success: (message: string) => writes.push(`success:${message}`),
-        warning: () => undefined,
-        info: () => undefined,
+    const uiLog = {
+      message: noop,
+      info: noop,
+      success: (message: string) => {
+        writes.push(`success:${message}`)
       },
-      note: () => undefined,
-      promptInt: async () => 123,
-      promptPEM: async () => 'PRIVATE KEY',
-      promptSelect: async () => 'skip',
-      promptString: async () => 'demo-app',
-    }))
-    mock.module('./config-edit.ts', () => ({
-      addGitHubAppSource: async (_configFile: string, name: string, appId: number) => {
-        writes.push(`source:${name}:${appId}`)
-      },
-      addGitHubKeySource: async () => undefined,
-      sourceNameAvailable: () => undefined,
-    }))
+      step: noop,
+      warn: noop,
+      warning: noop,
+      error: noop,
+    }
 
-    const { setupGitHubApp } = await import('./setup.ts')
-    const result = await setupGitHubApp({ config: {} as never, logger: {} as never, paths })
+    const result = await setupGitHubApp(
+      { config: {} as never, logger: {} as never, paths },
+      {
+        loadConfig: async () => ({
+          config_version: 3,
+          poll_interval: '5m',
+          modules: {},
+          sources: {},
+          apps: {},
+        }),
+        log: uiLog,
+        promptString: async () => 'demo-app',
+        promptInt: async () => 123,
+        promptPEM: async () => 'PRIVATE KEY',
+        sourceNameAvailable: () => undefined,
+        ensureCredsDir: async () => {
+          const dir = join(paths.secretsDir, '_jib', 'github-app')
+          await mkdir(dir, { recursive: true })
+          return dir
+        },
+        addGitHubAppSource: async (_configFile: string, name: string, appId: number) => {
+          writes.push(`source:${name}:${appId}`)
+        },
+      },
+    )
 
     expect(result).toBe('demo-app')
     expect(

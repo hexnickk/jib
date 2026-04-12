@@ -1,24 +1,13 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
+import { install } from './install.ts'
+import { uninstall } from './uninstall.ts'
 
 const serviceName = 'jib-cloudflared.test.service'
-const originalDollar = Bun.$
-
-type ShellLike = Promise<{ exitCode: number; stdout: Buffer; stderr: Buffer }> & {
-  quiet(): ShellLike
-  nothrow(): ShellLike
-}
-
-function fakeShell(result = { exitCode: 0, stdout: Buffer.from(''), stderr: Buffer.from('') }) {
-  const promise = Promise.resolve(result) as ShellLike
-  promise.quiet = () => promise
-  promise.nothrow = () => promise
-  return promise
-}
 
 const logger = {
   info() {},
@@ -35,36 +24,30 @@ let testRoot = ''
 beforeEach(async () => {
   testRoot = await mkdtemp(join(tmpdir(), 'jib-cloudflared-test-'))
   unitPath = join(testRoot, 'jib-cloudflared.service')
-  mock.module('./templates.ts', () => ({
-    UNIT_PATH: unitPath,
-    SERVICE_NAME: serviceName,
-    composeYaml: ({ tunnelEnvPath }: { tunnelEnvPath: string }) =>
-      `env_file:\n  - ${tunnelEnvPath}\n`,
-    systemdUnit: ({ cloudflaredDir }: { cloudflaredDir: string }) =>
-      `ExecStart=${cloudflaredDir}\n`,
-  }))
-  ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = (() => fakeShell()) as unknown as typeof Bun.$
 })
 
 afterEach(async () => {
-  mock.restore()
-  ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = originalDollar
   await rm(testRoot, { recursive: true, force: true })
 })
 
 describe('cloudflared install/uninstall', () => {
   test('install writes managed files and triggers daemon reload', async () => {
     const calls: string[] = []
-    ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = (() => {
-      calls.push('daemon-reload')
-      return fakeShell()
-    }) as unknown as typeof Bun.$
-    const { install } = await import('./install.ts')
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
 
     try {
-      await install({ logger, paths })
+      await install(
+        { logger, paths },
+        {
+          unitPath,
+          composeYaml: ({ tunnelEnvPath }) => `env_file:\n  - ${tunnelEnvPath}\n`,
+          systemdUnit: ({ cloudflaredDir }) => `ExecStart=${cloudflaredDir}\n`,
+          daemonReload: async () => {
+            calls.push('daemon-reload')
+          },
+        },
+      )
 
       expect(calls).toEqual(['daemon-reload'])
       expect(await readFile(join(paths.cloudflaredDir, 'docker-compose.yml'), 'utf8')).toContain(
@@ -81,11 +64,6 @@ describe('cloudflared install/uninstall', () => {
 
   test('uninstall disables the service, removes managed files, and reloads systemd', async () => {
     const calls: string[] = []
-    ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = (() => {
-      calls.push(calls.length === 0 ? 'disable' : 'daemon-reload')
-      return fakeShell()
-    }) as unknown as typeof Bun.$
-    const { uninstall } = await import('./uninstall.ts')
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
 
@@ -97,7 +75,19 @@ describe('cloudflared install/uninstall', () => {
       )
       await Bun.write(unitPath, 'unit')
 
-      await uninstall({ logger, paths })
+      await uninstall(
+        { logger, paths },
+        {
+          serviceName,
+          unitPath,
+          disableNow: async () => {
+            calls.push('disable')
+          },
+          daemonReload: async () => {
+            calls.push('daemon-reload')
+          },
+        },
+      )
 
       expect(calls).toEqual(['disable', 'daemon-reload'])
       expect(await stat(unitPath).catch(() => null)).toBeNull()
