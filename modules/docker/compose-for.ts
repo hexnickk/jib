@@ -4,7 +4,7 @@ import type { Config } from '@jib/config'
 import { type Paths, repoPath } from '@jib/paths'
 import { Compose } from './compose.ts'
 import { DockerAppNotFoundError } from './errors.ts'
-import { overridePath } from './override.ts'
+import { dockerOverridePath } from './override.ts'
 
 /**
  * Build a {@link Compose} handle for `app` from loaded config + resolved
@@ -17,7 +17,7 @@ import { overridePath } from './override.ts'
  * don't need secrets. `env_file: .env` at the app config level is the
  * default value of the schema, not a signal that secrets must exist.
  */
-export function composeForResult(
+export function dockerComposeFor(
   cfg: Config,
   paths: Paths,
   app: string,
@@ -39,14 +39,8 @@ export function composeForResult(
     app,
     dir,
     files,
-    override: overridePath(paths.overridesDir, app),
+    override: dockerOverridePath(paths.overridesDir, app),
   }
   if (envFile) config.envFile = envFile
   return new Compose(config)
-}
-
-export function composeFor(cfg: Config, paths: Paths, app: string): Compose {
-  const compose = composeForResult(cfg, paths, app)
-  if (compose instanceof DockerAppNotFoundError) throw compose
-  return compose
 }

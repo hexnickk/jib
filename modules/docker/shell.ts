@@ -1,15 +1,16 @@
 import { type App, ConfigError, MissingConfigAppError, configLoadAppContext } from '@jib/config'
 import { type Paths, repoPath } from '@jib/paths'
-import { composeForResult } from './compose-for.ts'
+import { dockerComposeFor } from './compose-for.ts'
 import {
   DockerAppHasNoServicesError,
   DockerAppNotFoundError,
+  DockerCommandError,
   DockerServiceSelectionRequiredError,
   ExecArgsMissingAppError,
   ExecArgsMissingCommandError,
   RunArgsMissingAppError,
 } from './errors.ts'
-import { parseComposeServices } from './parse.ts'
+import { ComposeInspectionError, dockerInspectComposeApp } from './resolve.ts'
 
 /**
  * Shared arg parsing and service resolution for `jib exec` and `jib run`.
@@ -24,7 +25,8 @@ export interface ExecParts {
 
 export type ParseExecArgsError = ExecArgsMissingAppError | ExecArgsMissingCommandError
 
-export function parseExecArgsResult(raw: string[]): ExecParts | ParseExecArgsError {
+/** Parses raw `jib exec` argv while preserving `--` passthrough for the container command. */
+export function dockerParseExecArgs(raw: string[]): ExecParts | ParseExecArgsError {
   if (raw.length === 0) return new ExecArgsMissingAppError()
   const [app, ...rest] = raw
   const dash = rest.indexOf('--')
@@ -34,18 +36,12 @@ export function parseExecArgsResult(raw: string[]): ExecParts | ParseExecArgsErr
   }
   const before = rest.slice(0, dash)
   const after = rest.slice(dash + 1)
+  if (after.length === 0) return new ExecArgsMissingCommandError()
   return { app: app as string, service: (before[0] ?? '') as string, cmd: after }
 }
 
-export function parseExecArgs(raw: string[]): ExecParts {
-  const parsed = parseExecArgsResult(raw)
-  if (parsed instanceof ExecArgsMissingAppError || parsed instanceof ExecArgsMissingCommandError) {
-    throw parsed
-  }
-  return parsed
-}
-
-export function parseRunArgsResult(raw: string[]): ExecParts | RunArgsMissingAppError {
+/** Parses raw `jib run` argv while preserving `--` passthrough for the container command. */
+export function dockerParseRunArgs(raw: string[]): ExecParts | RunArgsMissingAppError {
   if (raw.length === 0) return new RunArgsMissingAppError()
   const [app, ...rest] = raw
   const dash = rest.indexOf('--')
@@ -57,15 +53,17 @@ export function parseRunArgsResult(raw: string[]): ExecParts | RunArgsMissingApp
   return { app: app as string, service: (before[0] ?? '') as string, cmd: after }
 }
 
-export function parseRunArgs(raw: string[]): ExecParts {
-  const parsed = parseRunArgsResult(raw)
-  if (parsed instanceof RunArgsMissingAppError) throw parsed
-  return parsed
-}
+type ResolveServiceError =
+  | ComposeInspectionError
+  | DockerAppHasNoServicesError
+  | DockerServiceSelectionRequiredError
+export type HandleShellError =
+  | ConfigError
+  | DockerAppNotFoundError
+  | DockerCommandError
+  | ResolveServiceError
 
-type ResolveServiceError = DockerAppHasNoServicesError | DockerServiceSelectionRequiredError
-export type HandleShellError = ConfigError | DockerAppNotFoundError | ResolveServiceError
-
+/** Chooses the target service when the user omitted it and compose only has one service. */
 function resolveServiceResult(
   requested: string,
   appName: string,
@@ -74,7 +72,9 @@ function resolveServiceResult(
 ): string | ResolveServiceError {
   if (requested) return requested
   const dir = repoPath(paths, appName, appCfg.repo)
-  const services = parseComposeServices(dir, appCfg.compose ?? [])
+  const inspection = dockerInspectComposeApp(appCfg, dir)
+  if (inspection instanceof ComposeInspectionError) return inspection
+  const services = inspection.services
   if (services.length === 1) return services[0]?.name ?? ''
   if (services.length === 0) return new DockerAppHasNoServicesError(appName)
   return new DockerServiceSelectionRequiredError(
@@ -83,7 +83,11 @@ function resolveServiceResult(
   )
 }
 
-export async function handleShellResult(
+/**
+ * Resolves app + service selection for `jib exec` / `jib run` and performs the
+ * compose action. Returns typed selection/config errors instead of throwing.
+ */
+export async function dockerHandleShell(
   parts: ExecParts,
   mode: 'exec' | 'run',
 ): Promise<HandleShellError | undefined> {
@@ -94,18 +98,21 @@ export async function handleShellResult(
   const appCfg = cfg.apps[parts.app]
   if (!appCfg) return new DockerAppNotFoundError(parts.app)
   const service = resolveServiceResult(parts.service, parts.app, appCfg, paths)
+  if (service instanceof ComposeInspectionError) return service
   if (service instanceof DockerAppHasNoServicesError) return service
   if (service instanceof DockerServiceSelectionRequiredError) return service
-  const compose = composeForResult(cfg, paths, parts.app)
+  const compose = dockerComposeFor(cfg, paths, parts.app)
   if (compose instanceof DockerAppNotFoundError) return compose
-  if (mode === 'exec') await compose.exec(service, parts.cmd)
-  else await compose.run(service, parts.cmd)
+  try {
+    if (mode === 'exec') await compose.exec(service, parts.cmd)
+    else await compose.run(service, parts.cmd)
+  } catch (error) {
+    return new DockerCommandError(mode, parts.app, toErrorMessage(error), {
+      cause: error instanceof Error ? error : undefined,
+    })
+  }
 }
 
-export async function handleShell(parts: ExecParts, mode: 'exec' | 'run'): Promise<void> {
-  const result = await handleShellResult(parts, mode)
-  if (result instanceof ConfigError) throw result
-  if (result instanceof DockerAppNotFoundError) throw result
-  if (result instanceof DockerAppHasNoServicesError) throw result
-  if (result instanceof DockerServiceSelectionRequiredError) throw result
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

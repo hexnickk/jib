@@ -1,5 +1,5 @@
 import type { App } from '@jib/config'
-import { allHealthy, checkHealth, hasBuildServices } from '@jib/docker'
+import { dockerAllHealthy, dockerCheckHealth, dockerHasBuildServices } from '@jib/docker'
 import type { AppState } from '@jib/state'
 import { repoPath } from '../paths/paths.ts'
 import { DeployDiskSpaceError, DeployHealthCheckError, DeployMissingAppError } from './errors.ts'
@@ -47,7 +47,7 @@ export async function deployRunFlow(
   try {
     const compose = deployNewCompose(deps, cmd.app, appCfg, cmd.workdir)
     const buildArgs = appCfg.build_args ?? {}
-    if (hasBuildServices(cmd.workdir, appCfg.compose ?? [])) {
+    if (dockerHasBuildServices(cmd.workdir, appCfg.compose ?? [])) {
       progress.emit('build', `building ${cmd.app}`)
       await compose.build(buildArgs)
     }
@@ -62,8 +62,8 @@ export async function deployRunFlow(
 
     if (appCfg.health && appCfg.health.length > 0) {
       progress.emit('health', 'running health checks')
-      const results = await checkHealth(appCfg.health, deps.healthOpts ?? {})
-      if (!allHealthy(results)) {
+      const results = await dockerCheckHealth(appCfg.health, deps.healthOpts ?? {})
+      if (!dockerAllHealthy(results)) {
         return new DeployHealthCheckError(`health check failed: ${JSON.stringify(results)}`)
       }
     }

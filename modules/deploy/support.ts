@@ -1,7 +1,12 @@
 import { stat, symlink, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { App } from '@jib/config'
-import { Compose, overridePath, parseComposeServices, writeOverride } from '@jib/docker'
+import {
+  Compose,
+  dockerOverridePath,
+  dockerParseComposeServices,
+  dockerWriteOverride,
+} from '@jib/docker'
 import { JibError } from '@jib/errors'
 import { type AppState, type Store, acquire } from '@jib/state'
 import { $ } from 'bun'
@@ -29,7 +34,7 @@ export function deployNewCompose(
     app,
     dir: workdir,
     files: [...files],
-    override: overridePath(deps.paths.overridesDir, app),
+    override: dockerOverridePath(deps.paths.overridesDir, app),
     ...(deps.dockerExec ? { exec: deps.dockerExec } : {}),
   })
 }
@@ -43,9 +48,9 @@ export async function deploySyncOverride(
 ): Promise<DeployOverrideSyncError | JibError | undefined> {
   const result = await deployRunOrReturnError(
     async () => {
-      const parsed = parseComposeServices(workdir, appCfg.compose ?? [])
+      const parsed = dockerParseComposeServices(workdir, appCfg.compose ?? [])
       const services = deployBuildOverrideServices(parsed, appCfg.domains)
-      await writeOverride(deps.paths.overridesDir, app, services)
+      await dockerWriteOverride(deps.paths.overridesDir, app, services)
     },
     (message, options) => new DeployOverrideSyncError(message, options),
   )

@@ -104,6 +104,11 @@ describe('execution contract', () => {
       expect(runResult.exitCode).toBe(1)
       expect(runResult.stderr).toContain('app "demo" not found in config')
       expect(runResult.stderr).not.toContain('Unknown argument: demo')
+
+      const missingCommand = await runCli(root, ['exec', 'demo', '--'])
+      expect(missingCommand.exitCode).toBe(1)
+      expect(missingCommand.stderr).toContain('command required after app')
+      expect(missingCommand.stderr).not.toContain('app "demo" not found in config')
     })
   })
 

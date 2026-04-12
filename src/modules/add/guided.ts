@@ -1,6 +1,6 @@
 import type { CliIssue } from '@jib/cli'
 import type { ParsedDomain } from '@jib/config'
-import { type ComposeService, hasPublishedPorts, inferContainerPort } from '@jib/docker'
+import { type ComposeService, dockerHasPublishedPorts, dockerInferContainerPort } from '@jib/docker'
 import { ValidationError } from '@jib/errors'
 import { inferScope, mergeConfigEntries } from './config-entries.ts'
 import type { ConfigEntry, ConfigScope, EnvEntry } from './types.ts'
@@ -40,11 +40,11 @@ export function validateEnvEntry(raw: string): string | undefined {
 
 export function summarizeComposeServices(services: ComposeService[]): AddServiceSummary[] {
   return services.map((service) => {
-    const inferredContainerPort = inferContainerPort(service)
+    const inferredContainerPort = dockerInferContainerPort(service)
     return {
       name: service.name,
       ...(inferredContainerPort !== undefined ? { inferredContainerPort } : {}),
-      publishesPorts: hasPublishedPorts(service),
+      publishesPorts: dockerHasPublishedPorts(service),
       ...(service.envRefs.length > 0 ? { envRefs: service.envRefs } : {}),
       ...(service.buildArgRefs.length > 0 ? { buildArgRefs: service.buildArgRefs } : {}),
     }

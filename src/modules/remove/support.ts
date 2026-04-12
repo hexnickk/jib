@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { configWrite } from '@jib/config'
 import type { Config } from '@jib/config'
-import { composeFor, overridePath } from '@jib/docker'
+import { DockerAppNotFoundError, dockerComposeFor, dockerOverridePath } from '@jib/docker'
 import { type Paths, managedComposePath } from '@jib/paths'
 import { SecretsManager } from '@jib/secrets'
 import { sourcesRemoveCheckout } from '@jib/sources'
@@ -24,7 +24,8 @@ export function createRemoveSupport(options: DefaultRemoveSupportOptions): Remov
     },
 
     async stopApp(cfg: Config, appName: string, quiet: boolean) {
-      const compose = composeFor(cfg, options.paths, appName)
+      const compose = dockerComposeFor(cfg, options.paths, appName)
+      if (compose instanceof DockerAppNotFoundError) return
       await compose.down(false, { quiet })
     },
 
@@ -41,7 +42,7 @@ export function createRemoveSupport(options: DefaultRemoveSupportOptions): Remov
     },
 
     removeOverride(appName: string) {
-      return rm(overridePath(options.paths.overridesDir, appName), { force: true })
+      return rm(dockerOverridePath(options.paths.overridesDir, appName), { force: true })
     },
 
     removeManagedCompose(appName: string) {
@@ -51,7 +52,6 @@ export function createRemoveSupport(options: DefaultRemoveSupportOptions): Remov
     async writeConfig(configFile: string, cfg: Config) {
       const result = await configWrite(configFile, cfg)
       if (!result) return undefined
-      if (result instanceof RemoveWriteConfigError) return result
       return new RemoveWriteConfigError(configFile, { cause: result })
     },
   }

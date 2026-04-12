@@ -28,10 +28,10 @@ export type DockerExec = (args: string[], opts: ExecOpts) => Promise<ExecResult>
 
 /**
  * Spawns a command with inherited stdio so the caller's TTY flows straight
- * through to the child. Split out from `realExec` so tests can target it
+ * through to the child. Split out from `dockerRealExec` so tests can target it
  * without stubbing `Bun.$`.
  */
-export async function spawnInherit(
+export async function dockerSpawnInherit(
   cmd: string[],
   cwd: string | undefined,
   env: Record<string, string>,
@@ -48,10 +48,10 @@ export async function spawnInherit(
   return { stdout: '', stderr: '', exitCode }
 }
 
-export const realExec: DockerExec = async (args, opts) => {
+export const dockerRealExec: DockerExec = async (args, opts) => {
   const env = { ...process.env, ...(opts.env ?? {}) } as Record<string, string>
   if (opts.tty) {
-    return spawnInherit(args, opts.cwd, env)
+    return dockerSpawnInherit(args, opts.cwd, env)
   }
   const [_cmd, ...rest] = args
   const built = $`docker ${rest}`.cwd(opts.cwd ?? process.cwd())

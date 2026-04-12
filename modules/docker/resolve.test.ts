@@ -5,10 +5,9 @@ import { join } from 'node:path'
 import type { App } from '@jib/config'
 import { DockerDomainServiceNotFoundError, DockerDomainServiceRequiredError } from './errors.ts'
 import {
-  inspectComposeApp,
-  inspectComposeAppResult,
-  resolveFromCompose,
-  resolveFromComposeResult,
+  ComposeInspectionError,
+  dockerInspectComposeApp,
+  dockerResolveFromCompose,
 } from './resolve.ts'
 
 const tmpDirs: string[] = []
@@ -34,11 +33,12 @@ function mkApp(overrides: Partial<App>): App {
   } as App
 }
 
-describe('resolveFromCompose', () => {
+describe('dockerResolveFromCompose', () => {
   test('single-service compose auto-fills service + container_port from ports', () => {
     const dir = fixture('services:\n  web:\n    image: nginx\n    ports: ["8080:80"]\n')
     const app = mkApp({ domains: [{ host: 'demo.example.com', port: 20000 }] })
-    const out = resolveFromCompose(app, dir)
+    const out = dockerResolveFromCompose(app, dir)
+    if (out instanceof Error) throw out
     expect(out.domains[0]?.service).toBe('web')
     expect(out.domains[0]?.container_port).toBe(80)
   })
@@ -46,7 +46,8 @@ describe('resolveFromCompose', () => {
   test('single-service compose with expose infers container_port', () => {
     const dir = fixture('services:\n  api:\n    image: api\n    expose: ["3000"]\n')
     const app = mkApp({ domains: [{ host: 'demo.example.com', port: 20000 }] })
-    const out = resolveFromCompose(app, dir)
+    const out = dockerResolveFromCompose(app, dir)
+    if (out instanceof Error) throw out
     expect(out.domains[0]?.service).toBe('api')
     expect(out.domains[0]?.container_port).toBe(3000)
   })
@@ -56,7 +57,8 @@ describe('resolveFromCompose', () => {
     const app = mkApp({
       domains: [{ host: 'demo.example.com', port: 20000, container_port: 1234 }],
     })
-    const out = resolveFromCompose(app, dir)
+    const out = dockerResolveFromCompose(app, dir)
+    if (out instanceof Error) throw out
     expect(out.domains[0]?.container_port).toBe(1234)
   })
 
@@ -66,7 +68,7 @@ describe('resolveFromCompose', () => {
     )
     const app = mkApp({ domains: [{ host: 'demo.example.com', port: 20000 }] })
 
-    const result = resolveFromComposeResult(app, dir)
+    const result = dockerResolveFromCompose(app, dir)
 
     expect(result).toBeInstanceOf(DockerDomainServiceRequiredError)
   })
@@ -81,7 +83,8 @@ describe('resolveFromCompose', () => {
         { host: 'b.example.com', port: 20001, service: 'api' },
       ],
     })
-    const out = resolveFromCompose(app, dir)
+    const out = dockerResolveFromCompose(app, dir)
+    if (out instanceof Error) throw out
     expect(out.domains[0]?.container_port).toBe(80)
     expect(out.domains[1]?.container_port).toBe(3000)
   })
@@ -92,7 +95,7 @@ describe('resolveFromCompose', () => {
       domains: [{ host: 'demo.example.com', port: 20000, service: 'ghost' }],
     })
 
-    const result = resolveFromComposeResult(app, dir)
+    const result = dockerResolveFromCompose(app, dir)
 
     expect(result).toBeInstanceOf(DockerDomainServiceNotFoundError)
   })
@@ -100,14 +103,16 @@ describe('resolveFromCompose', () => {
   test('worker-only app with no domains only validates compose', () => {
     const dir = fixture('services:\n  worker:\n    image: busybox\n')
     const app = mkApp({})
-    const out = resolveFromCompose(app, dir)
+    const out = dockerResolveFromCompose(app, dir)
+    if (out instanceof Error) throw out
     expect(out).toEqual(app)
   })
 
   test('multi-service compose without domains is valid', () => {
     const dir = fixture('services:\n  web:\n    image: nginx\n  worker:\n    image: busybox\n')
     const app = mkApp({})
-    const out = resolveFromCompose(app, dir)
+    const out = dockerResolveFromCompose(app, dir)
+    if (out instanceof Error) throw out
     expect(out).toEqual(app)
   })
 
@@ -115,53 +120,49 @@ describe('resolveFromCompose', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
     tmpDirs.push(dir)
     const app = mkApp({ domains: [{ host: 'demo.example.com', port: 20000 }] })
-    expect(() => resolveFromCompose(app, dir)).toThrow(/no compose file found/)
+    const result = dockerResolveFromCompose(app, dir)
+    expect(result).toBeInstanceOf(ComposeInspectionError)
+    expect((result as ComposeInspectionError).message).toMatch(/no compose file found/)
   })
 
   test('no container_port inferable falls back to 80', () => {
     const dir = fixture('services:\n  web:\n    image: nginx\n')
     const app = mkApp({ domains: [{ host: 'demo.example.com', port: 20000 }] })
-    const out = resolveFromCompose(app, dir)
+    const out = dockerResolveFromCompose(app, dir)
+    if (out instanceof Error) throw out
     expect(out.domains[0]?.container_port).toBe(80)
   })
 
-  test('inspectComposeApp discovers compose.yml when compose is omitted', () => {
+  test('dockerInspectComposeApp discovers compose.yml when compose is omitted', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
     tmpDirs.push(dir)
     writeFileSync(join(dir, 'compose.yml'), 'services:\n  web:\n    image: nginx\n')
 
-    const inspection = inspectComposeApp({ compose: undefined }, dir)
+    const inspection = dockerInspectComposeApp({ compose: undefined }, dir)
+    if (inspection instanceof ComposeInspectionError) throw inspection
 
     expect(inspection.composeFiles).toEqual(['compose.yml'])
     expect(inspection.services.map((service) => service.name)).toEqual(['web'])
   })
 
-  test('inspectComposeApp accepts absolute compose paths', () => {
+  test('dockerInspectComposeApp accepts absolute compose paths', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
     tmpDirs.push(dir)
     const composePath = join(dir, 'managed.yml')
     writeFileSync(composePath, 'services:\n  web:\n    image: nginx\n')
 
-    const inspection = inspectComposeApp({ compose: [composePath] }, dir)
+    const inspection = dockerInspectComposeApp({ compose: [composePath] }, dir)
+    if (inspection instanceof ComposeInspectionError) throw inspection
 
     expect(inspection.composeFiles).toEqual([composePath])
     expect(inspection.services.map((service) => service.name)).toEqual(['web'])
   })
 
-  test('inspectComposeApp reports an explicit missing compose path clearly', () => {
+  test('dockerInspectComposeApp returns a typed error for a missing compose path', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
     tmpDirs.push(dir)
 
-    expect(() => inspectComposeApp({ compose: ['docker-compose.yml'] }, dir)).toThrow(
-      /compose file not found: docker-compose.yml/,
-    )
-  })
-
-  test('inspectComposeAppResult returns a typed error for a missing compose path', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'jib-resolve-'))
-    tmpDirs.push(dir)
-
-    const result = inspectComposeAppResult({ compose: ['docker-compose.yml'] }, dir)
+    const result = dockerInspectComposeApp({ compose: ['docker-compose.yml'] }, dir)
 
     expect(result).toBeInstanceOf(Error)
     expect(result).toMatchObject({ code: 'compose_not_found' })

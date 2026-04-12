@@ -5,9 +5,9 @@ import { JibError } from '@jib/errors'
 import { DockerDomainServiceNotFoundError, DockerDomainServiceRequiredError } from './errors.ts'
 import {
   type ComposeService,
-  hasPublishedPorts,
-  inferContainerPort,
-  parseComposeServices,
+  dockerHasPublishedPorts,
+  dockerInferContainerPort,
+  dockerParseComposeServices,
 } from './parse.ts'
 
 const FALLBACK_CONTAINER_PORT = 80
@@ -41,24 +41,24 @@ export type ResolveFromComposeError =
   | DockerDomainServiceRequiredError
   | DockerDomainServiceNotFoundError
 
-export function discoverComposeFiles(workdir: string): string[] {
+/** Returns the default compose filenames that already exist under `workdir`. */
+export function dockerDiscoverComposeFiles(workdir: string): string[] {
   return DEFAULT_COMPOSE_FILES.filter((file) => existsSync(join(workdir, file)))
 }
 
-export function inspectComposeAppResult(
+/**
+ * Resolves the compose files for one app and parses their merged service list.
+ * Returns a typed inspection error instead of throwing for expected problems.
+ */
+export function dockerInspectComposeApp(
   appCfg: Pick<App, 'compose'>,
   workdir: string,
 ): ComposeInspection | ComposeInspectionError {
-  let composeFiles: string[]
-  try {
-    composeFiles = resolveComposeFiles(workdir, appCfg.compose ?? [])
-  } catch (error) {
-    if (error instanceof ComposeInspectionError) return error
-    throw error
-  }
+  const composeFiles = resolveComposeFiles(workdir, appCfg.compose ?? [])
+  if (composeFiles instanceof ComposeInspectionError) return composeFiles
   let services: ComposeService[]
   try {
-    services = parseComposeServices(workdir, composeFiles)
+    services = dockerParseComposeServices(workdir, composeFiles)
   } catch (err) {
     return new ComposeInspectionError(
       'compose_parse',
@@ -76,26 +76,17 @@ export function inspectComposeAppResult(
   return { composeFiles, services }
 }
 
-export function inspectComposeApp(
-  appCfg: Pick<App, 'compose'>,
-  workdir: string,
-): ComposeInspection {
-  const inspection = inspectComposeAppResult(appCfg, workdir)
-  if (inspection instanceof ComposeInspectionError) throw inspection
-  return inspection
-}
-
 /**
  * Parse the compose file from the prepared workdir, resolve each ingress
  * mapping's `service` + `container_port`, and surface optional warnings
  * through the caller-provided `warn` callback. No disk writes.
  */
-export function resolveFromComposeResult(
+export function dockerResolveFromCompose(
   appCfg: App,
   workdir: string,
   opts: { warn?: (message: string) => void } = {},
 ): App | ResolveFromComposeError {
-  const inspection = inspectComposeAppResult(appCfg, workdir)
+  const inspection = dockerInspectComposeApp(appCfg, workdir)
   if (inspection instanceof ComposeInspectionError) return inspection
   const parsed = inspection.services
   if (appCfg.domains.length === 0) return appCfg
@@ -114,7 +105,7 @@ export function resolveFromComposeResult(
     }
     const svc = byName.get(serviceName)
     if (!svc) return new DockerDomainServiceNotFoundError(d.host, serviceName)
-    if (hasPublishedPorts(svc)) publishing.set(svc.name, svc)
+    if (dockerHasPublishedPorts(svc)) publishing.set(svc.name, svc)
     const containerPort = d.container_port ?? resolvePort(svc, opts.warn)
     nextDomains.push({ ...d, service: svc.name, container_port: containerPort })
   }
@@ -123,23 +114,17 @@ export function resolveFromComposeResult(
   return { ...appCfg, domains: nextDomains }
 }
 
-export function resolveFromCompose(
-  appCfg: App,
+/** Resolves explicit compose paths or falls back to the first default compose file on disk. */
+function resolveComposeFiles(
   workdir: string,
-  opts: { warn?: (message: string) => void } = {},
-): App {
-  const resolved = resolveFromComposeResult(appCfg, workdir, opts)
-  if (isResolveFromComposeError(resolved)) throw resolved
-  return resolved
-}
-
-function resolveComposeFiles(workdir: string, composeFiles: string[]): string[] {
+  composeFiles: string[],
+): ComposeInspectionError | string[] {
   if (composeFiles.length > 0) {
     const missing = composeFiles.filter(
       (file) => !existsSync(isAbsolute(file) ? file : join(workdir, file)),
     )
     if (missing.length > 0) {
-      throw new ComposeInspectionError(
+      return new ComposeInspectionError(
         'compose_not_found',
         `compose file not found: ${missing.join(', ')}`,
         { composeFiles: missing },
@@ -147,15 +132,16 @@ function resolveComposeFiles(workdir: string, composeFiles: string[]): string[] 
     }
     return composeFiles
   }
-  const discovered = discoverComposeFiles(workdir)
+  const discovered = dockerDiscoverComposeFiles(workdir)
   if (discovered.length > 0) return [discovered[0] as string]
-  throw new ComposeInspectionError('compose_not_found', 'no compose file found in the repo root', {
+  return new ComposeInspectionError('compose_not_found', 'no compose file found in the repo root', {
     availableFiles: discovered,
   })
 }
 
+/** Picks the inferred container port for one service, defaulting to `80` when compose is silent. */
 function resolvePort(svc: ComposeService, warn?: (message: string) => void): number {
-  const inferred = inferContainerPort(svc)
+  const inferred = dockerInferContainerPort(svc)
   if (inferred !== undefined) return inferred
   warn?.(
     `could not infer container port for service "${svc.name}"; defaulting to ${FALLBACK_CONTAINER_PORT}`,
@@ -163,6 +149,7 @@ function resolvePort(svc: ComposeService, warn?: (message: string) => void): num
   return FALLBACK_CONTAINER_PORT
 }
 
+/** Explains when jib will replace user-declared `ports:` entries with managed ingress mappings. */
 function warnPublished(
   publishing: Map<string, ComposeService>,
   domains: Domain[],
@@ -180,14 +167,4 @@ function warnPublished(
     )
   }
   warn('consider removing `ports:` from your compose file to avoid confusion.')
-}
-
-function isResolveFromComposeError(
-  value: App | ResolveFromComposeError,
-): value is ResolveFromComposeError {
-  return (
-    value instanceof ComposeInspectionError ||
-    value instanceof DockerDomainServiceRequiredError ||
-    value instanceof DockerDomainServiceNotFoundError
-  )
 }

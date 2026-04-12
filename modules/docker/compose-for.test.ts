@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
-import { composeForResult } from './compose-for.ts'
+import { dockerComposeFor } from './compose-for.ts'
 import { DockerAppNotFoundError } from './errors.ts'
 
 const tmpDirs: string[] = []
@@ -47,11 +47,11 @@ function fixture(): { cfg: Config; paths: Paths } {
   return { cfg, paths }
 }
 
-describe('composeForResult', () => {
+describe('dockerComposeFor', () => {
   test('returns a typed error when the app is missing', () => {
     const { cfg, paths } = fixture()
 
-    const result = composeForResult(cfg, paths, 'ghost')
+    const result = dockerComposeFor(cfg, paths, 'ghost')
 
     expect(result).toBeInstanceOf(DockerAppNotFoundError)
   })
@@ -62,7 +62,7 @@ describe('composeForResult', () => {
     mkdirSync(join(paths.secretsDir, 'demo'), { recursive: true })
     writeFileSync(join(paths.secretsDir, 'demo', '.env'), 'KEY=value\n')
 
-    const result = composeForResult(cfg, paths, 'demo')
+    const result = dockerComposeFor(cfg, paths, 'demo')
 
     expect(result).not.toBeInstanceOf(DockerAppNotFoundError)
     if (result instanceof DockerAppNotFoundError) return

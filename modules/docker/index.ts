@@ -1,25 +1,31 @@
 export { Compose, type ComposeConfig, type UpOptions } from './compose.ts'
-export { type DockerExec, type ExecResult, realExec } from './exec.ts'
-export { allHealthy, type CheckHealthOptions, checkHealth, type HealthResult } from './health.ts'
+export type { DockerExec, ExecResult } from './exec.ts'
 export {
-  buildOverride,
+  dockerAllHealthy,
+  dockerBuildEndpoint,
+  type CheckHealthOptions,
+  dockerCheckHealth,
+  type HealthResult,
+} from './health.ts'
+export {
+  dockerOverridePath,
   type OverrideFile,
   type OverrideService,
-  overridePath,
-  writeOverride,
+  dockerWriteOverride,
 } from './override.ts'
 export {
   type ComposeService,
-  hasBuildServices,
-  hasPublishedPorts,
-  inferContainerPort,
-  parseComposeServices,
+  dockerHasBuildServices,
+  dockerHasPublishedPorts,
+  dockerInferContainerPort,
+  dockerParseComposeServices,
 } from './parse.ts'
-export { findUnsafeBindMounts, type UnsafeBindMount } from './volume-safety.ts'
-export { composeFor, composeForResult } from './compose-for.ts'
+export { dockerFindUnsafeBindMounts, type UnsafeBindMount } from './volume-safety.ts'
+export { dockerComposeFor } from './compose-for.ts'
 export {
   DockerAppHasNoServicesError,
   DockerAppNotFoundError,
+  DockerCommandError,
   DockerDomainServiceNotFoundError,
   DockerDomainServiceRequiredError,
   DockerServiceSelectionRequiredError,
@@ -31,18 +37,13 @@ export {
   type ComposeInspection,
   type ComposeInspectionCode,
   ComposeInspectionError,
-  discoverComposeFiles,
-  inspectComposeApp,
-  inspectComposeAppResult,
-  resolveFromCompose,
-  resolveFromComposeResult,
+  dockerDiscoverComposeFiles,
+  dockerInspectComposeApp,
+  dockerResolveFromCompose,
 } from './resolve.ts'
 export {
   type ExecParts,
-  handleShell,
-  handleShellResult,
-  parseExecArgs,
-  parseExecArgsResult,
-  parseRunArgs,
-  parseRunArgsResult,
+  dockerHandleShell,
+  dockerParseExecArgs,
+  dockerParseRunArgs,
 } from './shell.ts'

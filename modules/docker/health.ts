@@ -21,7 +21,8 @@ export interface CheckHealthOptions {
   intervalsMs?: number[]
 }
 
-export function buildEndpoint(check: HealthCheck): string {
+/** Maps one configured health check to the localhost URL jib probes after deploy. */
+export function dockerBuildEndpoint(check: HealthCheck): string {
   return `http://localhost:${check.port}${check.path}`
 }
 
@@ -29,7 +30,7 @@ export function buildEndpoint(check: HealthCheck): string {
  * Runs each health check with exponential backoff retries. Every check must
  * pass for the deploy to be considered healthy.
  */
-export async function checkHealth(
+export async function dockerCheckHealth(
   checks: HealthCheck[],
   opts: CheckHealthOptions = {},
 ): Promise<HealthResult[]> {
@@ -54,7 +55,7 @@ async function probe(
   intervals: number[],
   requestTimeoutMs: number,
 ): Promise<HealthResult> {
-  const endpoint = buildEndpoint(check)
+  const endpoint = dockerBuildEndpoint(check)
   let lastError: string | undefined
   let lastStatus: number | undefined
   for (let attempt = 0; attempt < intervals.length; attempt++) {
@@ -80,6 +81,6 @@ async function probe(
 }
 
 /** Matches Go: returns true on an empty list (no checks configured = healthy). */
-export function allHealthy(results: HealthResult[]): boolean {
+export function dockerAllHealthy(results: HealthResult[]): boolean {
   return results.every((r) => r.ok)
 }

@@ -4,11 +4,11 @@ import {
   ExecArgsMissingCommandError,
   RunArgsMissingAppError,
 } from './errors.ts'
-import { parseExecArgs, parseExecArgsResult, parseRunArgs, parseRunArgsResult } from './shell.ts'
+import { dockerParseExecArgs, dockerParseRunArgs } from './shell.ts'
 
-describe('parseExecArgs', () => {
+describe('dockerParseExecArgs', () => {
   test('app + service + -- + cmd', () => {
-    expect(parseExecArgs(['web', 'api', '--', 'sh', '-c', 'ls'])).toEqual({
+    expect(dockerParseExecArgs(['web', 'api', '--', 'sh', '-c', 'ls'])).toEqual({
       app: 'web',
       service: 'api',
       cmd: ['sh', '-c', 'ls'],
@@ -16,25 +16,33 @@ describe('parseExecArgs', () => {
   })
 
   test('app + cmd without --', () => {
-    expect(parseExecArgs(['web', 'psql'])).toEqual({ app: 'web', service: 'psql', cmd: [] })
+    expect(dockerParseExecArgs(['web', 'psql'])).toEqual({ app: 'web', service: 'psql', cmd: [] })
   })
 
-  test('app only → result helper returns typed error', () => {
-    expect(parseExecArgsResult(['web'])).toBeInstanceOf(ExecArgsMissingCommandError)
+  test('app only returns a typed error', () => {
+    expect(dockerParseExecArgs(['web'])).toBeInstanceOf(ExecArgsMissingCommandError)
   })
 
-  test('empty → result helper returns typed error', () => {
-    expect(parseExecArgsResult([])).toBeInstanceOf(ExecArgsMissingAppError)
+  test('empty returns a typed error', () => {
+    expect(dockerParseExecArgs([])).toBeInstanceOf(ExecArgsMissingAppError)
   })
 
   test('-- with empty before', () => {
-    expect(parseExecArgs(['web', '--', 'ls'])).toEqual({ app: 'web', service: '', cmd: ['ls'] })
+    expect(dockerParseExecArgs(['web', '--', 'ls'])).toEqual({
+      app: 'web',
+      service: '',
+      cmd: ['ls'],
+    })
+  })
+
+  test('missing command after -- returns a typed error', () => {
+    expect(dockerParseExecArgs(['web', '--'])).toBeInstanceOf(ExecArgsMissingCommandError)
   })
 })
 
-describe('parseRunArgs', () => {
+describe('dockerParseRunArgs', () => {
   test('app + service + -- + cmd', () => {
-    expect(parseRunArgs(['web', 'api', '--', 'migrate'])).toEqual({
+    expect(dockerParseRunArgs(['web', 'api', '--', 'migrate'])).toEqual({
       app: 'web',
       service: 'api',
       cmd: ['migrate'],
@@ -42,27 +50,22 @@ describe('parseRunArgs', () => {
   })
 
   test('app + service (no cmd)', () => {
-    expect(parseRunArgs(['web', 'api'])).toEqual({ app: 'web', service: 'api', cmd: [] })
+    expect(dockerParseRunArgs(['web', 'api'])).toEqual({ app: 'web', service: 'api', cmd: [] })
   })
 
   test('app only → service defaults to empty (resolved at runtime)', () => {
-    expect(parseRunArgs(['web'])).toEqual({ app: 'web', service: '', cmd: [] })
+    expect(dockerParseRunArgs(['web'])).toEqual({ app: 'web', service: '', cmd: [] })
   })
 
   test('app + -- + cmd (service defaults to empty)', () => {
-    expect(parseRunArgs(['web', '--', 'ls', '/'])).toEqual({
+    expect(dockerParseRunArgs(['web', '--', 'ls', '/'])).toEqual({
       app: 'web',
       service: '',
       cmd: ['ls', '/'],
     })
   })
 
-  test('empty argv → result helper returns typed error', () => {
-    expect(parseRunArgsResult([])).toBeInstanceOf(RunArgsMissingAppError)
-  })
-
-  test('throwing wrappers still preserve current command-call behavior', () => {
-    expect(() => parseExecArgs([])).toThrow(/missing app/)
-    expect(() => parseRunArgs([])).toThrow(/missing app/)
+  test('empty argv returns a typed error', () => {
+    expect(dockerParseRunArgs([])).toBeInstanceOf(RunArgsMissingAppError)
   })
 })

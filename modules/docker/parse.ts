@@ -39,7 +39,7 @@ interface RawComposeFile {
  * Parses one or more compose files from `repoDir` and merges services. Later
  * files override earlier ones field-by-field, matching the Go parser.
  */
-export function parseComposeServices(
+export function dockerParseComposeServices(
   repoDir: string,
   composeFiles: string[] = [],
 ): ComposeService[] {
@@ -73,7 +73,8 @@ export function parseComposeServices(
   return out
 }
 
-export function hasBuildServices(repoDir: string, composeFiles: string[] = []): boolean {
+/** Reports whether any compose service declares a `build:` stanza. */
+export function dockerHasBuildServices(repoDir: string, composeFiles: string[] = []): boolean {
   const files = composeFiles.length > 0 ? composeFiles : ['docker-compose.yml']
   for (const f of files) {
     const data = readFileSync(isAbsolute(f) ? f : join(repoDir, f), 'utf8')
@@ -91,7 +92,7 @@ export function hasBuildServices(repoDir: string, composeFiles: string[] = []): 
  * Used by `jib add` to fill `domain.container_port` from the compose file
  * so the deploy engine can emit a correct `!override` ports list.
  */
-export function inferContainerPort(service: ComposeService): number | undefined {
+export function dockerInferContainerPort(service: ComposeService): number | undefined {
   if (service.ports.length > 0) {
     const p = parseContainerSide(service.ports[0])
     if (p) return p
@@ -105,7 +106,7 @@ export function inferContainerPort(service: ComposeService): number | undefined 
 }
 
 /** True when the user's compose file declares a non-empty `ports:` list. */
-export function hasPublishedPorts(service: ComposeService): boolean {
+export function dockerHasPublishedPorts(service: ComposeService): boolean {
   return service.ports.length > 0
 }
 
@@ -131,6 +132,7 @@ function parseContainerSide(p: unknown): number | undefined {
   return undefined
 }
 
+/** Extracts env keys that still need operator-provided values at runtime. */
 function parseEnvRefs(environment: unknown): string[] {
   const refs = new Set<string>()
   if (Array.isArray(environment)) {
@@ -158,11 +160,13 @@ function parseEnvRefs(environment: unknown): string[] {
   return [...refs]
 }
 
+/** Extracts build args that still need operator-provided values at build time. */
 function parseBuildArgRefs(build: unknown): string[] {
   if (!build || typeof build !== 'object' || Array.isArray(build) || !('args' in build)) return []
   return parseArgRefs((build as RawBuildConfig).args)
 }
 
+/** Normalizes compose arg syntaxes (`KEY`, `KEY=`, `${KEY}`) into plain key names. */
 function parseArgRefs(args: unknown): string[] {
   const refs = new Set<string>()
   if (Array.isArray(args)) {

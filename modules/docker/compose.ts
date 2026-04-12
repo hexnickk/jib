@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { JibError } from '@jib/errors'
-import { type DockerExec, type ExecResult, realExec } from './exec.ts'
+import { type DockerExec, type ExecResult, dockerRealExec } from './exec.ts'
 
 export interface ComposeConfig {
   app: string
@@ -27,7 +27,7 @@ export class Compose {
   private readonly runner: DockerExec
 
   constructor(readonly cfg: ComposeConfig) {
-    this.runner = cfg.exec ?? realExec
+    this.runner = cfg.exec ?? dockerRealExec
   }
 
   projectName(): string {

@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   type ComposeService,
-  hasPublishedPorts,
-  inferContainerPort,
-  parseComposeServices,
+  dockerHasPublishedPorts,
+  dockerInferContainerPort,
+  dockerParseComposeServices,
 } from './parse.ts'
 
 function svc(partial: Partial<ComposeService>): ComposeService {
@@ -21,12 +21,12 @@ function fixture(files: Record<string, string>): string {
   return dir
 }
 
-describe('parseComposeServices', () => {
+describe('dockerParseComposeServices', () => {
   test('minimal compose extracts service name', () => {
     const dir = fixture({
       'docker-compose.yml': 'services:\n  web:\n    image: nginx\n',
     })
-    const out = parseComposeServices(dir)
+    const out = dockerParseComposeServices(dir)
     expect(out).toHaveLength(1)
     expect(out[0]?.name).toBe('web')
     expect(out[0]?.ports).toEqual([])
@@ -44,7 +44,7 @@ describe('parseComposeServices', () => {
     expose: ["9000"]
 `,
     })
-    const out = parseComposeServices(dir)
+    const out = dockerParseComposeServices(dir)
     expect(out[0]?.ports).toEqual(['8080:80'])
     expect(out[0]?.expose).toEqual(['9000'])
     expect(out[0]?.envRefs).toEqual([])
@@ -55,7 +55,7 @@ describe('parseComposeServices', () => {
       'base.yml': 'services:\n  web:\n    ports: ["3000:3000"]\n',
       'over.yml': 'services:\n  web:\n    ports: ["4000:3000"]\n',
     })
-    const out = parseComposeServices(dir, ['base.yml', 'over.yml'])
+    const out = dockerParseComposeServices(dir, ['base.yml', 'over.yml'])
     expect(out[0]?.ports).toEqual(['4000:3000'])
   })
 
@@ -70,7 +70,7 @@ describe('parseComposeServices', () => {
         '      EMPTY_FROM_ENV:\n' +
         '      API_KEY: ""\n',
     })
-    const out = parseComposeServices(dir)
+    const out = dockerParseComposeServices(dir)
     expect(out[0]?.envRefs).toEqual(['DATABASE_URL', 'EMPTY_FROM_ENV'])
   })
 
@@ -86,7 +86,7 @@ describe('parseComposeServices', () => {
         '        STATIC_VALUE: hello\n' +
         '        EMPTY_BUILD_ARG:\n',
     })
-    const out = parseComposeServices(dir)
+    const out = dockerParseComposeServices(dir)
     expect(out[0]?.buildArgRefs).toEqual(['VITE_HOST_URL', 'EMPTY_BUILD_ARG'])
   })
 
@@ -101,42 +101,42 @@ describe('parseComposeServices', () => {
         '        - BUILD_VERSION\n' +
         '        - API_URL=${API_URL}\n',
     })
-    const out = parseComposeServices(dir)
+    const out = dockerParseComposeServices(dir)
     expect(out[0]?.buildArgRefs).toEqual(['BUILD_VERSION', 'API_URL'])
   })
 })
 
-describe('inferContainerPort / hasPublishedPorts', () => {
+describe('dockerInferContainerPort / dockerHasPublishedPorts', () => {
   test('ports: ["8080:80"] -> container 80, published=true', () => {
     const s = svc({ ports: ['8080:80'] })
-    expect(inferContainerPort(s)).toBe(80)
-    expect(hasPublishedPorts(s)).toBe(true)
+    expect(dockerInferContainerPort(s)).toBe(80)
+    expect(dockerHasPublishedPorts(s)).toBe(true)
   })
   test('ports: ["80"] (no host) -> container 80, published=true', () => {
     const s = svc({ ports: ['80'] })
-    expect(inferContainerPort(s)).toBe(80)
-    expect(hasPublishedPorts(s)).toBe(true)
+    expect(dockerInferContainerPort(s)).toBe(80)
+    expect(dockerHasPublishedPorts(s)).toBe(true)
   })
   test('expose: ["3000"] -> container 3000, published=false', () => {
     const s = svc({ expose: ['3000'] })
-    expect(inferContainerPort(s)).toBe(3000)
-    expect(hasPublishedPorts(s)).toBe(false)
+    expect(dockerInferContainerPort(s)).toBe(3000)
+    expect(dockerHasPublishedPorts(s)).toBe(false)
   })
   test('both ports and expose -> ports wins', () => {
     const s = svc({ ports: ['8080:80'], expose: ['3000'] })
-    expect(inferContainerPort(s)).toBe(80)
+    expect(dockerInferContainerPort(s)).toBe(80)
   })
   test('neither -> undefined, false', () => {
     const s = svc({})
-    expect(inferContainerPort(s)).toBeUndefined()
-    expect(hasPublishedPorts(s)).toBe(false)
+    expect(dockerInferContainerPort(s)).toBeUndefined()
+    expect(dockerHasPublishedPorts(s)).toBe(false)
   })
   test('long-form {target: 80} object', () => {
     const s = svc({ ports: [{ target: 80, published: 8080 }] })
-    expect(inferContainerPort(s)).toBe(80)
+    expect(dockerInferContainerPort(s)).toBe(80)
   })
   test('127.0.0.1:8080:80 -> container 80', () => {
     const s = svc({ ports: ['127.0.0.1:8080:80'] })
-    expect(inferContainerPort(s)).toBe(80)
+    expect(dockerInferContainerPort(s)).toBe(80)
   })
 })

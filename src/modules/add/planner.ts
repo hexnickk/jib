@@ -3,10 +3,10 @@ import { type App, type Config, type Domain, configAssignPorts } from '@jib/conf
 import {
   type ComposeInspection,
   ComposeInspectionError,
-  discoverComposeFiles,
-  findUnsafeBindMounts,
-  inspectComposeApp,
-  resolveFromCompose,
+  dockerDiscoverComposeFiles,
+  dockerFindUnsafeBindMounts,
+  dockerInspectComposeApp,
+  dockerResolveFromCompose,
 } from '@jib/docker'
 import { dockerHubImage } from '@jib/paths'
 import type { Paths } from '@jib/paths'
@@ -50,7 +50,7 @@ function composeNotFoundMessage(workdir: string, compose?: string[]): string {
   const searched = compose?.length
     ? compose
     : ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']
-  const discovered = discoverComposeFiles(workdir)
+  const discovered = dockerDiscoverComposeFiles(workdir)
   const lines = [
     'Jib could not find a compose file in the repo.',
     `Looked for: ${searched.join(', ')}`,
@@ -67,8 +67,9 @@ async function inspectComposeWithPrompts(
   let compose = draftApp.compose
   for (;;) {
     try {
-      const inspection = inspectComposeApp({ compose }, workdir)
-      const bindMounts = findUnsafeBindMounts(workdir, inspection.composeFiles)
+      const inspection = dockerInspectComposeApp({ compose }, workdir)
+      if (inspection instanceof ComposeInspectionError) throw inspection
+      const bindMounts = dockerFindUnsafeBindMounts(workdir, inspection.composeFiles)
       if (bindMounts.length > 0) {
         throw new CliError(
           'compose_inspection_failed',
@@ -161,7 +162,7 @@ async function buildResolvedApp(
   const buildArgs = configEntriesToBuildArgs(guided.configEntries)
   const composeFiles = await persistComposeFiles(paths, appName, workdir, inspection.composeFiles)
   const image = dockerHubImage(inputs.repo)
-  return resolveFromCompose(
+  const resolved = dockerResolveFromCompose(
     parseApp({
       repo: image ? 'local' : inputs.repo,
       ...(image ? { image } : {}),
@@ -177,6 +178,8 @@ async function buildResolvedApp(
     workdir,
     cliIsTextOutput() ? { warn: (message) => consola.warn(message) } : {},
   )
+  if (resolved instanceof Error) throw resolved
+  return resolved
 }
 
 async function persistComposeFiles(

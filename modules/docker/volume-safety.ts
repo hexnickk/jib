@@ -15,7 +15,8 @@ export interface UnsafeBindMount {
   source: string
 }
 
-export function findUnsafeBindMounts(
+/** Scans compose services for host bind mounts that would break jib app isolation. */
+export function dockerFindUnsafeBindMounts(
   repoDir: string,
   composeFiles: string[] = [],
 ): UnsafeBindMount[] {
@@ -41,6 +42,7 @@ export function findUnsafeBindMounts(
   return out
 }
 
+/** Pulls the host-side source path out of short-form and long-form bind mounts. */
 function bindMountSource(volume: unknown): string | null {
   if (typeof volume === 'string') {
     const source = volume.split(':')[0] ?? ''
@@ -56,6 +58,7 @@ function bindMountSource(volume: unknown): string | null {
   return null
 }
 
+/** Approximates whether a compose volume source points at the host filesystem. */
 function sourceLooksLikeHostPath(source: string): boolean {
   return (
     source.startsWith('/') ||

@@ -67,3 +67,10 @@ export class DockerDomainServiceNotFoundError extends JibError {
     this.name = 'DockerDomainServiceNotFoundError'
   }
 }
+
+export class DockerCommandError extends JibError {
+  constructor(action: 'exec' | 'run', app: string, message: string, options?: ErrorOptions) {
+    super('docker_command_failed', `${action} failed for app "${app}": ${message}`, options)
+    this.name = 'DockerCommandError'
+  }
+}
