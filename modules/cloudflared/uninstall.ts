@@ -4,7 +4,6 @@ import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import {
   CloudflaredUninstallDisableError,
-  CloudflaredUninstallError,
   CloudflaredUninstallReloadError,
   CloudflaredUninstallRemoveComposeError,
   CloudflaredUninstallRemoveUnitError,
@@ -86,15 +85,6 @@ export async function cloudflaredUninstallResult(
   }
 
   return disableError
-}
-
-/** Stops the unit, removes managed files, and reloads systemd. */
-export async function cloudflaredUninstall(
-  ctx: CloudflaredContext,
-  deps: CloudflaredUninstallDeps = {},
-): Promise<void> {
-  const error = await cloudflaredUninstallResult(ctx, deps)
-  if (error instanceof CloudflaredUninstallError) throw error
 }
 
 function cloudflaredCommandFailure(result: unknown): string | undefined {

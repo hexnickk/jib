@@ -112,9 +112,11 @@ describe('optional module configuration', () => {
           manifest: { name: 'cloudflared' },
           install: async () => {
             calls.push('install')
+            return undefined
           },
           uninstall: async () => {
             calls.push('uninstall')
+            return undefined
           },
         },
       ]

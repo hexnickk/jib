@@ -64,11 +64,11 @@ describe('watcher install/uninstall', () => {
       calls.push(calls.length === 0 ? 'daemon-reload' : 'enable')
       return fakeShell()
     }) as unknown as typeof Bun.$
-    const { watcherInstall } = await import('./install.ts')
+    const { watcherInstallResult } = await import('./install.ts')
     const root = await mkdtemp(join(tmpdir(), 'jib-watcher-'))
 
     try {
-      await watcherInstall({ logger, paths: getPaths(root) })
+      expect(await watcherInstallResult({ logger, paths: getPaths(root) })).toBeUndefined()
 
       expect(calls).toEqual(['daemon-reload', 'enable'])
       expect(await readFile(unitPath, 'utf8')).toContain(`Environment=JIB_ROOT=${root}`)
@@ -104,10 +104,10 @@ describe('watcher install/uninstall', () => {
       calls.push(calls.length === 0 ? 'disable' : 'daemon-reload')
       return fakeShell()
     }) as unknown as typeof Bun.$
-    const { watcherUninstall } = await import('./uninstall.ts')
+    const { watcherUninstallResult } = await import('./uninstall.ts')
     await Bun.write(unitPath, 'unit')
 
-    await watcherUninstall({ logger, paths: getPaths(testRoot) })
+    expect(await watcherUninstallResult({ logger, paths: getPaths(testRoot) })).toBeUndefined()
 
     expect(calls).toEqual(['disable', 'daemon-reload'])
     expect(await Bun.file(unitPath).exists()).toBe(false)

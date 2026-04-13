@@ -8,10 +8,7 @@ import {
   CloudflaredInstallReloadError,
   CloudflaredInstallWriteUnitError,
   CloudflaredUninstallDisableError,
-  CloudflaredUninstallError,
-  cloudflaredInstall,
   cloudflaredInstallResult,
-  cloudflaredUninstall,
   cloudflaredUninstallResult,
 } from './index.ts'
 
@@ -39,13 +36,13 @@ afterEach(async () => {
 })
 
 describe('cloudflared install/uninstall', () => {
-  test('cloudflaredInstall writes managed files and triggers daemon reload', async () => {
+  test('cloudflaredInstallResult writes managed files and triggers daemon reload', async () => {
     const calls: string[] = []
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
 
     try {
-      await cloudflaredInstall(
+      const result = await cloudflaredInstallResult(
         { logger, paths },
         {
           unitPath,
@@ -57,6 +54,7 @@ describe('cloudflared install/uninstall', () => {
         },
       )
 
+      expect(result).toBeUndefined()
       expect(calls).toEqual(['daemon-reload'])
       expect(await readFile(join(paths.cloudflaredDir, 'docker-compose.yml'), 'utf8')).toContain(
         'env_file:',
@@ -70,7 +68,7 @@ describe('cloudflared install/uninstall', () => {
     }
   })
 
-  test('cloudflaredUninstall disables the service, removes managed files, and reloads systemd', async () => {
+  test('cloudflaredUninstallResult disables the service, removes managed files, and reloads systemd', async () => {
     const calls: string[] = []
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
@@ -83,7 +81,7 @@ describe('cloudflared install/uninstall', () => {
       )
       await Bun.write(unitPath, 'unit')
 
-      await cloudflaredUninstall(
+      const result = await cloudflaredUninstallResult(
         { logger, paths },
         {
           serviceName,
@@ -97,6 +95,7 @@ describe('cloudflared install/uninstall', () => {
         },
       )
 
+      expect(result).toBeUndefined()
       expect(calls).toEqual(['disable', 'daemon-reload'])
       expect(await stat(unitPath).catch(() => null)).toBeNull()
       expect(
@@ -134,22 +133,22 @@ describe('cloudflared install/uninstall', () => {
     }
   })
 
-  test('cloudflaredInstall throws install result errors for hook compatibility', async () => {
+  test('cloudflaredInstallResult returns typed unit write errors', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
 
     try {
-      await expect(
-        cloudflaredInstall(
-          { logger, paths },
-          {
-            unitPath,
-            systemdUnit: () => {
-              throw new Error('bad unit template')
-            },
+      const result = await cloudflaredInstallResult(
+        { logger, paths },
+        {
+          unitPath,
+          systemdUnit: () => {
+            throw new Error('bad unit template')
           },
-        ),
-      ).rejects.toBeInstanceOf(CloudflaredInstallWriteUnitError)
+        },
+      )
+
+      expect(result).toBeInstanceOf(CloudflaredInstallWriteUnitError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -272,22 +271,22 @@ describe('cloudflared install/uninstall', () => {
     }
   })
 
-  test('cloudflaredUninstall throws uninstall result errors for hook compatibility', async () => {
+  test('cloudflaredUninstallResult returns uninstall errors for thrown disable failures', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
 
     try {
-      await expect(
-        cloudflaredUninstall(
-          { logger, paths },
-          {
-            unitPath,
-            disableNow: async () => {
-              throw new Error('disable failed')
-            },
+      const result = await cloudflaredUninstallResult(
+        { logger, paths },
+        {
+          unitPath,
+          disableNow: async () => {
+            throw new Error('disable failed')
           },
-        ),
-      ).rejects.toBeInstanceOf(CloudflaredUninstallError)
+        },
+      )
+
+      expect(result).toBeInstanceOf(CloudflaredUninstallDisableError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

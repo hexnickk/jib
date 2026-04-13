@@ -31,7 +31,10 @@ function initCtx(config: Config, paths: Paths): InitContext {
 async function rollbackModuleInstall(mod: ModLike, ctx: InitContext): Promise<void> {
   if (!mod.uninstall) return
   try {
-    await mod.uninstall(ctx)
+    const error = await mod.uninstall(ctx)
+    if (error instanceof Error) {
+      ctx.logger.warn(`${mod.manifest.name} uninstall failed after setup error: ${error.message}`)
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     ctx.logger.warn(`${mod.manifest.name} uninstall failed after setup error: ${message}`)

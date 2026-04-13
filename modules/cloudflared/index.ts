@@ -16,14 +16,8 @@ export {
   CloudflaredUninstallRemoveComposeError,
   CloudflaredUninstallRemoveUnitError,
 } from './errors.ts'
-export {
-  cloudflaredInstallResult,
-  cloudflaredInstall,
-} from './install.ts'
-export {
-  cloudflaredUninstallResult,
-  cloudflaredUninstall,
-} from './uninstall.ts'
+export { cloudflaredInstallResult } from './install.ts'
+export { cloudflaredUninstallResult } from './uninstall.ts'
 export {
   cloudflaredEnableService,
   cloudflaredHasTunnelToken,

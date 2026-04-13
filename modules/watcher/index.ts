@@ -13,25 +13,11 @@ export {
   WatcherSyncAppError,
   WatcherUninstallRemoveUnitError,
 } from './errors.ts'
-export {
-  watcherInstallResult,
-  watcherInstall,
-  watcherInstall as install,
-  watcherInstallResult as installWatcher,
-} from './install.ts'
-export {
-  watcherUninstallResult,
-  watcherUninstall,
-  watcherUninstall as uninstall,
-  watcherUninstallResult as uninstallWatcher,
-} from './uninstall.ts'
+export { watcherInstallResult } from './install.ts'
+export { watcherUninstallResult } from './uninstall.ts'
 export {
   watcherParsePollInterval,
-  watcherParsePollInterval as parsePollInterval,
   watcherPollApp,
-  watcherPollApp as pollApp,
   watcherRunPollCycle,
-  watcherRunPollCycle as runPollCycle,
   watcherRunPoller,
-  watcherRunPoller as runPoller,
 } from './poller.ts'

@@ -23,11 +23,3 @@ export async function watcherUninstallResult(
   }
   await Bun.$`sudo systemctl daemon-reload`.nothrow().quiet()
 }
-
-/** Stops the unit, deletes it, and reloads systemd so the file is fully gone. */
-export async function watcherUninstall(ctx: WatcherContext): Promise<void> {
-  const error = await watcherUninstallResult(ctx)
-  if (error) throw error
-}
-
-export { watcherUninstall as uninstall, watcherUninstallResult as uninstallWatcher }

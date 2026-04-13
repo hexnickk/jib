@@ -4,7 +4,6 @@ import type { Logger } from '@jib/logging'
 import { type Paths, credsPath } from '@jib/paths'
 import {
   CloudflaredInstallCreateDirError,
-  CloudflaredInstallError,
   CloudflaredInstallReloadError,
   CloudflaredInstallWriteComposeError,
   CloudflaredInstallWriteUnitError,
@@ -86,18 +85,6 @@ export async function cloudflaredInstallResult(
   } catch (error) {
     return new CloudflaredInstallReloadError(error)
   }
-}
-
-/**
- * Writes the compose file + systemd unit under `$JIB_ROOT/cloudflared/`.
- * Module install hooks still throw because the init hook contract is `Promise<void>`.
- */
-export async function cloudflaredInstall(
-  ctx: CloudflaredContext,
-  deps: CloudflaredInstallDeps = {},
-): Promise<void> {
-  const error = await cloudflaredInstallResult(ctx, deps)
-  if (error instanceof CloudflaredInstallError) throw error
 }
 
 function cloudflaredCommandFailure(result: unknown): string | undefined {

@@ -43,14 +43,3 @@ export async function watcherInstallResult(
     return new WatcherInstallEnableError(SERVICE_NAME, error)
   }
 }
-
-/**
- * Installs the watcher systemd unit. Requires root. The unit runs the main
- * `jib` binary directly, so there is no separate daemon artifact to ship.
- */
-export async function watcherInstall(ctx: WatcherContext): Promise<void> {
-  const error = await watcherInstallResult(ctx)
-  if (error) throw error
-}
-
-export { watcherInstall as install, watcherInstallResult as installWatcher }

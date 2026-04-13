@@ -14,7 +14,7 @@ export interface InitContext {
   paths: Paths
 }
 
-export type ModuleHook = (ctx: InitContext) => Promise<void>
+export type ModuleHook = (ctx: InitContext) => Promise<undefined | Error>
 
 export interface FirstPartyModule {
   manifest: ModuleManifest

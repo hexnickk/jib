@@ -14,7 +14,11 @@ async function rollbackInstalls(installed: ModLike[], ctx: InitContext): Promise
       continue
     }
     try {
-      await mod.uninstall(ctx)
+      const error = await mod.uninstall(ctx)
+      if (error instanceof Error) {
+        log.warning(`${mod.manifest.name} uninstall failed: ${error.message}`)
+        continue
+      }
       log.info(`rolled back ${mod.manifest.name}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -36,7 +40,11 @@ export async function initRunInstallsTx(
     }
 
     try {
-      await mod.install(ctx)
+      const error = await mod.install(ctx)
+      if (error instanceof Error) {
+        await rollbackInstalls(installed, ctx)
+        return toInitModuleInstallError(mod.manifest.name, error)
+      }
       log.success(mod.manifest.name)
       installed.push(mod)
     } catch (error) {

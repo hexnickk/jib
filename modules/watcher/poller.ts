@@ -150,13 +150,6 @@ export async function watcherRunPoller(deps: PollerDeps, abort: AbortSignal): Pr
   }
 }
 
-export {
-  watcherParsePollInterval as parsePollInterval,
-  watcherPollApp as pollApp,
-  watcherRunPollCycle as runPollCycle,
-  watcherRunPoller as runPoller,
-}
-
 function sleepUntilNextPoll(ms: number, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.resolve()
   return new Promise((resolve) => {

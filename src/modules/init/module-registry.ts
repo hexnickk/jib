@@ -1,11 +1,41 @@
-import * as cloudflaredMod from '@jib-module/cloudflared'
-import * as watcherMod from '@jib-module/watcher'
-import * as ingressMod from '@jib/ingress'
+import {
+  cloudflaredInstallResult,
+  manifest as cloudflaredManifest,
+  cloudflaredUninstallResult,
+} from '@jib-module/cloudflared'
+import {
+  watcherInstallResult,
+  manifest as watcherManifest,
+  watcherUninstallResult,
+} from '@jib-module/watcher'
+import { ingressInstall, manifest as ingressManifest, ingressUninstall } from '@jib/ingress'
 import type { FirstPartyModule } from './types.ts'
 export type { FirstPartyModule } from './types.ts'
 
 /** Static first-party module registry for bun build --compile visibility. */
-export const MODULES: readonly FirstPartyModule[] = [watcherMod, ingressMod, cloudflaredMod]
+export const MODULES: readonly FirstPartyModule[] = [
+  {
+    manifest: watcherManifest,
+    install: watcherInstallResult,
+    uninstall: watcherUninstallResult,
+  },
+  {
+    manifest: ingressManifest,
+    install: async (ctx) => {
+      await ingressInstall(ctx)
+      return undefined
+    },
+    uninstall: async (ctx) => {
+      await ingressUninstall(ctx)
+      return undefined
+    },
+  },
+  {
+    manifest: cloudflaredManifest,
+    install: cloudflaredInstallResult,
+    uninstall: cloudflaredUninstallResult,
+  },
+]
 
 export function initAllModules(
   registry: readonly FirstPartyModule[] = MODULES,

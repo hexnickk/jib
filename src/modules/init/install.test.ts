@@ -37,12 +37,15 @@ describe('initRunInstallsTx', () => {
     const mods = [
       mod('a', async () => {
         log.push('install:a')
+        return undefined
       }),
       mod('b', async () => {
         log.push('install:b')
+        return undefined
       }),
       mod('c', async () => {
         log.push('install:c')
+        return undefined
       }),
     ]
 
@@ -58,18 +61,22 @@ describe('initRunInstallsTx', () => {
         'a',
         async () => {
           log.push('install:a')
+          return undefined
         },
         async () => {
           log.push('uninstall:a')
+          return undefined
         },
       ),
       mod(
         'b',
         async () => {
           log.push('install:b')
+          return undefined
         },
         async () => {
           log.push('uninstall:b')
+          return undefined
         },
       ),
       mod(
@@ -80,10 +87,12 @@ describe('initRunInstallsTx', () => {
         },
         async () => {
           log.push('uninstall:c')
+          return undefined
         },
       ),
       mod('d', async () => {
         log.push('install:d')
+        return undefined
       }),
     ]
 
@@ -101,15 +110,18 @@ describe('initRunInstallsTx', () => {
         'a',
         async () => {
           log.push('install:a')
+          return undefined
         },
         async () => {
           log.push('uninstall:a')
+          return undefined
         },
       ),
       mod(
         'b',
         async () => {
           log.push('install:b')
+          return undefined
         },
         async () => {
           log.push('uninstall:b:fail')
@@ -136,9 +148,11 @@ describe('initRunInstallsTx', () => {
         'b',
         async () => {
           log.push('install:b')
+          return undefined
         },
         async () => {
           log.push('uninstall:b')
+          return undefined
         },
       ),
       mod('c', async () => {
@@ -158,6 +172,7 @@ describe('initRunInstallsTx', () => {
     const mods = [
       mod('a', async () => {
         log.push('install:a')
+        return undefined
       }),
       mod('b', async () => {
         throw new Error('b blew up')
