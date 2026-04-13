@@ -14,10 +14,9 @@ interface WatcherContext {
 }
 
 /**
- * Installs the watcher systemd unit. Requires root. The unit runs the main
- * `jib` binary directly, so there is no separate daemon artifact to ship.
+ * Writes and enables the watcher systemd unit, returning a typed error on failure.
  */
-export async function installWatcher(
+export async function watcherInstallResult(
   ctx: WatcherContext,
 ): Promise<
   WatcherInstallWriteUnitError | WatcherInstallReloadError | WatcherInstallEnableError | undefined
@@ -45,7 +44,13 @@ export async function installWatcher(
   }
 }
 
-export const install = async (ctx: WatcherContext): Promise<void> => {
-  const error = await installWatcher(ctx)
+/**
+ * Installs the watcher systemd unit. Requires root. The unit runs the main
+ * `jib` binary directly, so there is no separate daemon artifact to ship.
+ */
+export async function watcherInstall(ctx: WatcherContext): Promise<void> {
+  const error = await watcherInstallResult(ctx)
   if (error) throw error
 }
+
+export { watcherInstall as install, watcherInstallResult as installWatcher }

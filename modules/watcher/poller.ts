@@ -7,7 +7,7 @@ import { Store } from '@jib/state'
 import { WatcherDeployAppError, WatcherProbeAppError, WatcherSyncAppError } from './errors.ts'
 
 /** Parses `poll_interval`, defaulting to 5 minutes only for invalid raw strings. */
-export function parsePollInterval(raw: string): number {
+export function watcherParsePollInterval(raw: string): number {
   return configParseDuration(raw) ?? 5 * 60_000
 }
 
@@ -20,7 +20,7 @@ export interface PollAppDeps {
 
 export type PollAppError = WatcherProbeAppError | WatcherSyncAppError | WatcherDeployAppError
 
-export async function pollApp(
+export async function watcherPollApp(
   cfg: Config,
   paths: Paths,
   appName: string,
@@ -121,33 +121,40 @@ export interface PollerDeps {
 }
 
 /** Long-running polling loop. Exits cleanly when `abort` fires. */
-export async function runPollCycle(
+export async function watcherRunPollCycle(
   deps: PollerDeps,
   lastSeen: Map<string, string> = new Map(),
 ): Promise<Map<string, string>> {
   const cfg = await deps.getConfig()
   for (const name of Object.keys(cfg.apps)) {
-    const error = await pollApp(cfg, deps.paths, name, lastSeen, deps.log)
+    const error = await watcherPollApp(cfg, deps.paths, name, lastSeen, deps.log)
     if (error) deps.log.warn(`${name}: poll error: ${error.message}`)
   }
   return lastSeen
 }
 
-export async function runPoller(deps: PollerDeps, abort: AbortSignal): Promise<void> {
+export async function watcherRunPoller(deps: PollerDeps, abort: AbortSignal): Promise<void> {
   const sleep = deps.sleep ?? sleepUntilNextPoll
   const lastSeen = new Map<string, string>()
   while (!abort.aborted) {
     const cfg = await deps.getConfig()
     if (abort.aborted) return
-    await runPollCycle(
+    await watcherRunPollCycle(
       {
         ...deps,
         getConfig: () => cfg,
       },
       lastSeen,
     )
-    await sleep(parsePollInterval(cfg.poll_interval), abort)
+    await sleep(watcherParsePollInterval(cfg.poll_interval), abort)
   }
+}
+
+export {
+  watcherParsePollInterval as parsePollInterval,
+  watcherPollApp as pollApp,
+  watcherRunPollCycle as runPollCycle,
+  watcherRunPoller as runPoller,
 }
 
 function sleepUntilNextPoll(ms: number, signal: AbortSignal): Promise<void> {

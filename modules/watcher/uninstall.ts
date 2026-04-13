@@ -9,8 +9,8 @@ interface WatcherContext {
   paths: Paths
 }
 
-/** Stops the unit, deletes it, and reloads systemd so the file is fully gone. */
-export async function uninstallWatcher(
+/** Stops the unit, deletes it, and reloads systemd, returning a typed error on failure. */
+export async function watcherUninstallResult(
   ctx: WatcherContext,
 ): Promise<WatcherUninstallRemoveUnitError | undefined> {
   ctx.logger.info(`systemctl disable --now ${SERVICE_NAME}`)
@@ -24,7 +24,10 @@ export async function uninstallWatcher(
   await Bun.$`sudo systemctl daemon-reload`.nothrow().quiet()
 }
 
-export const uninstall = async (ctx: WatcherContext): Promise<void> => {
-  const error = await uninstallWatcher(ctx)
+/** Stops the unit, deletes it, and reloads systemd so the file is fully gone. */
+export async function watcherUninstall(ctx: WatcherContext): Promise<void> {
+  const error = await watcherUninstallResult(ctx)
   if (error) throw error
 }
+
+export { watcherUninstall as uninstall, watcherUninstallResult as uninstallWatcher }

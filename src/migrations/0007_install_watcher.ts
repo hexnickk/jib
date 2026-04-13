@@ -6,7 +6,7 @@ export const m0007_install_watcher: JibMigration = {
   description: 'Install watcher service',
   up: async (ctx) => {
     const mctx = await initCtx(ctx)
-    const { install } = await import('@jib-module/watcher')
-    await install(mctx)
+    const { watcherInstall } = await import('@jib-module/watcher')
+    await watcherInstall(mctx)
   },
 }

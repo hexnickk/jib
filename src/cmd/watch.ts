@@ -1,4 +1,4 @@
-import { runPollCycle, runPoller } from '@jib-module/watcher'
+import { watcherRunPollCycle, watcherRunPoller } from '@jib-module/watcher'
 import { configLoad } from '@jib/config'
 import { loggingCreateLogger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
@@ -20,7 +20,7 @@ const cliWatchCommand = {
     }
 
     if (args.once) {
-      await runPollCycle({ paths, getConfig, log })
+      await watcherRunPollCycle({ paths, getConfig, log })
       return { ran: true }
     }
 
@@ -28,7 +28,7 @@ const cliWatchCommand = {
     const shutdown = () => abort.abort()
     process.once('SIGTERM', shutdown)
     process.once('SIGINT', shutdown)
-    await runPoller({ paths, getConfig, log }, abort.signal)
+    await watcherRunPoller({ paths, getConfig, log }, abort.signal)
   },
 } satisfies CliCommand
 

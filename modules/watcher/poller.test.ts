@@ -3,7 +3,12 @@ import type { Config } from '@jib/config'
 import { loggingCreateLogger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
 import { WatcherDeployAppError, WatcherSyncAppError } from './errors.ts'
-import { type PollAppDeps, parsePollInterval, pollApp, runPoller } from './poller.ts'
+import {
+  type PollAppDeps,
+  watcherParsePollInterval,
+  watcherPollApp,
+  watcherRunPoller,
+} from './poller.ts'
 
 function mkCfg(overrides: Partial<Config> = {}): Config {
   return {
@@ -24,15 +29,15 @@ function mkCfg(overrides: Partial<Config> = {}): Config {
 
 describe('parsePollInterval', () => {
   test('parses supported config durations', () => {
-    expect(parsePollInterval('30s')).toBe(30_000)
-    expect(parsePollInterval('5m')).toBe(300_000)
-    expect(parsePollInterval('1h')).toBe(3_600_000)
-    expect(parsePollInterval('1.5h')).toBe(5_400_000)
-    expect(parsePollInterval('1h30m')).toBe(5_400_000)
+    expect(watcherParsePollInterval('30s')).toBe(30_000)
+    expect(watcherParsePollInterval('5m')).toBe(300_000)
+    expect(watcherParsePollInterval('1h')).toBe(3_600_000)
+    expect(watcherParsePollInterval('1.5h')).toBe(5_400_000)
+    expect(watcherParsePollInterval('1h30m')).toBe(5_400_000)
   })
 
   test('defaults to 5m on garbage', () => {
-    expect(parsePollInterval('nonsense')).toBe(300_000)
+    expect(watcherParsePollInterval('nonsense')).toBe(300_000)
   })
 })
 
@@ -62,13 +67,13 @@ describe('pollApp', () => {
     }
 
     expect(
-      await pollApp(cfg, paths, 'demo', seen, log, { lsRemote, syncApp, deployPrepared }),
+      await watcherPollApp(cfg, paths, 'demo', seen, log, { lsRemote, syncApp, deployPrepared }),
     ).toBeUndefined()
     expect(deploys).toHaveLength(1)
     expect(deploys[0]).toMatchObject({ app: 'demo', workdir: '/tmp/prepared-demo', sha })
 
     expect(
-      await pollApp(cfg, paths, 'demo', seen, log, { lsRemote, syncApp, deployPrepared }),
+      await watcherPollApp(cfg, paths, 'demo', seen, log, { lsRemote, syncApp, deployPrepared }),
     ).toBeUndefined()
     expect(deploys).toHaveLength(1)
   })
@@ -80,7 +85,7 @@ describe('pollApp', () => {
     const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
 
-    const error = await pollApp(cfg, paths, 'demo', seen, log, {
+    const error = await watcherPollApp(cfg, paths, 'demo', seen, log, {
       lsRemote: async () => sha,
       syncApp: async () => ({ workdir: '/tmp/prepared-demo', sha }),
       deployPrepared: async () => new WatcherDeployAppError('demo', new Error('deploy boom')),
@@ -97,7 +102,7 @@ describe('pollApp', () => {
     const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
 
-    const error = await pollApp(cfg, paths, 'demo', seen, log, {
+    const error = await watcherPollApp(cfg, paths, 'demo', seen, log, {
       lsRemote: async () => sha,
       syncApp: async () => ({ workdir: '/tmp/prepared-demo', sha }),
       deployPrepared: async () => {
@@ -117,7 +122,7 @@ describe('pollApp', () => {
     const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
 
-    const error = await pollApp(cfg, paths, 'demo', seen, log, {
+    const error = await watcherPollApp(cfg, paths, 'demo', seen, log, {
       lsRemote: async () => sha,
       syncApp: async () => {
         throw new Error('sync boom')
@@ -139,7 +144,7 @@ describe('runPoller', () => {
     let sleepCalls = 0
     let configLoads = 0
 
-    const run = runPoller(
+    const run = watcherRunPoller(
       {
         paths,
         log,

@@ -64,11 +64,11 @@ describe('watcher install/uninstall', () => {
       calls.push(calls.length === 0 ? 'daemon-reload' : 'enable')
       return fakeShell()
     }) as unknown as typeof Bun.$
-    const { install } = await import('./install.ts')
+    const { watcherInstall } = await import('./install.ts')
     const root = await mkdtemp(join(tmpdir(), 'jib-watcher-'))
 
     try {
-      await install({ logger, paths: getPaths(root) })
+      await watcherInstall({ logger, paths: getPaths(root) })
 
       expect(calls).toEqual(['daemon-reload', 'enable'])
       expect(await readFile(unitPath, 'utf8')).toContain(`Environment=JIB_ROOT=${root}`)
@@ -77,17 +77,17 @@ describe('watcher install/uninstall', () => {
     }
   })
 
-  test('installWatcher returns a typed enable error', async () => {
+  test('watcherInstallResult returns a typed enable error', async () => {
     const calls: string[] = []
     ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = (() => {
       calls.push(calls.length === 0 ? 'daemon-reload' : 'enable')
       return calls.length === 1 ? fakeShell() : fakeShellRejected(new Error('enable boom'))
     }) as unknown as typeof Bun.$
-    const { installWatcher } = await import('./install.ts')
+    const { watcherInstallResult } = await import('./install.ts')
     const root = await mkdtemp(join(tmpdir(), 'jib-watcher-'))
 
     try {
-      const error = await installWatcher({ logger, paths: getPaths(root) })
+      const error = await watcherInstallResult({ logger, paths: getPaths(root) })
 
       expect(calls).toEqual(['daemon-reload', 'enable'])
       expect(error).toBeInstanceOf(WatcherInstallEnableError)
@@ -104,10 +104,10 @@ describe('watcher install/uninstall', () => {
       calls.push(calls.length === 0 ? 'disable' : 'daemon-reload')
       return fakeShell()
     }) as unknown as typeof Bun.$
-    const { uninstall } = await import('./uninstall.ts')
+    const { watcherUninstall } = await import('./uninstall.ts')
     await Bun.write(unitPath, 'unit')
 
-    await uninstall({ logger, paths: getPaths(testRoot) })
+    await watcherUninstall({ logger, paths: getPaths(testRoot) })
 
     expect(calls).toEqual(['disable', 'daemon-reload'])
     expect(await Bun.file(unitPath).exists()).toBe(false)
