@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { cliCheckLinuxHost, cliCheckRootHost, cliIsTextOutput } from '@jib/cli'
 import { getPaths } from '@jib/paths'
-import { intro, note, outro } from '@jib/tui'
+import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import { runPendingMigrations } from '../migrations/service.ts'
 import type { CliCommand } from './command.ts'
 
@@ -16,17 +16,17 @@ const cliMigrateCommand = {
 
     const paths = getPaths()
     const configExisted = existsSync(paths.configFile)
-    if (cliIsTextOutput()) intro('jib migrate')
+    if (cliIsTextOutput()) tuiIntro('jib migrate')
 
     const result = await runPendingMigrations(paths)
     if (cliIsTextOutput()) {
-      outro(
+      tuiOutro(
         result.appliedMigrations.length > 0
           ? `applied ${result.appliedMigrations.length} migration(s)`
           : 'nothing to do',
       )
       if (result.sessionReloadRecommended) {
-        note(
+        tuiNote(
           'You were added to the `jib` group. Start a new login session for group-based access to apply; until then, keep using `sudo`.',
           'Next steps',
         )

@@ -34,16 +34,3 @@ export async function tuiReadPemBlockResult(
   if (!out.some((line) => isBoundary(line, 'END'))) return new TuiPemMissingEndError()
   return out.join('\n')
 }
-
-export async function tuiReadPemBlock(
-  lines: AsyncIterable<string>,
-  maxLines = 200,
-): Promise<string> {
-  const result = await tuiReadPemBlockResult(lines, maxLines)
-  if (result instanceof Error) throw result
-  return result
-}
-
-export { tuiReadPemBlock as readPemBlock }
-export { tuiReadPemBlockResult as readPemBlockResult }
-export type { TuiReadPemBlockError as ReadPemBlockError }

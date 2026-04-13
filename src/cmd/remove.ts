@@ -2,7 +2,7 @@ import { cliCanPrompt, cliCreateMissingInputError, cliIsTextOutput } from '@jib/
 import { configLoadAppContext } from '@jib/config'
 import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
-import { promptConfirm, spinner } from '@jib/tui'
+import { tuiPromptConfirmResult, tuiSpinner } from '@jib/tui'
 import { consola } from 'consola'
 import {
   RemoveMissingAppError,
@@ -33,10 +33,11 @@ const cliRemoveCommand = {
       }
       const ingressSummary =
         appCfg.domains.length > 0 ? ` (${appCfg.domains.map((d) => d.host).join(', ')})` : ''
-      const ok = await promptConfirm({
+      const ok = await tuiPromptConfirmResult({
         message: `Remove app "${appName}"${ingressSummary}?`,
         initialValue: false,
       })
+      if (ok instanceof Error) return ok
       if (!ok) return { app: appName, removed: false }
     }
 
@@ -63,7 +64,7 @@ const cliRemoveCommand = {
 
 /** Releases managed ingress while mirroring progress through the CLI spinner. */
 async function removeReleaseIngress(paths: Paths, app: string): Promise<void> {
-  const progress = cliIsTextOutput() ? spinner() : null
+  const progress = cliIsTextOutput() ? tuiSpinner() : null
   progress?.start(`releasing ingress for ${app}`)
   try {
     await ingressRelease(ingressCreateOperator(paths), app, (update) =>

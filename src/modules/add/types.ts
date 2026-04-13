@@ -53,8 +53,8 @@ export type AddFlowResult = { finalApp: App; secretsWritten: number }
 export type AddFlowOutcome = AddFlowResult | AddFlowError
 
 export interface AddPlanner {
-  inspectCompose(draftApp: App, workdir: string): Promise<ComposeInspection>
-  collectGuidedInputs(inputs: AddInputs, services: ComposeService[]): Promise<GuidedInputs>
+  inspectCompose(draftApp: App, workdir: string): Promise<ComposeInspection | Error>
+  collectGuidedInputs(inputs: AddInputs, services: ComposeService[]): Promise<GuidedInputs | Error>
   buildResolvedApp(
     cfg: Config,
     paths: Paths,
@@ -64,13 +64,13 @@ export interface AddPlanner {
     inputs: AddInputs,
     inspection: ComposeInspection,
     guided: GuidedInputs,
-  ): Promise<App>
+  ): Promise<App | Error>
   confirmPlan(
     appName: string,
     inspection: ComposeInspection,
     finalApp: App,
     configEntries: ConfigEntry[],
-  ): Promise<void>
+  ): Promise<undefined | Error>
 }
 
 export interface AddFlowObserver {

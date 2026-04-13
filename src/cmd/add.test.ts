@@ -16,7 +16,11 @@ const cfg = {
 } as Config
 
 const tempDirs: string[] = []
-const selectSetup = async <T extends string>(): Promise<T> => 'setup:github' as T
+const selectSetup = async <T extends string>(_opts: {
+  message: string
+  options: { value: T; label: string; hint?: string }[]
+  initialValue?: T
+}): Promise<T> => 'setup:github' as T
 
 /** Creates an isolated temp workspace for add command tests. */
 function createAddTestPaths() {
@@ -31,14 +35,14 @@ afterEach(() => {
 
 describe('addChooseInitialSource', () => {
   test('cancels add when source setup does not complete', async () => {
-    await expect(
-      addChooseInitialSource(cfg, createAddTestPaths(), undefined, {
-        isInteractive: () => true,
-        buildSourceChoices: () => [{ value: 'setup:github', label: 'Set up new GitHub source' }],
-        promptSelect: selectSetup,
-        runSourceSetup: async () => null,
-      }),
-    ).rejects.toMatchObject({
+    const result = await addChooseInitialSource(cfg, createAddTestPaths(), undefined, {
+      isInteractive: () => true,
+      buildSourceChoices: () => [{ value: 'setup:github', label: 'Set up new GitHub source' }],
+      promptSelect: selectSetup,
+      runSourceSetup: async () => null,
+    })
+
+    expect(result).toMatchObject({
       code: 'cancelled',
       message: 'source setup did not complete; add cancelled',
     } satisfies Partial<CliError>)

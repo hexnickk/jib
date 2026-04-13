@@ -46,8 +46,8 @@ describe('github keygen helpers', () => {
       return fakeShell()
     }) as unknown as typeof Bun.$
 
-    const { generateDeployKey } = await import('./keygen.ts')
-    const pubKey = await generateDeployKey('demo', paths)
+    const { githubGenerateDeployKey } = await import('./keygen.ts')
+    const pubKey = await githubGenerateDeployKey('demo', paths)
 
     expect(pubKey).toBe('ssh-ed25519 AAAA test')
     await rm(root, { recursive: true, force: true })
@@ -60,8 +60,8 @@ describe('github keygen helpers', () => {
         stdout: Buffer.from('256 SHA256:abc demo (ED25519)\n'),
         stderr: Buffer.from(''),
       })) as unknown as typeof Bun.$
-    const { keyFingerprint } = await import('./keygen.ts')
+    const { githubReadKeyFingerprint } = await import('./keygen.ts')
 
-    expect(await keyFingerprint('/tmp/demo.pub')).toBe('256 SHA256:abc demo (ED25519)')
+    expect(await githubReadKeyFingerprint('/tmp/demo.pub')).toBe('256 SHA256:abc demo (ED25519)')
   })
 })

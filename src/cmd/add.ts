@@ -3,7 +3,12 @@ import { type App, ConfigError, configLoad, configLoadContext } from '@jib/confi
 import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { sourcesPreflightSelection } from '@jib/sources'
-import { isInteractive, promptConfirm, promptSelect, spinner } from '@jib/tui'
+import {
+  tuiIsInteractive,
+  tuiPromptConfirmResult,
+  tuiPromptSelectResult,
+  tuiSpinner,
+} from '@jib/tui'
 import { DEFAULT_TIMEOUT_MS, runDeploy } from '../deploy/run.ts'
 import {
   AddRolledBackError,
@@ -40,11 +45,13 @@ const cliAddCommand = {
       typeof args.app === 'string' ? args.app : undefined,
       cfg.apps,
     )
+    if (appName instanceof Error) return appName
     const source = await addChooseInitialSource(
       cfg,
       paths,
       typeof args.source === 'string' ? args.source : undefined,
     )
+    if (source instanceof Error) return source
     if (source.created) {
       const reloaded = await configLoad(paths.configFile)
       if (reloaded instanceof ConfigError) return reloaded
@@ -52,6 +59,7 @@ const cliAddCommand = {
     }
 
     const inputs = await addGatherInputs(args)
+    if (inputs instanceof Error) return inputs
     const planner = addCreatePlanner()
     const interrupt = addTrapInterrupt()
     const preflight = await sourcesPreflightSelection(
@@ -61,7 +69,11 @@ const cliAddCommand = {
       inputs.repo,
       source.value,
       typeof args.branch === 'string' ? args.branch : undefined,
-      { isInteractive, promptConfirm, promptSelect },
+      {
+        isInteractive: tuiIsInteractive,
+        promptConfirm: tuiPromptConfirmResult,
+        promptSelect: tuiPromptSelectResult,
+      },
     )
     if (preflight instanceof Error) return preflight
 
@@ -78,6 +90,8 @@ const cliAddCommand = {
     try {
       const { addResult, deployResult } = await addRunSequence(
         async () => {
+          const draftApp = addBuildDraftApp(flowArgs, inputs)
+          if (draftApp instanceof Error) throw draftApp
           const result = await addRun(
             { support: addSupport, planner, observer: inspection.observer },
             {
@@ -87,7 +101,7 @@ const cliAddCommand = {
               configFile: paths.configFile,
               inputs,
               paths,
-              draftApp: addBuildDraftApp(flowArgs, inputs),
+              draftApp,
               signal: {
                 get cancelled() {
                   return interrupt.interrupted
@@ -130,7 +144,7 @@ const cliAddCommand = {
 
 /** Claims ingress for a newly added app while keeping spinner updates local to the command. */
 async function addClaimIngress(paths: Paths, app: string, appCfg: App): Promise<void> {
-  const progress = cliIsTextOutput() ? spinner() : null
+  const progress = cliIsTextOutput() ? tuiSpinner() : null
   progress?.start(`claiming ingress for ${app}`)
   try {
     await ingressClaim(ingressCreateOperator(paths), app, appCfg, (update) =>

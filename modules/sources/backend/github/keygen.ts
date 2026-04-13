@@ -1,6 +1,10 @@
 import { chmod, readFile, stat } from 'node:fs/promises'
-import { JibError } from '@jib/errors'
-import { type Paths, credsPath, ensureCredsDir } from '@jib/paths'
+import { type Paths, pathsCredsPath, pathsEnsureCredsDirResult } from '@jib/paths'
+import {
+  GitHubDeployKeyExistsError,
+  GitHubDeployKeyGenerateError,
+  GitHubKeyFingerprintError,
+} from './errors.ts'
 
 /** Disk layout for a deploy-key source. Mirrors Go `ghPkg.KeyPath`. */
 export interface DeployKeyPaths {
@@ -13,8 +17,8 @@ export interface DeployKeyPaths {
  * Lives under `secrets/_jib/github-key/<name>{,.pub}` so permissions follow
  * the rest of the jib-managed secret tree.
  */
-export function deployKeyPaths(paths: Paths, name: string): DeployKeyPaths {
-  const privateKey = credsPath(paths, 'github-key', name)
+export function githubDeployKeyPaths(paths: Paths, name: string): DeployKeyPaths {
+  const privateKey = pathsCredsPath(paths, 'github-key', name)
   return { privateKey, publicKey: `${privateKey}.pub` }
 }
 
@@ -23,28 +27,36 @@ export function deployKeyPaths(paths: Paths, name: string): DeployKeyPaths {
  * exists — callers are expected to run `remove` first. Returns the public key
  * text so the CLI can print it for the user to paste into GitHub.
  */
-export async function generateDeployKey(name: string, paths: Paths): Promise<string> {
-  const { privateKey, publicKey } = deployKeyPaths(paths, name)
+export async function githubGenerateDeployKey(name: string, paths: Paths): Promise<string | Error> {
+  const { privateKey, publicKey } = githubDeployKeyPaths(paths, name)
   if (await exists(privateKey)) {
-    throw new JibError('github.keygen', `deploy key already exists at ${privateKey}`)
+    return new GitHubDeployKeyExistsError(privateKey)
   }
-  await ensureCredsDir(paths, 'github-key')
+  const ensured = await pathsEnsureCredsDirResult(paths, 'github-key')
+  if (ensured instanceof Error) return ensured
   const comment = `jib-${name}`
   const res = await Bun.$`ssh-keygen -t ed25519 -f ${privateKey} -N "" -C ${comment}`
     .quiet()
     .nothrow()
   if (res.exitCode !== 0) {
-    throw new JibError('github.keygen', `ssh-keygen failed: ${res.stderr.toString()}`)
+    return new GitHubDeployKeyGenerateError(`ssh-keygen failed: ${res.stderr.toString()}`)
   }
-  await chmod(privateKey, 0o640)
-  return (await readFile(publicKey, 'utf8')).trimEnd()
+  try {
+    await chmod(privateKey, 0o640)
+    return (await readFile(publicKey, 'utf8')).trimEnd()
+  } catch (error) {
+    return new GitHubDeployKeyGenerateError(
+      `read ${publicKey}: ${error instanceof Error ? error.message : String(error)}`,
+      error,
+    )
+  }
 }
 
 /** Parses the fingerprint line printed by `ssh-keygen -l -f <pub>`. */
-export async function keyFingerprint(pubKeyPath: string): Promise<string> {
+export async function githubReadKeyFingerprint(pubKeyPath: string): Promise<string | Error> {
   const res = await Bun.$`ssh-keygen -l -f ${pubKeyPath}`.quiet().nothrow()
   if (res.exitCode !== 0) {
-    throw new JibError('github.keygen', `ssh-keygen -l failed: ${res.stderr.toString()}`)
+    return new GitHubKeyFingerprintError(res.stderr.toString())
   }
   return res.stdout.toString().trim()
 }

@@ -2,11 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { cliSetRuntime } from '@jib/cli'
 import { ValidationError } from '@jib/errors'
 import { TuiNotInteractiveError } from './errors.ts'
-import {
-  tuiAssertInteractive,
-  tuiAssertInteractiveResult,
-  tuiIsInteractive,
-} from './interactive.ts'
+import { tuiAssertInteractiveResult, tuiIsInteractive } from './interactive.ts'
 
 const stdin = process.stdin as { isTTY: boolean | undefined }
 const stdout = process.stdout as { isTTY: boolean | undefined }
@@ -69,13 +65,5 @@ describe('isInteractive', () => {
     expect(error).toBeInstanceOf(TuiNotInteractiveError)
     expect(error).toBeInstanceOf(ValidationError)
     expect(error?.message).toBe('interactive prompts are disabled by --interactive=never')
-  })
-
-  test('assertInteractive throws TuiNotInteractiveError in non-interactive mode', () => {
-    process.env.JIB_NON_INTERACTIVE = '1'
-    stdin.isTTY = true
-    stdout.isTTY = true
-    setTestRuntime()
-    expect(() => tuiAssertInteractive()).toThrow(TuiNotInteractiveError)
   })
 })

@@ -2,7 +2,7 @@ import { CliError } from '@jib/cli'
 import { cliIsTextOutput } from '@jib/cli'
 import type { App } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
-import { isInteractive, promptConfirm } from '@jib/tui'
+import { tuiIsInteractive, tuiPromptConfirmResult } from '@jib/tui'
 import { consola } from 'consola'
 import { addRenderPlanSummary, addSummarizeComposeServices } from './guided.ts'
 import type { ConfigEntry } from './types.ts'
@@ -13,7 +13,7 @@ export async function addConfirmPlan(
   inspection: ComposeInspection,
   finalApp: App,
   configEntries: ConfigEntry[],
-): Promise<void> {
+): Promise<undefined | CliError | Error> {
   if (!cliIsTextOutput()) return
   consola.box(
     addRenderPlanSummary({
@@ -25,8 +25,11 @@ export async function addConfirmPlan(
       envFile: finalApp.env_file,
     }),
   )
-  if (!isInteractive()) return
-  if (!(await promptConfirm({ message: `Write config for "${appName}"?`, initialValue: true }))) {
-    throw new CliError('cancelled', 'add cancelled')
-  }
+  if (!tuiIsInteractive()) return
+  const confirmed = await tuiPromptConfirmResult({
+    message: `Write config for "${appName}"?`,
+    initialValue: true,
+  })
+  if (confirmed instanceof Error) return confirmed
+  if (!confirmed) return new CliError('cancelled', 'add cancelled')
 }

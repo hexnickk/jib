@@ -9,7 +9,12 @@ import {
   configValidateRepo,
 } from '@jib/config'
 import { ValidationError } from '@jib/errors'
-import { isInteractive, promptSelect, promptString, promptStringOptional } from '@jib/tui'
+import {
+  tuiIsInteractive,
+  tuiPromptSelectResult,
+  tuiPromptStringOptionalResult,
+  tuiPromptStringResult,
+} from '@jib/tui'
 import { addMergeConfigEntries } from './config-entries.ts'
 import { addParseEnvEntry, addSplitCommaValues } from './guided.ts'
 import {
@@ -21,10 +26,10 @@ import {
 import type { AddInputs, ConfigEntry, ConfigScope } from './types.ts'
 
 interface GatherAddInputsDeps {
-  isInteractive?: typeof isInteractive
-  promptSelect?: typeof promptSelect
-  promptString?: typeof promptString
-  promptStringOptional?: typeof promptStringOptional
+  isInteractive?: typeof tuiIsInteractive
+  promptSelect?: typeof tuiPromptSelectResult
+  promptString?: typeof tuiPromptStringResult
+  promptStringOptional?: typeof tuiPromptStringOptionalResult
 }
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
@@ -33,22 +38,24 @@ const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 export async function addResolveAppName(
   app: string | undefined,
   existingApps: Record<string, App>,
-): Promise<string> {
+): Promise<string | MissingInputError | ValidationError | Error> {
   let value = app
   if (!value) {
-    if (!isInteractive()) {
-      throw new MissingInputError('missing required input for jib add', [
+    if (!tuiIsInteractive()) {
+      return new MissingInputError('missing required input for jib add', [
         { field: 'app', message: 'provide <app> or rerun with interactive prompts enabled' },
       ])
     }
-    value = await promptString({ message: 'App name', placeholder: 'my-app' })
+    const prompted = await tuiPromptStringResult({ message: 'App name', placeholder: 'my-app' })
+    if (prompted instanceof Error) return prompted
+    value = prompted
   }
 
   if (!APP_NAME_RE.test(value)) {
-    throw new ValidationError(`app name "${value}" must match ${APP_NAME_RE}`)
+    return new ValidationError(`app name "${value}" must match ${APP_NAME_RE}`)
   }
   if (existingApps[value]) {
-    throw new ValidationError(`app "${value}" already exists in config`)
+    return new ValidationError(`app "${value}" already exists in config`)
   }
   return value
 }
@@ -68,37 +75,44 @@ export async function addGatherInputs(
     backend?: string
   },
   deps: GatherAddInputsDeps = {},
-): Promise<AddInputs> {
-  const interactive = deps.isInteractive ?? isInteractive
-  const select = deps.promptSelect ?? promptSelect
-  const prompt = deps.promptString ?? promptString
-  const promptOptional = deps.promptStringOptional ?? promptStringOptional
+): Promise<AddInputs | MissingInputError | ValidationError | Error> {
+  const interactive = deps.isInteractive ?? tuiIsInteractive
+  const select = deps.promptSelect ?? tuiPromptSelectResult
+  const prompt = deps.promptString ?? tuiPromptStringResult
+  const promptOptional = deps.promptStringOptional ?? tuiPromptStringOptionalResult
   const backend = await addResolveRepoBackend(args.backend, args.repo, { interactive, select })
+  if (backend instanceof Error) return backend
   let repo = args.repo
   if (!repo) {
     if (!interactive()) {
-      throw new MissingInputError('missing required input for jib add', [
+      return new MissingInputError('missing required input for jib add', [
         { field: 'repo', message: 'provide --repo or rerun with interactive prompts enabled' },
       ])
     }
-    repo = await prompt(addRepoPrompt(backend))
+    const prompted = await prompt(addRepoPrompt(backend))
+    if (prompted instanceof Error) return prompted
+    repo = prompted
   }
   repo = addNormalizeRepo(repo, backend)
   const repoErr = configValidateRepo(repo)
-  if (repoErr) throw new ValidationError(`--repo "${repo}" ${repoErr}`)
+  if (repoErr) return new ValidationError(`--repo "${repo}" ${repoErr}`)
   const ingressDefault = args.ingress ?? 'direct'
   const composeRaw = args.compose ? addSplitCommaValues(args.compose) : undefined
   const persistPaths = await addResolvePersistPaths(repo, configToArray(args.persist), {
     interactive,
     promptOptional,
   })
+  if (persistPaths instanceof Error) return persistPaths
   const parsedDomains = parseDomains(configToArray(args.domain), ingressDefault)
+  if (parsedDomains instanceof Error) return parsedDomains
   const healthChecks = parseChecks(configToArray(args.health))
+  if (healthChecks instanceof Error) return healthChecks
   const configEntries = parseConfigEntries(
     configToArray(args.env),
     configToArray(args['build-arg']),
     configToArray(args['build-env']),
   )
+  if (configEntries instanceof Error) return configEntries
   return {
     repo,
     persistPaths,
@@ -110,42 +124,60 @@ export async function addGatherInputs(
   }
 }
 
-function parseDomains(rawDomains: string[], ingressDefault: string): ParsedDomain[] {
+function parseDomains(
+  rawDomains: string[],
+  ingressDefault: string,
+): ParsedDomain[] | ValidationError {
   const parsed: ParsedDomain[] = []
   for (const domain of rawDomains) {
     const result = configParseDomain(domain, ingressDefault)
-    if (result instanceof Error) throw new ValidationError(result.message)
+    if (result instanceof Error) return new ValidationError(result.message)
     parsed.push(result)
   }
   return parsed
 }
 
-function parseChecks(rawHealth: string[]): HealthCheck[] {
+function parseChecks(rawHealth: string[]): HealthCheck[] | ValidationError {
   const parsed: HealthCheck[] = []
   for (const entry of rawHealth.flatMap((value) => value.split(','))) {
     const result = configParseHealth(entry)
-    if (result instanceof Error) throw new ValidationError(result.message)
+    if (result instanceof Error) return new ValidationError(result.message)
     parsed.push(result)
   }
   return parsed
 }
 
-function parseConfigEntries(runtime: string[], build: string[], both: string[]): ConfigEntry[] {
-  return addMergeConfigEntries([
-    ...parseScopedEntries(runtime, 'runtime'),
-    ...parseScopedEntries(build, 'build'),
-    ...parseScopedEntries(both, 'both'),
-  ])
+function parseConfigEntries(
+  runtime: string[],
+  build: string[],
+  both: string[],
+): ConfigEntry[] | ValidationError {
+  const runtimeEntries = parseScopedEntries(runtime, 'runtime')
+  if (runtimeEntries instanceof Error) return runtimeEntries
+  const buildEntries = parseScopedEntries(build, 'build')
+  if (buildEntries instanceof Error) return buildEntries
+  const bothEntries = parseScopedEntries(both, 'both')
+  if (bothEntries instanceof Error) return bothEntries
+  try {
+    return addMergeConfigEntries([...runtimeEntries, ...buildEntries, ...bothEntries])
+  } catch (error) {
+    return error instanceof ValidationError ? error : new ValidationError(String(error))
+  }
 }
 
-function parseScopedEntries(rawEntries: string[], scope: ConfigScope): ConfigEntry[] {
-  return rawEntries.map((pair) => {
-    try {
-      return { ...addParseEnvEntry(pair), scope }
-    } catch {
-      throw new ValidationError(`invalid ${flagForScope(scope)} "${pair}" - expected KEY=VALUE`)
+function parseScopedEntries(
+  rawEntries: string[],
+  scope: ConfigScope,
+): ConfigEntry[] | ValidationError {
+  const entries: ConfigEntry[] = []
+  for (const pair of rawEntries) {
+    const entry = addParseEnvEntry(pair)
+    if (entry instanceof Error) {
+      return new ValidationError(`invalid ${flagForScope(scope)} "${pair}" - expected KEY=VALUE`)
     }
-  })
+    entries.push({ ...entry, scope })
+  }
+  return entries
 }
 
 function flagForScope(scope: ConfigScope): string {

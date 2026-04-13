@@ -6,9 +6,9 @@ import type { AddPlanner } from './types.ts'
 export interface AddPlannerDeps extends AddInspectComposeDeps {
   canScaffoldCompose?: (workdir: string) => boolean
   isInteractive?: () => boolean
-  note?: typeof import('@jib/tui').note
-  promptConfirm?: typeof import('@jib/tui').promptConfirm
-  promptString?: typeof import('@jib/tui').promptString
+  note?: typeof import('@jib/tui').tuiNote
+  promptConfirm?: typeof import('@jib/tui').tuiPromptConfirmResult
+  promptString?: typeof import('@jib/tui').tuiPromptStringResult
   scaffoldComposeFromDockerfile?: (workdir: string) => string | null
 }
 

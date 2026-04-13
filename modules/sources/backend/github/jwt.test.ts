@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { createVerify, generateKeyPairSync } from 'node:crypto'
-import { createAppJWT } from './jwt.ts'
+import { GitHubJwtSignError } from './errors.ts'
+import { githubJwtCreateApp } from './jwt.ts'
 
 /**
  * Roundtrip: sign a JWT with a freshly generated RSA keypair, then verify the
@@ -15,7 +16,9 @@ describe('createAppJWT', () => {
   })
 
   test('produces a valid RS256 JWT', () => {
-    const { jwt, expiresAt } = createAppJWT(12345, privateKey)
+    const signed = githubJwtCreateApp(12345, privateKey)
+    if (signed instanceof Error) throw signed
+    const { jwt, expiresAt } = signed
     const parts = jwt.split('.')
     expect(parts).toHaveLength(3)
     const [h, p, s] = parts as [string, string, string]
@@ -34,7 +37,7 @@ describe('createAppJWT', () => {
     expect(expiresAt.getTime()).toBeGreaterThan(Date.now())
   })
 
-  test('rejects non-RSA PEMs', () => {
-    expect(() => createAppJWT(1, 'not a pem')).toThrow(/signing JWT/)
+  test('returns a typed error for non-RSA PEMs', () => {
+    expect(githubJwtCreateApp(1, 'not a pem')).toBeInstanceOf(GitHubJwtSignError)
   })
 })

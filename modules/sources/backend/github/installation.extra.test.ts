@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { generateKeyPairSync } from 'node:crypto'
-import { findInstallationForOrg, listInstallations } from './installation.ts'
+import { githubInstallationFindForOrg, githubInstallationList } from './installation.ts'
 
 const { privateKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -26,7 +26,8 @@ describe('github installation lookup', () => {
       return new Response(JSON.stringify([{ id: 7, account: { login: 'Acme' } }]), { status: 200 })
     }) as unknown as typeof fetch
 
-    const items = await listInstallations(12345, privateKey)
+    const items = await githubInstallationList(12345, privateKey)
+    if (items instanceof Error) throw items
 
     expect(seenAuth.startsWith('Bearer ')).toBe(true)
     expect(items).toEqual([{ id: 7, account: { login: 'Acme' } }])
@@ -38,7 +39,8 @@ describe('github installation lookup', () => {
         status: 200,
       })) as unknown as typeof fetch
 
-    const installationId = await findInstallationForOrg(12345, privateKey, 'acme')
+    const installationId = await githubInstallationFindForOrg(12345, privateKey, 'acme')
+    if (installationId instanceof Error) throw installationId
 
     expect(installationId).toBe(42)
   })

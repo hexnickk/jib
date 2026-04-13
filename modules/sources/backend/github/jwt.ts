@@ -1,5 +1,9 @@
 import { createSign } from 'node:crypto'
-import { JibError } from '@jib/errors'
+import {
+  GitHubJwtCreateAccessTokenError,
+  GitHubJwtMissingTokenError,
+  GitHubJwtSignError,
+} from './errors.ts'
 
 /**
  * Base64url encoder — GitHub JWT headers/payloads use the URL-safe variant
@@ -21,7 +25,10 @@ export interface AppJWT {
  * `exp`=now+10min per GitHub's docs). The PEM may be PKCS1 or PKCS8; Node's
  * `createSign` autodetects both. Throws if the PEM is not an RSA key.
  */
-export function createAppJWT(appId: number, privateKeyPem: string): AppJWT {
+export function githubJwtCreateApp(
+  appId: number,
+  privateKeyPem: string,
+): AppJWT | GitHubJwtSignError {
   const now = Math.floor(Date.now() / 1000)
   const exp = now + 10 * 60
   const header = { alg: 'RS256', typ: 'JWT' }
@@ -34,7 +41,7 @@ export function createAppJWT(appId: number, privateKeyPem: string): AppJWT {
     const sig = signer.sign(privateKeyPem)
     return { jwt: `${signingInput}.${base64url(sig)}`, expiresAt: new Date(exp * 1000) }
   } catch (err) {
-    throw new JibError('github.jwt', `signing JWT: ${(err as Error).message}`, { cause: err })
+    return new GitHubJwtSignError(err)
   }
 }
 
@@ -48,12 +55,14 @@ export interface InstallationToken {
  * POSTing to `/app/installations/<id>/access_tokens`. The returned token is
  * scoped to that installation and typically expires in an hour.
  */
-export async function generateInstallationToken(
+export async function githubJwtGenerateInstallationToken(
   appId: number,
   privateKeyPem: string,
   installationId: number,
-): Promise<InstallationToken> {
-  const { jwt } = createAppJWT(appId, privateKeyPem)
+): Promise<InstallationToken | Error> {
+  const signed = githubJwtCreateApp(appId, privateKeyPem)
+  if (signed instanceof Error) return signed
+  const { jwt } = signed
   const res = await fetch(
     `https://api.github.com/app/installations/${installationId}/access_tokens`,
     {
@@ -67,10 +76,10 @@ export async function generateInstallationToken(
   )
   if (res.status !== 201) {
     const body = await res.text()
-    throw new JibError('github.jwt', `creating access token: HTTP ${res.status}: ${body}`)
+    return new GitHubJwtCreateAccessTokenError(res.status, body)
   }
   const data = (await res.json()) as { token?: string; expires_at?: string }
-  if (!data.token) throw new JibError('github.jwt', 'GitHub returned no token')
+  if (!data.token) return new GitHubJwtMissingTokenError()
   return {
     token: data.token,
     expiresAt: data.expires_at ? new Date(data.expires_at) : new Date(Date.now() + 3_600_000),

@@ -2,13 +2,13 @@ import { CliError, cliIsTextOutput } from '@jib/cli'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import { sourcesBuildChoices, sourcesRunSetup } from '@jib/sources'
-import { isInteractive, promptSelect, spinner } from '@jib/tui'
+import { tuiIsInteractive, tuiPromptSelectResult, tuiSpinner } from '@jib/tui'
 import { consola } from 'consola'
 
 export interface AddChooseInitialSourceDeps {
   buildSourceChoices?: typeof sourcesBuildChoices
-  isInteractive?: typeof isInteractive
-  promptSelect?: typeof promptSelect
+  isInteractive?: typeof tuiIsInteractive
+  promptSelect?: typeof tuiPromptSelectResult
   runSourceSetup?: typeof sourcesRunSetup
 }
 
@@ -18,9 +18,9 @@ export async function addChooseInitialSource(
   paths: Paths,
   currentSource?: string,
   deps: AddChooseInitialSourceDeps = {},
-): Promise<{ value?: string; created: boolean }> {
-  const interactive = deps.isInteractive ?? isInteractive
-  const select = deps.promptSelect ?? promptSelect
+): Promise<{ value?: string; created: boolean } | Error> {
+  const interactive = deps.isInteractive ?? tuiIsInteractive
+  const select = deps.promptSelect ?? tuiPromptSelectResult
   const buildSourceChoices = deps.buildSourceChoices ?? sourcesBuildChoices
   const runSourceSetup = deps.runSourceSetup ?? sourcesRunSetup
   if (currentSource || !interactive()) {
@@ -34,10 +34,11 @@ export async function addChooseInitialSource(
     message: 'Source for this app?',
     options: [{ value: 'none', label: 'None', hint: 'Public repo or local path' }, ...options],
   })
+  if (choice instanceof Error) return choice
   if (choice === 'none') return { created: false }
   if (choice.startsWith('setup:')) {
     const created = await runSourceSetup(cfg, paths, choice.slice('setup:'.length))
-    if (!created) throw new CliError('cancelled', 'source setup did not complete; add cancelled')
+    if (!created) return new CliError('cancelled', 'source setup did not complete; add cancelled')
     return { value: created, created: true }
   }
   return choice.startsWith('existing:')
@@ -47,7 +48,7 @@ export async function addChooseInitialSource(
 
 /** Creates spinner-backed inspection callbacks for the add flow. */
 export function addCreateInspectionObserver() {
-  const progress = cliIsTextOutput() ? spinner() : null
+  const progress = cliIsTextOutput() ? tuiSpinner() : null
   let active = false
   return {
     observer: {

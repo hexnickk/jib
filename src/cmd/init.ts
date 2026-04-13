@@ -8,7 +8,7 @@ import {
 } from '@jib/cli'
 import { configLoad } from '@jib/config'
 import { getPaths } from '@jib/paths'
-import { intro, note, outro } from '@jib/tui'
+import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import { hasBootstrapState } from '../migrations/service.ts'
 import { initConfigureOptionalModules } from '../modules/init/optional.ts'
 import { initReconcileOptionalModules } from '../modules/init/reconcile.ts'
@@ -48,7 +48,7 @@ const cliInitCommand = {
     const paths = getPaths()
     const migrationError = initCheckMigration(hasBootstrapState(paths))
     if (migrationError) return migrationError
-    if (cliIsTextOutput()) intro('jib init')
+    if (cliIsTextOutput()) tuiIntro('jib init')
 
     if (args.check) {
       let config = await configLoad(paths.configFile)
@@ -61,11 +61,11 @@ const cliInitCommand = {
       const pending = initPendingOptionalModuleNames(config)
       if (cliIsTextOutput()) {
         if (pending.length === 0) {
-          note('No optional modules are waiting for setup.', 'Optional modules')
-          outro('nothing to do')
+          tuiNote('No optional modules are waiting for setup.', 'Optional modules')
+          tuiOutro('nothing to do')
         } else {
-          note(`Pending optional modules: ${pending.join(', ')}`, 'Optional modules')
-          outro('run `sudo jib init` to configure them')
+          tuiNote(`Pending optional modules: ${pending.join(', ')}`, 'Optional modules')
+          tuiOutro('run `sudo jib init` to configure them')
         }
       }
       return {
@@ -85,8 +85,8 @@ const cliInitCommand = {
 
     if (unseen.length === 0) {
       if (cliIsTextOutput()) {
-        note('No optional modules are waiting for setup.', 'Optional modules')
-        outro('nothing to do')
+        tuiNote('No optional modules are waiting for setup.', 'Optional modules')
+        tuiOutro('nothing to do')
       }
       return {
         enabledOptionalModules: initInstalledOptionalModules(config).map(
@@ -97,7 +97,7 @@ const cliInitCommand = {
     }
 
     if (cliIsTextOutput()) {
-      note(
+      tuiNote(
         `Choose which optional pieces you want Jib to manage now.\n${initDescribeModules(unseen).join('\n')}`,
         'Optional modules',
       )
@@ -119,8 +119,8 @@ const cliInitCommand = {
     const finalConfig = await configLoad(paths.configFile)
     if (finalConfig instanceof Error) return finalConfig
     if (cliIsTextOutput()) {
-      outro('modules configured')
-      note('Next: run `jib status` to confirm services are healthy.', 'Next steps')
+      tuiOutro('modules configured')
+      tuiNote('Next: run `jib status` to confirm services are healthy.', 'Next steps')
     }
 
     return {

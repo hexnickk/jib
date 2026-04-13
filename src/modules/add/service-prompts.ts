@@ -2,12 +2,12 @@ import { MissingInputError } from '@jib/cli'
 import type { ParsedDomain } from '@jib/config'
 import type { ComposeService } from '@jib/docker'
 import {
-  isInteractive,
-  note,
-  promptConfirm,
-  promptLines,
-  promptSelect,
-  promptString,
+  tuiIsInteractive,
+  tuiNote,
+  tuiPromptConfirmResult,
+  tuiPromptLinesResult,
+  tuiPromptSelectResult,
+  tuiPromptStringResult,
 } from '@jib/tui'
 import { addMergeConfigEntries, addScopeCovers, addScopeLabel } from './config-entries.ts'
 import {
@@ -32,7 +32,11 @@ export async function addPromptForServices(
   domains: ParsedDomain[],
   composeServices: ComposeService[],
   initialEntries: ConfigEntry[],
-) {
+): Promise<
+  | MissingInputError
+  | Error
+  | { service: string; expose: boolean; domainHosts: string[]; configEntries: ConfigEntry[] }[]
+> {
   const summaries = addSummarizeComposeServices(composeServices)
   const provided = new Map(initialEntries.map((entry) => [entry.key, entry]))
   const issues: { field: string; message: string }[] = []
@@ -40,22 +44,24 @@ export async function addPromptForServices(
 
   for (const service of summaries) {
     const existingDomains = domains.filter((domain) => domain.service === service.name)
-    const expose =
-      existingDomains.length > 0 ||
-      (isInteractive() &&
-        (await promptConfirm({
-          message: `Expose service "${service.name}" with a domain?`,
-          initialValue: addShouldDefaultExposeService(service, summaries.length),
-        })))
-    const domainHosts =
-      isInteractive() && expose && existingDomains.length === 0
-        ? addSplitCommaValues(
-            await promptString({
-              message: `Domain(s) for service "${service.name}" (comma-separated)`,
-              placeholder: 'app.example.com',
-            }),
-          )
-        : []
+    let expose = existingDomains.length > 0
+    if (!expose && tuiIsInteractive()) {
+      const confirm = await tuiPromptConfirmResult({
+        message: `Expose service "${service.name}" with a domain?`,
+        initialValue: addShouldDefaultExposeService(service, summaries.length),
+      })
+      if (confirm instanceof Error) return confirm
+      expose = confirm
+    }
+    let nextDomainHosts: string[] = []
+    if (tuiIsInteractive() && expose && existingDomains.length === 0) {
+      const hosts = await tuiPromptStringResult({
+        message: `Domain(s) for service "${service.name}" (comma-separated)`,
+        placeholder: 'app.example.com',
+      })
+      if (hosts instanceof Error) return hosts
+      nextDomainHosts = addSplitCommaValues(hosts)
+    }
 
     const requiredEntries = [...addRequiredConfigScopes(service)].filter(([key, requiredScope]) => {
       const existing = provided.get(key)
@@ -63,7 +69,7 @@ export async function addPromptForServices(
     })
 
     const configEntries: ConfigEntry[] = []
-    if (!isInteractive()) {
+    if (!tuiIsInteractive()) {
       for (const [key, requiredScope] of requiredEntries) {
         issues.push({
           field: `env.${key}`,
@@ -72,41 +78,51 @@ export async function addPromptForServices(
       }
     } else if (requiredEntries.length > 0) {
       const useRecommended = await confirmRecommendedScopes(service.name, requiredEntries)
+      if (useRecommended instanceof Error) return useRecommended
       for (const [key, requiredScope] of requiredEntries) {
         const existing = provided.get(key)
         const scope = useRecommended
           ? requiredScope
           : await promptRequiredScope(service.name, key, requiredScope)
+        if (scope instanceof Error) return scope
         const entry = {
           key,
-          value:
-            existing?.value ??
-            (await promptString({
-              message: `Value for ${key}`,
-              placeholder: scope === 'build' ? 'https://example.com' : 'secret-or-value',
-            })),
+          value: existing?.value ?? '',
           scope,
         } satisfies ConfigEntry
+        if (!existing?.value) {
+          const value = await tuiPromptStringResult({
+            message: `Value for ${key}`,
+            placeholder: scope === 'build' ? 'https://example.com' : 'secret-or-value',
+          })
+          if (value instanceof Error) return value
+          entry.value = value
+        }
         configEntries.push(entry)
         provided.set(key, mergeEntry(existing, entry))
       }
     }
 
-    if (
-      isInteractive() &&
-      (await promptConfirm({
+    let addManual = false
+    if (tuiIsInteractive()) {
+      const confirm = await tuiPromptConfirmResult({
         message: `Add more runtime environment variables for "${service.name}"?`,
         initialValue: false,
-      }))
-    ) {
-      const manual = await promptLines({
+      })
+      if (confirm instanceof Error) return confirm
+      addManual = confirm
+    }
+    if (addManual) {
+      const manual = await tuiPromptLinesResult({
         title: `Additional runtime environment variables for "${service.name}"`,
         lines: MANUAL_CONFIG_LINES,
         promptLabel: 'var',
         validateLine: addValidateEnvEntry,
       })
+      if (manual instanceof Error) return manual
       for (const raw of manual) {
         const base = addParseEnvEntry(raw)
+        if (base instanceof Error) return base
         const existing = provided.get(base.key)
         const entry = { ...base, scope: existing?.scope ?? 'runtime' }
         configEntries.push(entry)
@@ -114,11 +130,11 @@ export async function addPromptForServices(
       }
     }
 
-    answers.push({ service: service.name, expose, domainHosts, configEntries })
+    answers.push({ service: service.name, expose, domainHosts: nextDomainHosts, configEntries })
   }
 
   if (issues.length > 0) {
-    throw new MissingInputError('missing required input for jib add', issues)
+    return new MissingInputError('missing required input for jib add', issues)
   }
   return answers
 }
@@ -141,12 +157,12 @@ function scopeSummaryLabel(scope: ConfigScope): string {
 async function confirmRecommendedScopes(
   service: string,
   entries: [string, ConfigScope][],
-): Promise<boolean> {
-  note(
+): Promise<boolean | Error> {
+  tuiNote(
     entries.map(([key, scope]) => `${key}: ${scopeSummaryLabel(scope)}`).join('\n'),
     `Detected variables from compose for ${service}`,
   )
-  return await promptConfirm({
+  return await tuiPromptConfirmResult({
     message: `Use these placements for the detected variables in "${service}"?`,
     initialValue: true,
   })
@@ -167,8 +183,8 @@ async function promptRequiredScope(
   service: string,
   key: string,
   recommended: ConfigScope,
-): Promise<ConfigScope> {
-  return await promptSelect({
+): Promise<ConfigScope | Error> {
+  return await tuiPromptSelectResult({
     message: `Where should jib store ${key} for service "${service}"?`,
     options: scopeOptions(recommended),
     initialValue: recommended,

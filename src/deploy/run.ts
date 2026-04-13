@@ -3,7 +3,7 @@ import type { Config } from '@jib/config'
 import { type DeployError, type DeployResult, deployApp } from '@jib/deploy'
 import type { Paths } from '@jib/paths'
 import { sourcesSync } from '@jib/sources'
-import { spinner } from '@jib/tui'
+import { tuiSpinner } from '@jib/tui'
 import { deployCreateDeps } from './deps.ts'
 import {
   DeployExecuteError,
@@ -59,7 +59,7 @@ export async function runDeployResult(
   deps: DeployRunDeps = {},
 ): Promise<DeployRunError | DeployRunResult> {
   const showProgress = cliIsTextOutput()
-  const createSpin = deps.createSpinner ?? spinner
+  const createSpin = deps.createSpinner ?? tuiSpinner
   const prepareSpin = showProgress ? createSpin() : null
 
   prepareSpin?.start(`[1/2] preparing ${app}`)

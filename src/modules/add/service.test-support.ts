@@ -147,22 +147,23 @@ export function addMakeDeps(
   const planner: AddPlanner = {
     inspectCompose: async () => {
       calls.push('inspectCompose')
-      if (failAt === 'inspectCompose') throw new Error('inspectCompose failed')
+      if (failAt === 'inspectCompose') return new Error('inspectCompose failed')
       return inspection
     },
     collectGuidedInputs: async () => {
       calls.push('collectGuidedInputs')
-      if (failAt === 'collectGuidedInputs') throw new Error('collectGuidedInputs failed')
+      if (failAt === 'collectGuidedInputs') return new Error('collectGuidedInputs failed')
       return guided
     },
     buildResolvedApp: async () => {
       calls.push('buildResolvedApp')
-      if (failAt === 'buildResolvedApp') throw new Error('buildResolvedApp failed')
+      if (failAt === 'buildResolvedApp') return new Error('buildResolvedApp failed')
       return appOverride
     },
     confirmPlan: async () => {
       calls.push('confirmPlan')
-      if (failAt === 'confirmPlan') throw new Error('confirmPlan failed')
+      if (failAt === 'confirmPlan') return new Error('confirmPlan failed')
+      return undefined
     },
   }
   const observer: AddFlowObserver = {

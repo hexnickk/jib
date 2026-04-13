@@ -5,7 +5,7 @@ import {
   cloudflaredSaveTunnelToken,
 } from '@jib-module/cloudflared'
 import type { Paths } from '@jib/paths'
-import { log, promptConfirm, promptPassword } from '@jib/tui'
+import { tuiLog, tuiPromptConfirmResult, tuiPromptPasswordResult } from '@jib/tui'
 import {
   CloudflaredSetupPromptError,
   CloudflaredSetupSaveTokenError,
@@ -22,8 +22,8 @@ interface CloudflaredSetupDeps {
   enableService?: typeof cloudflaredEnableService
   hasToken?: typeof cloudflaredHasTunnelToken
   logger?: CloudflaredSetupLogger
-  promptConfirm?: typeof promptConfirm
-  promptPassword?: typeof promptPassword
+  promptConfirm?: typeof tuiPromptConfirmResult
+  promptPassword?: typeof tuiPromptPasswordResult
   saveToken?: typeof cloudflaredSaveTunnelToken
 }
 
@@ -50,7 +50,7 @@ export async function cloudflaredRunSetup(
   deps: CloudflaredSetupDeps = {},
 ): Promise<boolean> {
   const result = await cloudflaredRunSetupResult(paths, deps)
-  return renderSetupResult(result, deps.logger ?? log)
+  return renderSetupResult(result, deps.logger ?? tuiLog)
 }
 
 /** Runs tunnel setup and returns a structured outcome for CLI callers. */
@@ -59,8 +59,8 @@ export async function cloudflaredRunSetupResult(
   deps: CloudflaredSetupDeps = {},
 ): Promise<CloudflaredSetupResult> {
   const hasToken = deps.hasToken ?? cloudflaredHasTunnelToken
-  const confirm = deps.promptConfirm ?? promptConfirm
-  const password = deps.promptPassword ?? promptPassword
+  const confirm = deps.promptConfirm ?? tuiPromptConfirmResult
+  const password = deps.promptPassword ?? tuiPromptPasswordResult
   const saveToken = deps.saveToken ?? cloudflaredSaveTunnelToken
   const enableService = deps.enableService ?? cloudflaredEnableService
 
@@ -70,6 +70,7 @@ export async function cloudflaredRunSetupResult(
         message: 'Existing tunnel token found. Replace it?',
         initialValue: false,
       })
+      if (replace instanceof Error) return new CloudflaredSetupPromptError('replace', replace)
       if (!replace) return startService(true, enableService)
     } catch (error) {
       return new CloudflaredSetupPromptError('replace', error)
@@ -78,9 +79,11 @@ export async function cloudflaredRunSetupResult(
 
   let raw: string
   try {
-    raw = await password({
+    const token = await password({
       message: 'Tunnel token (or full "cloudflared service install <token>" command)',
     })
+    if (token instanceof Error) return new CloudflaredSetupPromptError('token', token)
+    raw = token
   } catch (error) {
     return new CloudflaredSetupPromptError('token', error)
   }

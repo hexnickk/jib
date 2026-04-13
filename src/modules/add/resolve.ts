@@ -16,10 +16,12 @@ import type { AddInputs, ConfigEntry } from './types.ts'
 export async function addCollectGuidedInputs(
   inputs: AddInputs,
   composeServices: ComposeInspection['services'],
-): Promise<{ domains: Domain[]; configEntries: ConfigEntry[] }> {
+): Promise<{ domains: Domain[]; configEntries: ConfigEntry[] } | Error> {
   const serviceNames = composeServices.map((service) => service.name)
   const domains = await addCollectDomains(inputs.parsedDomains, serviceNames)
+  if (domains instanceof Error) return domains
   const answers = await addPromptForServices(domains, composeServices, inputs.configEntries)
+  if (answers instanceof Error) return answers
   return addMergeGuidedServiceAnswers(domains, serviceNames, answers, inputs.ingressDefault)
 }
 
@@ -33,29 +35,31 @@ export async function addBuildResolvedApp(
   inputs: AddInputs,
   inspection: ComposeInspection,
   guided: { domains: Domain[]; configEntries: ConfigEntry[] },
-): Promise<App> {
+): Promise<App | Error> {
   const domains = await configAssignPorts(cfg, appName, guided.domains)
-  if (domains instanceof Error) throw domains
+  if (domains instanceof Error) return domains
   const buildArgs = addConfigEntriesToBuildArgs(guided.configEntries)
   const composeFiles = await persistComposeFiles(paths, appName, workdir, inspection.composeFiles)
   const image = dockerHubImage(inputs.repo)
+  const parsedApp = addParseApp({
+    repo: image ? 'local' : inputs.repo,
+    ...(image ? { image } : {}),
+    branch: args.branch ?? 'main',
+    domains,
+    env_file: '.env',
+    services: inspection.services.map((service) => service.name),
+    compose: composeFiles,
+    ...(args.source ? { source: args.source } : {}),
+    ...(inputs.healthChecks.length > 0 ? { health: inputs.healthChecks } : {}),
+    ...(buildArgs ? { build_args: buildArgs } : {}),
+  })
+  if (parsedApp instanceof Error) return parsedApp
   const resolved = dockerResolveFromCompose(
-    addParseApp({
-      repo: image ? 'local' : inputs.repo,
-      ...(image ? { image } : {}),
-      branch: args.branch ?? 'main',
-      domains,
-      env_file: '.env',
-      services: inspection.services.map((service) => service.name),
-      compose: composeFiles,
-      ...(args.source ? { source: args.source } : {}),
-      ...(inputs.healthChecks.length > 0 ? { health: inputs.healthChecks } : {}),
-      ...(buildArgs ? { build_args: buildArgs } : {}),
-    }),
+    parsedApp,
     workdir,
     cliIsTextOutput() ? { warn: (message) => consola.warn(message) } : {},
   )
-  if (resolved instanceof Error) throw resolved
+  if (resolved instanceof Error) return resolved
   return resolved
 }
 

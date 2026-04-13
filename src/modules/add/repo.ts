@@ -10,27 +10,28 @@ export async function addResolveRepoBackend(
   repo: string | undefined,
   deps: {
     interactive: () => boolean
-    select: typeof import('@jib/tui').promptSelect
+    select: typeof import('@jib/tui').tuiPromptSelectResult
   },
-): Promise<RepoBackend | undefined> {
+): Promise<RepoBackend | Error | undefined> {
   if (rawBackend) return addParseRepoBackend(rawBackend)
   if (repo || !deps.interactive()) return undefined
-  return (await deps.select({
+  const backend = await deps.select({
     message: 'Source backend',
     options: [
       { value: 'github', label: 'GitHub', hint: 'owner/repo or GitHub URL' },
       { value: 'dockerhub', label: 'Docker Hub', hint: 'owner/repo or Docker Hub URL' },
       { value: 'other', label: 'Other/local', hint: 'absolute path or external git URL' },
     ],
-  })) as RepoBackend
+  })
+  return backend instanceof Error ? backend : (backend as RepoBackend)
 }
 
 /** Parses the explicit `--backend` flag into a known backend value. */
-export function addParseRepoBackend(rawBackend: string): RepoBackend {
+export function addParseRepoBackend(rawBackend: string): RepoBackend | ValidationError {
   if (rawBackend === 'github' || rawBackend === 'dockerhub' || rawBackend === 'other') {
     return rawBackend
   }
-  throw new ValidationError(`invalid --backend "${rawBackend}" (expected github|dockerhub|other)`)
+  return new ValidationError(`invalid --backend "${rawBackend}" (expected github|dockerhub|other)`)
 }
 
 /** Builds the repo prompt copy for the selected backend. */
@@ -70,15 +71,16 @@ export async function addResolvePersistPaths(
   rawPersist: string[],
   deps: {
     interactive: () => boolean
-    promptOptional: typeof import('@jib/tui').promptStringOptional
+    promptOptional: typeof import('@jib/tui').tuiPromptStringOptionalResult
   },
-): Promise<string[]> {
+): Promise<string[] | Error> {
   if (rawPersist.length > 0) return rawPersist.flatMap(addSplitCommaValues)
   if (!dockerHubImage(repo) || !deps.interactive()) return []
   const raw = await deps.promptOptional({
     message: 'Persistent container path(s) (comma-separated, blank for none)',
     placeholder: '/data',
   })
+  if (raw instanceof Error) return raw
   return addSplitCommaValues(raw)
 }
 

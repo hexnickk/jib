@@ -3,9 +3,9 @@ import type { Paths } from '@jib/paths'
 import { isExternalRepoURL, pathExists } from '@jib/paths'
 import { sourcesGitConfigureSshKey } from '../../git.ts'
 import type { DriverSourceStatus, ResolvedDriverSource, SourceDriver } from '../../types.ts'
-import { appPemPath, applyAuth, refreshAuth } from './auth.ts'
-import { deployKeyPaths } from './keygen.ts'
-import { httpsCloneURL, sshCloneURL } from './remote-url.ts'
+import { githubAuthApply, githubAuthPemPath, githubAuthRefresh } from './auth.ts'
+import { githubDeployKeyPaths } from './keygen.ts'
+import { githubRemoteHttpsCloneUrl, githubRemoteSshCloneUrl } from './remote-url.ts'
 import { githubSetup } from './setup.ts'
 
 const AUTH_FAILURE_SNIPPETS = [
@@ -20,26 +20,30 @@ const AUTH_FAILURE_SNIPPETS = [
 export function githubCloneUrl(app: App, cfg: Config): string {
   if (isExternalRepoURL(app.repo)) return app.repo
   const sourceType = app.source ? cfg.sources[app.source]?.type : undefined
-  return sourceType === 'key' ? sshCloneURL(app.repo) : httpsCloneURL(app.repo)
+  return sourceType === 'key'
+    ? githubRemoteSshCloneUrl(app.repo)
+    : githubRemoteHttpsCloneUrl(app.repo)
 }
 
 export async function githubResolveSource(
   cfg: Config,
   app: App,
   paths: Paths,
-): Promise<ResolvedDriverSource> {
+): Promise<ResolvedDriverSource | Error> {
   const external = isExternalRepoURL(app.repo)
-  const auth = !external && app.source ? await refreshAuth(app.source, cfg, app, paths) : undefined
+  const auth =
+    !external && app.source ? await githubAuthRefresh(app.source, cfg, app, paths) : undefined
+  if (auth instanceof Error) return auth
   const env = auth?.sshKeyPath ? sourcesGitConfigureSshKey(auth.sshKeyPath) : {}
   const url =
-    auth?.token && !external ? httpsCloneURL(app.repo, auth.token) : githubCloneUrl(app, cfg)
+    auth?.token && !external
+      ? githubRemoteHttpsCloneUrl(app.repo, auth.token)
+      : githubCloneUrl(app, cfg)
 
   return {
     applyAuth: external
-      ? async () => {}
-      : async (workdir: string) => {
-          if (auth) await applyAuth(auth, workdir, app.repo)
-        },
+      ? async () => undefined
+      : async (workdir: string) => (auth ? githubAuthApply(auth, workdir, app.repo) : undefined),
     env,
     url,
   }
@@ -65,8 +69,8 @@ async function describeGitHubStatus(
 ): Promise<DriverSourceStatus> {
   const credentialPath =
     source.type === 'app'
-      ? appPemPath(paths, sourceName)
-      : deployKeyPaths(paths, sourceName).privateKey
+      ? githubAuthPemPath(paths, sourceName)
+      : githubDeployKeyPaths(paths, sourceName).privateKey
   return {
     detail: source.type === 'app' ? `github app (id ${source.app_id})` : 'github deploy-key',
     hasCredential: await pathExists(credentialPath),

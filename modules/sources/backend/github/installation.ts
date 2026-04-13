@@ -1,5 +1,5 @@
-import { JibError } from '@jib/errors'
-import { createAppJWT } from './jwt.ts'
+import { GitHubInstallationListError, GitHubInstallationNotFoundError } from './errors.ts'
+import { githubJwtCreateApp } from './jwt.ts'
 
 interface RawInstallation {
   id: number
@@ -10,11 +10,13 @@ interface RawInstallation {
  * Lists every installation of a GitHub App using its JWT. Returns the raw
  * ID/org pairs; callers pick which one they want.
  */
-export async function listInstallations(
+export async function githubInstallationList(
   appId: number,
   privateKeyPem: string,
-): Promise<RawInstallation[]> {
-  const { jwt } = createAppJWT(appId, privateKeyPem)
+): Promise<RawInstallation[] | Error> {
+  const signed = githubJwtCreateApp(appId, privateKeyPem)
+  if (signed instanceof Error) return signed
+  const { jwt } = signed
   const res = await fetch('https://api.github.com/app/installations', {
     headers: {
       Authorization: `Bearer ${jwt}`,
@@ -24,7 +26,7 @@ export async function listInstallations(
   })
   if (res.status !== 200) {
     const body = await res.text()
-    throw new JibError('github.installation', `listing installations: HTTP ${res.status}: ${body}`)
+    return new GitHubInstallationListError(res.status, body)
   }
   return (await res.json()) as RawInstallation[]
 }
@@ -34,13 +36,14 @@ export async function listInstallations(
  * Throws if the app isn't installed on that org. Matches Go's
  * `findInstallation`.
  */
-export async function findInstallationForOrg(
+export async function githubInstallationFindForOrg(
   appId: number,
   privateKeyPem: string,
   org: string,
-): Promise<number> {
-  const installs = await listInstallations(appId, privateKeyPem)
+): Promise<number | Error> {
+  const installs = await githubInstallationList(appId, privateKeyPem)
+  if (installs instanceof Error) return installs
   const match = installs.find((i) => i.account.login.toLowerCase() === org.toLowerCase())
-  if (!match) throw new JibError('github.installation', `no installation found for org "${org}"`)
+  if (!match) return new GitHubInstallationNotFoundError(org)
   return match.id
 }

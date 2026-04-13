@@ -27,10 +27,10 @@ export function addSplitCommaValues(raw?: string | null): string[] {
     .filter((value) => value.length > 0)
 }
 
-export function addParseEnvEntry(raw: string): EnvEntry {
+export function addParseEnvEntry(raw: string): EnvEntry | ValidationError {
   const line = raw.trim()
   const eq = line.indexOf('=')
-  if (eq < 1) throw new ValidationError(`invalid env entry "${raw}" - expected KEY=VALUE`)
+  if (eq < 1) return new ValidationError(`invalid env entry "${raw}" - expected KEY=VALUE`)
   return { key: line.slice(0, eq), value: line.slice(eq + 1) }
 }
 

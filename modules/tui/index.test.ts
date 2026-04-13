@@ -1,19 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  promptConfirm,
-  promptString,
-  readPemBlock,
   tuiIsInteractive,
-  tuiPromptConfirm,
-  tuiPromptString,
-  tuiReadPemBlock,
+  tuiPromptConfirmResult,
+  tuiPromptStringResult,
+  tuiReadPemBlockResult,
 } from './index.ts'
 
 describe('index exports', () => {
-  test('keeps the prefixed exports and compatibility aliases aligned', () => {
+  test('exposes the prefixed result-style APIs', () => {
     expect(tuiIsInteractive).toBeDefined()
-    expect(tuiPromptString).toBe(promptString)
-    expect(tuiPromptConfirm).toBe(promptConfirm)
-    expect(tuiReadPemBlock).toBe(readPemBlock)
+    expect(tuiPromptStringResult).toBeDefined()
+    expect(tuiPromptConfirmResult).toBeDefined()
+    expect(tuiReadPemBlockResult).toBeDefined()
   })
 })

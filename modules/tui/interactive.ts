@@ -14,13 +14,3 @@ export function tuiAssertInteractiveResult(): TuiNotInteractiveError | undefined
   const reason = cliDescribePromptBlock()
   return reason ? new TuiNotInteractiveError(reason) : undefined
 }
-
-/** Throws `TuiNotInteractiveError` if the process can't prompt the user. */
-export function tuiAssertInteractive(): void {
-  const error = tuiAssertInteractiveResult()
-  if (error) throw error
-}
-
-export { tuiAssertInteractive as assertInteractive }
-export { tuiAssertInteractiveResult as assertInteractiveResult }
-export { tuiIsInteractive as isInteractive }

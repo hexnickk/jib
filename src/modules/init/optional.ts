@@ -78,6 +78,9 @@ export async function initConfigureOptionalModules(
   let current = config
   for (const mod of candidates) {
     const enabled = await ask(mod)
+    if (enabled instanceof Error) {
+      return toOptionalModuleSetupError(mod.manifest.name, enabled)
+    }
     if (!enabled) {
       const persisted = await initPersistModuleChoice(
         paths.configFile,

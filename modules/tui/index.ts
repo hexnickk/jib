@@ -1,36 +1,20 @@
 export * from './errors.ts'
+export { tuiAssertInteractiveResult, tuiIsInteractive } from './interactive.ts'
 export {
-  tuiAssertInteractive,
-  tuiAssertInteractiveResult,
-  tuiIsInteractive,
-  assertInteractive,
-  assertInteractiveResult,
-  isInteractive,
-} from './interactive.ts'
-export {
-  intro,
-  log,
-  note,
-  outro,
-  spinner,
-  promptConfirm,
-  promptInt,
-  promptLines,
-  promptMultiSelect,
-  promptPEM,
-  promptPassword,
-  promptSelect,
-  promptString,
-  promptStringOptional,
-  tuiPromptConfirm,
-  tuiPromptInt,
-  tuiPromptLines,
-  tuiPromptMultiSelect,
-  tuiPromptPEM,
-  tuiPromptPassword,
-  tuiPromptSelect,
-  tuiPromptString,
-  tuiPromptStringOptional,
+  tuiIntro,
+  tuiLog,
+  tuiNote,
+  tuiOutro,
+  tuiPromptConfirmResult,
+  tuiPromptIntResult,
+  tuiPromptMultiSelectResult,
+  tuiPromptPasswordResult,
+  tuiPromptPemResult,
+  tuiPromptSelectResult,
+  tuiPromptStringOptionalResult,
+  tuiPromptStringResult,
+  tuiSpinner,
 } from './prompts.ts'
-export type { ReadPemBlockError, TuiReadPemBlockError } from './pem.ts'
-export { readPemBlock, readPemBlockResult, tuiReadPemBlock, tuiReadPemBlockResult } from './pem.ts'
+export { tuiPromptLinesResult } from './lines.ts'
+export type { TuiReadPemBlockError } from './pem.ts'
+export { tuiReadPemBlockResult } from './pem.ts'

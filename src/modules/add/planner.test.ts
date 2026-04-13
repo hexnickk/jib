@@ -38,6 +38,7 @@ describe('addCreatePlanner', () => {
     })
 
     const inspection = await planner.inspectCompose(draftApp, workdir)
+    if (inspection instanceof Error) throw inspection
 
     expect(inspection.composeFiles).toEqual([GENERATED_COMPOSE_FILE])
     expect(inspection.services.map((service) => service.name)).toEqual(['app'])
@@ -74,6 +75,7 @@ describe('addCreatePlanner', () => {
       },
       { domains: [], configEntries: [] },
     )
+    if (app instanceof Error) throw app
 
     expect(app.compose).toEqual([managedComposePath(paths, 'demo')])
   })
@@ -91,6 +93,7 @@ describe('addCreatePlanner', () => {
     })
 
     const inspection = await planner.inspectCompose(draftApp, workdir)
+    if (inspection instanceof Error) throw inspection
 
     expect(inspection.composeFiles).toEqual(['compose.yml'])
     expect(inspection.services.map((service) => service.name)).toEqual(['web'])
@@ -105,6 +108,6 @@ describe('addCreatePlanner', () => {
 
     const planner = addCreatePlanner()
 
-    await expect(planner.inspectCompose(draftApp, workdir)).rejects.toBeInstanceOf(CliError)
+    expect(await planner.inspectCompose(draftApp, workdir)).toBeInstanceOf(CliError)
   })
 })

@@ -8,7 +8,7 @@ import type { AddInputs } from './types.ts'
 export function addBuildDraftApp(
   args: { source?: string; branch?: string },
   inputs: AddInputs,
-): App {
+): App | ValidationError {
   const image = dockerHubImage(inputs.repo)
   return addParseApp({
     repo: image ? 'local' : inputs.repo,
@@ -26,10 +26,10 @@ export function addBuildDraftApp(
 /** Parses and validates a complete app config object for add flows. */
 export function addParseApp(
   appObj: Partial<App> & { repo: string; domains: Domain[]; health?: HealthCheck[] },
-): App {
+): App | ValidationError {
   const parsed = AppSchema.safeParse(appObj)
   if (!parsed.success) {
-    throw new ValidationError(`invalid app config: ${parsed.error.message}`)
+    return new ValidationError(`invalid app config: ${parsed.error.message}`)
   }
   return parsed.data
 }

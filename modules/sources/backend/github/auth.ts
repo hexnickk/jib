@@ -1,12 +1,17 @@
 import { readFile } from 'node:fs/promises'
 import type { App, Config } from '@jib/config'
-import { JibError } from '@jib/errors'
-import { type Paths, credsPath } from '@jib/paths'
+import { type Paths, pathsCredsPath } from '@jib/paths'
 import { githubGetSource } from './config-edit.ts'
-import { findInstallationForOrg } from './installation.ts'
-import { generateInstallationToken } from './jwt.ts'
-import { deployKeyPaths } from './keygen.ts'
-import { setRemoteToken } from './remote-url.ts'
+import {
+  GitHubAuthInvalidRepoError,
+  GitHubAuthMissingAppIdError,
+  GitHubAuthReadPemError,
+  GitHubAuthSourceNotFoundError,
+} from './errors.ts'
+import { githubInstallationFindForOrg } from './installation.ts'
+import { githubJwtGenerateInstallationToken } from './jwt.ts'
+import { githubDeployKeyPaths } from './keygen.ts'
+import { githubRemoteSetToken } from './remote-url.ts'
 
 /**
  * Result of resolving live git credentials for a repo. At most one of the
@@ -20,8 +25,8 @@ export interface AuthResult {
 }
 
 /** On-disk path for a GitHub App source's PEM file. */
-export function appPemPath(paths: Paths, sourceName: string): string {
-  return credsPath(paths, 'github-app', `${sourceName}.pem`)
+export function githubAuthPemPath(paths: Paths, sourceName: string): string {
+  return pathsCredsPath(paths, 'github-app', `${sourceName}.pem`)
 }
 
 /**
@@ -32,26 +37,38 @@ export function appPemPath(paths: Paths, sourceName: string): string {
  * Called by the watcher/source sync flows before every `fetch`/`clone` — it's the only
  * consumer of this module's network code.
  */
-export async function refreshAuth(
+export async function githubAuthRefresh(
   sourceName: string,
   cfg: Config,
   app: App,
   paths: Paths,
-): Promise<AuthResult> {
+): Promise<AuthResult | Error> {
   const source = githubGetSource(cfg, sourceName)
   if (!source) {
-    throw new JibError('github.auth', `source "${sourceName}" not found in config`)
+    return new GitHubAuthSourceNotFoundError(sourceName)
   }
   if (source.type === 'key') {
-    return { sshKeyPath: deployKeyPaths(paths, sourceName).privateKey }
+    return { sshKeyPath: githubDeployKeyPaths(paths, sourceName).privateKey }
   }
-  if (!source.app_id) throw new JibError('github.auth', `source "${sourceName}" missing app_id`)
-  const pem = await readFile(appPemPath(paths, sourceName), 'utf8')
+  if (!source.app_id) return new GitHubAuthMissingAppIdError(sourceName)
+  const pemPath = githubAuthPemPath(paths, sourceName)
+  let pem: string
+  try {
+    pem = await readFile(pemPath, 'utf8')
+  } catch (error) {
+    return new GitHubAuthReadPemError(pemPath, error)
+  }
   const org = app.repo.split('/')[0] ?? ''
-  if (!org) throw new JibError('github.auth', `invalid repo "${app.repo}"`)
-  const installationId = await findInstallationForOrg(source.app_id, pem, org)
-  const { token } = await generateInstallationToken(source.app_id, pem, installationId)
-  return { token }
+  if (!org) return new GitHubAuthInvalidRepoError(app.repo)
+  const installationId = await githubInstallationFindForOrg(source.app_id, pem, org)
+  if (installationId instanceof Error) return installationId
+  const installationToken = await githubJwtGenerateInstallationToken(
+    source.app_id,
+    pem,
+    installationId,
+  )
+  if (installationToken instanceof Error) return installationToken
+  return { token: installationToken.token }
 }
 
 /**
@@ -59,6 +76,10 @@ export async function refreshAuth(
  * authenticate correctly. For SSH: nothing to do on disk (caller must set
  * `GIT_SSH_COMMAND`). For tokens: rewrite the `origin` remote URL.
  */
-export async function applyAuth(auth: AuthResult, repoDir: string, repo: string): Promise<void> {
-  if (auth.token) await setRemoteToken(repoDir, repo, auth.token)
+export async function githubAuthApply(
+  auth: AuthResult,
+  repoDir: string,
+  repo: string,
+): Promise<Error | undefined> {
+  if (auth.token) return githubRemoteSetToken(repoDir, repo, auth.token)
 }
