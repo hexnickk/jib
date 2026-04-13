@@ -4,9 +4,9 @@ import {
   type AppStatus,
   type ServiceStatus,
   type SourceStatus,
-  collectApps,
-  collectServices,
-  collectSources,
+  stateCollectApps,
+  stateCollectServices,
+  stateCollectSources,
 } from '@jib/state'
 import type { CliCommand } from './command.ts'
 
@@ -89,10 +89,11 @@ const cliStatusCommand = {
     const { cfg, paths } = loaded
     const hasCloudflared = cfg.modules?.cloudflared === true
     const [services, sources, apps] = await Promise.all([
-      collectServices(hasCloudflared),
-      collectSources(cfg, paths),
-      collectApps(cfg, paths),
+      stateCollectServices(hasCloudflared),
+      stateCollectSources(cfg, paths),
+      stateCollectApps(cfg, paths),
     ])
+    if (apps instanceof Error) return apps
 
     if (cliIsTextOutput()) {
       printServices(services)

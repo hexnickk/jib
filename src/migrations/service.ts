@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Paths } from '@jib/paths'
-import { openDb } from '@jib/state'
+import { stateOpenDb } from '@jib/state'
 import type { JibDb } from '@jib/state'
 import { type RunMigrationError, RunPendingMigrationsError, errorMessage } from './errors.ts'
 import { migrations, runJibMigrationsResult } from './index.ts'
@@ -51,7 +51,7 @@ export async function runPendingMigrationsResult(
 
   let db: JibDb
   try {
-    db = openDb(paths.stateDir)
+    db = stateOpenDb(paths.stateDir)
   } catch (error) {
     return new RunPendingMigrationsError(
       `failed to open migration database: ${errorMessage(error)}`,

@@ -16,7 +16,7 @@ export type Release = () => Promise<void>
  * its stdin (via the returned `Release`) lets the shell exit cleanly. No FFI,
  * no races with Bun's fd handling.
  */
-export async function acquireLock(
+export async function stateAcquireLock(
   dir: string,
   app: string,
   opts: LockOptions = {},
@@ -64,11 +64,20 @@ export async function acquireLock(
   }
 }
 
-export async function acquire(dir: string, app: string, opts: LockOptions = {}): Promise<Release> {
-  const release = await acquireLock(dir, app, opts)
+export { stateAcquireLock as acquireLock }
+
+/** Compatibility wrapper that preserves the legacy throw-on-error behavior. */
+export async function stateAcquire(
+  dir: string,
+  app: string,
+  opts: LockOptions = {},
+): Promise<Release> {
+  const release = await stateAcquireLock(dir, app, opts)
   if (release instanceof LockError) throw release
   return release
 }
+
+export { stateAcquire as acquire }
 
 async function waitForReady(proc: Bun.Subprocess<'pipe', 'pipe', 'pipe'>): Promise<boolean> {
   const reader = proc.stdout.getReader()

@@ -2,27 +2,31 @@ import { mkdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises
 import { join } from 'node:path'
 import { ZodError } from 'zod'
 import { StateError } from './errors.ts'
-import { type AppState, AppStateSchema, CURRENT_SCHEMA_VERSION, emptyState } from './schema.ts'
+import { type AppState, AppStateSchema, CURRENT_SCHEMA_VERSION, stateEmpty } from './schema.ts'
 
 export interface StateStore {
   dir: string
 }
 
-export function createStateStore(dir: string): StateStore {
+/** Returns the filesystem-backed store root for app state files. */
+export function stateCreateStore(dir: string): StateStore {
   return { dir }
 }
+
+export { stateCreateStore as createStateStore }
 
 function statePath(store: StateStore, app: string): string {
   return join(store.dir, `${app}.json`)
 }
 
-export async function loadState(store: StateStore, app: string): Promise<AppState | StateError> {
+/** Loads one app's state file, returning a typed error on read/parse failures. */
+export async function stateLoad(store: StateStore, app: string): Promise<AppState | StateError> {
   const path = statePath(store, app)
   let raw: string
   try {
     raw = await readFile(path, 'utf8')
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return emptyState(app)
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return stateEmpty(app)
     return new StateError(`reading state ${path}: ${(error as Error).message}`, { cause: error })
   }
 
@@ -43,7 +47,10 @@ export async function loadState(store: StateStore, app: string): Promise<AppStat
   }
 }
 
-export async function saveState(
+export { stateLoad as loadState }
+
+/** Writes one app's state atomically via a temp file rename. */
+export async function stateSave(
   store: StateStore,
   app: string,
   state: AppState,
@@ -64,7 +71,10 @@ export async function saveState(
   }
 }
 
-export async function removeState(store: StateStore, app: string): Promise<StateError | undefined> {
+export { stateSave as saveState }
+
+/** Removes one app's state file without failing when it is already absent. */
+export async function stateRemove(store: StateStore, app: string): Promise<StateError | undefined> {
   const path = statePath(store, app)
   try {
     await rm(path, { force: true })
@@ -74,50 +84,54 @@ export async function removeState(store: StateStore, app: string): Promise<State
   }
 }
 
+export { stateRemove as removeState }
+
 /**
  * Record a failed deploy attempt in the last-deploy summary. Purely
  * informational — jib has no auto-pinning or retry-counting logic, so
  * nothing reads this field except a human running `cat state/<app>.json`.
  */
-export async function recordStateFailure(
+export async function stateRecordFailure(
   store: StateStore,
   app: string,
   errorMsg: string,
 ): Promise<StateError | undefined> {
-  const state = await loadState(store, app)
+  const state = await stateLoad(store, app)
   if (state instanceof StateError) return state
   state.last_deploy_status = 'failure'
   state.last_deploy_error = errorMsg
   state.last_deploy = new Date().toISOString()
-  return saveState(store, app, state)
+  return stateSave(store, app, state)
 }
+
+export { stateRecordFailure as recordStateFailure }
 
 /** JSON-backed per-app state store. Compatibility wrapper over the function API. */
 export class Store {
   private readonly store: StateStore
 
   constructor(dir: string) {
-    this.store = createStateStore(dir)
+    this.store = stateCreateStore(dir)
   }
 
   async load(app: string): Promise<AppState> {
-    const state = await loadState(this.store, app)
+    const state = await stateLoad(this.store, app)
     if (state instanceof StateError) throw state
     return state
   }
 
   async save(app: string, state: AppState): Promise<void> {
-    const error = await saveState(this.store, app, state)
+    const error = await stateSave(this.store, app, state)
     if (error) throw error
   }
 
   async remove(app: string): Promise<void> {
-    const error = await removeState(this.store, app)
+    const error = await stateRemove(this.store, app)
     if (error) throw error
   }
 
   async recordFailure(app: string, errorMsg: string): Promise<void> {
-    const error = await recordStateFailure(this.store, app, errorMsg)
+    const error = await stateRecordFailure(this.store, app, errorMsg)
     if (error) throw error
   }
 }

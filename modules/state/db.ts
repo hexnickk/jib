@@ -12,7 +12,7 @@ const DB_FILE = 'jib.db'
  * file-based migrator because `bun build --compile` does not bundle the
  * generated SQL files. Drizzle is used as a query builder only.
  */
-export function openDb(stateDir: string) {
+export function stateOpenDb(stateDir: string) {
   const dbPath = join(stateDir, DB_FILE)
   const sqlite = new Database(dbPath)
   sqlite.run('PRAGMA journal_mode = WAL')
@@ -24,4 +24,6 @@ export function openDb(stateDir: string) {
   return drizzle(sqlite, { schema })
 }
 
-export type JibDb = ReturnType<typeof openDb>
+export { stateOpenDb as openDb }
+
+export type JibDb = ReturnType<typeof stateOpenDb>

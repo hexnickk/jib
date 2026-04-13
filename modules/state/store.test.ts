@@ -3,8 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { StateError } from './errors.ts'
-import { emptyState } from './schema.ts'
-import { Store, createStateStore, loadState, saveState } from './store.ts'
+import { stateEmpty } from './schema.ts'
+import { Store, stateCreateStore, stateLoad, stateSave } from './store.ts'
 
 async function withStore<T>(fn: (store: Store, dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), 'jib-state-'))
@@ -26,7 +26,7 @@ describe('Store', () => {
 
   test('round-trip save + load', async () => {
     await withStore(async (s) => {
-      const st = emptyState('web')
+      const st = stateEmpty('web')
       st.deployed_sha = 'abc123'
       st.last_deploy_status = 'success'
       await s.save('web', st)
@@ -39,7 +39,7 @@ describe('Store', () => {
 
   test('recordFailure writes last-deploy summary', async () => {
     await withStore(async (s) => {
-      await s.save('web', emptyState('web'))
+      await s.save('web', stateEmpty('web'))
       await s.recordFailure('web', 'boom')
       const st = await s.load('web')
       expect(st.last_deploy_error).toBe('boom')
@@ -50,7 +50,7 @@ describe('Store', () => {
 
   test('remove deletes the app state file', async () => {
     await withStore(async (s) => {
-      await s.save('web', emptyState('web'))
+      await s.save('web', stateEmpty('web'))
       await s.remove('web')
       const st = await s.load('web')
       expect(st.app).toBe('web')
@@ -71,7 +71,7 @@ describe('loadState', () => {
     const dir = await mkdtemp(join(tmpdir(), 'jib-state-'))
     try {
       await Bun.write(join(dir, 'web.json'), '{not json')
-      const state = await loadState(createStateStore(dir), 'web')
+      const state = await stateLoad(stateCreateStore(dir), 'web')
       expect(state).toBeInstanceOf(StateError)
     } finally {
       await rm(dir, { recursive: true, force: true })
@@ -83,7 +83,7 @@ describe('loadState', () => {
     const blockedDir = join(root, 'blocked')
     try {
       await Bun.write(blockedDir, 'not a directory')
-      const error = await saveState(createStateStore(blockedDir), 'web', emptyState('web'))
+      const error = await stateSave(stateCreateStore(blockedDir), 'web', stateEmpty('web'))
       expect(error).toBeInstanceOf(StateError)
     } finally {
       await rm(root, { recursive: true, force: true })

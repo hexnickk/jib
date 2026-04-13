@@ -1,32 +1,67 @@
 import { describe, expect, test } from 'bun:test'
-import { managedServiceNames, normalizeUnitStatus } from './collect.ts'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import type { Config } from '@jib/config'
+import { getPaths } from '@jib/paths'
+import { stateCollectApps, stateManagedServiceNames, stateNormalizeUnitStatus } from './collect.ts'
+import { StateError } from './errors.ts'
 
-describe('managedServiceNames', () => {
+describe('stateManagedServiceNames', () => {
   test('always includes the watcher service', () => {
-    expect(managedServiceNames(false)).toEqual(['jib-watcher'])
+    expect(stateManagedServiceNames(false)).toEqual(['jib-watcher'])
   })
 
   test('includes cloudflared only when the module is enabled', () => {
-    expect(managedServiceNames(true)).toEqual(['jib-watcher', 'jib-cloudflared'])
+    expect(stateManagedServiceNames(true)).toEqual(['jib-watcher', 'jib-cloudflared'])
   })
 })
 
-describe('normalizeUnitStatus', () => {
+describe('stateNormalizeUnitStatus', () => {
   test('preserves one-word systemctl states', () => {
-    expect(normalizeUnitStatus('active\n', 0)).toBe('active')
-    expect(normalizeUnitStatus('failed\n', 3)).toBe('failed')
+    expect(stateNormalizeUnitStatus('active\n', 0)).toBe('active')
+    expect(stateNormalizeUnitStatus('failed\n', 3)).toBe('failed')
   })
 
   test('maps empty failed output to unavailable', () => {
-    expect(normalizeUnitStatus('', 1)).toBe('unavailable')
+    expect(stateNormalizeUnitStatus('', 1)).toBe('unavailable')
   })
 
   test('maps verbose diagnostics to unavailable', () => {
     expect(
-      normalizeUnitStatus(
+      stateNormalizeUnitStatus(
         '"systemd" is not running in this container due to its overhead.\nservice --status-all\n',
         1,
       ),
     ).toBe('unavailable')
+  })
+})
+
+describe('stateCollectApps', () => {
+  test('returns a typed error when one app state file is corrupt', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-state-'))
+    const paths = getPaths(root)
+    try {
+      await mkdir(paths.stateDir, { recursive: true })
+      await Bun.write(join(paths.stateDir, 'web.json'), '{not json')
+      const cfg = {
+        config_version: 3,
+        poll_interval: '5m',
+        modules: {},
+        sources: {},
+        apps: {
+          web: {
+            repo: 'local',
+            branch: 'main',
+            domains: [],
+            env_file: '.env',
+          },
+        },
+      } as Config
+      const result = await stateCollectApps(cfg, paths)
+      expect(result).toBeInstanceOf(StateError)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

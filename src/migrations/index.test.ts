@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getPaths } from '@jib/paths'
-import { openDb } from '@jib/state'
+import { stateOpenDb } from '@jib/state'
 import type { JibDb } from '@jib/state'
 import { jibMigrations } from '@jib/state'
 import { RunMigrationError } from './errors.ts'
@@ -18,7 +18,7 @@ beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'jib-migration-test-'))
   const paths = getPaths(root)
   await mkdir(paths.stateDir, { recursive: true })
-  db = openDb(paths.stateDir)
+  db = stateOpenDb(paths.stateDir)
   ctx = { db, paths }
 })
 

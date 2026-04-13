@@ -3,7 +3,7 @@ import type { Paths } from '@jib/paths'
 import { type SourceStatus, sourcesCollectStatuses } from '@jib/sources'
 import { $ } from 'bun'
 import { StateError } from './errors.ts'
-import { createStateStore, loadState } from './store.ts'
+import { stateCreateStore, stateLoad } from './store.ts'
 
 export interface ServiceStatus {
   name: string
@@ -29,38 +29,54 @@ export interface AppStatus {
 const WATCHER_SERVICE = 'jib-watcher'
 const CLOUDFLARED_SERVICE = 'jib-cloudflared'
 
-export function managedServiceNames(hasCloudflared: boolean): string[] {
+/** Returns the systemd units managed by the status screen. */
+export function stateManagedServiceNames(hasCloudflared: boolean): string[] {
   return hasCloudflared ? [WATCHER_SERVICE, CLOUDFLARED_SERVICE] : [WATCHER_SERVICE]
 }
 
-export async function collectServices(hasCloudflared: boolean): Promise<ServiceStatus[]> {
-  return Promise.all(managedServiceNames(hasCloudflared).map(checkUnit))
+export { stateManagedServiceNames as managedServiceNames }
+
+/** Reads `systemctl is-active` for the managed units and normalizes the result. */
+export async function stateCollectServices(hasCloudflared: boolean): Promise<ServiceStatus[]> {
+  return Promise.all(stateManagedServiceNames(hasCloudflared).map(checkUnit))
 }
 
-export function normalizeUnitStatus(output: string, exitCode: number): string {
+export { stateCollectServices as collectServices }
+
+/** Normalizes `systemctl is-active` output into a stable display string. */
+export function stateNormalizeUnitStatus(output: string, exitCode: number): string {
   const raw = output.trim()
   if (!raw) return exitCode === 0 ? 'unknown' : 'unavailable'
   const firstLine = raw.split('\n', 1)[0]?.trim() ?? ''
   return /^[a-z-]+$/.test(firstLine) ? firstLine : 'unavailable'
 }
 
+export { stateNormalizeUnitStatus as normalizeUnitStatus }
+
 async function checkUnit(name: string): Promise<ServiceStatus> {
   const res = await $`systemctl is-active ${name}`.quiet().nothrow()
   const output = res.stdout.toString() || res.stderr.toString()
-  const status = normalizeUnitStatus(output, res.exitCode)
+  const status = stateNormalizeUnitStatus(output, res.exitCode)
   return { name, active: status === 'active', status }
 }
 
-export async function collectSources(cfg: Config, paths: Paths): Promise<SourceStatus[]> {
+/** Collects source-driver status rows for the status screen. */
+export async function stateCollectSources(cfg: Config, paths: Paths): Promise<SourceStatus[]> {
   return sourcesCollectStatuses(cfg, paths)
 }
 
-export async function collectApps(cfg: Config, paths: Paths): Promise<AppStatus[]> {
-  const store = createStateStore(paths.stateDir)
+export { stateCollectSources as collectSources }
+
+/** Collects app status rows, returning a typed error if app state is unreadable. */
+export async function stateCollectApps(
+  cfg: Config,
+  paths: Paths,
+): Promise<AppStatus[] | StateError> {
+  const store = stateCreateStore(paths.stateDir)
   const results: AppStatus[] = []
   for (const [name, app] of Object.entries(cfg.apps)) {
-    const state = await loadState(store, name)
-    if (state instanceof StateError) throw state
+    const state = await stateLoad(store, name)
+    if (state instanceof StateError) return state
     const containers = await collectContainers(name)
     results.push({
       name,
@@ -72,6 +88,13 @@ export async function collectApps(cfg: Config, paths: Paths): Promise<AppStatus[
     })
   }
   return results
+}
+
+/** Compatibility wrapper that preserves the legacy throw-on-error behavior. */
+export async function collectApps(cfg: Config, paths: Paths): Promise<AppStatus[]> {
+  const result = await stateCollectApps(cfg, paths)
+  if (result instanceof StateError) throw result
+  return result
 }
 
 async function collectContainers(app: string): Promise<ContainerStatus[]> {

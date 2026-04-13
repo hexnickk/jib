@@ -8,7 +8,7 @@ import {
   dockerWriteOverride,
 } from '@jib/docker'
 import { JibError } from '@jib/errors'
-import { type AppState, type Store, acquire } from '@jib/state'
+import { type AppState, type Store, stateAcquire } from '@jib/state'
 import { $ } from 'bun'
 import {
   DeployDiskCheckError,
@@ -108,7 +108,7 @@ export async function deployAcquireLock(
   app: string,
 ): Promise<(() => Promise<void>) | DeployLockAcquireError | JibError> {
   return deployRunOrReturnError(
-    () => acquire(deps.paths.locksDir, app, { blocking: false }),
+    () => stateAcquire(deps.paths.locksDir, app, { blocking: false }),
     (message, options) => new DeployLockAcquireError(app, message, options),
   )
 }

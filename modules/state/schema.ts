@@ -21,6 +21,9 @@ export const AppStateSchema = z.object({
 
 export type AppState = z.infer<typeof AppStateSchema>
 
-export function emptyState(app = ''): AppState {
+/** Builds the empty on-disk state shape for one app. */
+export function stateEmpty(app = ''): AppState {
   return AppStateSchema.parse({ app })
 }
+
+export { stateEmpty as emptyState }
