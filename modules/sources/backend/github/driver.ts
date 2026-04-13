@@ -1,6 +1,6 @@
 import type { App, Config, Source } from '@jib/config'
 import type { Paths } from '@jib/paths'
-import { isExternalRepoURL, pathExists } from '@jib/paths'
+import { pathsIsExternalRepoURL, pathsPathExistsResult } from '@jib/paths'
 import { sourcesGitConfigureSshKey } from '../../git.ts'
 import type { DriverSourceStatus, ResolvedDriverSource, SourceDriver } from '../../types.ts'
 import { githubAuthApply, githubAuthPemPath, githubAuthRefresh } from './auth.ts'
@@ -18,7 +18,7 @@ const AUTH_FAILURE_SNIPPETS = [
 ]
 
 export function githubCloneUrl(app: App, cfg: Config): string {
-  if (isExternalRepoURL(app.repo)) return app.repo
+  if (pathsIsExternalRepoURL(app.repo)) return app.repo
   const sourceType = app.source ? cfg.sources[app.source]?.type : undefined
   return sourceType === 'key'
     ? githubRemoteSshCloneUrl(app.repo)
@@ -30,7 +30,7 @@ export async function githubResolveSource(
   app: App,
   paths: Paths,
 ): Promise<ResolvedDriverSource | Error> {
-  const external = isExternalRepoURL(app.repo)
+  const external = pathsIsExternalRepoURL(app.repo)
   const auth =
     !external && app.source ? await githubAuthRefresh(app.source, cfg, app, paths) : undefined
   if (auth instanceof Error) return auth
@@ -50,7 +50,7 @@ export async function githubResolveSource(
 }
 
 function supportsGitHubRepo(repo: string): boolean {
-  return repo !== 'local' && !isExternalRepoURL(repo)
+  return repo !== 'local' && !pathsIsExternalRepoURL(repo)
 }
 
 function isGitHubAuthFailure(error: unknown): boolean {
@@ -73,7 +73,7 @@ async function describeGitHubStatus(
       : githubDeployKeyPaths(paths, sourceName).privateKey
   return {
     detail: source.type === 'app' ? `github app (id ${source.app_id})` : 'github deploy-key',
-    hasCredential: await pathExists(credentialPath),
+    hasCredential: (await pathsPathExistsResult(credentialPath)) === true,
   }
 }
 

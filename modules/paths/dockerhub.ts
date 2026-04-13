@@ -12,14 +12,10 @@ export function pathsDockerHubImage(repo: string): string | null {
   return null
 }
 
-export { pathsDockerHubImage as dockerHubImage }
-
 /** Returns true when the repo string points at a Docker Hub image or page. */
 export function pathsIsDockerHubRepo(repo: string): boolean {
   return pathsDockerHubImage(repo) !== null
 }
-
-export { pathsIsDockerHubRepo as isDockerHubRepo }
 
 function normalizeImage(value: string): string | null {
   return value.length > 0 && IMAGE_REF_RE.test(value) ? value : null

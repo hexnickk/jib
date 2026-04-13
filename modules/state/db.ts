@@ -24,6 +24,4 @@ export function stateOpenDb(stateDir: string) {
   return drizzle(sqlite, { schema })
 }
 
-export { stateOpenDb as openDb }
-
 export type JibDb = ReturnType<typeof stateOpenDb>

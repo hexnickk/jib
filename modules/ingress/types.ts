@@ -15,6 +15,9 @@ export interface IngressProgress {
 }
 
 export interface IngressOperator {
-  claim(claim: IngressClaim, onProgress?: (progress: IngressProgress) => void): Promise<void>
-  release(app: string, onProgress?: (progress: IngressProgress) => void): Promise<void>
+  claim(
+    claim: IngressClaim,
+    onProgress?: (progress: IngressProgress) => void,
+  ): Promise<undefined | Error>
+  release(app: string, onProgress?: (progress: IngressProgress) => void): Promise<undefined | Error>
 }

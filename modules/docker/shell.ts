@@ -1,5 +1,5 @@
 import { type App, ConfigError, MissingConfigAppError, configLoadAppContext } from '@jib/config'
-import { type Paths, repoPath } from '@jib/paths'
+import { type Paths, pathsRepoPath } from '@jib/paths'
 import { dockerComposeFor } from './compose-for.ts'
 import {
   DockerAppHasNoServicesError,
@@ -71,7 +71,7 @@ function resolveServiceResult(
   paths: Paths,
 ): string | ResolveServiceError {
   if (requested) return requested
-  const dir = repoPath(paths, appName, appCfg.repo)
+  const dir = pathsRepoPath(paths, appName, appCfg.repo)
   const inspection = dockerInspectComposeApp(appCfg, dir)
   if (inspection instanceof ComposeInspectionError) return inspection
   const services = inspection.services

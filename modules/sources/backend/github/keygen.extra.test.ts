@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 
 const originalDollar = Bun.$
 
@@ -31,7 +31,7 @@ afterEach(() => {
 describe('github keygen helpers', () => {
   test('generateDeployKey shells out and returns the public key text', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-keygen-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = ((
       parts: TemplateStringsArray,
       ...values: string[]

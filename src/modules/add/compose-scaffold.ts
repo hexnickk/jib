@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { copyFile, mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { type Paths, managedComposePath } from '@jib/paths'
+import { type Paths, pathsManagedComposePath } from '@jib/paths'
 
 export const GENERATED_COMPOSE_FILE = 'docker-compose.generated.yml'
 
@@ -25,7 +25,7 @@ export async function addPersistGeneratedCompose(
   workdir: string,
 ): Promise<string> {
   const source = join(workdir, GENERATED_COMPOSE_FILE)
-  const target = managedComposePath(paths, app)
+  const target = pathsManagedComposePath(paths, app)
   await mkdir(dirname(target), { recursive: true, mode: 0o750 })
   await copyFile(source, target)
   return target

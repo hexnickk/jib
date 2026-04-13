@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
-import { getPaths, pathExists, repoPath } from '@jib/paths'
+import { pathsGetPaths, pathsPathExistsResult, pathsRepoPath } from '@jib/paths'
 import { $ } from 'bun'
 import {
   SourceDriverNotRegisteredError,
@@ -84,20 +84,20 @@ describe('sources service', () => {
   test('probe returns the remote sha without requiring a checkout', async () => {
     const upstream = await makeUpstream('jib-probe')
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const result = expectSourceValue(
       await sourcesProbe(configFor(upstream), paths, { app: 'demo' }),
     )
 
     expect(result.sha).toMatch(/^[0-9a-f]{40}$/)
-    expect(result.workdir).toBe(repoPath(paths, 'demo', upstream))
+    expect(result.workdir).toBe(pathsRepoPath(paths, 'demo', upstream))
   })
 
   test('sourcesCloneForInspection and sourcesSync share the checkout lifecycle', async () => {
     const upstream = await makeUpstream('jib-roundtrip')
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
-    const workdir = repoPath(paths, 'demo', upstream)
+    const paths = pathsGetPaths(root)
+    const workdir = pathsRepoPath(paths, 'demo', upstream)
 
     const checkout = expectSourceValue(
       await sourcesCloneForInspection(configFor(upstream), paths, { app: 'demo' }),
@@ -108,16 +108,16 @@ describe('sources service', () => {
       await sourcesSync(configFor(upstream), paths, { app: 'demo' }, 'main'),
     )
     expect(prepared.workdir).toBe(workdir)
-    expect(await pathExists(workdir)).toBe(true)
+    expect(await pathsPathExistsResult(workdir)).toBe(true)
 
     await sourcesRemoveCheckout(paths, 'demo', upstream)
-    expect(await pathExists(workdir)).toBe(false)
+    expect(await pathsPathExistsResult(workdir)).toBe(false)
   })
 
   test('probe and sourcesSync follow the remote default branch for a new app', async () => {
     const upstream = await makeUpstreamOnBranch('jib-master', 'master')
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const cfg: Config = {
       config_version: 3,
       poll_interval: '5m',
@@ -145,7 +145,7 @@ describe('sources service', () => {
     await $`git -C ${upstream} tag v2`.quiet()
 
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const prepared = expectSourceValue(
       await sourcesSync(configFor(upstream), paths, { app: 'demo' }, 'v2'),
     )
@@ -155,7 +155,7 @@ describe('sources service', () => {
 
   test('docker hub repo resolves to a stable local workdir without git', async () => {
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const cfg: Config = {
       config_version: 3,
       poll_interval: '5m',
@@ -176,13 +176,13 @@ describe('sources service', () => {
     )
 
     expect(probed).toBeNull()
-    expect(prepared.workdir).toBe(repoPath(paths, 'demo', 'local'))
+    expect(prepared.workdir).toBe(pathsRepoPath(paths, 'demo', 'local'))
     expect(prepared.sha).toBe('n8nio/n8n')
   })
 
   test('returns typed result errors for missing app and local repo resolution failures', async () => {
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const cfg: Config = {
       config_version: 3,
       poll_interval: '5m',
@@ -199,7 +199,7 @@ describe('sources service', () => {
 
   test('returns typed result errors for missing source config and driver registration', async () => {
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
 
     const missingSourceCfg: Config = {
       config_version: 3,
@@ -233,7 +233,7 @@ describe('sources service', () => {
 
   test('returns a typed local checkout error for a missing local repo workdir', async () => {
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const result = await sourcesSync(configFor('local'), paths, { app: 'demo' })
 
     expect(result).toBeInstanceOf(SourceLocalCheckoutError)
@@ -242,7 +242,7 @@ describe('sources service', () => {
 
   test('returns a typed remote resolve error when default branch lookup fails', async () => {
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const cfg: Config = {
       config_version: 3,
       poll_interval: '5m',
@@ -260,20 +260,20 @@ describe('sources service', () => {
 
   test('returns a typed remote sync error when clone fails', async () => {
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const missingRepo = join(root, 'missing-upstream')
     const result = await sourcesSync(configFor(join(root, 'missing-upstream')), paths, {
       app: 'demo',
     })
 
     expect(result).toBeInstanceOf(SourceRemoteSyncError)
-    expect(await pathExists(repoPath(paths, 'demo', missingRepo))).toBe(false)
+    expect(await pathsPathExistsResult(pathsRepoPath(paths, 'demo', missingRepo))).toBe(false)
   })
 
   test('returns a typed probe error when lsRemote returns an error result', async () => {
     const upstream = await makeUpstream('jib-probe-fail')
     const root = await makeTempRoot('jib-root-')
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const result = await sourcesProbe(
       configFor(upstream),
       paths,

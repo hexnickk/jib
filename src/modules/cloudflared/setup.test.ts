@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { CloudflaredSaveTunnelTokenError } from '@jib-module/cloudflared'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import {
   CloudflaredSetupPromptError,
   CloudflaredSetupSaveTokenError,
@@ -25,7 +25,7 @@ function createLogger() {
 }
 
 describe('cloudflaredRunSetupResult', () => {
-  const paths = getPaths('/tmp/jib-cloudflared-setup')
+  const paths = pathsGetPaths('/tmp/jib-cloudflared-setup')
 
   test('returns typed prompt errors when replacement confirmation fails', async () => {
     const result = await cloudflaredRunSetupResult(paths, {
@@ -84,7 +84,7 @@ describe('cloudflaredRunSetupResult', () => {
 })
 
 describe('cloudflaredRunSetup', () => {
-  const paths = getPaths('/tmp/jib-cloudflared-setup')
+  const paths = pathsGetPaths('/tmp/jib-cloudflared-setup')
 
   test('keeps the boolean wrapper behavior for existing callers', async () => {
     const logger = createLogger()

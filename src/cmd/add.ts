@@ -88,10 +88,10 @@ const cliAddCommand = {
     })
 
     try {
-      const { addResult, deployResult } = await addRunSequence(
+      const sequence = await addRunSequence(
         async () => {
           const draftApp = addBuildDraftApp(flowArgs, inputs)
-          if (draftApp instanceof Error) throw draftApp
+          if (draftApp instanceof Error) return draftApp
           const result = await addRun(
             { support: addSupport, planner, observer: inspection.observer },
             {
@@ -109,8 +109,8 @@ const cliAddCommand = {
               },
             },
           )
-          if (result instanceof CancelledAddError) throw result
-          if (result instanceof Error) throw addNormalizeError(result, appName, paths.configFile)
+          if (result instanceof CancelledAddError) return result
+          if (result instanceof Error) return addNormalizeError(result, appName, paths.configFile)
           return result
         },
         (result) =>
@@ -124,18 +124,24 @@ const cliAddCommand = {
         (result) => addRollbackApp(paths, appName, preflight.cfg, result.finalApp),
         interrupt,
       )
-      inspection.stop()
-      return addRenderResult(appName, inputs.repo, addResult, deployResult)
-    } catch (error) {
-      inspection.fail()
-      if (error instanceof CancelledAddError) return new CliError('cancelled', error.message)
-      if (error instanceof AddRolledBackError) {
+      if (sequence instanceof CancelledAddError) {
+        inspection.fail()
+        return new CliError('cancelled', sequence.message)
+      }
+      if (sequence instanceof AddRolledBackError) {
         const original = interrupt.interrupted
           ? new CliError('cancelled', 'add cancelled')
-          : error.original
+          : sequence.original
+        inspection.fail()
         return addNormalizeDeployError(original, appName, paths.configFile)
       }
-      throw error
+      if (sequence instanceof Error) {
+        inspection.fail()
+        return sequence
+      }
+      const { addResult, deployResult } = sequence
+      inspection.stop()
+      return addRenderResult(appName, inputs.repo, addResult, deployResult)
     } finally {
       interrupt.dispose()
     }
@@ -143,18 +149,18 @@ const cliAddCommand = {
 } satisfies CliCommand<AddCommandArgv>
 
 /** Claims ingress for a newly added app while keeping spinner updates local to the command. */
-async function addClaimIngress(paths: Paths, app: string, appCfg: App): Promise<void> {
+async function addClaimIngress(paths: Paths, app: string, appCfg: App): Promise<undefined | Error> {
   const progress = cliIsTextOutput() ? tuiSpinner() : null
   progress?.start(`claiming ingress for ${app}`)
-  try {
-    await ingressClaim(ingressCreateOperator(paths), app, appCfg, (update) =>
-      progress?.message(update.message),
-    )
-    progress?.stop('ingress ready')
-  } catch (error) {
+  const error = await ingressClaim(ingressCreateOperator(paths), app, appCfg, (update) =>
+    progress?.message(update.message),
+  )
+  if (error instanceof Error) {
     progress?.stop('ingress failed')
-    throw error
+    return error
   }
+  progress?.stop('ingress ready')
+  return undefined
 }
 
 export default cliAddCommand

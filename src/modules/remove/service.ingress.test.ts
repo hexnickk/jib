@@ -25,25 +25,31 @@ describe('runRemove ingress cleanup', () => {
     const support: RemoveSupport = {
       releaseIngress: async () => {
         calls.push('releaseIngress')
-        throw new Error('nginx reload failed')
+        return new Error('nginx reload failed')
       },
       stopApp: async () => {
         calls.push('stopApp')
+        return undefined
       },
       removeCheckout: async () => {
         calls.push('removeCheckout')
+        return undefined
       },
       removeSecrets: async () => {
         calls.push('removeSecrets')
+        return undefined
       },
       removeState: async () => {
         calls.push('removeState')
+        return undefined
       },
       removeOverride: async () => {
         calls.push('removeOverride')
+        return undefined
       },
       removeManagedCompose: async () => {
         calls.push('removeManagedCompose')
+        return undefined
       },
       writeConfig: async (): Promise<undefined> => {
         calls.push('writeConfig')

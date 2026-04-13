@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { CliError } from '@jib/cli'
 import type { Config } from '@jib/config'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import { addChooseInitialSource } from './add-support.ts'
 
 const cfg = {
@@ -26,7 +26,7 @@ const selectSetup = async <T extends string>(_opts: {
 function createAddTestPaths() {
   const dir = mkdtempSync(join(tmpdir(), 'jib-add-test-'))
   tempDirs.push(dir)
-  return getPaths(dir)
+  return pathsGetPaths(dir)
 }
 
 afterEach(() => {

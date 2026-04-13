@@ -1,5 +1,5 @@
 import { ValidationError } from '@jib/errors'
-import { dockerHubImage } from '@jib/paths'
+import { pathsDockerHubImage } from '@jib/paths'
 import { addSplitCommaValues } from './guided.ts'
 
 type RepoBackend = 'github' | 'dockerhub' | 'other'
@@ -61,7 +61,7 @@ export function addRepoPrompt(backend: RepoBackend | undefined): {
 export function addNormalizeRepo(repo: string, backend: RepoBackend | undefined): string {
   if (backend === 'github') return addNormalizeGitHubRepo(repo)
   if (backend !== 'dockerhub') return repo
-  if (dockerHubImage(repo)) return repo
+  if (pathsDockerHubImage(repo)) return repo
   return `docker://${repo}`
 }
 
@@ -75,7 +75,7 @@ export async function addResolvePersistPaths(
   },
 ): Promise<string[] | Error> {
   if (rawPersist.length > 0) return rawPersist.flatMap(addSplitCommaValues)
-  if (!dockerHubImage(repo) || !deps.interactive()) return []
+  if (!pathsDockerHubImage(repo) || !deps.interactive()) return []
   const raw = await deps.promptOptional({
     message: 'Persistent container path(s) (comma-separated, blank for none)',
     placeholder: '/data',

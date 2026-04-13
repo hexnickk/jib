@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
-import { getPaths, managedComposePath, repoPath } from '@jib/paths'
+import { pathsGetPaths, pathsManagedComposePath, pathsRepoPath } from '@jib/paths'
 import { $ } from 'bun'
 import { addRun } from './service.ts'
 import { addCreateDefaultSupport } from './support.ts'
@@ -43,7 +43,7 @@ describe('addRun with addCreateDefaultSupport', () => {
     const upstream = await makeUpstream()
 
     try {
-      const paths = getPaths(root)
+      const paths = pathsGetPaths(root)
       await mkdir(paths.secretsDir, { recursive: true })
       const cfg: Config = {
         config_version: 3,
@@ -57,7 +57,7 @@ describe('addRun with addCreateDefaultSupport', () => {
       await mkdir(paths.root, { recursive: true })
       await writeFile(paths.configFile, configYaml())
 
-      const managedCompose = managedComposePath(paths, 'blog')
+      const managedCompose = pathsManagedComposePath(paths, 'blog')
       const inspection: ComposeInspection = {
         composeFiles: [managedCompose],
         services: [{ name: 'web', ports: ['8080:80'], expose: [], envRefs: [], buildArgRefs: [] }],
@@ -117,7 +117,7 @@ describe('addRun with addCreateDefaultSupport', () => {
       expect((result as Error).message).toBe('claim ingress failed')
 
       expect(await stat(managedCompose).catch(() => null)).toBeNull()
-      expect(await stat(repoPath(paths, 'blog', upstream)).catch(() => null)).toBeNull()
+      expect(await stat(pathsRepoPath(paths, 'blog', upstream)).catch(() => null)).toBeNull()
       expect(await readFile(join(paths.secretsDir, 'blog', '.env'), 'utf8')).toBe('')
       expect(await readFile(paths.configFile, 'utf8')).not.toContain('blog:')
     } finally {

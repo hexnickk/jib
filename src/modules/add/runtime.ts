@@ -80,7 +80,7 @@ export async function addRollbackApp(
   app: string,
   originalCfg: Config,
   finalApp: App,
-): Promise<void> {
+): Promise<undefined | Error> {
   const cfgResult = await configLoad(paths.configFile)
   const cfg =
     cfgResult instanceof Error
@@ -89,7 +89,7 @@ export async function addRollbackApp(
           apps: { ...originalCfg.apps, [app]: finalApp },
         }
       : cfgResult
-  if (!cfg.apps[app]) return
+  if (!cfg.apps[app]) return undefined
   const result = await removeApp(
     {
       support: removeCreateSupport({
@@ -100,8 +100,9 @@ export async function addRollbackApp(
     },
     { appName: app, cfg, configFile: paths.configFile, quiet: !cliIsTextOutput() },
   )
-  if (result instanceof RemoveMissingAppError) return
-  if (result instanceof RemoveWriteConfigError) throw result
+  if (result instanceof RemoveMissingAppError) return undefined
+  if (result instanceof RemoveWriteConfigError) return result
+  return undefined
 }
 
 export function addTrapInterrupt(): InterruptTrap {

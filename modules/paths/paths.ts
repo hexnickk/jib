@@ -41,8 +41,6 @@ export function pathsGetPaths(root?: string): Paths {
   }
 }
 
-export { pathsGetPaths as getPaths }
-
 /**
  * Returns true for repo strings that are already complete clone URLs
  * (file://, ssh://, http(s)://, git://, git@host:…, or absolute paths).
@@ -60,8 +58,6 @@ export function pathsIsExternalRepoURL(repo: string): boolean {
   )
 }
 
-export { pathsIsExternalRepoURL as isExternalRepoURL }
-
 /**
  * On-disk path for an app's git checkout. Local repos land under
  * `repos/local/<app>`, external URLs under `repos/external/<app>`, and
@@ -77,8 +73,6 @@ export function pathsRepoPath(paths: Paths, app: string, repo: string): string {
   return join(paths.reposDir, 'github', repo)
 }
 
-export { pathsRepoPath as repoPath }
-
 /**
  * Path for a jib-managed credential under `secrets/_jib/<kind>/<name>`.
  * Mirrors Go `CredsPath`.
@@ -87,29 +81,16 @@ export function pathsCredsPath(paths: Paths, kind: string, name: string): string
   return join(paths.secretsDir, '_jib', kind, name)
 }
 
-export { pathsCredsPath as credsPath }
-
 /** Deterministic path for an app's jib-managed generated compose file. */
 export function pathsManagedComposePath(paths: Paths, app: string): string {
   return join(paths.composeDir, `${app}.yml`)
 }
-
-export { pathsManagedComposePath as managedComposePath }
 
 /**
  * Creates credential directories beneath the shared `secrets/_jib` tree.
  * Existing directories are left alone so a non-root CLI does not try to chmod
  * root-owned paths; migrations repair older installs in place.
  */
-export async function pathsEnsureCredsDir(paths: Paths, kind: string): Promise<string> {
-  const ensured = await pathsEnsureCredsDirResult(paths, kind)
-  if (ensured instanceof EnsureCredsDirError) throw ensured
-  return ensured
-}
-
-export { pathsEnsureCredsDir as ensureCredsDir }
-
-/** Ensures the credential directory exists and returns a typed error on failure. */
 export async function pathsEnsureCredsDirResult(
   paths: Paths,
   kind: string,
@@ -135,17 +116,6 @@ export async function pathsEnsureCredsDirResult(
   return dir
 }
 
-export { pathsEnsureCredsDirResult as ensureCredsDirResult }
-
-/** Returns true if a file or directory exists at `path`. */
-export async function pathsPathExists(path: string): Promise<boolean> {
-  const exists = await pathsPathExistsResult(path)
-  if (exists instanceof PathLookupError) throw exists
-  return exists
-}
-
-export { pathsPathExists as pathExists }
-
 /** Returns true for existing files and directories, or a typed error on stat failures. */
 export async function pathsPathExistsResult(path: string): Promise<boolean | PathLookupError> {
   try {
@@ -156,8 +126,6 @@ export async function pathsPathExistsResult(path: string): Promise<boolean | Pat
     return new PathLookupError(path, { cause: toError(error) })
   }
 }
-
-export { pathsPathExistsResult as pathExistsResult }
 
 async function createCredsDir(kind: string, dir: string): Promise<EnsureCredsDirError | undefined> {
   try {

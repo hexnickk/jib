@@ -140,7 +140,8 @@ export async function addPromptForServices(
 }
 
 function mergeEntry(existing: ConfigEntry | undefined, next: ConfigEntry): ConfigEntry {
-  return addMergeConfigEntries(existing ? [existing, next] : [next])[0] as ConfigEntry
+  const merged = addMergeConfigEntries(existing ? [existing, next] : [next])
+  return (merged instanceof Error ? [next] : merged)[0] as ConfigEntry
 }
 
 function scopeSummaryLabel(scope: ConfigScope): string {

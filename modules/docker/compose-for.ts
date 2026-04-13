@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
-import { type Paths, repoPath } from '@jib/paths'
+import { type Paths, pathsRepoPath } from '@jib/paths'
 import { type ComposeConfig, type DockerCompose, dockerCreateCompose } from './compose.ts'
 import { DockerAppNotFoundError } from './errors.ts'
 import { dockerOverridePath } from './override.ts'
@@ -25,7 +25,7 @@ export function dockerComposeFor(
   const appCfg = cfg.apps[app]
   if (!appCfg) return new DockerAppNotFoundError(app)
 
-  const dir = repoPath(paths, app, appCfg.repo)
+  const dir = pathsRepoPath(paths, app, appCfg.repo)
   const files = (
     appCfg.compose && appCfg.compose.length > 0 ? appCfg.compose : ['docker-compose.yml']
   ).map((f) => (f.startsWith('/') ? f : join(dir, f)))

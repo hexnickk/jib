@@ -7,7 +7,7 @@ import {
   cliIsTextOutput,
 } from '@jib/cli'
 import { configLoad } from '@jib/config'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import { hasBootstrapState } from '../migrations/service.ts'
 import { initConfigureOptionalModules } from '../modules/init/optional.ts'
@@ -45,7 +45,7 @@ const cliInitCommand = {
       if (rootError) return rootError
     }
 
-    const paths = getPaths()
+    const paths = pathsGetPaths()
     const migrationError = initCheckMigration(hasBootstrapState(paths))
     if (migrationError) return migrationError
     if (cliIsTextOutput()) tuiIntro('jib init')

@@ -30,11 +30,11 @@ export async function ingressClaim(
   app: string,
   appCfg: App,
   onProgress?: (progress: IngressProgress) => void,
-): Promise<void> {
+): Promise<undefined | Error> {
   const claim = ingressBuildClaim(app, appCfg)
-  if (!claim) return
-  if (claim instanceof IngressMissingPortError) throw claim
-  await operator.claim(claim, onProgress)
+  if (!claim) return undefined
+  if (claim instanceof IngressMissingPortError) return claim
+  return await operator.claim(claim, onProgress)
 }
 
 /** Releases ingress state for an app through the active operator. */
@@ -42,8 +42,8 @@ export async function ingressRelease(
   operator: IngressOperator,
   app: string,
   onProgress?: (progress: IngressProgress) => void,
-): Promise<void> {
-  await operator.release(app, onProgress)
+): Promise<undefined | Error> {
+  return await operator.release(app, onProgress)
 }
 
 function getIngressPort(

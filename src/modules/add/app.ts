@@ -1,6 +1,6 @@
 import { type App, AppSchema, type Domain, type HealthCheck } from '@jib/config'
 import { ValidationError } from '@jib/errors'
-import { dockerHubImage } from '@jib/paths'
+import { pathsDockerHubImage } from '@jib/paths'
 import { GENERATED_COMPOSE_FILE } from './compose-scaffold.ts'
 import type { AddInputs } from './types.ts'
 
@@ -9,7 +9,7 @@ export function addBuildDraftApp(
   args: { source?: string; branch?: string },
   inputs: AddInputs,
 ): App | ValidationError {
-  const image = dockerHubImage(inputs.repo)
+  const image = pathsDockerHubImage(inputs.repo)
   return addParseApp({
     repo: image ? 'local' : inputs.repo,
     ...(image ? { image } : {}),

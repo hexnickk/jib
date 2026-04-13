@@ -23,25 +23,48 @@ export class AddRolledBackError extends JibError {
 }
 
 export async function addRunSequence(
-  add: () => Promise<AddFlowResult>,
-  deploy: (result: AddFlowResult) => Promise<DeploySequenceResult>,
-  rollback: (result: AddFlowResult) => Promise<void>,
+  add: () => Promise<AddFlowResult | Error>,
+  deploy: (result: AddFlowResult) => Promise<DeploySequenceResult | Error>,
+  rollback: (result: AddFlowResult) => Promise<undefined | Error>,
   interrupt: InterruptState,
-): Promise<{ addResult: AddFlowResult; deployResult: DeploySequenceResult }> {
-  let addResult: AddFlowResult | null = null
+): Promise<{ addResult: AddFlowResult; deployResult: DeploySequenceResult } | Error> {
+  let addResult: AddFlowResult | undefined
+
   try {
-    addResult = await add()
-    throwIfInterrupted(interrupt)
+    const added = await add()
+    if (added instanceof Error) return added
+    addResult = added
+
+    const interrupted = addInterruptError(interrupt)
+    if (interrupted) return await addRollbackAfterFailure(addResult, interrupted, rollback)
+
     const deployResult = await deploy(addResult)
+    if (deployResult instanceof Error) {
+      return await addRollbackAfterFailure(addResult, deployResult, rollback)
+    }
+
     return { addResult, deployResult }
   } catch (error) {
-    if (!addResult) throw error
-    await rollback(addResult)
-    throw new AddRolledBackError(error)
+    if (!addResult) return error instanceof Error ? error : new Error(String(error))
+    return await addRollbackAfterFailure(addResult, error, rollback)
   }
 }
 
-function throwIfInterrupted(interrupt: InterruptState): void {
-  if (!interrupt.interrupted) return
-  throw new CliError('cancelled', 'add cancelled')
+function addInterruptError(interrupt: InterruptState): CliError | undefined {
+  if (!interrupt.interrupted) return undefined
+  return new CliError('cancelled', 'add cancelled')
+}
+
+async function addRollbackAfterFailure(
+  addResult: AddFlowResult,
+  failure: unknown,
+  rollback: (result: AddFlowResult) => Promise<undefined | Error>,
+): Promise<Error> {
+  try {
+    const rollbackError = await rollback(addResult)
+    if (rollbackError instanceof Error) return rollbackError
+  } catch (rollbackError) {
+    return rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError))
+  }
+  return new AddRolledBackError(failure)
 }

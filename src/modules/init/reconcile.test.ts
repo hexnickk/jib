@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
-import { credsPath, getPaths } from '@jib/paths'
+import { pathsCredsPath, pathsGetPaths } from '@jib/paths'
 import { initInferredOptionalModules, initReconcileOptionalModules } from './reconcile.ts'
 
 async function readConfig(file: string): Promise<Config> {
@@ -33,8 +33,8 @@ async function withTmpConfig<T>(fn: (cfg: Config, root: string) => Promise<T>): 
 describe('initReconcileOptionalModules', () => {
   test('infers cloudflared when a tunnel token already exists', async () => {
     await withTmpConfig(async (cfg, root) => {
-      const paths = getPaths(root)
-      const tokenPath = credsPath(paths, 'cloudflare', 'tunnel.env')
+      const paths = pathsGetPaths(root)
+      const tokenPath = pathsCredsPath(paths, 'cloudflare', 'tunnel.env')
       await mkdir(join(root, 'secrets', '_jib', 'cloudflare'), { recursive: true })
       await writeFile(tokenPath, 'TUNNEL_TOKEN=abc\n')
 
@@ -48,8 +48,8 @@ describe('initReconcileOptionalModules', () => {
 
   test('can infer modules without persisting config changes', async () => {
     await withTmpConfig(async (cfg, root) => {
-      const paths = getPaths(root)
-      const tokenPath = credsPath(paths, 'cloudflare', 'tunnel.env')
+      const paths = pathsGetPaths(root)
+      const tokenPath = pathsCredsPath(paths, 'cloudflare', 'tunnel.env')
       await mkdir(join(root, 'secrets', '_jib', 'cloudflare'), { recursive: true })
       await writeFile(tokenPath, 'TUNNEL_TOKEN=abc\n')
 
@@ -70,8 +70,8 @@ describe('initReconcileOptionalModules', () => {
 
   test('preserves explicit module decisions', async () => {
     await withTmpConfig(async (_, root) => {
-      const paths = getPaths(root)
-      const tokenPath = credsPath(paths, 'cloudflare', 'tunnel.env')
+      const paths = pathsGetPaths(root)
+      const tokenPath = pathsCredsPath(paths, 'cloudflare', 'tunnel.env')
       await mkdir(join(root, 'secrets', '_jib', 'cloudflare'), { recursive: true })
       await writeFile(tokenPath, 'TUNNEL_TOKEN=abc\n')
       const cfg = {

@@ -1,4 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pathsGetPaths } from '@jib/paths'
 import type { AddFlowError } from './flow-errors.ts'
 import { CancelledAddError } from './flow-errors.ts'
 import { addFinalApp, addMakeDeps, addMakeParams } from './service.test-support.ts'
@@ -66,5 +70,28 @@ describe('add flow state machine', () => {
     expect(calls.includes('rollbackRepo')).toBe(true)
     expect(calls.some((call) => call.startsWith('removeSecret:'))).toBe(false)
     expect(calls.includes('loadConfig')).toBe(false)
+  })
+
+  test('docker hub workdir preparation failures return PrepareRepoError', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-add-dockerhub-'))
+    const { flow } = addMakeDeps()
+
+    try {
+      const paths = pathsGetPaths(root)
+      await mkdir(paths.reposDir, { recursive: true })
+      await writeFile(join(paths.reposDir, 'local'), 'not-a-directory')
+
+      const params = addMakeParams()
+      const result = await flow.run({
+        ...params,
+        paths,
+        inputs: { ...params.inputs, repo: 'docker://n8nio/n8n' },
+      })
+
+      expect(result).toBeInstanceOf(Error)
+      expect((result as AddFlowError).code).toBe('add_prepare_repo')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

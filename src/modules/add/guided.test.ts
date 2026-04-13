@@ -39,6 +39,7 @@ describe('guided add helpers', () => {
       ],
       'direct',
     )
+    if (merged instanceof Error) throw merged
 
     expect(merged.domains).toEqual([{ host: 'demo.example.com', service: 'web' }])
     expect(merged.configEntries).toEqual([
@@ -65,6 +66,7 @@ describe('guided add helpers', () => {
       ],
       'direct',
     )
+    if (merged instanceof Error) throw merged
 
     expect(merged.domains).toEqual([{ host: 'app.example.com', service: 'web' }])
     expect(merged.configEntries).toEqual([{ key: 'API_URL', value: 'https://api', scope: 'both' }])
@@ -77,6 +79,7 @@ describe('guided add helpers', () => {
       [{ service: 'worker', expose: false }],
       'direct',
     )
+    if (merged instanceof Error) throw merged
 
     expect(merged.domains).toEqual([])
     expect(merged.configEntries).toEqual([])

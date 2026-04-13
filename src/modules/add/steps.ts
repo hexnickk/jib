@@ -1,5 +1,5 @@
 import type { ComposeInspection } from '@jib/docker'
-import { managedComposePath } from '@jib/paths'
+import { pathsManagedComposePath } from '@jib/paths'
 import type { Step } from '../tx/run.ts'
 import { addPrepareDockerHubWorkdir } from './dockerhub.ts'
 import {
@@ -50,31 +50,33 @@ export function addBuildSteps(): readonly Step<AddRunContext, unknown, AddFlowEr
 const prepareRepoStep: Step<AddRunContext, { repo: string }, AddFlowError> = {
   name: 'repo',
   async up(ctx) {
-    try {
-      const { workdir } = await ctx.support.cloneForInspection(ctx.params.cfg, ctx.params.appName, {
+    const inspectionCheckout = await ctx.support.cloneForInspection(
+      ctx.params.cfg,
+      ctx.params.appName,
+      {
         repo: ctx.params.inputs.repo,
         branch: ctx.params.draftApp.branch,
         ...(ctx.params.args.source ? { source: ctx.params.args.source } : {}),
-      })
+      },
+    )
+    if (inspectionCheckout instanceof Error) return new PrepareRepoError(inspectionCheckout)
+    try {
       await addPrepareDockerHubWorkdir(
         ctx.params.paths,
         ctx.params.appName,
         ctx.params.inputs.repo,
         ctx.params.inputs.persistPaths,
       )
-      ctx.workdir = workdir
-      ctx.observer.onStateChange?.('repo_prepared')
-      return { repo: ctx.params.draftApp.image ? 'local' : ctx.params.inputs.repo }
     } catch (cause) {
       return new PrepareRepoError(cause)
     }
+    ctx.workdir = inspectionCheckout.workdir
+    ctx.observer.onStateChange?.('repo_prepared')
+    return { repo: ctx.params.draftApp.image ? 'local' : ctx.params.inputs.repo }
   },
   async down(ctx, state) {
-    try {
-      await ctx.support.removeCheckout(ctx.params.appName, state.repo)
-    } catch (cause) {
-      return new PrepareRepoRollbackError(cause)
-    }
+    const error = await ctx.support.removeCheckout(ctx.params.appName, state.repo)
+    if (error instanceof Error) return new PrepareRepoRollbackError(error)
   },
 }
 
@@ -118,17 +120,15 @@ const resolveAppStep: Step<AddRunContext, { managedComposeWritten: boolean }, Ad
     ctx.observer.onStateChange?.('app_resolved')
     return {
       managedComposeWritten:
-        ctx.finalApp.compose?.includes(managedComposePath(ctx.params.paths, ctx.params.appName)) ??
-        false,
+        ctx.finalApp.compose?.includes(
+          pathsManagedComposePath(ctx.params.paths, ctx.params.appName),
+        ) ?? false,
     }
   },
   async down(ctx, state) {
     if (!state.managedComposeWritten) return
-    try {
-      await ctx.support.removeManagedCompose(ctx.params.appName)
-    } catch (cause) {
-      return new RemoveManagedComposeError(cause)
-    }
+    const error = await ctx.support.removeManagedCompose(ctx.params.appName)
+    if (error instanceof Error) return new RemoveManagedComposeError(error)
   },
 }
 

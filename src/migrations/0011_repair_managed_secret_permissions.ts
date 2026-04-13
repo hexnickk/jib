@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { pathExists } from '@jib/paths'
+import { pathsPathExistsResult } from '@jib/paths'
 import type { JibMigration } from './types.ts'
 
 /**
@@ -9,7 +9,7 @@ import type { JibMigration } from './types.ts'
  */
 export async function repairManagedSecretsTree(paths: { secretsDir: string }): Promise<void> {
   const root = join(paths.secretsDir, '_jib')
-  if (!(await pathExists(root))) return
+  if ((await pathsPathExistsResult(root)) !== true) return
 
   await Bun.$`chown -R root:jib ${root}`.quiet().nothrow()
   await Bun.$`find ${root} -type d -exec chmod 2770 {} +`.quiet().nothrow()

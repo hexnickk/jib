@@ -47,10 +47,11 @@ export async function removeApp(
 async function runBestEffort(
   ctx: RemoveRunContext,
   label: string,
-  step: () => Promise<void>,
+  step: () => Promise<undefined | Error>,
 ): Promise<void> {
   try {
-    await step()
+    const error = await step()
+    if (error instanceof Error) ctx.observer?.warn?.(`${label}: ${error.message}`)
   } catch (error) {
     ctx.observer?.warn?.(`${label}: ${error instanceof Error ? error.message : String(error)}`)
   }

@@ -6,7 +6,7 @@ import type { Config } from '@jib/config'
 import type { DockerExec, ExecResult } from '@jib/docker'
 import { loggingCreateLogger } from '@jib/logging'
 import { stateCreateStore, stateLoad } from '@jib/state'
-import { getPaths, repoPath } from '../paths/paths.ts'
+import { pathsGetPaths, pathsRepoPath } from '../paths/paths.ts'
 import { DeployDiskSpaceError, DeployMissingAppError } from './errors.ts'
 import { deployApp, deployUpApp } from './service.ts'
 
@@ -69,7 +69,7 @@ async function mkEnv() {
   const root = await mkdtemp(join(tmpdir(), 'jib-root-'))
   await mkdir(join(root, 'locks'), { recursive: true })
   await mkdir(join(root, 'state'), { recursive: true })
-  const paths = getPaths(root)
+  const paths = pathsGetPaths(root)
   const store = stateCreateStore(paths.stateDir)
   return { paths, store, log: loggingCreateLogger('test') }
 }
@@ -270,7 +270,7 @@ describe('deployUpApp', () => {
       domains: [],
       env_file: '.env',
     }
-    const workdir = repoPath(paths, 'demo', cfg.apps.demo.repo)
+    const workdir = pathsRepoPath(paths, 'demo', cfg.apps.demo.repo)
     await mkdir(workdir, { recursive: true })
     await writeFile(
       join(workdir, 'docker-compose.yml'),

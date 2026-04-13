@@ -1,7 +1,7 @@
 import type { App } from '@jib/config'
 import { dockerAllHealthy, dockerCheckHealth, dockerHasBuildServices } from '@jib/docker'
 import type { AppState } from '@jib/state'
-import { repoPath } from '../paths/paths.ts'
+import { pathsRepoPath } from '../paths/paths.ts'
 import { DeployDiskSpaceError, DeployHealthCheckError, DeployMissingAppError } from './errors.ts'
 import {
   deployCoerceError,
@@ -92,7 +92,7 @@ export async function deployResolveAppCompose(
 ): Promise<DeployError | { appCfg: App; compose: ReturnType<typeof deployNewCompose> }> {
   const appCfg = deps.config.apps[appName]
   if (!appCfg) return new DeployMissingAppError(appName)
-  const workdir = repoPath(deps.paths, appName, appCfg.repo)
+  const workdir = pathsRepoPath(deps.paths, appName, appCfg.repo)
   const overrideError = await deploySyncOverride(deps, appName, appCfg, workdir)
   if (overrideError) return overrideError
   const secretsError = await deployLinkSecrets(deps, appName, appCfg, workdir)

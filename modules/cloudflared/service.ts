@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
-import { type Paths, credsPath, ensureCredsDir } from '@jib/paths'
+import { type Paths, pathsCredsPath, pathsEnsureCredsDirResult } from '@jib/paths'
 import { CloudflaredSaveTunnelTokenError } from './errors.ts'
 import { CLOUDFLARED_SERVICE_NAME } from './templates.ts'
 import { cloudflaredExtractTunnelToken } from './token.ts'
@@ -22,7 +22,7 @@ export interface CloudflaredEnableServiceResult {
 
 /** Returns the env-file path that stores the tunnel token for cloudflared. */
 export function cloudflaredTunnelTokenPath(paths: Paths): string {
-  return credsPath(paths, 'cloudflare', 'tunnel.env')
+  return pathsCredsPath(paths, 'cloudflare', 'tunnel.env')
 }
 
 /** Reports whether a non-empty tunnel token has already been saved. */
@@ -41,7 +41,12 @@ export async function cloudflaredSaveTunnelToken(
 
   try {
     const path = cloudflaredTunnelTokenPath(paths)
-    await ensureCredsDir(paths, 'cloudflare')
+    const ensured = await pathsEnsureCredsDirResult(paths, 'cloudflare')
+    if (ensured instanceof Error) {
+      return new CloudflaredSaveTunnelTokenError(`write tunnel token: ${ensured.message}`, {
+        cause: ensured,
+      })
+    }
     await writeFile(path, `TUNNEL_TOKEN=${token}\n`, { mode: 0o640 })
     return true
   } catch (error) {

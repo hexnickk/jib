@@ -63,18 +63,18 @@ const cliRemoveCommand = {
 } satisfies CliCommand
 
 /** Releases managed ingress while mirroring progress through the CLI spinner. */
-async function removeReleaseIngress(paths: Paths, app: string): Promise<void> {
+async function removeReleaseIngress(paths: Paths, app: string): Promise<undefined | Error> {
   const progress = cliIsTextOutput() ? tuiSpinner() : null
   progress?.start(`releasing ingress for ${app}`)
-  try {
-    await ingressRelease(ingressCreateOperator(paths), app, (update) =>
-      progress?.message(update.message),
-    )
-    progress?.stop('ingress released')
-  } catch (error) {
+  const error = await ingressRelease(ingressCreateOperator(paths), app, (update) =>
+    progress?.message(update.message),
+  )
+  if (error instanceof Error) {
     progress?.stop('ingress release failed')
-    throw error
+    return error
   }
+  progress?.stop('ingress released')
+  return undefined
 }
 
 export default cliRemoveCommand

@@ -1,5 +1,5 @@
 import { rm } from 'node:fs/promises'
-import { pathExists } from '@jib/paths'
+import { pathsPathExistsResult } from '@jib/paths'
 import * as git from './git.ts'
 
 /** Converts an unknown source failure into `ErrorOptions` cause metadata. */
@@ -14,17 +14,22 @@ export async function sourcesEnsureCheckout(
   branch: string,
   env: git.GitEnv,
 ): Promise<Error | undefined> {
-  if (await pathExists(workdir)) {
+  const initialExists = await pathsPathExistsResult(workdir)
+  if (initialExists instanceof Error) return initialExists
+
+  let workdirExists = initialExists
+  if (workdirExists) {
     const [repoReady, hasRemote] = await Promise.all([
       git.sourcesGitIsRepo(workdir),
       git.sourcesGitHasRemote(workdir),
     ])
     if (!repoReady || !hasRemote) {
       await rm(workdir, { recursive: true, force: true })
+      workdirExists = false
     }
   }
 
-  if (!(await pathExists(workdir))) {
+  if (!workdirExists) {
     const cloneError = await git.sourcesGitClone(url, workdir, { branch, env })
     if (cloneError instanceof Error) {
       await rm(workdir, { recursive: true, force: true })

@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { cliCheckLinuxHost, cliCheckRootHost, cliIsTextOutput } from '@jib/cli'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import { runPendingMigrations } from '../migrations/service.ts'
 import type { CliCommand } from './command.ts'
@@ -14,7 +14,7 @@ const cliMigrateCommand = {
     const rootError = cliCheckRootHost('migrate')
     if (rootError) return rootError
 
-    const paths = getPaths()
+    const paths = pathsGetPaths()
     const configExisted = existsSync(paths.configFile)
     if (cliIsTextOutput()) tuiIntro('jib migrate')
 

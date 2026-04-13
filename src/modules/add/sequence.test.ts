@@ -35,9 +35,11 @@ describe('addRunSequence', () => {
       },
       async () => {
         calls.push('rollback')
+        return undefined
       },
       { interrupted: false },
     )
+    if (result instanceof Error) throw result
 
     expect(calls).toEqual(['add', 'deploy'])
     expect(result.deployResult.sha).toBe('abcdef1234')
@@ -45,22 +47,22 @@ describe('addRunSequence', () => {
 
   test('rolls back when deploy fails', async () => {
     const calls: string[] = []
-    await expect(
-      addRunSequence(
-        async () => {
-          calls.push('add')
-          return addResult
-        },
-        async () => {
-          calls.push('deploy')
-          throw new Error('deploy failed')
-        },
-        async () => {
-          calls.push('rollback')
-        },
-        { interrupted: false },
-      ),
-    ).rejects.toMatchObject({
+    const result = await addRunSequence(
+      async () => {
+        calls.push('add')
+        return addResult
+      },
+      async () => {
+        calls.push('deploy')
+        return new Error('deploy failed')
+      },
+      async () => {
+        calls.push('rollback')
+        return undefined
+      },
+      { interrupted: false },
+    )
+    expect(result).toMatchObject({
       message: 'deploy failed',
       name: 'AddRolledBackError',
     } satisfies Partial<AddRolledBackError>)
@@ -70,28 +72,28 @@ describe('addRunSequence', () => {
 
   test('rolls back if interrupted after add completes', async () => {
     const calls: string[] = []
-    await expect(
-      addRunSequence(
-        async () => {
-          calls.push('add')
-          return addResult
-        },
-        async () => {
-          calls.push('deploy')
-          return {
-            app: 'blog',
-            durationMs: 42,
-            preparedSha: '1234567890',
-            sha: 'abcdef1234',
-            workdir: '/tmp/blog',
-          }
-        },
-        async () => {
-          calls.push('rollback')
-        },
-        { interrupted: true },
-      ),
-    ).rejects.toMatchObject({
+    const result = await addRunSequence(
+      async () => {
+        calls.push('add')
+        return addResult
+      },
+      async () => {
+        calls.push('deploy')
+        return {
+          app: 'blog',
+          durationMs: 42,
+          preparedSha: '1234567890',
+          sha: 'abcdef1234',
+          workdir: '/tmp/blog',
+        }
+      },
+      async () => {
+        calls.push('rollback')
+        return undefined
+      },
+      { interrupted: true },
+    )
+    expect(result).toMatchObject({
       message: 'add cancelled',
       name: 'AddRolledBackError',
       original: { code: 'cancelled', message: 'add cancelled' } satisfies Partial<CliError>,
@@ -122,6 +124,7 @@ describe('addRunSequence', () => {
       },
       async () => {
         calls.push('rollback')
+        return undefined
       },
       {
         get interrupted() {
@@ -129,6 +132,7 @@ describe('addRunSequence', () => {
         },
       },
     )
+    if (result instanceof Error) throw result
 
     expect(calls).toEqual(['add', 'deploy'])
     expect(result.deployResult.sha).toBe('abcdef1234')

@@ -1,7 +1,7 @@
 import { watcherRunPollCycle, watcherRunPoller } from '@jib-module/watcher'
 import { configLoad } from '@jib/config'
 import { loggingCreateLogger } from '@jib/logging'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import type { CliCommand } from './command.ts'
 
 const cliWatchCommand = {
@@ -11,7 +11,7 @@ const cliWatchCommand = {
     once: { type: 'boolean', description: 'Run one poll cycle and exit' },
   },
   async run(args) {
-    const paths = getPaths()
+    const paths = pathsGetPaths()
     const log = loggingCreateLogger('watch')
     const getConfig = async () => {
       const config = await configLoad(paths.configFile)

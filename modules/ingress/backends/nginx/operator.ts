@@ -37,29 +37,39 @@ export function ingressCreateNginxOperator(deps: IngressNginxDeps): IngressOpera
   return {
     async claim(claim, onProgress) {
       const staged = await stageNginxAppDir(deps.nginxDir, claim.app)
+      if (staged instanceof Error) return staged
       try {
         onProgress?.({ app: claim.app, message: `writing ${claim.domains.length} config(s)` })
         await renderAndWrite(deps.nginxDir, claim, certExists)
         onProgress?.({ app: claim.app, message: 'running nginx -t + reload' })
         const reloadError = await reloadNginx(exec)
-        if (reloadError) throw reloadError
+        if (reloadError) {
+          await restoreStagedAppDir(staged)
+          return reloadError
+        }
         await discardStagedAppDir(staged)
+        return undefined
       } catch (error) {
         await restoreStagedAppDir(staged)
-        throw error
+        return error instanceof Error ? error : new Error(String(error))
       }
     },
     async release(app, onProgress) {
       const staged = await stageNginxAppDir(deps.nginxDir, app)
-      if (!staged.existed) return
+      if (staged instanceof Error) return staged
+      if (!staged.existed) return undefined
       try {
         onProgress?.({ app, message: `removing configs for ${app}` })
         const reloadError = await reloadNginx(exec)
-        if (reloadError) throw reloadError
+        if (reloadError) {
+          await restoreStagedAppDir(staged)
+          return reloadError
+        }
         await discardStagedAppDir(staged)
+        return undefined
       } catch (error) {
         await restoreStagedAppDir(staged)
-        throw error
+        return error instanceof Error ? error : new Error(String(error))
       }
     },
   }
@@ -91,7 +101,7 @@ interface StagedAppDir {
   existed: boolean
 }
 
-async function stageNginxAppDir(nginxDir: string, app: string): Promise<StagedAppDir> {
+async function stageNginxAppDir(nginxDir: string, app: string): Promise<StagedAppDir | Error> {
   const current = ingressNginxAppConfDir(nginxDir, app)
   const backup = `${current}.bak`
   await rm(backup, { recursive: true, force: true })
@@ -100,7 +110,7 @@ async function stageNginxAppDir(nginxDir: string, app: string): Promise<StagedAp
     return { current, backup, existed: true }
   } catch (error) {
     if (isMissingPathError(error)) return { current, backup, existed: false }
-    throw error
+    return error instanceof Error ? error : new Error(String(error))
   }
 }
 

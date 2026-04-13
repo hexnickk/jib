@@ -1,7 +1,7 @@
 import { cliIsTextOutput } from '@jib/cli'
 import { type App, type Config, type Domain, configAssignPorts } from '@jib/config'
 import { type ComposeInspection, dockerResolveFromCompose } from '@jib/docker'
-import { dockerHubImage } from '@jib/paths'
+import { pathsDockerHubImage } from '@jib/paths'
 import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
 import { addParseApp } from './app.ts'
@@ -22,7 +22,9 @@ export async function addCollectGuidedInputs(
   if (domains instanceof Error) return domains
   const answers = await addPromptForServices(domains, composeServices, inputs.configEntries)
   if (answers instanceof Error) return answers
-  return addMergeGuidedServiceAnswers(domains, serviceNames, answers, inputs.ingressDefault)
+  const guided = addMergeGuidedServiceAnswers(domains, serviceNames, answers, inputs.ingressDefault)
+  if (guided instanceof Error) return guided
+  return guided
 }
 
 /** Builds the fully resolved app config once compose inspection and prompts are done. */
@@ -40,7 +42,7 @@ export async function addBuildResolvedApp(
   if (domains instanceof Error) return domains
   const buildArgs = addConfigEntriesToBuildArgs(guided.configEntries)
   const composeFiles = await persistComposeFiles(paths, appName, workdir, inspection.composeFiles)
-  const image = dockerHubImage(inputs.repo)
+  const image = pathsDockerHubImage(inputs.repo)
   const parsedApp = addParseApp({
     repo: image ? 'local' : inputs.repo,
     ...(image ? { image } : {}),

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import { stateCollectApps, stateManagedServiceNames, stateNormalizeUnitStatus } from './collect.ts'
 import { StateError } from './errors.ts'
 
@@ -40,7 +40,7 @@ describe('stateNormalizeUnitStatus', () => {
 describe('stateCollectApps', () => {
   test('returns a typed error when one app state file is corrupt', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-state-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     try {
       await mkdir(paths.stateDir, { recursive: true })
       await Bun.write(join(paths.stateDir, 'web.json'), '{not json')

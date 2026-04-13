@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { type Paths, getPaths } from '@jib/paths'
+import { type Paths, pathsGetPaths } from '@jib/paths'
 import {
   sourcesBuildChoices,
   sourcesIsAuthFailure,
@@ -9,7 +9,7 @@ import {
 } from './flow.ts'
 import type { SourceTarget } from './types.ts'
 
-const paths = getPaths('/tmp/jib-add-github-test')
+const paths = pathsGetPaths('/tmp/jib-add-github-test')
 const cfg = {
   config_version: 3,
   poll_interval: '5m',

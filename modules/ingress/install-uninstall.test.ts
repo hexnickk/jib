@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { Logger } from '@jib/logging'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 
 const logger = {
   info() {},
@@ -41,7 +41,7 @@ describe('ingress install/uninstall delegation', () => {
     await ingressInstall({
       config: { config_version: 3, poll_interval: '5m', modules: {}, sources: {}, apps: {} },
       logger,
-      paths: getPaths('/tmp/jib-ingress'),
+      paths: pathsGetPaths('/tmp/jib-ingress'),
     })
 
     expect(calls).toEqual(['install'])
@@ -68,7 +68,7 @@ describe('ingress install/uninstall delegation', () => {
     await ingressUninstall({
       config: { config_version: 3, poll_interval: '5m', modules: {}, sources: {}, apps: {} },
       logger,
-      paths: getPaths('/tmp/jib-ingress'),
+      paths: pathsGetPaths('/tmp/jib-ingress'),
     })
 
     expect(calls).toEqual(['uninstall'])

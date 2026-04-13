@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import { stateOpenDb } from '@jib/state'
 import type { JibDb } from '@jib/state'
 import { jibMigrations } from '@jib/state'
@@ -16,7 +16,7 @@ let root = ''
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'jib-migration-test-'))
-  const paths = getPaths(root)
+  const paths = pathsGetPaths(root)
   await mkdir(paths.stateDir, { recursive: true })
   db = stateOpenDb(paths.stateDir)
   ctx = { db, paths }

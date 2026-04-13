@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import { githubSetupApp, githubSetupDeployKey } from './setup.ts'
 
 const noop = () => undefined
@@ -12,7 +12,7 @@ describe('github setup flows', () => {
     const notes: string[] = []
     const logs: string[] = []
     const root = await mkdtemp(join(tmpdir(), 'jib-gh-setup-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const uiLog = {
       message: noop,
       info: (message: string) => {
@@ -59,7 +59,7 @@ describe('github setup flows', () => {
 
   test('githubSetupApp writes the PEM and adds the app source', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-gh-app-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const writes: string[] = []
     const uiLog = {
       message: noop,

@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { dockerHubImage, repoPath } from '@jib/paths'
+import { pathsDockerHubImage, pathsRepoPath } from '@jib/paths'
 import type { Paths } from '@jib/paths'
 import { GENERATED_COMPOSE_FILE } from './compose-scaffold.ts'
 
@@ -10,9 +10,9 @@ export async function addPrepareDockerHubWorkdir(
   repo: string,
   persistPaths: string[],
 ): Promise<string | null> {
-  const image = dockerHubImage(repo)
+  const image = pathsDockerHubImage(repo)
   if (!image) return null
-  const workdir = repoPath(paths, app, 'local')
+  const workdir = pathsRepoPath(paths, app, 'local')
   await mkdir(workdir, { recursive: true, mode: 0o750 })
   await writeFile(
     join(workdir, GENERATED_COMPOSE_FILE),

@@ -25,5 +25,3 @@ export type AppState = z.infer<typeof AppStateSchema>
 export function stateEmpty(app = ''): AppState {
   return AppStateSchema.parse({ app })
 }
-
-export { stateEmpty as emptyState }

@@ -1,7 +1,7 @@
 import { cloudflaredReadStatus } from '@jib-module/cloudflared'
 import { cliIsTextOutput } from '@jib/cli'
 import { configLoad } from '@jib/config'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import { cloudflaredRunSetup, cloudflaredRunSetupResult } from '../modules/cloudflared/setup.ts'
 import type { CliCommand } from './command.ts'
 
@@ -20,7 +20,7 @@ const cliCloudflaredCommands = [
     command: 'cloudflared setup',
     describe: 'Configure Cloudflare Tunnel token',
     async run() {
-      const paths = getPaths()
+      const paths = pathsGetPaths()
       if (cliIsTextOutput()) {
         await cloudflaredRunSetup(paths)
         return
@@ -32,7 +32,7 @@ const cliCloudflaredCommands = [
     command: 'cloudflared status',
     describe: 'Show Cloudflare Tunnel status',
     async run() {
-      const paths = getPaths()
+      const paths = pathsGetPaths()
       const config = await configLoad(paths.configFile)
       if (config instanceof Error) return config
       const status = cloudflaredReadStatus(config)

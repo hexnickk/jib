@@ -1,5 +1,5 @@
 import type { Paths } from '@jib/paths'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import { ConfigError, MissingConfigAppError } from './errors.ts'
 import { configLoad } from './load.ts'
 import type { Config } from './schema.ts'
@@ -9,7 +9,7 @@ import type { Config } from './schema.ts'
  * config load" boilerplate and leaves error rendering to the command boundary.
  */
 export async function configLoadContext(): Promise<{ cfg: Config; paths: Paths } | ConfigError> {
-  const paths = getPaths()
+  const paths = pathsGetPaths()
   const cfg = await configLoad(paths.configFile)
   if (cfg instanceof ConfigError) return cfg
   return { cfg, paths }

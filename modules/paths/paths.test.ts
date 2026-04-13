@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import { EnsureCredsDirError, PathLookupError } from './errors.ts'
 import {
   pathsCredsPath,
-  pathsEnsureCredsDir,
   pathsEnsureCredsDirResult,
   pathsGetPaths,
   pathsManagedComposePath,
@@ -95,12 +94,13 @@ describe('pathsManagedComposePath', () => {
   })
 })
 
-describe('pathsEnsureCredsDir', () => {
+describe('pathsEnsureCredsDirResult', () => {
   test('creates group-writable setgid credential directories', async () => {
     const root = await createTempRoot()
     const p = pathsGetPaths(root)
 
-    const dir = await pathsEnsureCredsDir(p, 'github-app')
+    const dir = await pathsEnsureCredsDirResult(p, 'github-app')
+    if (dir instanceof Error) throw dir
     const info = await stat(dir)
 
     expect(dir).toBe(join(root, 'secrets', '_jib', 'github-app'))

@@ -158,11 +158,7 @@ function parseConfigEntries(
   if (buildEntries instanceof Error) return buildEntries
   const bothEntries = parseScopedEntries(both, 'both')
   if (bothEntries instanceof Error) return bothEntries
-  try {
-    return addMergeConfigEntries([...runtimeEntries, ...buildEntries, ...bothEntries])
-  } catch (error) {
-    return error instanceof ValidationError ? error : new ValidationError(String(error))
-  }
+  return addMergeConfigEntries([...runtimeEntries, ...buildEntries, ...bothEntries])
 }
 
 function parseScopedEntries(

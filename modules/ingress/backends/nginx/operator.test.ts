@@ -39,10 +39,12 @@ function operator(exec: ExecFn) {
 
 describe('ingressCreateNginxOperator', () => {
   test('claim writes files and reloads nginx', async () => {
-    await operator(fakeExec(() => ({ ok: true, stdout: '', stderr: '' }))).claim({
-      app: 'web',
-      domains: [{ host: 'web.example.com', port: 8080, isTunnel: false }],
-    })
+    expect(
+      await operator(fakeExec(() => ({ ok: true, stdout: '', stderr: '' }))).claim({
+        app: 'web',
+        domains: [{ host: 'web.example.com', port: 8080, isTunnel: false }],
+      }),
+    ).toBeUndefined()
 
     const files = await readdir(join(ctx.nginxDir, 'web'))
     expect(files).toContain('web.example.com.conf')
@@ -59,12 +61,12 @@ describe('ingressCreateNginxOperator', () => {
       ),
     )
 
-    await expect(
-      ingress.claim({
+    expect(
+      await ingress.claim({
         app: 'web',
         domains: [{ host: 'web.example.com', port: 8080, isTunnel: false }],
       }),
-    ).rejects.toBeInstanceOf(NginxIngressReloadError)
+    ).toBeInstanceOf(NginxIngressReloadError)
 
     const files = await readdir(ctx.nginxDir).catch(() => [])
     expect(files).toEqual([])
@@ -73,13 +75,15 @@ describe('ingressCreateNginxOperator', () => {
   test('claim preserves SSL and tunnel rendering rules', async () => {
     const ingress = operator(fakeExec(() => ({ ok: true, stdout: '', stderr: '' })))
 
-    await ingress.claim({
-      app: 'edge',
-      domains: [
-        { host: 'ssl.example.com', port: 20000, isTunnel: false },
-        { host: 'tun.example.com', port: 20001, isTunnel: true },
-      ],
-    })
+    expect(
+      await ingress.claim({
+        app: 'edge',
+        domains: [
+          { host: 'ssl.example.com', port: 20000, isTunnel: false },
+          { host: 'tun.example.com', port: 20001, isTunnel: true },
+        ],
+      }),
+    ).toBeUndefined()
 
     const ssl = await readFile(join(ctx.nginxDir, 'edge', 'ssl.example.com.conf'), 'utf8')
     const tun = await readFile(join(ctx.nginxDir, 'edge', 'tun.example.com.conf'), 'utf8')
@@ -91,17 +95,21 @@ describe('ingressCreateNginxOperator', () => {
   test('release removes only the target app directory', async () => {
     const ingress = operator(fakeExec(() => ({ ok: true, stdout: '', stderr: '' })))
 
-    await ingress.claim({
-      app: 'foo',
-      domains: [{ host: 'foo.example.com', port: 8080, isTunnel: false }],
-    })
-    await ingress.claim({
-      app: 'foo-bar',
-      domains: [{ host: 'foo-bar.example.com', port: 8081, isTunnel: false }],
-    })
+    expect(
+      await ingress.claim({
+        app: 'foo',
+        domains: [{ host: 'foo.example.com', port: 8080, isTunnel: false }],
+      }),
+    ).toBeUndefined()
+    expect(
+      await ingress.claim({
+        app: 'foo-bar',
+        domains: [{ host: 'foo-bar.example.com', port: 8081, isTunnel: false }],
+      }),
+    ).toBeUndefined()
 
     ctx.calls = []
-    await ingress.release('foo')
+    expect(await ingress.release('foo')).toBeUndefined()
 
     const foo = await stat(join(ctx.nginxDir, 'foo')).catch(() => null)
     const fooBar = await stat(join(ctx.nginxDir, 'foo-bar')).catch(() => null)

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import {
   CloudflaredSaveTunnelTokenError,
   cloudflaredEnableService,
@@ -23,13 +23,13 @@ async function withTmpPaths<T>(fn: (root: string) => Promise<T>): Promise<T> {
 describe('cloudflared service helpers', () => {
   test('cloudflaredHasTunnelToken returns false before a token is saved', async () => {
     await withTmpPaths(async (root) => {
-      expect(cloudflaredHasTunnelToken(getPaths(root))).toBe(false)
+      expect(cloudflaredHasTunnelToken(pathsGetPaths(root))).toBe(false)
     })
   })
 
   test('cloudflaredSaveTunnelToken writes the normalized env file', async () => {
     await withTmpPaths(async (root) => {
-      const paths = getPaths(root)
+      const paths = pathsGetPaths(root)
 
       const saved = await cloudflaredSaveTunnelToken(
         paths,
@@ -47,7 +47,7 @@ describe('cloudflared service helpers', () => {
 
   test('cloudflaredSaveTunnelToken skips blank or invalid cloudflared commands', async () => {
     await withTmpPaths(async (root) => {
-      const paths = getPaths(root)
+      const paths = pathsGetPaths(root)
 
       expect(await cloudflaredSaveTunnelToken(paths, '')).toBe(false)
       expect(await cloudflaredSaveTunnelToken(paths, 'cloudflared service install')).toBe(false)
@@ -57,7 +57,7 @@ describe('cloudflared service helpers', () => {
 
   test('cloudflaredSaveTunnelToken returns a typed filesystem error', async () => {
     await withTmpPaths(async (root) => {
-      const paths = getPaths(root)
+      const paths = pathsGetPaths(root)
       await Bun.write(join(root, 'secrets'), 'not-a-directory')
 
       const result = await cloudflaredSaveTunnelToken(paths, 'eyJhIjoiNzQ')

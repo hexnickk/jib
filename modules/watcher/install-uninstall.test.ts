@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import { WatcherInstallEnableError } from './errors.ts'
 
 const serviceName = 'jib-watcher.test.service'
@@ -68,7 +68,7 @@ describe('watcher install/uninstall', () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-watcher-'))
 
     try {
-      expect(await watcherInstallResult({ logger, paths: getPaths(root) })).toBeUndefined()
+      expect(await watcherInstallResult({ logger, paths: pathsGetPaths(root) })).toBeUndefined()
 
       expect(calls).toEqual(['daemon-reload', 'enable'])
       expect(await readFile(unitPath, 'utf8')).toContain(`Environment=JIB_ROOT=${root}`)
@@ -87,7 +87,7 @@ describe('watcher install/uninstall', () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-watcher-'))
 
     try {
-      const error = await watcherInstallResult({ logger, paths: getPaths(root) })
+      const error = await watcherInstallResult({ logger, paths: pathsGetPaths(root) })
 
       expect(calls).toEqual(['daemon-reload', 'enable'])
       expect(error).toBeInstanceOf(WatcherInstallEnableError)
@@ -107,7 +107,7 @@ describe('watcher install/uninstall', () => {
     const { watcherUninstallResult } = await import('./uninstall.ts')
     await Bun.write(unitPath, 'unit')
 
-    expect(await watcherUninstallResult({ logger, paths: getPaths(testRoot) })).toBeUndefined()
+    expect(await watcherUninstallResult({ logger, paths: pathsGetPaths(testRoot) })).toBeUndefined()
 
     expect(calls).toEqual(['disable', 'daemon-reload'])
     expect(await Bun.file(unitPath).exists()).toBe(false)

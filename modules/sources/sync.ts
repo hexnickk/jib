@@ -1,4 +1,4 @@
-import { pathExists } from '@jib/paths'
+import { pathsPathExistsResult } from '@jib/paths'
 import { sourcesEnsureCheckout, sourcesErrorOptions } from './checkout.ts'
 import { SourceLocalCheckoutError, SourceRemoteSyncError } from './errors.ts'
 import * as git from './git.ts'
@@ -11,7 +11,7 @@ export async function sourcesSyncLocalCheckout(
   ref: string,
 ): Promise<PreparedSource | SourceLocalCheckoutError> {
   try {
-    if (!(await pathExists(workdir)) || !(await git.sourcesGitIsRepo(workdir))) {
+    if ((await pathsPathExistsResult(workdir)) !== true || !(await git.sourcesGitIsRepo(workdir))) {
       return new SourceLocalCheckoutError(appName, workdir)
     }
     const checkoutError = await git.sourcesGitCheckout(workdir, ref)

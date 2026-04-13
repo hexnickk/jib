@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { loggingCreateLogger } from '@jib/logging'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import { WatcherDeployAppError, WatcherSyncAppError } from './errors.ts'
 import {
   type PollAppDeps,
@@ -44,7 +44,7 @@ describe('parsePollInterval', () => {
 describe('pollApp', () => {
   test('new sha deploys from the prepared checkout; same sha is a no-op', async () => {
     const cfg = mkCfg()
-    const paths = getPaths('/tmp/jib-root-test')
+    const paths = pathsGetPaths('/tmp/jib-root-test')
     const seen = new Map<string, string>()
     const log = loggingCreateLogger('test')
     const deploys: unknown[] = []
@@ -80,7 +80,7 @@ describe('pollApp', () => {
 
   test('failed deploy does not mark the sha as seen', async () => {
     const cfg = mkCfg()
-    const paths = getPaths('/tmp/jib-root-test')
+    const paths = pathsGetPaths('/tmp/jib-root-test')
     const seen = new Map<string, string>()
     const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
@@ -97,7 +97,7 @@ describe('pollApp', () => {
 
   test('thrown deploy failure returns a typed watcher error', async () => {
     const cfg = mkCfg()
-    const paths = getPaths('/tmp/jib-root-test')
+    const paths = pathsGetPaths('/tmp/jib-root-test')
     const seen = new Map<string, string>()
     const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
@@ -117,7 +117,7 @@ describe('pollApp', () => {
 
   test('sync failure returns a typed watcher error', async () => {
     const cfg = mkCfg()
-    const paths = getPaths('/tmp/jib-root-test')
+    const paths = pathsGetPaths('/tmp/jib-root-test')
     const seen = new Map<string, string>()
     const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
@@ -138,7 +138,7 @@ describe('pollApp', () => {
 describe('runPoller', () => {
   test('stops promptly when aborted during sleep', async () => {
     const cfg = mkCfg({ apps: {} as Config['apps'] })
-    const paths = getPaths('/tmp/jib-root-test')
+    const paths = pathsGetPaths('/tmp/jib-root-test')
     const log = loggingCreateLogger('test')
     const abort = new AbortController()
     let sleepCalls = 0

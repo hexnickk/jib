@@ -20,7 +20,7 @@ export function addScopeCovers(scope: ConfigScope, required: ConfigScope): boole
 }
 
 /** Merges config entries by key, upgrading compatible scopes and rejecting conflicts. */
-export function addMergeConfigEntries(entries: ConfigEntry[]): ConfigEntry[] {
+export function addMergeConfigEntries(entries: ConfigEntry[]): ConfigEntry[] | ValidationError {
   const merged = new Map<string, ConfigEntry>()
   for (const entry of entries) {
     const existing = merged.get(entry.key)
@@ -29,7 +29,7 @@ export function addMergeConfigEntries(entries: ConfigEntry[]): ConfigEntry[] {
       continue
     }
     if (existing.value !== entry.value) {
-      throw new ValidationError(
+      return new ValidationError(
         `conflicting values for "${entry.key}" - use one value across runtime/build flags`,
       )
     }

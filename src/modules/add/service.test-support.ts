@@ -1,6 +1,6 @@
 import type { App, Config } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
-import { getPaths, managedComposePath } from '@jib/paths'
+import { pathsGetPaths, pathsManagedComposePath } from '@jib/paths'
 import {
   type AddFlowObserver,
   type AddFlowParams,
@@ -20,7 +20,7 @@ const baseCfg: Config = {
   },
 }
 
-const paths = getPaths('/tmp/jib-add-test')
+const paths = pathsGetPaths('/tmp/jib-add-test')
 
 const draftApp: App = {
   repo: 'owner/blog',
@@ -100,16 +100,17 @@ export function addMakeDeps(
   const support: AddSupport = {
     cloneForInspection: async () => {
       calls.push('prepareRepo')
-      if (failAt === 'prepareRepo') throw new Error('prepareRepo failed')
+      if (failAt === 'prepareRepo') return new Error('prepareRepo failed')
       return { workdir: '/tmp/blog' }
     },
     removeCheckout: async () => {
       calls.push('rollbackRepo')
-      if (failRollbackRepo) throw new Error('rollbackRepo failed')
+      if (failRollbackRepo) return new Error('rollbackRepo failed')
+      return undefined
     },
     writeConfig: async (_configFile, cfg) => {
       calls.push('writeConfig')
-      if (failAt === 'writeConfig') throw new Error('writeConfig failed')
+      if (failAt === 'writeConfig') return new Error('writeConfig failed')
       currentConfig = structuredClone(cfg)
       if (injectConcurrentConfigChange && currentConfig.apps.blog) {
         currentConfig.apps.worker = {
@@ -120,28 +121,33 @@ export function addMakeDeps(
         }
       }
       writtenConfigs.push(structuredClone(cfg))
+      return undefined
     },
     loadConfig: async () => {
       calls.push('loadConfig')
-      if (failLoadConfig) throw new Error('loadConfig failed')
+      if (failLoadConfig) return new Error('loadConfig failed')
       return structuredClone(currentConfig)
     },
     upsertSecret: async (_appName, entry) => {
       calls.push(`upsertSecret:${entry.key}`)
       secretWrites++
       if (failAt === 'writeSecondSecret' && secretWrites === 2) {
-        throw new Error('writeSecondSecret failed')
+        return new Error('writeSecondSecret failed')
       }
+      return undefined
     },
     removeSecret: async (_appName, key) => {
       calls.push(`removeSecret:${key}`)
+      return undefined
     },
     removeManagedCompose: async (appName) => {
       calls.push(`removeManagedCompose:${appName}`)
+      return undefined
     },
     claimIngress: async () => {
       calls.push('claimRoutes')
-      if (failAt === 'claimRoutes') throw new Error('claimRoutes failed')
+      if (failAt === 'claimRoutes') return new Error('claimRoutes failed')
+      return undefined
     },
   }
   const planner: AddPlanner = {
@@ -187,6 +193,6 @@ export function addMakeDeps(
     states,
     warnings,
     writtenConfigs,
-    managedCompose: managedComposePath(paths, 'blog'),
+    managedCompose: pathsManagedComposePath(paths, 'blog'),
   }
 }

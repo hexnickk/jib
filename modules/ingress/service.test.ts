@@ -46,21 +46,21 @@ describe('ingress service', () => {
     })
   })
 
-  test('ingressClaim still fails at the boundary with the typed port error', async () => {
-    await expect(
-      ingressClaim(
-        {
-          claim: async () => undefined,
-          release: async () => undefined,
-        },
-        'web',
-        {
-          repo: 'acme/web',
-          branch: 'main',
-          domains: [{ host: 'web.example.com', ingress: 'direct' }],
-          env_file: '.env',
-        },
-      ),
-    ).rejects.toBeInstanceOf(IngressMissingPortError)
+  test('ingressClaim returns the typed port error for missing ingress ports', async () => {
+    const result = await ingressClaim(
+      {
+        claim: async () => undefined,
+        release: async () => undefined,
+      },
+      'web',
+      {
+        repo: 'acme/web',
+        branch: 'main',
+        domains: [{ host: 'web.example.com', ingress: 'direct' }],
+        env_file: '.env',
+      },
+    )
+
+    expect(result).toBeInstanceOf(IngressMissingPortError)
   })
 })

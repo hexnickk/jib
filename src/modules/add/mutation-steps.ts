@@ -12,32 +12,30 @@ import type { AddRunContext } from './steps.ts'
 export const addWriteConfigStep: Step<AddRunContext, { configWritten: true }, AddFlowError> = {
   name: 'config',
   async up(ctx) {
-    try {
-      const finalCfg = {
-        ...ctx.params.cfg,
-        apps: { ...ctx.params.cfg.apps, [ctx.params.appName]: ctx.finalApp },
-      }
-      await ctx.support.writeConfig(ctx.params.configFile, finalCfg)
-      ctx.observer.onStateChange?.('config_written')
-      return { configWritten: true }
-    } catch (cause) {
-      return new ConfigWriteError(cause)
+    const finalCfg = {
+      ...ctx.params.cfg,
+      apps: { ...ctx.params.cfg.apps, [ctx.params.appName]: ctx.finalApp },
     }
+    const error = await ctx.support.writeConfig(ctx.params.configFile, finalCfg)
+    if (error instanceof Error) return new ConfigWriteError(error)
+    ctx.observer.onStateChange?.('config_written')
+    return { configWritten: true }
   },
   async down(ctx) {
-    try {
-      const current = await ctx.support.loadConfig(ctx.params.configFile).catch((cause) => {
-        ctx.observer.warn?.(
-          `config cleanup load: ${cause instanceof Error ? cause.message : String(cause)}; falling back to original snapshot`,
-        )
-        return ctx.params.cfg
-      })
-      const rollbackApps = { ...current.apps }
-      delete rollbackApps[ctx.params.appName]
-      await ctx.support.writeConfig(ctx.params.configFile, { ...current, apps: rollbackApps })
-    } catch (cause) {
-      return new ConfigRollbackError(cause)
+    const current = await ctx.support.loadConfig(ctx.params.configFile)
+    const loaded = current instanceof Error ? ctx.params.cfg : current
+    if (current instanceof Error) {
+      ctx.observer.warn?.(
+        `config cleanup load: ${current.message}; falling back to original snapshot`,
+      )
     }
+    const rollbackApps = { ...loaded.apps }
+    delete rollbackApps[ctx.params.appName]
+    const error = await ctx.support.writeConfig(ctx.params.configFile, {
+      ...loaded,
+      apps: rollbackApps,
+    })
+    if (error instanceof Error) return new ConfigRollbackError(error)
   },
 }
 
@@ -52,8 +50,17 @@ export const addWriteSecretsStep: Step<
     const keys: string[] = []
     for (const entry of runtimeEntries) {
       try {
-        await ctx.support.upsertSecret(ctx.params.appName, entry, ctx.finalApp.env_file)
-        keys.push(entry.key)
+        const error = await ctx.support.upsertSecret(
+          ctx.params.appName,
+          entry,
+          ctx.finalApp.env_file,
+        )
+        if (!(error instanceof Error)) {
+          keys.push(entry.key)
+          continue
+        }
+        await cleanupWrittenSecrets(ctx, keys, ctx.finalApp.env_file)
+        return new SecretWriteError(entry.key, error)
       } catch (cause) {
         await cleanupWrittenSecrets(ctx, keys, ctx.finalApp.env_file)
         return new SecretWriteError(entry.key, cause)
@@ -72,13 +79,10 @@ export const addWriteSecretsStep: Step<
 export const addClaimIngressStep: Step<AddRunContext, undefined, AddFlowError> = {
   name: 'ingress',
   async up(ctx) {
-    try {
-      await ctx.support.claimIngress(ctx.params.appName, ctx.finalApp)
-      ctx.observer.onStateChange?.('routes_claimed')
-      return undefined
-    } catch (cause) {
-      return new ClaimIngressError(cause)
-    }
+    const error = await ctx.support.claimIngress(ctx.params.appName, ctx.finalApp)
+    if (error instanceof Error) return new ClaimIngressError(error)
+    ctx.observer.onStateChange?.('routes_claimed')
+    return undefined
   },
 }
 
@@ -89,7 +93,10 @@ async function cleanupWrittenSecrets(
 ): Promise<undefined> {
   for (const key of keys) {
     try {
-      await ctx.support.removeSecret(ctx.params.appName, key, envFile)
+      const error = await ctx.support.removeSecret(ctx.params.appName, key, envFile)
+      if (error instanceof Error) {
+        ctx.observer.warn?.(`secret cleanup (${key}): ${error.message}`)
+      }
     } catch (cause) {
       ctx.observer.warn?.(
         `secret cleanup (${key}): ${cause instanceof Error ? cause.message : String(cause)}`,

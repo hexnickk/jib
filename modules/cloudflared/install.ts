@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
-import { type Paths, credsPath } from '@jib/paths'
+import { type Paths, pathsCredsPath } from '@jib/paths'
 import {
   CloudflaredInstallCreateDirError,
   CloudflaredInstallReloadError,
@@ -48,7 +48,7 @@ export async function cloudflaredInstallResult(
 > {
   const log = ctx.logger
   const dir = ctx.paths.cloudflaredDir
-  const tunnelEnvPath = credsPath(ctx.paths, 'cloudflare', 'tunnel.env')
+  const tunnelEnvPath = pathsCredsPath(ctx.paths, 'cloudflare', 'tunnel.env')
   const vars = { cloudflaredDir: dir, tunnelEnvPath }
   const renderCompose = deps.composeYaml ?? cloudflaredComposeYaml
   const renderUnit = deps.systemdUnit ?? cloudflaredSystemdUnit

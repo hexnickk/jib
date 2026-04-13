@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import {
   InitModuleInstallError,
   OptionalModuleChoicePersistError,
@@ -79,7 +79,7 @@ describe('optional module configuration', () => {
 
   test('initConfigureOptionalModules preserves setup-written config before enabling the module', async () => {
     await withTmpConfig(async (cfg, root) => {
-      const paths = getPaths(root)
+      const paths = pathsGetPaths(root)
       const mods: ModLike[] = [mod('source-auth')]
 
       expect(
@@ -105,7 +105,7 @@ describe('optional module configuration', () => {
 
   test('initConfigureOptionalModules rolls back install when setup does not complete', async () => {
     await withTmpConfig(async (cfg, root) => {
-      const paths = getPaths(root)
+      const paths = pathsGetPaths(root)
       const calls: string[] = []
       const mods: ModLike[] = [
         {
@@ -140,7 +140,7 @@ describe('optional module configuration', () => {
 
   test('initConfigureOptionalModules does not enable a module when setup does not complete', async () => {
     await withTmpConfig(async (cfg, root) => {
-      const paths = getPaths(root)
+      const paths = pathsGetPaths(root)
       const mods: ModLike[] = [mod('cloudflared')]
 
       const error = await initConfigureOptionalModules(cfg, paths, mods, {
@@ -161,7 +161,7 @@ describe('optional module configuration', () => {
 
   test('initConfigureOptionalModules keeps earlier choices when a later setup fails', async () => {
     await withTmpConfig(async (cfg, root) => {
-      const paths = getPaths(root)
+      const paths = pathsGetPaths(root)
       const mods: ModLike[] = [mod('cloudflared'), mod('source-auth')]
       const answers = [true, true]
 
@@ -192,7 +192,7 @@ describe('optional module configuration', () => {
 
   test('initConfigureOptionalModules converts thrown install dependency failures', async () => {
     await withTmpConfig(async (cfg, root) => {
-      const paths = getPaths(root)
+      const paths = pathsGetPaths(root)
       const mods: ModLike[] = [
         {
           manifest: { name: 'cloudflared' },
@@ -219,7 +219,7 @@ describe('optional module configuration', () => {
 
   test('initConfigureOptionalModules returns typed setup errors', async () => {
     await withTmpConfig(async (cfg, root) => {
-      const paths = getPaths(root)
+      const paths = pathsGetPaths(root)
       const mods: ModLike[] = [mod('cloudflared')]
 
       expect(

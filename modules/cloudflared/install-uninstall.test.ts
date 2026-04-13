@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
-import { getPaths } from '@jib/paths'
+import { pathsGetPaths } from '@jib/paths'
 import {
   CloudflaredInstallReloadError,
   CloudflaredInstallWriteUnitError,
@@ -39,7 +39,7 @@ describe('cloudflared install/uninstall', () => {
   test('cloudflaredInstallResult writes managed files and triggers daemon reload', async () => {
     const calls: string[] = []
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
 
     try {
       const result = await cloudflaredInstallResult(
@@ -71,7 +71,7 @@ describe('cloudflared install/uninstall', () => {
   test('cloudflaredUninstallResult disables the service, removes managed files, and reloads systemd', async () => {
     const calls: string[] = []
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
 
     try {
       await mkdir(paths.cloudflaredDir, { recursive: true })
@@ -108,7 +108,7 @@ describe('cloudflared install/uninstall', () => {
 
   test('cloudflaredInstallResult returns a typed reload error for non-zero daemon-reload exits', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
 
     try {
       const result = await cloudflaredInstallResult(
@@ -135,7 +135,7 @@ describe('cloudflared install/uninstall', () => {
 
   test('cloudflaredInstallResult returns typed unit write errors', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
 
     try {
       const result = await cloudflaredInstallResult(
@@ -156,7 +156,7 @@ describe('cloudflared install/uninstall', () => {
 
   test('cloudflaredUninstall keeps cleaning up when disable reports an absent unit', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const calls: string[] = []
 
     try {
@@ -199,7 +199,7 @@ describe('cloudflared install/uninstall', () => {
 
   test('cloudflaredUninstallResult returns a typed disable error after cleanup on real failures', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
     const calls: string[] = []
 
     try {
@@ -242,7 +242,7 @@ describe('cloudflared install/uninstall', () => {
 
   test('cloudflaredUninstallResult returns a typed reload error for non-zero daemon-reload exits', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
 
     try {
       await mkdir(paths.cloudflaredDir, { recursive: true })
@@ -273,7 +273,7 @@ describe('cloudflared install/uninstall', () => {
 
   test('cloudflaredUninstallResult returns uninstall errors for thrown disable failures', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
-    const paths = getPaths(root)
+    const paths = pathsGetPaths(root)
 
     try {
       const result = await cloudflaredUninstallResult(

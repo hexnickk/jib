@@ -100,7 +100,7 @@ export function addMergeGuidedServiceAnswers(
   serviceNames: string[],
   answers: GuidedServiceAnswer[],
   ingressDefault: string,
-): { domains: ParsedDomain[]; configEntries: ConfigEntry[] } {
+): { domains: ParsedDomain[]; configEntries: ConfigEntry[] } | ValidationError {
   const knownServices = new Set(serviceNames)
   const domains: ParsedDomain[] = [...existingDomains]
   const configEntries: ConfigEntry[] = []
@@ -124,7 +124,9 @@ export function addMergeGuidedServiceAnswers(
     }
   }
 
-  return { domains, configEntries: addMergeConfigEntries(configEntries) }
+  const merged = addMergeConfigEntries(configEntries)
+  if (merged instanceof Error) return merged
+  return { domains, configEntries: merged }
 }
 
 /** Renders the final add plan summary shown before config is written. */

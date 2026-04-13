@@ -1,6 +1,6 @@
 import { mkdir, rm } from 'node:fs/promises'
 import type { App, Config } from '@jib/config'
-import { type Paths, dockerHubImage, repoPath } from '@jib/paths'
+import { type Paths, pathsDockerHubImage, pathsRepoPath } from '@jib/paths'
 import { sourcesErrorOptions } from './checkout.ts'
 import {
   SourceLocalRepoError,
@@ -29,7 +29,7 @@ function resolveTargetApp(cfg: Config, target: SourceTarget): App | SourceMissin
   const existing = cfg.apps[target.app]
   if (existing) return existing
   if (!target.repo) return new SourceMissingAppError(target.app)
-  const image = dockerHubImage(target.repo)
+  const image = pathsDockerHubImage(target.repo)
   return {
     repo: image ? 'local' : target.repo,
     branch: target.branch ?? 'main',
@@ -51,7 +51,7 @@ export async function sourcesResolve(
   const app = resolveTargetApp(cfg, target)
   if (app instanceof Error) return app
   if (app.repo === 'local') return new SourceLocalRepoError(target.app)
-  const workdir = repoPath(paths, target.app, app.repo)
+  const workdir = pathsRepoPath(paths, target.app, app.repo)
   const driver = resolveSourceDriverResult(cfg, app)
   if (driver instanceof Error) return driver
 
@@ -89,7 +89,7 @@ export async function sourcesSync(
   if (app instanceof Error) return app
 
   if (app.image) {
-    const workdir = repoPath(paths, target.app, app.repo)
+    const workdir = pathsRepoPath(paths, target.app, app.repo)
     try {
       await mkdir(workdir, { recursive: true, mode: 0o750 })
     } catch (error) {
@@ -101,7 +101,7 @@ export async function sourcesSync(
   if (app.repo === 'local') {
     return sourcesSyncLocalCheckout(
       target.app,
-      repoPath(paths, target.app, app.repo),
+      pathsRepoPath(paths, target.app, app.repo),
       ref ?? app.branch,
     )
   }
@@ -153,6 +153,6 @@ export async function sourcesRemoveCheckout(
   app: string,
   repo: string,
 ): Promise<void> {
-  const workdir = repoPath(paths, app, repo)
+  const workdir = pathsRepoPath(paths, app, repo)
   await rm(workdir, { recursive: true, force: true })
 }
