@@ -1,4 +1,4 @@
-import { runSteps } from '../tx/run.ts'
+import { txRunSteps } from '../tx/run.ts'
 import { CancelledAddError } from './flow-errors.ts'
 import { type AddRunContext, addBuildSteps } from './steps.ts'
 import type {
@@ -33,7 +33,7 @@ export async function addRun(
 
   observer.onStateChange?.('inputs_ready')
 
-  const error = await runSteps(
+  const error = await txRunSteps(
     ctx,
     addBuildSteps(),
     params.signal ?? { cancelled: false },

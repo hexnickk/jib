@@ -1,11 +1,13 @@
 import { JibError } from '@jib/errors'
 
+/** Cancellation contract checked before and after each transactional step. */
 export interface CancelSignal {
   readonly cancelled: boolean
 }
 
 type NonErrorState<T> = T extends Error ? never : T
 
+/** Wraps rollback failures so callers can warn without losing the original cause. */
 export class TxRollbackError extends JibError {
   readonly stepName: string
 
@@ -22,7 +24,8 @@ export interface Step<Ctx, State, Err extends Error, RollbackErr extends Error =
   down?(ctx: Ctx, state: NonErrorState<State>): Promise<undefined | RollbackErr>
 }
 
-export async function runSteps<Ctx, Err extends Error, RollbackErr extends Error = Error>(
+/** Runs transactional steps in order and rolls back completed steps on failure. */
+export async function txRunSteps<Ctx, Err extends Error, RollbackErr extends Error = Error>(
   ctx: Ctx,
   steps: readonly Step<Ctx, unknown, Err, RollbackErr>[],
   signal: CancelSignal,

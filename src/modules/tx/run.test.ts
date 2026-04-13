@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { type Step, TxRollbackError, runSteps } from './run.ts'
+import { type Step, TxRollbackError, txRunSteps } from './run.ts'
 
 class FlowError extends Error {}
 class CancelledError extends Error {}
@@ -15,7 +15,7 @@ describe('TxRollbackError', () => {
   })
 })
 
-describe('runSteps', () => {
+describe('txRunSteps', () => {
   test('runs steps in order without rollback on success', async () => {
     const calls: string[] = []
     const steps: Step<object, string, FlowError>[] = [
@@ -39,7 +39,7 @@ describe('runSteps', () => {
       },
     ]
 
-    const result = await runSteps({}, steps, { cancelled: false }, () => new CancelledError())
+    const result = await txRunSteps({}, steps, { cancelled: false }, () => new CancelledError())
 
     expect(result).toBeUndefined()
     expect(calls).toEqual(['up:one', 'up:two'])
@@ -79,7 +79,7 @@ describe('runSteps', () => {
       },
     ]
 
-    const result = await runSteps({}, steps, { cancelled: false }, () => new CancelledError())
+    const result = await txRunSteps({}, steps, { cancelled: false }, () => new CancelledError())
 
     expect(result).toBeInstanceOf(FlowError)
     expect((result as Error).message).toBe('boom')
@@ -113,7 +113,7 @@ describe('runSteps', () => {
       },
     ]
 
-    const result = await runSteps({}, steps, signal, () => new CancelledError('cancelled'))
+    const result = await txRunSteps({}, steps, signal, () => new CancelledError('cancelled'))
 
     expect(result).toBeInstanceOf(CancelledError)
     expect(calls).toEqual(['up:one', 'down:one'])
@@ -148,7 +148,7 @@ describe('runSteps', () => {
       },
     ]
 
-    const result = await runSteps(
+    const result = await txRunSteps(
       {},
       steps,
       { cancelled: false },
@@ -180,7 +180,7 @@ describe('runSteps', () => {
       },
     ]
 
-    await runSteps(
+    await txRunSteps(
       {},
       steps,
       { cancelled: false },
