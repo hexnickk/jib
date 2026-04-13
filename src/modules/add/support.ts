@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import { configLoad, configWrite } from '@jib/config'
 import type { App, Config } from '@jib/config'
 import { type Paths, managedComposePath } from '@jib/paths'
-import { SecretsManager } from '@jib/secrets'
+import { createSecretsManager } from '@jib/secrets'
 import { sourcesCloneForInspection, sourcesRemoveCheckout } from '@jib/sources'
 import type { AddSupport, EnvEntry } from './types.ts'
 
@@ -12,7 +12,7 @@ export interface DefaultAddSupportOptions {
 }
 
 export function createDefaultAddSupport(options: DefaultAddSupportOptions): AddSupport {
-  const secrets = new SecretsManager(options.paths.secretsDir)
+  const secrets = createSecretsManager(options.paths.secretsDir)
 
   return {
     async cloneForInspection(

@@ -3,7 +3,7 @@ import { configWrite } from '@jib/config'
 import type { Config } from '@jib/config'
 import { DockerAppNotFoundError, dockerComposeFor, dockerOverridePath } from '@jib/docker'
 import { type Paths, managedComposePath } from '@jib/paths'
-import { SecretsManager } from '@jib/secrets'
+import { createSecretsManager } from '@jib/secrets'
 import { sourcesRemoveCheckout } from '@jib/sources'
 import { Store } from '@jib/state'
 import { RemoveWriteConfigError } from './errors.ts'
@@ -15,7 +15,7 @@ export interface DefaultRemoveSupportOptions {
 }
 
 export function createRemoveSupport(options: DefaultRemoveSupportOptions): RemoveSupport {
-  const secrets = new SecretsManager(options.paths.secretsDir)
+  const secrets = createSecretsManager(options.paths.secretsDir)
   const store = new Store(options.paths.stateDir)
 
   return {

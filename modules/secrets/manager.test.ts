@@ -2,18 +2,29 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SecretsManager } from './manager.ts'
+import { SecretsManager, createSecretsManager } from './manager.ts'
 
-async function withMgr<T>(fn: (mgr: SecretsManager, dir: string) => Promise<T>): Promise<T> {
+async function withMgr<T>(
+  fn: (mgr: ReturnType<typeof createSecretsManager>, dir: string) => Promise<T>,
+): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), 'jib-secrets-'))
   try {
-    return await fn(new SecretsManager(dir), dir)
+    return await fn(createSecretsManager(dir), dir)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
 }
 
 describe('SecretsManager', () => {
+  test('legacy class wrapper still delegates to the function API', async () => {
+    await withMgr(async (_mgr, dir) => {
+      const legacy = new SecretsManager(dir)
+      await legacy.upsert('web', 'FOO', 'bar')
+      const content = await Bun.file(join(dir, 'web', '.env')).text()
+      expect(content).toContain('FOO=bar')
+    })
+  })
+
   test('upsert creates file and inserts key', async () => {
     await withMgr(async (mgr, dir) => {
       await mgr.upsert('web', 'FOO', 'bar')
