@@ -23,7 +23,7 @@ describe('ingress install/uninstall delegation', () => {
   test('install forwards to the default backend hook', async () => {
     const calls: string[] = []
     mock.module('./backends/index.ts', () => ({
-      defaultIngressBackend: () => ({
+      ingressDefaultBackend: () => ({
         install: async () => {
           calls.push('install')
         },
@@ -33,9 +33,9 @@ describe('ingress install/uninstall delegation', () => {
         name: 'fake',
       }),
     }))
-    const { install } = await import('./install.ts')
+    const { ingressInstall } = await import('./install.ts')
 
-    await install({
+    await ingressInstall({
       config: { config_version: 3, poll_interval: '5m', modules: {}, sources: {}, apps: {} },
       logger,
       paths: getPaths('/tmp/jib-ingress'),
@@ -47,7 +47,7 @@ describe('ingress install/uninstall delegation', () => {
   test('uninstall forwards to the default backend hook', async () => {
     const calls: string[] = []
     mock.module('./backends/index.ts', () => ({
-      defaultIngressBackend: () => ({
+      ingressDefaultBackend: () => ({
         uninstall: async () => {
           calls.push('uninstall')
         },
@@ -57,9 +57,9 @@ describe('ingress install/uninstall delegation', () => {
         name: 'fake',
       }),
     }))
-    const { uninstall } = await import('./uninstall.ts')
+    const { ingressUninstall } = await import('./uninstall.ts')
 
-    await uninstall({
+    await ingressUninstall({
       config: { config_version: 3, poll_interval: '5m', modules: {}, sources: {}, apps: {} },
       logger,
       paths: getPaths('/tmp/jib-ingress'),

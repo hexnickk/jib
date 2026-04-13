@@ -6,7 +6,7 @@ export const m0008_install_nginx: JibMigration = {
   description: 'Install ingress reverse proxy',
   up: async (ctx) => {
     const mctx = await initCtx(ctx)
-    const { install } = await import('@jib/ingress')
-    await install(mctx)
+    const { ingressInstall } = await import('@jib/ingress')
+    await ingressInstall(mctx)
   },
 }

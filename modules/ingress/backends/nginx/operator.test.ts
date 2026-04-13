@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NginxIngressReloadError } from '../../errors.ts'
 import type { ExecFn, ExecResult } from '../../exec.ts'
-import { createNginxIngressOperator } from './operator.ts'
+import { ingressCreateNginxOperator } from './operator.ts'
 
 interface TestCtx {
   calls: string[][]
@@ -30,14 +30,14 @@ function fakeExec(run: (argv: string[]) => ExecResult): ExecFn {
 }
 
 function operator(exec: ExecFn) {
-  return createNginxIngressOperator({
+  return ingressCreateNginxOperator({
     nginxDir: ctx.nginxDir,
     exec,
     certExists: async (host) => host === 'ssl.example.com',
   })
 }
 
-describe('createNginxIngressOperator', () => {
+describe('ingressCreateNginxOperator', () => {
   test('claim writes files and reloads nginx', async () => {
     await operator(fakeExec(() => ({ ok: true, stdout: '', stderr: '' }))).claim({
       app: 'web',

@@ -1,6 +1,6 @@
 import { cliCanPrompt, cliCreateMissingInputError, cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
-import { createIngressOperator, releaseIngress } from '@jib/ingress'
+import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { promptConfirm, spinner } from '@jib/tui'
 import { consola } from 'consola'
@@ -60,7 +60,7 @@ async function removeReleaseIngress(paths: Paths, app: string): Promise<void> {
   const progress = cliIsTextOutput() ? spinner() : null
   progress?.start(`releasing ingress for ${app}`)
   try {
-    await releaseIngress(createIngressOperator(paths), app, (update) =>
+    await ingressRelease(ingressCreateOperator(paths), app, (update) =>
       progress?.message(update.message),
     )
     progress?.stop('ingress released')

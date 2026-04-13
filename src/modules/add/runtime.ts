@@ -1,7 +1,7 @@
 import { CliError, cliIsTextOutput } from '@jib/cli'
 import { configLoad } from '@jib/config'
 import type { App, Config } from '@jib/config'
-import { createIngressOperator, releaseIngress } from '@jib/ingress'
+import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
 import type { DeployRunResult } from '../../deploy/run.ts'
@@ -89,7 +89,7 @@ export async function rollbackAddedApp(
     {
       support: new DefaultRemoveSupport({
         paths,
-        releaseIngress: (appName) => releaseIngress(createIngressOperator(paths), appName),
+        releaseIngress: (appName) => ingressRelease(ingressCreateOperator(paths), appName),
       }),
       observer: { warn: (message) => cliIsTextOutput() && consola.warn(message) },
     },

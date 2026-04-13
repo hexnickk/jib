@@ -14,6 +14,7 @@ const defaultExec: ExecFn = async (argv) => {
 
 const current: ExecFn = defaultExec
 
-export function getExec(): ExecFn {
+/** Returns the current exec adapter used by ingress backends. */
+export function ingressGetExec(): ExecFn {
   return current
 }

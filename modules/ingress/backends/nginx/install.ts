@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { getExec } from '../../exec.ts'
+import { ingressGetExec } from '../../exec.ts'
 import type { IngressHook } from '../types.ts'
 
 /**
@@ -27,9 +27,10 @@ include ${nginxDir}/*/*.conf;
  * nginx's conf.d directory if it isn't already present with the expected
  * content.
  */
-export const install: IngressHook = async (ctx) => {
+/** Installs nginx support files and reloads systemd if nginx is available. */
+export const ingressInstall: IngressHook = async (ctx) => {
   const log = ctx.logger
-  const exec = getExec()
+  const exec = ingressGetExec()
 
   const which = await exec(['which', 'nginx'])
   if (!which.ok) {

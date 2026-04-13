@@ -1,6 +1,7 @@
-import { defaultIngressBackend } from './backends/index.ts'
+import { ingressDefaultBackend } from './backends/index.ts'
 import type { IngressHook } from './backends/types.ts'
 
-export const install: IngressHook = async (ctx) => {
-  await defaultIngressBackend().install?.(ctx)
+/** Runs the default backend install hook when the backend provides one. */
+export const ingressInstall: IngressHook = async (ctx) => {
+  await ingressDefaultBackend().install?.(ctx)
 }

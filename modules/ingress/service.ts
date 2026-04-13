@@ -2,7 +2,8 @@ import type { App } from '@jib/config'
 import { IngressMissingPortError } from './errors.ts'
 import type { IngressClaim, IngressOperator, IngressProgress } from './types.ts'
 
-export function buildIngressClaim(
+/** Builds the ingress claim for one app, or returns a typed port error. */
+export function ingressBuildClaim(
   app: string,
   appCfg: App,
 ): IngressClaim | IngressMissingPortError | null {
@@ -23,19 +24,21 @@ export function buildIngressClaim(
   }
 }
 
-export async function claimIngress(
+/** Applies the ingress claim through the active operator. */
+export async function ingressClaim(
   operator: IngressOperator,
   app: string,
   appCfg: App,
   onProgress?: (progress: IngressProgress) => void,
 ): Promise<void> {
-  const claim = buildIngressClaim(app, appCfg)
+  const claim = ingressBuildClaim(app, appCfg)
   if (!claim) return
   if (claim instanceof IngressMissingPortError) throw claim
   await operator.claim(claim, onProgress)
 }
 
-export async function releaseIngress(
+/** Releases ingress state for an app through the active operator. */
+export async function ingressRelease(
   operator: IngressOperator,
   app: string,
   onProgress?: (progress: IngressProgress) => void,

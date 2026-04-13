@@ -1,16 +1,20 @@
 import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { NginxIngressReloadError } from '../../errors.ts'
-import { type ExecFn, getExec } from '../../exec.ts'
+import { type ExecFn, ingressGetExec } from '../../exec.ts'
 import type { IngressClaim, IngressOperator } from '../../types.ts'
-import { nginxAppConfDir, nginxConfFilename, renderNginxSite } from './templates.ts'
+import {
+  ingressNginxAppConfDir,
+  ingressNginxConfFilename,
+  ingressRenderNginxSite,
+} from './templates.ts'
 
-export type CertExistsFn = (host: string) => Promise<boolean>
+export type IngressCertExistsFn = (host: string) => Promise<boolean>
 
 const LETSENCRYPT_LIVE = '/etc/letsencrypt/live'
 const NGINX_BIN = '/usr/sbin/nginx'
 
-const defaultCertExists: CertExistsFn = async (host) => {
+const defaultCertExists: IngressCertExistsFn = async (host) => {
   try {
     await stat(`${LETSENCRYPT_LIVE}/${host}/fullchain.pem`)
     return true
@@ -19,14 +23,15 @@ const defaultCertExists: CertExistsFn = async (host) => {
   }
 }
 
-export interface NginxIngressDeps {
+export interface IngressNginxDeps {
   nginxDir: string
   exec?: ExecFn
-  certExists?: CertExistsFn
+  certExists?: IngressCertExistsFn
 }
 
-export function createNginxIngressOperator(deps: NginxIngressDeps): IngressOperator {
-  const exec = deps.exec ?? getExec()
+/** Creates the nginx-backed ingress operator. */
+export function ingressCreateNginxOperator(deps: IngressNginxDeps): IngressOperator {
+  const exec = deps.exec ?? ingressGetExec()
   const certExists = deps.certExists ?? defaultCertExists
 
   return {
@@ -63,20 +68,20 @@ export function createNginxIngressOperator(deps: NginxIngressDeps): IngressOpera
 async function renderAndWrite(
   nginxDir: string,
   claim: IngressClaim,
-  certExists: CertExistsFn,
+  certExists: IngressCertExistsFn,
 ): Promise<void> {
-  const dir = nginxAppConfDir(nginxDir, claim.app)
+  const dir = ingressNginxAppConfDir(nginxDir, claim.app)
   await rm(dir, { recursive: true, force: true })
   await mkdir(dir, { recursive: true, mode: 0o755 })
   for (const domain of claim.domains) {
     const hasSSL = domain.isTunnel ? false : await certExists(domain.host)
-    const body = renderNginxSite({
+    const body = ingressRenderNginxSite({
       host: domain.host,
       port: domain.port,
       isTunnel: domain.isTunnel,
       hasSSL,
     })
-    await writeFile(join(dir, nginxConfFilename(domain.host)), body, { mode: 0o644 })
+    await writeFile(join(dir, ingressNginxConfFilename(domain.host)), body, { mode: 0o644 })
   }
 }
 
@@ -87,7 +92,7 @@ interface StagedAppDir {
 }
 
 async function stageNginxAppDir(nginxDir: string, app: string): Promise<StagedAppDir> {
-  const current = nginxAppConfDir(nginxDir, app)
+  const current = ingressNginxAppConfDir(nginxDir, app)
   const backup = `${current}.bak`
   await rm(backup, { recursive: true, force: true })
   try {

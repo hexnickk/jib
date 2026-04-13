@@ -7,7 +7,8 @@ import { JIB_NGINX_INCLUDE_PATH } from './install.ts'
  * `$JIB_ROOT/nginx/`. Leaves nginx itself alone — uninstalling a package
  * the operator may own is out of scope.
  */
-export const uninstall: IngressHook = async (ctx) => {
+/** Removes generated nginx config and the jib include snippet. */
+export const ingressUninstall: IngressHook = async (ctx) => {
   const log = ctx.logger
 
   log.info(`removing ${JIB_NGINX_INCLUDE_PATH}`)

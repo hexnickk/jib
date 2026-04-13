@@ -1,6 +1,6 @@
 import { CliError, cliIsTextOutput } from '@jib/cli'
 import { type App, type Config, ConfigError, configLoad, configLoadContext } from '@jib/config'
-import { claimIngress, createIngressOperator } from '@jib/ingress'
+import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { sourcesBuildChoices, sourcesPreflightSelection, sourcesRunSetup } from '@jib/sources'
 import { isInteractive, promptConfirm, promptSelect, spinner } from '@jib/tui'
@@ -134,7 +134,7 @@ async function addClaimIngress(paths: Paths, app: string, appCfg: App): Promise<
   const progress = cliIsTextOutput() ? spinner() : null
   progress?.start(`claiming ingress for ${app}`)
   try {
-    await claimIngress(createIngressOperator(paths), app, appCfg, (update) =>
+    await ingressClaim(ingressCreateOperator(paths), app, appCfg, (update) =>
       progress?.message(update.message),
     )
     progress?.stop('ingress ready')
