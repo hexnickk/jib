@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { LogLevels } from 'consola'
 
-import { createLogger } from './index'
+import { loggingCreateLogger } from './index'
 
 const originalDebug = process.env.JIB_DEBUG
 
@@ -14,11 +14,11 @@ afterEach(() => {
   process.env.JIB_DEBUG = originalDebug
 })
 
-describe('createLogger', () => {
+describe('loggingCreateLogger', () => {
   test('defaults to warn when JIB_DEBUG is unset', () => {
     Reflect.deleteProperty(process.env, 'JIB_DEBUG')
 
-    const logger = createLogger('demo')
+    const logger = loggingCreateLogger('demo')
 
     expect(logger.level).toBe(LogLevels.warn)
   })
@@ -27,7 +27,7 @@ describe('createLogger', () => {
     for (const value of ['1', 'true', 'yes', 'on', 'TRUE']) {
       process.env.JIB_DEBUG = value
 
-      const logger = createLogger('demo')
+      const logger = loggingCreateLogger('demo')
 
       expect(logger.level).toBe(LogLevels.debug)
     }

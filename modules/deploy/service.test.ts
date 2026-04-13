@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import type { DockerExec, ExecResult } from '@jib/docker'
-import { createLogger } from '@jib/logging'
+import { loggingCreateLogger } from '@jib/logging'
 import { Store } from '@jib/state'
 import { getPaths, repoPath } from '../paths/paths.ts'
 import { DeployDiskSpaceError, DeployMissingAppError } from './errors.ts'
@@ -71,7 +71,7 @@ async function mkEnv() {
   await mkdir(join(root, 'state'), { recursive: true })
   const paths = getPaths(root)
   const store = new Store(paths.stateDir)
-  return { paths, store, log: createLogger('test') }
+  return { paths, store, log: loggingCreateLogger('test') }
 }
 
 const noProgress = { emit: () => {} }

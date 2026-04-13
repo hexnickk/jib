@@ -1,18 +1,17 @@
 import { type ConsolaInstance, LogLevels, consola } from 'consola'
 
-/** True when the user wants verbose output. Check this before any expensive debug work. */
-function isJibDebugEnabled(): boolean {
+/** Returns whether `JIB_DEBUG` is enabled with a shell-style truthy value. */
+function loggingIsDebugEnabled(): boolean {
   return ['1', 'true', 'yes', 'on'].includes((process.env.JIB_DEBUG ?? '').toLowerCase())
 }
 
 /**
- * Returns a child logger prefixed with `[tag]`. By default only shows
- * warnings and errors — step-by-step detail is hidden. Set `JIB_DEBUG=1`
- * to see everything.
+ * Returns a child logger prefixed with `[tag]`.
+ * By default only warnings and errors are shown.
  */
-export function createLogger(tag: string): ConsolaInstance {
+export function loggingCreateLogger(tag: string): ConsolaInstance {
   const child = consola.withTag(tag)
-  child.level = isJibDebugEnabled() ? LogLevels.debug : LogLevels.warn
+  child.level = loggingIsDebugEnabled() ? LogLevels.debug : LogLevels.warn
   return child
 }
 

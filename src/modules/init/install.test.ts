@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { createLogger } from '@jib/logging'
+import { loggingCreateLogger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
 import { InitModuleInstallError } from './errors.ts'
 import { runInstallsTx, runInstallsTxResult } from './install.ts'
@@ -16,7 +16,7 @@ import type { InitContext } from './types.ts'
 
 const ctx: InitContext = {
   config: { config_version: 3, poll_interval: '5m', sources: {}, apps: {} } as Config,
-  logger: createLogger('init-test'),
+  logger: loggingCreateLogger('init-test'),
   paths: getPaths('/tmp/jib-init-test'),
 }
 

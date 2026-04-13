@@ -1,5 +1,5 @@
 import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
-import { createLogger } from '@jib/logging'
+import { loggingCreateLogger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import {
   type InitModuleInstallError,
@@ -24,7 +24,7 @@ interface OptionalModuleDeps {
 }
 
 function initCtx(config: Config, paths: Paths): InitContext {
-  return { config, logger: createLogger('init'), paths }
+  return { config, logger: loggingCreateLogger('init'), paths }
 }
 
 async function rollbackModuleInstall(mod: ModLike, ctx: InitContext): Promise<void> {

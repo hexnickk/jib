@@ -1,5 +1,5 @@
 import { configLoad } from '@jib/config'
-import { createLogger } from '@jib/logging'
+import { loggingCreateLogger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import type { JibDb } from '@jib/state'
 import type { InitContext } from '../modules/init/types.ts'
@@ -19,5 +19,5 @@ export interface JibMigration {
 export async function initCtx(mctx: MigrationContext): Promise<InitContext> {
   const config = await configLoad(mctx.paths.configFile)
   if (config instanceof Error) throw config
-  return { config, logger: createLogger('init'), paths: mctx.paths }
+  return { config, logger: loggingCreateLogger('init'), paths: mctx.paths }
 }

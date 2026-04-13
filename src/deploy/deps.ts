@@ -1,6 +1,6 @@
 import type { Config } from '@jib/config'
 import type { DeployDeps } from '@jib/deploy'
-import { createLogger } from '@jib/logging'
+import { loggingCreateLogger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import { Store } from '@jib/state'
 
@@ -10,6 +10,6 @@ export function deployCreateDeps(config: Config, paths: Paths, name = 'deploy'):
     config,
     paths,
     store: new Store(paths.stateDir),
-    log: createLogger(name),
+    log: loggingCreateLogger(name),
   }
 }

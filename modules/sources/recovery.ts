@@ -1,5 +1,5 @@
 import type { Config } from '@jib/config'
-import { createLogger } from '@jib/logging'
+import { loggingCreateLogger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import { sourceDriver, sourceDrivers } from './registry.ts'
 import type { SourceSelectOption, SourceSetupOption, SourceStatus } from './types.ts'
@@ -37,7 +37,7 @@ export async function sourcesRunSetup(
 ): Promise<string | null> {
   const driver = sourceDriver(value)
   if (!driver?.setup) return null
-  return driver.setup({ config: cfg, logger: createLogger('sources'), paths })
+  return driver.setup({ config: cfg, logger: loggingCreateLogger('sources'), paths })
 }
 
 export async function sourcesCollectStatuses(cfg: Config, paths: Paths): Promise<SourceStatus[]> {

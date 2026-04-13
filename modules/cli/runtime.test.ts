@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { createLogger } from '@jib/logging'
+import { loggingCreateLogger } from '@jib/logging'
 import { LogLevels } from 'consola'
 import {
   InvalidInteractiveModeError,
@@ -93,7 +93,7 @@ describe('cliApplyRuntimeArgv', () => {
   })
 })
 
-describe('createLogger', () => {
+describe('loggingCreateLogger', () => {
   test('reflects runtime debug changes', () => {
     cliSetRuntime({
       interactive: 'auto',
@@ -102,7 +102,7 @@ describe('createLogger', () => {
       stdinTty: true,
       stdoutTty: true,
     })
-    expect(createLogger('test').level).toBe(LogLevels.warn)
+    expect(loggingCreateLogger('test').level).toBe(LogLevels.warn)
 
     cliSetRuntime({
       interactive: 'auto',
@@ -111,7 +111,7 @@ describe('createLogger', () => {
       stdinTty: true,
       stdoutTty: true,
     })
-    expect(createLogger('test').level).toBeGreaterThan(LogLevels.warn)
+    expect(loggingCreateLogger('test').level).toBeGreaterThan(LogLevels.warn)
   })
 })
 

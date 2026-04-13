@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
-import { createLogger } from '@jib/logging'
+import { loggingCreateLogger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
 import { WatcherDeployAppError, WatcherSyncAppError } from './errors.ts'
 import { type PollAppDeps, parsePollInterval, pollApp, runPoller } from './poller.ts'
@@ -41,7 +41,7 @@ describe('pollApp', () => {
     const cfg = mkCfg()
     const paths = getPaths('/tmp/jib-root-test')
     const seen = new Map<string, string>()
-    const log = createLogger('test')
+    const log = loggingCreateLogger('test')
     const deploys: unknown[] = []
 
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
@@ -77,7 +77,7 @@ describe('pollApp', () => {
     const cfg = mkCfg()
     const paths = getPaths('/tmp/jib-root-test')
     const seen = new Map<string, string>()
-    const log = createLogger('test')
+    const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
 
     const error = await pollApp(cfg, paths, 'demo', seen, log, {
@@ -94,7 +94,7 @@ describe('pollApp', () => {
     const cfg = mkCfg()
     const paths = getPaths('/tmp/jib-root-test')
     const seen = new Map<string, string>()
-    const log = createLogger('test')
+    const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
 
     const error = await pollApp(cfg, paths, 'demo', seen, log, {
@@ -114,7 +114,7 @@ describe('pollApp', () => {
     const cfg = mkCfg()
     const paths = getPaths('/tmp/jib-root-test')
     const seen = new Map<string, string>()
-    const log = createLogger('test')
+    const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
 
     const error = await pollApp(cfg, paths, 'demo', seen, log, {
@@ -134,7 +134,7 @@ describe('runPoller', () => {
   test('stops promptly when aborted during sleep', async () => {
     const cfg = mkCfg({ apps: {} as Config['apps'] })
     const paths = getPaths('/tmp/jib-root-test')
-    const log = createLogger('test')
+    const log = loggingCreateLogger('test')
     const abort = new AbortController()
     let sleepCalls = 0
     let configLoads = 0
