@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { type Paths, credsPath, ensureCredsDir } from '@jib/paths'
-import { CloudflaredSaveTunnelTokenError, cloudflaredWrapError } from './errors.ts'
+import { CloudflaredSaveTunnelTokenError } from './errors.ts'
 import { CLOUDFLARED_SERVICE_NAME } from './templates.ts'
 import { cloudflaredExtractTunnelToken } from './token.ts'
 
@@ -45,7 +45,10 @@ export async function cloudflaredSaveTunnelToken(
     await writeFile(path, `TUNNEL_TOKEN=${token}\n`, { mode: 0o640 })
     return true
   } catch (error) {
-    return cloudflaredWrapError(error, CloudflaredSaveTunnelTokenError)
+    const message = error instanceof Error ? error.message : String(error)
+    return new CloudflaredSaveTunnelTokenError(`write tunnel token: ${message}`, {
+      cause: error,
+    })
   }
 }
 

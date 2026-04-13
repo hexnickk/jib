@@ -5,10 +5,14 @@ import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
 import {
-  CloudflaredInstallError,
+  CloudflaredInstallReloadError,
+  CloudflaredInstallWriteUnitError,
+  CloudflaredUninstallDisableError,
   CloudflaredUninstallError,
   cloudflaredInstall,
+  cloudflaredInstallResult,
   cloudflaredUninstall,
+  cloudflaredUninstallResult,
 } from './index.ts'
 
 const serviceName = 'jib-cloudflared.test.service'
@@ -103,36 +107,36 @@ describe('cloudflared install/uninstall', () => {
     }
   })
 
-  test('cloudflaredInstall wraps daemon reload failures with a typed error and cause', async () => {
+  test('cloudflaredInstallResult returns a typed reload error for non-zero daemon-reload exits', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
-    const cause = new Error('reload failed')
 
     try {
-      await expect(
-        cloudflaredInstall(
-          { logger, paths },
-          {
-            unitPath,
-            daemonReload: async () => {
-              throw cause
-            },
-          },
-        ),
-      ).rejects.toMatchObject({
-        cause,
-        message: 'reload failed',
-        name: 'CloudflaredInstallError',
+      const result = await cloudflaredInstallResult(
+        { logger, paths },
+        {
+          unitPath,
+          daemonReload: async () => ({
+            exitCode: 1,
+            stdout: Buffer.from(''),
+            stderr: Buffer.from('reload failed'),
+          }),
+        },
+      )
+
+      expect(result).toMatchObject({
+        message: 'systemctl daemon-reload: reload failed',
+        name: 'CloudflaredInstallReloadError',
       })
+      expect(result).toBeInstanceOf(CloudflaredInstallReloadError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
   })
 
-  test('cloudflaredInstall does not double-wrap typed install errors', async () => {
+  test('cloudflaredInstall throws install result errors for hook compatibility', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
-    const error = new CloudflaredInstallError('already wrapped')
 
     try {
       await expect(
@@ -140,18 +144,135 @@ describe('cloudflared install/uninstall', () => {
           { logger, paths },
           {
             unitPath,
-            daemonReload: async () => {
-              throw error
+            systemdUnit: () => {
+              throw new Error('bad unit template')
             },
           },
         ),
-      ).rejects.toBe(error)
+      ).rejects.toBeInstanceOf(CloudflaredInstallWriteUnitError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
   })
 
-  test('cloudflaredUninstall wraps disable failures with a typed error', async () => {
+  test('cloudflaredUninstall keeps cleaning up when disable reports an absent unit', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
+    const paths = getPaths(root)
+    const calls: string[] = []
+
+    try {
+      await mkdir(paths.cloudflaredDir, { recursive: true })
+      await Bun.write(
+        join(paths.cloudflaredDir, 'docker-compose.yml'),
+        'services:\n  cloudflared:\n',
+      )
+      await Bun.write(unitPath, 'unit')
+
+      const result = await cloudflaredUninstallResult(
+        { logger, paths },
+        {
+          serviceName,
+          unitPath,
+          disableNow: async () => {
+            calls.push('disable')
+            return {
+              exitCode: 1,
+              stdout: Buffer.from(''),
+              stderr: Buffer.from('Unit jib-cloudflared.test.service not loaded.'),
+            }
+          },
+          daemonReload: async () => {
+            calls.push('daemon-reload')
+          },
+        },
+      )
+
+      expect(result).toBeUndefined()
+      expect(calls).toEqual(['disable', 'daemon-reload'])
+      expect(await stat(unitPath).catch(() => null)).toBeNull()
+      expect(
+        await stat(join(paths.cloudflaredDir, 'docker-compose.yml')).catch(() => null),
+      ).toBeNull()
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test('cloudflaredUninstallResult returns a typed disable error after cleanup on real failures', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
+    const paths = getPaths(root)
+    const calls: string[] = []
+
+    try {
+      await mkdir(paths.cloudflaredDir, { recursive: true })
+      await Bun.write(
+        join(paths.cloudflaredDir, 'docker-compose.yml'),
+        'services:\n  cloudflared:\n',
+      )
+      await Bun.write(unitPath, 'unit')
+
+      const result = await cloudflaredUninstallResult(
+        { logger, paths },
+        {
+          serviceName,
+          unitPath,
+          disableNow: async () => {
+            calls.push('disable')
+            return {
+              exitCode: 1,
+              stdout: Buffer.from(''),
+              stderr: Buffer.from('permission denied'),
+            }
+          },
+          daemonReload: async () => {
+            calls.push('daemon-reload')
+          },
+        },
+      )
+
+      expect(result).toBeInstanceOf(CloudflaredUninstallDisableError)
+      expect(calls).toEqual(['disable', 'daemon-reload'])
+      expect(await stat(unitPath).catch(() => null)).toBeNull()
+      expect(
+        await stat(join(paths.cloudflaredDir, 'docker-compose.yml')).catch(() => null),
+      ).toBeNull()
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test('cloudflaredUninstallResult returns a typed reload error for non-zero daemon-reload exits', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
+    const paths = getPaths(root)
+
+    try {
+      await mkdir(paths.cloudflaredDir, { recursive: true })
+      await Bun.write(
+        join(paths.cloudflaredDir, 'docker-compose.yml'),
+        'services:\n  cloudflared:\n',
+      )
+
+      const result = await cloudflaredUninstallResult(
+        { logger, paths },
+        {
+          unitPath,
+          disableNow: async () => undefined,
+          daemonReload: async () => ({
+            exitCode: 1,
+            stdout: Buffer.from(''),
+            stderr: Buffer.from('reload failed'),
+          }),
+        },
+      )
+
+      expect(result?.name).toBe('CloudflaredUninstallReloadError')
+      expect(result?.message).toBe('systemctl daemon-reload: reload failed')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test('cloudflaredUninstall throws uninstall result errors for hook compatibility', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
     const paths = getPaths(root)
 
