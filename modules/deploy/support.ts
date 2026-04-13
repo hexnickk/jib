@@ -12,7 +12,7 @@ import { JibError } from '@jib/errors'
 import {
   type AppState,
   type StateStore,
-  stateAcquire,
+  stateAcquireLock,
   stateLoad,
   stateRecordFailure,
   stateSave,
@@ -115,10 +115,11 @@ export async function deployAcquireLock(
   deps: DeployDeps,
   app: string,
 ): Promise<(() => Promise<void>) | DeployLockAcquireError | JibError> {
-  return deployRunOrReturnError(
-    () => stateAcquire(deps.paths.locksDir, app, { blocking: false }),
-    (message, options) => new DeployLockAcquireError(app, message, options),
-  )
+  const release = await stateAcquireLock(deps.paths.locksDir, app, { blocking: false })
+  if (release instanceof Error) {
+    return new DeployLockAcquireError(app, release.message, { cause: release })
+  }
+  return release
 }
 
 /** Releases a previously acquired deploy lock. */

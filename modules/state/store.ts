@@ -13,8 +13,6 @@ export function stateCreateStore(dir: string): StateStore {
   return { dir }
 }
 
-export { stateCreateStore as createStateStore }
-
 function statePath(store: StateStore, app: string): string {
   return join(store.dir, `${app}.json`)
 }
@@ -47,8 +45,6 @@ export async function stateLoad(store: StateStore, app: string): Promise<AppStat
   }
 }
 
-export { stateLoad as loadState }
-
 /** Writes one app's state atomically via a temp file rename. */
 export async function stateSave(
   store: StateStore,
@@ -71,8 +67,6 @@ export async function stateSave(
   }
 }
 
-export { stateSave as saveState }
-
 /** Removes one app's state file without failing when it is already absent. */
 export async function stateRemove(store: StateStore, app: string): Promise<StateError | undefined> {
   const path = statePath(store, app)
@@ -83,8 +77,6 @@ export async function stateRemove(store: StateStore, app: string): Promise<State
     return new StateError(`removing state ${path}: ${(error as Error).message}`, { cause: error })
   }
 }
-
-export { stateRemove as removeState }
 
 /**
  * Record a failed deploy attempt in the last-deploy summary. Purely
@@ -102,36 +94,4 @@ export async function stateRecordFailure(
   state.last_deploy_error = errorMsg
   state.last_deploy = new Date().toISOString()
   return stateSave(store, app, state)
-}
-
-export { stateRecordFailure as recordStateFailure }
-
-/** JSON-backed per-app state store. Compatibility wrapper over the function API. */
-export class Store {
-  private readonly store: StateStore
-
-  constructor(dir: string) {
-    this.store = stateCreateStore(dir)
-  }
-
-  async load(app: string): Promise<AppState> {
-    const state = await stateLoad(this.store, app)
-    if (state instanceof StateError) throw state
-    return state
-  }
-
-  async save(app: string, state: AppState): Promise<void> {
-    const error = await stateSave(this.store, app, state)
-    if (error) throw error
-  }
-
-  async remove(app: string): Promise<void> {
-    const error = await stateRemove(this.store, app)
-    if (error) throw error
-  }
-
-  async recordFailure(app: string, errorMsg: string): Promise<void> {
-    const error = await stateRecordFailure(this.store, app, errorMsg)
-    if (error) throw error
-  }
 }

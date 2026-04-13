@@ -1,6 +1,6 @@
 import { CliError, cliIsTextOutput } from '@jib/cli'
 import { configLoadContext } from '@jib/config'
-import { createSecretsManager } from '@jib/secrets'
+import { secretsCreateManager } from '@jib/secrets'
 import { consola } from 'consola'
 import type { CliCommand } from './command.ts'
 
@@ -9,7 +9,7 @@ async function loadSecretsContext() {
   const loaded = await configLoadContext()
   if (loaded instanceof Error) return loaded
   const { cfg, paths } = loaded
-  const manager = createSecretsManager(paths.secretsDir)
+  const manager = secretsCreateManager(paths.secretsDir)
   return { cfg, paths, manager }
 }
 

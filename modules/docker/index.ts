@@ -1,5 +1,4 @@
 export {
-  Compose,
   dockerCreateCompose,
   type ComposeConfig,
   type DockerCompose,

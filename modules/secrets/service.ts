@@ -78,7 +78,7 @@ export function secretsEnvPath(ctx: SecretsContext, app: string, envFile?: strin
   return join(ctx.secretsDir, app, envFileName(envFile))
 }
 
-export async function checkSecretsApp(
+export async function secretsCheckApp(
   ctx: SecretsContext,
   app: string,
   envFile?: string,
@@ -93,7 +93,7 @@ export async function checkSecretsApp(
   }
 }
 
-export async function readMaskedSecrets(
+export async function secretsReadMasked(
   ctx: SecretsContext,
   app: string,
   envFile?: string,
@@ -112,7 +112,7 @@ export async function readMaskedSecrets(
   })
 }
 
-export async function upsertSecret(
+export async function secretsUpsert(
   ctx: SecretsContext,
   app: string,
   key: string,
@@ -139,7 +139,7 @@ export async function upsertSecret(
   return writeSecure(path, lines.join('\n'))
 }
 
-export async function removeSecret(
+export async function secretsRemove(
   ctx: SecretsContext,
   app: string,
   key: string,
@@ -158,7 +158,7 @@ export async function removeSecret(
   return true
 }
 
-export async function removeAppSecrets(
+export async function secretsRemoveApp(
   ctx: SecretsContext,
   app: string,
 ): Promise<undefined | SecretsRemoveAppError> {

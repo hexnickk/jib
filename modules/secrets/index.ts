@@ -4,13 +4,14 @@ export {
   SecretsStatError,
   SecretsWriteError,
 } from './errors.ts'
-export { createSecretsManager, SecretsManager } from './manager.ts'
+export { secretsCreateManager } from './manager.ts'
+export type { SecretsManagerClient } from './manager.ts'
 export {
-  checkSecretsApp,
-  readMaskedSecrets,
-  removeAppSecrets,
-  removeSecret,
+  secretsCheckApp,
   secretsEnvPath,
-  upsertSecret,
+  secretsReadMasked,
+  secretsRemove,
+  secretsRemoveApp,
+  secretsUpsert,
 } from './service.ts'
 export type { AppSecretStatus, MaskedSecretEntry, SecretsContext } from './service.ts'

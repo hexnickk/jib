@@ -64,21 +64,6 @@ export async function stateAcquireLock(
   }
 }
 
-export { stateAcquireLock as acquireLock }
-
-/** Compatibility wrapper that preserves the legacy throw-on-error behavior. */
-export async function stateAcquire(
-  dir: string,
-  app: string,
-  opts: LockOptions = {},
-): Promise<Release> {
-  const release = await stateAcquireLock(dir, app, opts)
-  if (release instanceof LockError) throw release
-  return release
-}
-
-export { stateAcquire as acquire }
-
 async function waitForReady(proc: Bun.Subprocess<'pipe', 'pipe', 'pipe'>): Promise<boolean> {
   const reader = proc.stdout.getReader()
   const decoder = new TextDecoder()

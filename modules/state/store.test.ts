@@ -4,21 +4,24 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { StateError } from './errors.ts'
 import { stateEmpty } from './schema.ts'
-import { Store, stateCreateStore, stateLoad, stateSave } from './store.ts'
+import { stateCreateStore, stateLoad, stateRecordFailure, stateRemove, stateSave } from './store.ts'
 
-async function withStore<T>(fn: (store: Store, dir: string) => Promise<T>): Promise<T> {
+async function withStore<T>(
+  fn: (store: ReturnType<typeof stateCreateStore>, dir: string) => Promise<T>,
+): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), 'jib-state-'))
   try {
-    return await fn(new Store(dir), dir)
+    return await fn(stateCreateStore(dir), dir)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
 }
 
-describe('Store', () => {
+describe('state store', () => {
   test('load on missing file returns empty', async () => {
     await withStore(async (s) => {
-      const st = await s.load('ghost')
+      const st = await stateLoad(s, 'ghost')
+      if (st instanceof Error) throw st
       expect(st.app).toBe('ghost')
       expect(st.deployed_sha).toBe('')
     })
@@ -29,8 +32,9 @@ describe('Store', () => {
       const st = stateEmpty('web')
       st.deployed_sha = 'abc123'
       st.last_deploy_status = 'success'
-      await s.save('web', st)
-      const loaded = await s.load('web')
+      expect(await stateSave(s, 'web', st)).toBeUndefined()
+      const loaded = await stateLoad(s, 'web')
+      if (loaded instanceof Error) throw loaded
       expect(loaded.deployed_sha).toBe('abc123')
       expect(loaded.last_deploy_status).toBe('success')
       expect(loaded.schema_version).toBe(1)
@@ -39,9 +43,10 @@ describe('Store', () => {
 
   test('recordFailure writes last-deploy summary', async () => {
     await withStore(async (s) => {
-      await s.save('web', stateEmpty('web'))
-      await s.recordFailure('web', 'boom')
-      const st = await s.load('web')
+      expect(await stateSave(s, 'web', stateEmpty('web'))).toBeUndefined()
+      expect(await stateRecordFailure(s, 'web', 'boom')).toBeUndefined()
+      const st = await stateLoad(s, 'web')
+      if (st instanceof Error) throw st
       expect(st.last_deploy_error).toBe('boom')
       expect(st.last_deploy_status).toBe('failure')
       expect(st.last_deploy).not.toBe('')
@@ -50,9 +55,10 @@ describe('Store', () => {
 
   test('remove deletes the app state file', async () => {
     await withStore(async (s) => {
-      await s.save('web', stateEmpty('web'))
-      await s.remove('web')
-      const st = await s.load('web')
+      expect(await stateSave(s, 'web', stateEmpty('web'))).toBeUndefined()
+      expect(await stateRemove(s, 'web')).toBeUndefined()
+      const st = await stateLoad(s, 'web')
+      if (st instanceof Error) throw st
       expect(st.app).toBe('web')
       expect(st.deployed_sha).toBe('')
     })
@@ -61,7 +67,7 @@ describe('Store', () => {
   test('load rejects corrupt JSON', async () => {
     await withStore(async (s, dir) => {
       await Bun.write(join(dir, 'web.json'), '{not json')
-      await expect(s.load('web')).rejects.toThrow(StateError)
+      expect(await stateLoad(s, 'web')).toBeInstanceOf(StateError)
     })
   })
 })

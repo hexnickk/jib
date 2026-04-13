@@ -7,7 +7,7 @@ import { DockerAppNotFoundError } from './errors.ts'
 import { dockerOverridePath } from './override.ts'
 
 /**
- * Build a {@link Compose} handle for `app` from loaded config + resolved
+ * Build a docker-compose handle for `app` from loaded config + resolved
  * paths. Mirrors the Go `newCompose` helper: resolves the app's workdir,
  * stitches together declared compose files, and points at jib's managed
  * override file.

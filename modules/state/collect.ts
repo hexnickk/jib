@@ -34,14 +34,10 @@ export function stateManagedServiceNames(hasCloudflared: boolean): string[] {
   return hasCloudflared ? [WATCHER_SERVICE, CLOUDFLARED_SERVICE] : [WATCHER_SERVICE]
 }
 
-export { stateManagedServiceNames as managedServiceNames }
-
 /** Reads `systemctl is-active` for the managed units and normalizes the result. */
 export async function stateCollectServices(hasCloudflared: boolean): Promise<ServiceStatus[]> {
   return Promise.all(stateManagedServiceNames(hasCloudflared).map(checkUnit))
 }
-
-export { stateCollectServices as collectServices }
 
 /** Normalizes `systemctl is-active` output into a stable display string. */
 export function stateNormalizeUnitStatus(output: string, exitCode: number): string {
@@ -50,8 +46,6 @@ export function stateNormalizeUnitStatus(output: string, exitCode: number): stri
   const firstLine = raw.split('\n', 1)[0]?.trim() ?? ''
   return /^[a-z-]+$/.test(firstLine) ? firstLine : 'unavailable'
 }
-
-export { stateNormalizeUnitStatus as normalizeUnitStatus }
 
 async function checkUnit(name: string): Promise<ServiceStatus> {
   const res = await $`systemctl is-active ${name}`.quiet().nothrow()
@@ -64,8 +58,6 @@ async function checkUnit(name: string): Promise<ServiceStatus> {
 export async function stateCollectSources(cfg: Config, paths: Paths): Promise<SourceStatus[]> {
   return sourcesCollectStatuses(cfg, paths)
 }
-
-export { stateCollectSources as collectSources }
 
 /** Collects app status rows, returning a typed error if app state is unreadable. */
 export async function stateCollectApps(
@@ -88,13 +80,6 @@ export async function stateCollectApps(
     })
   }
   return results
-}
-
-/** Compatibility wrapper that preserves the legacy throw-on-error behavior. */
-export async function collectApps(cfg: Config, paths: Paths): Promise<AppStatus[]> {
-  const result = await stateCollectApps(cfg, paths)
-  if (result instanceof StateError) throw result
-  return result
 }
 
 async function collectContainers(app: string): Promise<ContainerStatus[]> {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { Compose } from './compose.ts'
+import { dockerCreateCompose } from './compose.ts'
 import type { DockerExec, ExecResult } from './exec.ts'
 
 interface Call {
@@ -34,12 +34,12 @@ function make(override?: string) {
     ...(override ? { override } : {}),
     exec,
   }
-  return { compose: new Compose(cfg), calls }
+  return { compose: dockerCreateCompose(cfg), calls }
 }
 
-describe('Compose', () => {
+describe('dockerCreateCompose', () => {
   test('projectName prefixes with jib-', () => {
-    expect(new Compose({ app: 'foo', dir: '.', files: [] }).projectName()).toBe('jib-foo')
+    expect(dockerCreateCompose({ app: 'foo', dir: '.', files: [] }).projectName()).toBe('jib-foo')
   })
 
   test('baseArgs includes project and compose files', () => {
@@ -90,7 +90,7 @@ describe('Compose', () => {
 
   test('throws JibError on non-zero exit', async () => {
     const exec: DockerExec = async () => ({ stdout: '', stderr: 'boom', exitCode: 2 })
-    const compose = new Compose({ app: 'demo', dir: '.', files: [], exec })
+    const compose = dockerCreateCompose({ app: 'demo', dir: '.', files: [], exec })
     await expect(compose.up()).rejects.toThrow(/exited 2/)
   })
 })
