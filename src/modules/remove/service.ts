@@ -8,6 +8,7 @@ export interface RemoveRunContext {
   observer?: RemoveObserver
 }
 
+/** Removes one app and persists the config change before best-effort cleanup. */
 export async function removeApp(
   ctx: RemoveRunContext,
   params: RemoveParams,
@@ -42,6 +43,7 @@ export async function removeApp(
   return { app: params.appName, removed: true }
 }
 
+/** Runs a cleanup step and downgrades failures to observer warnings. */
 async function runBestEffort(
   ctx: RemoveRunContext,
   label: string,

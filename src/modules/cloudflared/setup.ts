@@ -160,7 +160,3 @@ function shouldShowSetupIntro(result: CloudflaredSetupResult): boolean {
   if (result.status === 'skipped') return true
   return !result.keptExisting
 }
-
-// Compatibility aliases for callers outside this slice.
-export const runCloudflaredSetup = cloudflaredRunSetup
-export const runCloudflaredSetupResult = cloudflaredRunSetupResult

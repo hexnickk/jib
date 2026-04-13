@@ -20,6 +20,7 @@ export interface GuidedServiceAnswer {
   configEntries?: ConfigEntry[]
 }
 
+/** Splits comma-separated user input into trimmed non-empty values. */
 export function addSplitCommaValues(raw?: string | null): string[] {
   return (raw ?? '')
     .split(',')
@@ -27,6 +28,7 @@ export function addSplitCommaValues(raw?: string | null): string[] {
     .filter((value) => value.length > 0)
 }
 
+/** Parses a single `KEY=VALUE` entry for add-flow env configuration. */
 export function addParseEnvEntry(raw: string): EnvEntry | ValidationError {
   const line = raw.trim()
   const eq = line.indexOf('=')
@@ -34,10 +36,12 @@ export function addParseEnvEntry(raw: string): EnvEntry | ValidationError {
   return { key: line.slice(0, eq), value: line.slice(eq + 1) }
 }
 
+/** Validates one interactive env entry line and returns a human hint on failure. */
 export function addValidateEnvEntry(raw: string): string | undefined {
   return raw.indexOf('=') < 1 ? 'expected KEY=VALUE (example: SECRET_KEY=VALUE)' : undefined
 }
 
+/** Summarizes compose services into the smaller add-flow service model. */
 export function addSummarizeComposeServices(services: ComposeService[]): AddServiceSummary[] {
   return services.map((service) => {
     const inferredContainerPort = dockerInferContainerPort(service)
@@ -51,6 +55,7 @@ export function addSummarizeComposeServices(services: ComposeService[]): AddServ
   })
 }
 
+/** Assigns CLI domains to services or returns issues when multiple services exist. */
 export function addAssignCliDomainsToServices(
   domains: ParsedDomain[],
   serviceNames: string[],
@@ -78,6 +83,7 @@ export function addAssignCliDomainsToServices(
   return { domains: nextDomains, issues }
 }
 
+/** Infers the required config scopes for one summarized compose service. */
 export function addRequiredConfigScopes(service: AddServiceSummary): Map<string, ConfigScope> {
   const out = new Map<string, ConfigScope>()
   for (const key of service.envRefs ?? []) out.set(key, addInferScope(true, out.has(key)))
@@ -88,6 +94,7 @@ export function addRequiredConfigScopes(service: AddServiceSummary): Map<string,
   return out
 }
 
+/** Merges guided prompt answers back into final domains and config entries. */
 export function addMergeGuidedServiceAnswers(
   existingDomains: ParsedDomain[],
   serviceNames: string[],
@@ -120,6 +127,7 @@ export function addMergeGuidedServiceAnswers(
   return { domains, configEntries: addMergeConfigEntries(configEntries) }
 }
 
+/** Renders the final add plan summary shown before config is written. */
 export function addRenderPlanSummary(input: {
   app: string
   composeFiles: string[]
@@ -150,6 +158,7 @@ export function addRenderPlanSummary(input: {
   return lines.join('\n')
 }
 
+/** Chooses the default exposure suggestion for one service in the guided flow. */
 export function addShouldDefaultExposeService(
   _service: AddServiceSummary,
   totalServices: number,

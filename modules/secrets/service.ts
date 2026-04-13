@@ -25,10 +25,12 @@ export interface MaskedSecretEntry {
 const FILE_MODE = 0o640
 const DIR_MODE = 0o750
 
+/** Normalizes the env filename so callers can omit it for the default `.env`. */
 function envFileName(name?: string): string {
   return name && name !== '' ? name : '.env'
 }
 
+/** Splits an env file into mutable lines plus a key-to-line index. */
 function parseEnv(content: string): { lines: string[]; entries: Map<string, number> } {
   const lines = content.split('\n')
   const entries = new Map<string, number>()
@@ -41,10 +43,12 @@ function parseEnv(content: string): { lines: string[]; entries: Map<string, numb
   return { lines, entries }
 }
 
+/** Detects missing-file fs errors that should be treated as absence, not failure. */
 function isMissingError(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT'
 }
 
+/** Reads an env file when present and returns a typed error for other read failures. */
 async function readEnvIfPresent(path: string): Promise<string | SecretsReadError | undefined> {
   try {
     return await readFile(path, 'utf8')
@@ -54,6 +58,7 @@ async function readEnvIfPresent(path: string): Promise<string | SecretsReadError
   }
 }
 
+/** Ensures the per-app secrets directory exists with the managed permissions. */
 async function ensureAppDir(path: string): Promise<undefined | SecretsWriteError> {
   try {
     await mkdir(path, { recursive: true, mode: DIR_MODE })
@@ -64,6 +69,7 @@ async function ensureAppDir(path: string): Promise<undefined | SecretsWriteError
   }
 }
 
+/** Writes one managed secrets file and reapplies the expected mode. */
 async function writeSecure(path: string, content: string): Promise<undefined | SecretsWriteError> {
   try {
     await writeFile(path, content, { mode: FILE_MODE })
@@ -74,10 +80,12 @@ async function writeSecure(path: string, content: string): Promise<undefined | S
   }
 }
 
+/** Returns the managed env-file path for one app under the secrets tree. */
 export function secretsEnvPath(ctx: SecretsContext, app: string, envFile?: string): string {
   return join(ctx.secretsDir, app, envFileName(envFile))
 }
 
+/** Checks whether an app secrets file exists without treating absence as failure. */
 export async function secretsCheckApp(
   ctx: SecretsContext,
   app: string,
@@ -93,6 +101,7 @@ export async function secretsCheckApp(
   }
 }
 
+/** Reads one app secrets file and returns masked key previews for display. */
 export async function secretsReadMasked(
   ctx: SecretsContext,
   app: string,
@@ -112,6 +121,7 @@ export async function secretsReadMasked(
   })
 }
 
+/** Inserts or updates one secret key in an app env file. */
 export async function secretsUpsert(
   ctx: SecretsContext,
   app: string,
@@ -139,6 +149,7 @@ export async function secretsUpsert(
   return writeSecure(path, lines.join('\n'))
 }
 
+/** Removes one secret key from an app env file, returning false when absent. */
 export async function secretsRemove(
   ctx: SecretsContext,
   app: string,
@@ -158,6 +169,7 @@ export async function secretsRemove(
   return true
 }
 
+/** Removes the entire managed secrets directory for one app. */
 export async function secretsRemoveApp(
   ctx: SecretsContext,
   app: string,
