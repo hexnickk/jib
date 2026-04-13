@@ -3,6 +3,7 @@ import type { CheckHealthOptions, DockerExec } from '@jib/docker'
 import type { JibError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
+import type { StateStore } from '@jib/state'
 import type {
   DeployDiskCheckError,
   DeployDiskSpaceError,
@@ -20,7 +21,7 @@ export const MIN_DISK_BYTES = 2 * 1024 * 1024 * 1024
 export interface DeployDeps {
   config: Config
   paths: Paths
-  store: import('@jib/state').Store
+  store: StateStore
   log: Logger
   diskFree?: (path: string) => Promise<number>
   dockerExec?: DockerExec

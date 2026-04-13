@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import type { DockerExec, ExecResult } from '@jib/docker'
 import { loggingCreateLogger } from '@jib/logging'
-import { Store } from '@jib/state'
+import { stateCreateStore, stateLoad } from '@jib/state'
 import { getPaths, repoPath } from '../paths/paths.ts'
 import { DeployDiskSpaceError, DeployMissingAppError } from './errors.ts'
 import { deployApp, deployUpApp } from './service.ts'
@@ -70,7 +70,7 @@ async function mkEnv() {
   await mkdir(join(root, 'locks'), { recursive: true })
   await mkdir(join(root, 'state'), { recursive: true })
   const paths = getPaths(root)
-  const store = new Store(paths.stateDir)
+  const store = stateCreateStore(paths.stateDir)
   return { paths, store, log: loggingCreateLogger('test') }
 }
 
@@ -99,7 +99,8 @@ describe('deployApp', () => {
     if (result instanceof Error) return
     expect(result.deployedSHA).toBe('deadbeef')
 
-    const state = await store.load('demo')
+    const state = await stateLoad(store, 'demo')
+    if (state instanceof Error) throw state
     expect(state.deployed_sha).toBe('deadbeef')
     expect(state.deployed_workdir).toBe(workdir)
     expect(calls.some((call) => call.args.includes('build'))).toBe(true)
@@ -199,7 +200,8 @@ describe('deployApp', () => {
     )
 
     expect(result instanceof Error).toBe(true)
-    const state = await store.load('demo')
+    const state = await stateLoad(store, 'demo')
+    if (state instanceof Error) throw state
     expect(state.last_deploy_status).toBe('failure')
     expect(state.last_deploy_error).toContain('boom')
   })

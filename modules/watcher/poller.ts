@@ -3,7 +3,7 @@ import { deployApp } from '@jib/deploy'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import { type ProbeSourceDeps, sourcesProbe, sourcesSync } from '@jib/sources'
-import { Store } from '@jib/state'
+import { stateCreateStore } from '@jib/state'
 import { WatcherDeployAppError, WatcherProbeAppError, WatcherSyncAppError } from './errors.ts'
 
 /** Parses `poll_interval`, defaulting to 5 minutes only for invalid raw strings. */
@@ -104,7 +104,7 @@ async function deployPreparedApp(
     {
       config: cfg,
       paths,
-      store: new Store(paths.stateDir),
+      store: stateCreateStore(paths.stateDir),
       log,
     },
     { app: appName, workdir: prepared.workdir, sha: prepared.sha, trigger: 'auto' },

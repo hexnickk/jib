@@ -2,13 +2,21 @@ import { stat, symlink, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { App } from '@jib/config'
 import {
-  Compose,
+  type DockerCompose,
+  dockerCreateCompose,
   dockerOverridePath,
   dockerParseComposeServices,
   dockerWriteOverride,
 } from '@jib/docker'
 import { JibError } from '@jib/errors'
-import { type AppState, type Store, stateAcquire } from '@jib/state'
+import {
+  type AppState,
+  type StateStore,
+  stateAcquire,
+  stateLoad,
+  stateRecordFailure,
+  stateSave,
+} from '@jib/state'
 import { $ } from 'bun'
 import {
   DeployDiskCheckError,
@@ -27,10 +35,10 @@ export function deployNewCompose(
   app: string,
   appCfg: App,
   workdir: string,
-): Compose {
+): DockerCompose {
   const files =
     appCfg.compose && appCfg.compose.length > 0 ? appCfg.compose : ['docker-compose.yml']
-  return new Compose({
+  return dockerCreateCompose({
     app,
     dir: workdir,
     files: [...files],
@@ -126,17 +134,21 @@ export async function deployReleaseLock(
 }
 
 /** Loads the persisted deploy state for one app. */
-export async function deployReadState(store: Store, app: string): Promise<AppState | JibError> {
-  return deployRunOrReturnError(() => store.load(app))
+export async function deployReadState(
+  store: StateStore,
+  app: string,
+): Promise<AppState | JibError> {
+  const result = await stateLoad(store, app)
+  return result instanceof JibError ? result : result
 }
 
 /** Persists updated deploy state for one app. */
 export async function deployWriteState(
-  store: Store,
+  store: StateStore,
   app: string,
   state: AppState,
 ): Promise<JibError | undefined> {
-  const result = await deployRunOrReturnError(() => store.save(app, state))
+  const result = await stateSave(store, app, state)
   return result instanceof Error ? result : undefined
 }
 
@@ -146,7 +158,7 @@ export async function deployRecordFailure(
   app: string,
   message: string,
 ): Promise<JibError | undefined> {
-  const result = await deployRunOrReturnError(() => deps.store.recordFailure(app, message))
+  const result = await stateRecordFailure(deps.store, app, message)
   return result instanceof Error ? result : undefined
 }
 
