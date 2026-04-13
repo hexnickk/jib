@@ -1,4 +1,5 @@
 import { CliError } from '@jib/cli'
+import { JibError } from '@jib/errors'
 import type { AddFlowResult } from './types.ts'
 
 export interface InterruptState {
@@ -13,10 +14,11 @@ export interface DeploySequenceResult {
   workdir: string
 }
 
-export class AddRolledBackError extends Error {
+export class AddRolledBackError extends JibError {
   constructor(readonly original: unknown) {
-    super(original instanceof Error ? original.message : String(original))
-    this.name = 'AddRolledBackError'
+    super('add_rolled_back', original instanceof Error ? original.message : String(original), {
+      cause: original,
+    })
   }
 }
 

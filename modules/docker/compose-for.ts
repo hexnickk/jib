@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { type Paths, repoPath } from '@jib/paths'
-import { Compose } from './compose.ts'
+import { type ComposeConfig, type DockerCompose, dockerCreateCompose } from './compose.ts'
 import { DockerAppNotFoundError } from './errors.ts'
 import { dockerOverridePath } from './override.ts'
 
@@ -21,7 +21,7 @@ export function dockerComposeFor(
   cfg: Config,
   paths: Paths,
   app: string,
-): Compose | DockerAppNotFoundError {
+): DockerCompose | DockerAppNotFoundError {
   const appCfg = cfg.apps[app]
   if (!appCfg) return new DockerAppNotFoundError(app)
 
@@ -35,12 +35,12 @@ export function dockerComposeFor(
     : undefined
   const envFile = envFileCandidate && existsSync(envFileCandidate) ? envFileCandidate : undefined
 
-  const config: ConstructorParameters<typeof Compose>[0] = {
+  const config: ComposeConfig = {
     app,
     dir,
     files,
     override: dockerOverridePath(paths.overridesDir, app),
   }
   if (envFile) config.envFile = envFile
-  return new Compose(config)
+  return dockerCreateCompose(config)
 }

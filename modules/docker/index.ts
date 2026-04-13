@@ -1,4 +1,10 @@
-export { Compose, type ComposeConfig, type UpOptions } from './compose.ts'
+export {
+  Compose,
+  dockerCreateCompose,
+  type ComposeConfig,
+  type DockerCompose,
+  type UpOptions,
+} from './compose.ts'
 export type { DockerExec, ExecResult } from './exec.ts'
 export {
   dockerAllHealthy,
