@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import { configLoad, configWrite } from '@jib/config'
 import type { App, Config } from '@jib/config'
 import { type Paths, managedComposePath } from '@jib/paths'
-import { secretsCreateManager } from '@jib/secrets'
+import { type SecretsContext, secretsRemove, secretsUpsert } from '@jib/secrets'
 import { sourcesCloneForInspection, sourcesRemoveCheckout } from '@jib/sources'
 import type { AddSupport, EnvEntry } from './types.ts'
 
@@ -12,7 +12,7 @@ export interface AddDefaultSupportOptions {
 }
 
 export function addCreateDefaultSupport(options: AddDefaultSupportOptions): AddSupport {
-  const secrets = secretsCreateManager(options.paths.secretsDir)
+  const secrets: SecretsContext = { secretsDir: options.paths.secretsDir }
 
   return {
     async cloneForInspection(
@@ -41,11 +41,13 @@ export function addCreateDefaultSupport(options: AddDefaultSupportOptions): AddS
         if (result instanceof Error) throw result
       })
     },
-    upsertSecret(appName: string, entry: EnvEntry, envFile: string) {
-      return secrets.upsert(appName, entry.key, entry.value, envFile)
+    async upsertSecret(appName: string, entry: EnvEntry, envFile: string) {
+      const error = await secretsUpsert(secrets, appName, entry.key, entry.value, envFile)
+      if (error) throw error
     },
     async removeSecret(appName: string, key: string, envFile: string) {
-      await secrets.remove(appName, key, envFile)
+      const result = await secretsRemove(secrets, appName, key, envFile)
+      if (result instanceof Error) throw result
     },
     removeManagedCompose(appName: string) {
       return rm(managedComposePath(options.paths, appName), { force: true })

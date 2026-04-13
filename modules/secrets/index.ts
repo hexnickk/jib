@@ -4,8 +4,6 @@ export {
   SecretsStatError,
   SecretsWriteError,
 } from './errors.ts'
-export { secretsCreateManager } from './manager.ts'
-export type { SecretsManagerClient } from './manager.ts'
 export {
   secretsCheckApp,
   secretsEnvPath,
