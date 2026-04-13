@@ -13,7 +13,7 @@ import {
   SecretWriteError,
 } from './flow-errors.ts'
 
-export function normalizeAddError(error: AddFlowError, appName: string, configFile: string): Error {
+export function addNormalizeError(error: AddFlowError, appName: string, configFile: string): Error {
   const original = unwrapAddFlowError(error)
   if (original instanceof CliError || original instanceof ValidationError) {
     return original

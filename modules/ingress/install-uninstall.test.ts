@@ -23,6 +23,9 @@ describe('ingress install/uninstall delegation', () => {
   test('install forwards to the default backend hook', async () => {
     const calls: string[] = []
     mock.module('./backends/index.ts', () => ({
+      ingressCreateOperator() {
+        throw new Error('unused in test')
+      },
       ingressDefaultBackend: () => ({
         install: async () => {
           calls.push('install')
@@ -47,6 +50,9 @@ describe('ingress install/uninstall delegation', () => {
   test('uninstall forwards to the default backend hook', async () => {
     const calls: string[] = []
     mock.module('./backends/index.ts', () => ({
+      ingressCreateOperator() {
+        throw new Error('unused in test')
+      },
       ingressDefaultBackend: () => ({
         uninstall: async () => {
           calls.push('uninstall')

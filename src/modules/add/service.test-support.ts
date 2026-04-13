@@ -7,7 +7,7 @@ import {
   type AddFlowState,
   type AddPlanner,
   type AddSupport,
-  runAdd,
+  addRun,
 } from './index.ts'
 
 const baseCfg: Config = {
@@ -43,7 +43,7 @@ const guided = {
   ],
 }
 
-export const finalApp: App = {
+export const addFinalApp: App = {
   repo: 'owner/blog',
   branch: 'main',
   compose: ['compose.yml'],
@@ -56,7 +56,7 @@ export const finalApp: App = {
   },
 }
 
-export function makeParams(): AddFlowParams {
+export function addMakeParams(): AddFlowParams {
   return {
     appName: 'blog',
     args: {},
@@ -75,7 +75,7 @@ export function makeParams(): AddFlowParams {
   }
 }
 
-export function makeDeps(
+export function addMakeDeps(
   failAt?:
     | 'prepareRepo'
     | 'inspectCompose'
@@ -88,7 +88,7 @@ export function makeDeps(
   injectConcurrentConfigChange = false,
   failLoadConfig = false,
   failRollbackRepo = false,
-  appOverride: App = finalApp,
+  appOverride: App = addFinalApp,
 ) {
   const calls: string[] = []
   const states: AddFlowState[] = []
@@ -176,7 +176,7 @@ export function makeDeps(
 
   const flow = {
     run(params: AddFlowParams) {
-      return runAdd({ support, planner, observer }, params)
+      return addRun({ support, planner, observer }, params)
     },
   }
 

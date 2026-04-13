@@ -13,7 +13,7 @@ export interface InterruptTrap {
   dispose(): void
 }
 
-export function renderAddResult(
+export function addRenderResult(
   app: string,
   repo: string,
   result: AddFlowResult,
@@ -53,7 +53,7 @@ export function renderAddResult(
   }
 }
 
-export function normalizeAddDeployError(error: unknown, app: string, configFile: string): Error {
+export function addNormalizeDeployError(error: unknown, app: string, configFile: string): Error {
   const rollbackHint = `rolled back ${app} from ${configFile}; safe to retry: jib add ...`
   const message =
     error instanceof CliError && error.code === 'cancelled'
@@ -70,7 +70,7 @@ export function normalizeAddDeployError(error: unknown, app: string, configFile:
   )
 }
 
-export async function rollbackAddedApp(
+export async function addRollbackApp(
   paths: Paths,
   app: string,
   originalCfg: Config,
@@ -98,7 +98,7 @@ export async function rollbackAddedApp(
   if (result instanceof RemoveMissingAppError) return
 }
 
-export function trapInterrupt(): InterruptTrap {
+export function addTrapInterrupt(): InterruptTrap {
   let interrupted = false
   const markInterrupted = () => {
     interrupted = true

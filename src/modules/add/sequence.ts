@@ -13,14 +13,14 @@ export interface DeploySequenceResult {
   workdir: string
 }
 
-export class RolledBackAddError extends Error {
+export class AddRolledBackError extends Error {
   constructor(readonly original: unknown) {
     super(original instanceof Error ? original.message : String(original))
-    this.name = 'RolledBackAddError'
+    this.name = 'AddRolledBackError'
   }
 }
 
-export async function runAddSequence(
+export async function addRunSequence(
   add: () => Promise<AddFlowResult>,
   deploy: (result: AddFlowResult) => Promise<DeploySequenceResult>,
   rollback: (result: AddFlowResult) => Promise<void>,
@@ -35,7 +35,7 @@ export async function runAddSequence(
   } catch (error) {
     if (!addResult) throw error
     await rollback(addResult)
-    throw new RolledBackAddError(error)
+    throw new AddRolledBackError(error)
   }
 }
 

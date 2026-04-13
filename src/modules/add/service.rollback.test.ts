@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import type { App } from '@jib/config'
-import { makeDeps, makeParams } from './service.test-support.ts'
+import { addMakeDeps, addMakeParams } from './service.test-support.ts'
 
 describe('add flow rollback', () => {
   test('post-config failures roll back repo, secrets, and remove only the failed app', async () => {
-    const { calls, flow, warnings, writtenConfigs } = makeDeps('claimRoutes', true)
+    const { calls, flow, warnings, writtenConfigs } = addMakeDeps('claimRoutes', true)
 
-    const result = await flow.run(makeParams())
+    const result = await flow.run(addMakeParams())
     expect(result).toBeInstanceOf(Error)
     expect((result as Error).message).toBe('claimRoutes failed')
     expect(calls).toContain('rollbackRepo')
@@ -22,7 +22,7 @@ describe('add flow rollback', () => {
   })
 
   test('cleanup removes a managed compose file written during add', async () => {
-    const base = makeDeps()
+    const base = addMakeDeps()
     const managedApp = {
       repo: 'owner/blog',
       branch: 'main',
@@ -31,18 +31,18 @@ describe('add flow rollback', () => {
       domains: [{ host: 'blog.example.com', service: 'web', port: 20000, container_port: 80 }],
       env_file: '.env',
     } satisfies App
-    const { calls, flow } = makeDeps('claimRoutes', false, false, false, managedApp)
+    const { calls, flow } = addMakeDeps('claimRoutes', false, false, false, managedApp)
 
-    const result = await flow.run(makeParams())
+    const result = await flow.run(addMakeParams())
     expect(result).toBeInstanceOf(Error)
     expect((result as Error).message).toBe('claimRoutes failed')
     expect(calls).toContain('removeManagedCompose:blog')
   })
 
   test('cleanup keeps going when repo rollback itself fails', async () => {
-    const { calls, flow, warnings, writtenConfigs } = makeDeps('claimRoutes', true, false, true)
+    const { calls, flow, warnings, writtenConfigs } = addMakeDeps('claimRoutes', true, false, true)
 
-    const result = await flow.run(makeParams())
+    const result = await flow.run(addMakeParams())
     expect(result).toBeInstanceOf(Error)
     expect((result as Error).message).toBe('claimRoutes failed')
     expect(calls).toContain('rollbackRepo')

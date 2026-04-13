@@ -2,7 +2,7 @@ import type { CliIssue } from '@jib/cli'
 import type { ParsedDomain } from '@jib/config'
 import { type ComposeService, dockerHasPublishedPorts, dockerInferContainerPort } from '@jib/docker'
 import { ValidationError } from '@jib/errors'
-import { inferScope, mergeConfigEntries } from './config-entries.ts'
+import { addInferScope, addMergeConfigEntries } from './config-entries.ts'
 import type { ConfigEntry, ConfigScope, EnvEntry } from './types.ts'
 
 export interface AddServiceSummary {
@@ -20,25 +20,25 @@ export interface GuidedServiceAnswer {
   configEntries?: ConfigEntry[]
 }
 
-export function splitCommaValues(raw?: string | null): string[] {
+export function addSplitCommaValues(raw?: string | null): string[] {
   return (raw ?? '')
     .split(',')
     .map((value) => value.trim())
     .filter((value) => value.length > 0)
 }
 
-export function parseEnvEntry(raw: string): EnvEntry {
+export function addParseEnvEntry(raw: string): EnvEntry {
   const line = raw.trim()
   const eq = line.indexOf('=')
   if (eq < 1) throw new ValidationError(`invalid env entry "${raw}" - expected KEY=VALUE`)
   return { key: line.slice(0, eq), value: line.slice(eq + 1) }
 }
 
-export function validateEnvEntry(raw: string): string | undefined {
+export function addValidateEnvEntry(raw: string): string | undefined {
   return raw.indexOf('=') < 1 ? 'expected KEY=VALUE (example: SECRET_KEY=VALUE)' : undefined
 }
 
-export function summarizeComposeServices(services: ComposeService[]): AddServiceSummary[] {
+export function addSummarizeComposeServices(services: ComposeService[]): AddServiceSummary[] {
   return services.map((service) => {
     const inferredContainerPort = dockerInferContainerPort(service)
     return {
@@ -51,7 +51,7 @@ export function summarizeComposeServices(services: ComposeService[]): AddService
   })
 }
 
-export function assignCliDomainsToServices(
+export function addAssignCliDomainsToServices(
   domains: ParsedDomain[],
   serviceNames: string[],
 ): { domains: ParsedDomain[]; issues: CliIssue[] } {
@@ -78,17 +78,17 @@ export function assignCliDomainsToServices(
   return { domains: nextDomains, issues }
 }
 
-export function requiredConfigScopes(service: AddServiceSummary): Map<string, ConfigScope> {
+export function addRequiredConfigScopes(service: AddServiceSummary): Map<string, ConfigScope> {
   const out = new Map<string, ConfigScope>()
-  for (const key of service.envRefs ?? []) out.set(key, inferScope(true, out.has(key)))
+  for (const key of service.envRefs ?? []) out.set(key, addInferScope(true, out.has(key)))
   for (const key of service.buildArgRefs ?? []) {
     const prior = out.get(key)
-    out.set(key, inferScope(prior === 'runtime' || prior === 'both', true))
+    out.set(key, addInferScope(prior === 'runtime' || prior === 'both', true))
   }
   return out
 }
 
-export function mergeGuidedServiceAnswers(
+export function addMergeGuidedServiceAnswers(
   existingDomains: ParsedDomain[],
   serviceNames: string[],
   answers: GuidedServiceAnswer[],
@@ -117,10 +117,10 @@ export function mergeGuidedServiceAnswers(
     }
   }
 
-  return { domains, configEntries: mergeConfigEntries(configEntries) }
+  return { domains, configEntries: addMergeConfigEntries(configEntries) }
 }
 
-export function renderAddPlanSummary(input: {
+export function addRenderPlanSummary(input: {
   app: string
   composeFiles: string[]
   services: AddServiceSummary[]
@@ -150,7 +150,7 @@ export function renderAddPlanSummary(input: {
   return lines.join('\n')
 }
 
-export function shouldDefaultExposeService(
+export function addShouldDefaultExposeService(
   _service: AddServiceSummary,
   totalServices: number,
 ): boolean {

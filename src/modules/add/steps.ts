@@ -1,7 +1,7 @@
 import type { ComposeInspection } from '@jib/docker'
 import { managedComposePath } from '@jib/paths'
 import type { Step } from '../tx/run.ts'
-import { prepareDockerHubWorkdir } from './dockerhub.ts'
+import { addPrepareDockerHubWorkdir } from './dockerhub.ts'
 import {
   type AddFlowError,
   CollectGuidedInputsError,
@@ -12,7 +12,7 @@ import {
   RemoveManagedComposeError,
   ResolveAppError,
 } from './flow-errors.ts'
-import { claimIngressStep, writeConfigStep, writeSecretsStep } from './mutation-steps.ts'
+import { addClaimIngressStep, addWriteConfigStep, addWriteSecretsStep } from './mutation-steps.ts'
 import type {
   AddFlowObserver,
   AddFlowParams,
@@ -34,16 +34,16 @@ export interface AddRunContext {
   secretsWritten: number
 }
 
-export function buildAddSteps(): readonly Step<AddRunContext, unknown, AddFlowError>[] {
+export function addBuildSteps(): readonly Step<AddRunContext, unknown, AddFlowError>[] {
   return [
     prepareRepoStep,
     inspectComposeStep,
     collectGuidedInputsStep,
     resolveAppStep,
     confirmPlanStep,
-    writeConfigStep,
-    writeSecretsStep,
-    claimIngressStep,
+    addWriteConfigStep,
+    addWriteSecretsStep,
+    addClaimIngressStep,
   ]
 }
 
@@ -56,7 +56,7 @@ const prepareRepoStep: Step<AddRunContext, { repo: string }, AddFlowError> = {
         branch: ctx.params.draftApp.branch,
         ...(ctx.params.args.source ? { source: ctx.params.args.source } : {}),
       })
-      await prepareDockerHubWorkdir(
+      await addPrepareDockerHubWorkdir(
         ctx.params.paths,
         ctx.params.appName,
         ctx.params.inputs.repo,

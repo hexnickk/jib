@@ -4,7 +4,7 @@ import { dockerHubImage, repoPath } from '@jib/paths'
 import type { Paths } from '@jib/paths'
 import { GENERATED_COMPOSE_FILE } from './compose-scaffold.ts'
 
-export async function prepareDockerHubWorkdir(
+export async function addPrepareDockerHubWorkdir(
   paths: Paths,
   app: string,
   repo: string,

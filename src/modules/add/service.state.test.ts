@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 import type { AddFlowError } from './flow-errors.ts'
 import { CancelledAddError } from './flow-errors.ts'
-import { finalApp, makeDeps, makeParams } from './service.test-support.ts'
+import { addFinalApp, addMakeDeps, addMakeParams } from './service.test-support.ts'
 
 describe('add flow state machine', () => {
   test('success visits each state in order', async () => {
-    const { calls, flow, states } = makeDeps()
+    const { calls, flow, states } = addMakeDeps()
 
-    const result = await flow.run(makeParams())
+    const result = await flow.run(addMakeParams())
 
-    expect(result).toEqual({ finalApp, secretsWritten: 2 })
+    expect(result).toEqual({ finalApp: addFinalApp, secretsWritten: 2 })
     expect(states).toEqual([
       'inputs_ready',
       'repo_prepared',
@@ -35,10 +35,10 @@ describe('add flow state machine', () => {
   })
 
   test('cancellation after config write rolls back completed steps', async () => {
-    const { calls, flow, states } = makeDeps()
+    const { calls, flow, states } = addMakeDeps()
 
     const result = await flow.run({
-      ...makeParams(),
+      ...addMakeParams(),
       signal: {
         get cancelled() {
           return states.includes('config_written')
@@ -52,9 +52,9 @@ describe('add flow state machine', () => {
   })
 
   test('failure before config write rolls back prepared repo without partial cleanup noise', async () => {
-    const { calls, flow, states } = makeDeps('buildResolvedApp')
+    const { calls, flow, states } = addMakeDeps('buildResolvedApp')
 
-    const result = await flow.run(makeParams())
+    const result = await flow.run(addMakeParams())
     expect(result).toBeInstanceOf(Error)
     expect((result as AddFlowError).message).toBe('buildResolvedApp failed')
     expect(states).toEqual([

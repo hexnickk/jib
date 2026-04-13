@@ -6,7 +6,7 @@ import { CliError } from '@jib/cli'
 import type { App, Config } from '@jib/config'
 import { getPaths, managedComposePath } from '@jib/paths'
 import { GENERATED_COMPOSE_FILE } from './compose-scaffold.ts'
-import { createAddPlanner } from './planner.ts'
+import { addCreatePlanner } from './planner.ts'
 
 const draftApp: App = {
   repo: 'owner/demo',
@@ -23,12 +23,12 @@ const cfg: Config = {
   apps: {},
 }
 
-describe('createAddPlanner', () => {
+describe('addCreatePlanner', () => {
   test('offers to generate a compose file from Dockerfile when none exists', async () => {
     const workdir = mkdtempSync(join(tmpdir(), 'jib-planner-'))
     writeFileSync(join(workdir, 'Dockerfile'), 'FROM node:20\nEXPOSE 3000\n')
 
-    const planner = createAddPlanner({
+    const planner = addCreatePlanner({
       isInteractive: () => true,
       note: () => {},
       promptConfirm: async () => true,
@@ -53,7 +53,7 @@ describe('createAddPlanner', () => {
       'services:\n  app:\n    build:\n      context: .\n',
     )
 
-    const planner = createAddPlanner()
+    const planner = addCreatePlanner()
     const app = await planner.buildResolvedApp(
       cfg,
       paths,
@@ -83,7 +83,7 @@ describe('createAddPlanner', () => {
     writeFileSync(join(workdir, 'Dockerfile'), 'FROM node:20\nEXPOSE 3000\n')
     writeFileSync(join(workdir, 'compose.yml'), 'services:\n  web:\n    image: nginx\n')
 
-    const planner = createAddPlanner({
+    const planner = addCreatePlanner({
       isInteractive: () => true,
       note: () => {},
       promptConfirm: async () => false,
@@ -103,7 +103,7 @@ describe('createAddPlanner', () => {
       'services:\n  web:\n    image: nginx\n    volumes:\n      - /data/sqlite:/data/sqlite\n',
     )
 
-    const planner = createAddPlanner()
+    const planner = addCreatePlanner()
 
     await expect(planner.inspectCompose(draftApp, workdir)).rejects.toBeInstanceOf(CliError)
   })

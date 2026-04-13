@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type { CliError } from '@jib/cli'
 import type { Config } from '@jib/config'
 import { getPaths } from '@jib/paths'
-import { addChooseInitialSource } from './add.ts'
+import { addChooseInitialSource } from './add-support.ts'
 
 const cfg = {
   config_version: 3,

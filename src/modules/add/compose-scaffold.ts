@@ -5,21 +5,21 @@ import { type Paths, managedComposePath } from '@jib/paths'
 
 export const GENERATED_COMPOSE_FILE = 'docker-compose.generated.yml'
 
-export function canScaffoldCompose(workdir: string): boolean {
+export function addCanScaffoldCompose(workdir: string): boolean {
   return existsSync(join(workdir, 'Dockerfile'))
 }
 
-export function scaffoldComposeFromDockerfile(workdir: string): string | null {
-  if (!canScaffoldCompose(workdir)) return null
+export function addScaffoldComposeFromDockerfile(workdir: string): string | null {
+  if (!addCanScaffoldCompose(workdir)) return null
   const dockerfile = readFileSync(join(workdir, 'Dockerfile'), 'utf8')
   writeFileSync(
     join(workdir, GENERATED_COMPOSE_FILE),
-    renderGeneratedCompose(parseDockerfileExpose(dockerfile)),
+    addRenderGeneratedCompose(addParseDockerfileExpose(dockerfile)),
   )
   return GENERATED_COMPOSE_FILE
 }
 
-export async function persistGeneratedCompose(
+export async function addPersistGeneratedCompose(
   paths: Paths,
   app: string,
   workdir: string,
@@ -31,7 +31,7 @@ export async function persistGeneratedCompose(
   return target
 }
 
-export function parseDockerfileExpose(dockerfile: string): number | undefined {
+export function addParseDockerfileExpose(dockerfile: string): number | undefined {
   for (const rawLine of dockerfile.split('\n')) {
     const line = rawLine.trim()
     if (!/^EXPOSE\s+/i.test(line)) continue
@@ -42,7 +42,7 @@ export function parseDockerfileExpose(dockerfile: string): number | undefined {
   return undefined
 }
 
-export function renderGeneratedCompose(containerPort?: number): string {
+export function addRenderGeneratedCompose(containerPort?: number): string {
   const lines = ['services:', '  app:', '    build:', '      context: .']
   if (containerPort) lines.push('    expose:', `      - "${containerPort}"`)
   return `${lines.join('\n')}\n`

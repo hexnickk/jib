@@ -6,8 +6,8 @@ import type { Config } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
 import { getPaths, managedComposePath, repoPath } from '@jib/paths'
 import { $ } from 'bun'
-import { runAdd } from './service.ts'
-import { createDefaultAddSupport } from './support.ts'
+import { addRun } from './service.ts'
+import { addCreateDefaultSupport } from './support.ts'
 import type { AddPlanner, GuidedInputs } from './types.ts'
 
 async function makeUpstream(): Promise<string> {
@@ -37,7 +37,7 @@ function configYaml(): string {
   ].join('\n')
 }
 
-describe('runAdd with createDefaultAddSupport', () => {
+describe('addRun with addCreateDefaultSupport', () => {
   test('real support rolls back checkout, secrets, config, and managed compose after late failure', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-add-root-'))
     const upstream = await makeUpstream()
@@ -81,7 +81,7 @@ describe('runAdd with createDefaultAddSupport', () => {
       await mkdir(paths.composeDir, { recursive: true })
       await writeFile(managedCompose, 'services:\n  web:\n    image: nginx\n')
 
-      const support = createDefaultAddSupport({
+      const support = addCreateDefaultSupport({
         paths,
         claimIngress: async () => {
           throw new Error('claim ingress failed')
@@ -93,7 +93,7 @@ describe('runAdd with createDefaultAddSupport', () => {
         buildResolvedApp: async () => finalApp,
         confirmPlan: async () => undefined,
       }
-      const result = await runAdd(
+      const result = await addRun(
         { support, planner },
         {
           appName: 'blog',

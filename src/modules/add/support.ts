@@ -6,12 +6,12 @@ import { createSecretsManager } from '@jib/secrets'
 import { sourcesCloneForInspection, sourcesRemoveCheckout } from '@jib/sources'
 import type { AddSupport, EnvEntry } from './types.ts'
 
-export interface DefaultAddSupportOptions {
+export interface AddDefaultSupportOptions {
   paths: Paths
   claimIngress(appName: string, appCfg: App): Promise<void>
 }
 
-export function createDefaultAddSupport(options: DefaultAddSupportOptions): AddSupport {
+export function addCreateDefaultSupport(options: AddDefaultSupportOptions): AddSupport {
   const secrets = createSecretsManager(options.paths.secretsDir)
 
   return {
@@ -53,49 +53,5 @@ export function createDefaultAddSupport(options: DefaultAddSupportOptions): AddS
     claimIngress(appName: string, finalApp: App) {
       return options.claimIngress(appName, finalApp)
     },
-  }
-}
-
-export class DefaultAddSupport implements AddSupport {
-  private readonly support: AddSupport
-
-  constructor(options: DefaultAddSupportOptions) {
-    this.support = createDefaultAddSupport(options)
-  }
-
-  cloneForInspection(
-    cfg: Config,
-    appName: string,
-    target: { repo: string; branch: string; source?: string },
-  ) {
-    return this.support.cloneForInspection(cfg, appName, target)
-  }
-
-  removeCheckout(appName: string, repo: string) {
-    return this.support.removeCheckout(appName, repo)
-  }
-
-  loadConfig(configFile: string) {
-    return this.support.loadConfig(configFile)
-  }
-
-  writeConfig(configFile: string, cfg: Config) {
-    return this.support.writeConfig(configFile, cfg)
-  }
-
-  upsertSecret(appName: string, entry: EnvEntry, envFile: string) {
-    return this.support.upsertSecret(appName, entry, envFile)
-  }
-
-  removeSecret(appName: string, key: string, envFile: string) {
-    return this.support.removeSecret(appName, key, envFile)
-  }
-
-  removeManagedCompose(appName: string) {
-    return this.support.removeManagedCompose(appName)
-  }
-
-  claimIngress(appName: string, finalApp: App) {
-    return this.support.claimIngress(appName, finalApp)
   }
 }

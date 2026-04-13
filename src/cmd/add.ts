@@ -1,31 +1,31 @@
 import { CliError, cliIsTextOutput } from '@jib/cli'
-import { type App, type Config, ConfigError, configLoad, configLoadContext } from '@jib/config'
+import { type App, ConfigError, configLoad, configLoadContext } from '@jib/config'
 import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
-import { sourcesBuildChoices, sourcesPreflightSelection, sourcesRunSetup } from '@jib/sources'
+import { sourcesPreflightSelection } from '@jib/sources'
 import { isInteractive, promptConfirm, promptSelect, spinner } from '@jib/tui'
-import { consola } from 'consola'
 import { DEFAULT_TIMEOUT_MS, runDeploy } from '../deploy/run.ts'
 import {
-  AddService,
+  AddRolledBackError,
   CancelledAddError,
-  DefaultAddSupport,
-  RolledBackAddError,
-  buildDraftApp,
-  createAddPlanner,
-  gatherAddInputs,
-  normalizeAddError,
-  resolveAddAppName,
-  runAddSequence,
+  addBuildDraftApp,
+  addCreateDefaultSupport,
+  addCreatePlanner,
+  addGatherInputs,
+  addNormalizeError,
+  addResolveAppName,
+  addRun,
+  addRunSequence,
 } from '../modules/add/index.ts'
 import {
-  normalizeAddDeployError,
-  renderAddResult,
-  rollbackAddedApp,
-  trapInterrupt,
+  addNormalizeDeployError,
+  addRenderResult,
+  addRollbackApp,
+  addTrapInterrupt,
 } from '../modules/add/runtime.ts'
 import type { AddCommandArgv } from './add-args.ts'
 import { addCommandOptions } from './add-args.ts'
+import { addChooseInitialSource, addCreateInspectionObserver } from './add-support.ts'
 import type { CliCommand } from './command.ts'
 
 const cliAddCommand = {
@@ -36,7 +36,7 @@ const cliAddCommand = {
     const loaded = await configLoadContext()
     if (loaded instanceof ConfigError) return loaded
     let { cfg, paths } = loaded
-    const appName = await resolveAddAppName(
+    const appName = await addResolveAppName(
       typeof args.app === 'string' ? args.app : undefined,
       cfg.apps,
     )
@@ -51,9 +51,9 @@ const cliAddCommand = {
       cfg = reloaded
     }
 
-    const inputs = await gatherAddInputs(args)
-    const planner = createAddPlanner()
-    const interrupt = trapInterrupt()
+    const inputs = await addGatherInputs(args)
+    const planner = addCreatePlanner()
+    const interrupt = addTrapInterrupt()
     const preflight = await sourcesPreflightSelection(
       appName,
       cfg,
@@ -69,35 +69,34 @@ const cliAddCommand = {
       branch: preflight.branch,
       ...(preflight.source ? { source: preflight.source } : {}),
     }
-    const inspection = createInspectionObserver()
-    const addService = new AddService(
-      new DefaultAddSupport({
-        paths,
-        claimIngress: (nextAppName, finalApp) => addClaimIngress(paths, nextAppName, finalApp),
-      }),
-      planner,
-      inspection.observer,
-    )
+    const inspection = addCreateInspectionObserver()
+    const addSupport = addCreateDefaultSupport({
+      paths,
+      claimIngress: (nextAppName, finalApp) => addClaimIngress(paths, nextAppName, finalApp),
+    })
 
     try {
-      const { addResult, deployResult } = await runAddSequence(
+      const { addResult, deployResult } = await addRunSequence(
         async () => {
-          const result = await addService.run({
-            appName,
-            args: flowArgs,
-            cfg: preflight.cfg,
-            configFile: paths.configFile,
-            inputs,
-            paths,
-            draftApp: buildDraftApp(flowArgs, inputs),
-            signal: {
-              get cancelled() {
-                return interrupt.interrupted
+          const result = await addRun(
+            { support: addSupport, planner, observer: inspection.observer },
+            {
+              appName,
+              args: flowArgs,
+              cfg: preflight.cfg,
+              configFile: paths.configFile,
+              inputs,
+              paths,
+              draftApp: addBuildDraftApp(flowArgs, inputs),
+              signal: {
+                get cancelled() {
+                  return interrupt.interrupted
+                },
               },
             },
-          })
+          )
           if (result instanceof CancelledAddError) throw result
-          if (result instanceof Error) throw normalizeAddError(result, appName, paths.configFile)
+          if (result instanceof Error) throw addNormalizeError(result, appName, paths.configFile)
           return result
         },
         (result) =>
@@ -108,19 +107,19 @@ const cliAddCommand = {
             undefined,
             DEFAULT_TIMEOUT_MS,
           ),
-        (result) => rollbackAddedApp(paths, appName, preflight.cfg, result.finalApp),
+        (result) => addRollbackApp(paths, appName, preflight.cfg, result.finalApp),
         interrupt,
       )
       inspection.stop()
-      return renderAddResult(appName, inputs.repo, addResult, deployResult)
+      return addRenderResult(appName, inputs.repo, addResult, deployResult)
     } catch (error) {
       inspection.fail()
       if (error instanceof CancelledAddError) return new CliError('cancelled', error.message)
-      if (error instanceof RolledBackAddError) {
+      if (error instanceof AddRolledBackError) {
         const original = interrupt.interrupted
           ? new CliError('cancelled', 'add cancelled')
           : error.original
-        return normalizeAddDeployError(original, appName, paths.configFile)
+        return addNormalizeDeployError(original, appName, paths.configFile)
       }
       throw error
     } finally {
@@ -141,79 +140,6 @@ async function addClaimIngress(paths: Paths, app: string, appCfg: App): Promise<
   } catch (error) {
     progress?.stop('ingress failed')
     throw error
-  }
-}
-
-export interface AddChooseInitialSourceDeps {
-  buildSourceChoices?: typeof sourcesBuildChoices
-  isInteractive?: typeof isInteractive
-  promptSelect?: typeof promptSelect
-  runSourceSetup?: typeof sourcesRunSetup
-}
-
-/** Chooses the initial source, prompting only when the caller did not provide one. */
-export async function addChooseInitialSource(
-  cfg: Config,
-  paths: Paths,
-  currentSource?: string,
-  deps: AddChooseInitialSourceDeps = {},
-): Promise<{ value?: string; created: boolean }> {
-  const interactive = deps.isInteractive ?? isInteractive
-  const select = deps.promptSelect ?? promptSelect
-  const buildSourceChoices = deps.buildSourceChoices ?? sourcesBuildChoices
-  const runSourceSetup = deps.runSourceSetup ?? sourcesRunSetup
-  if (currentSource || !interactive()) {
-    return currentSource ? { value: currentSource, created: false } : { created: false }
-  }
-
-  const options = buildSourceChoices(cfg)
-  if (options.length === 0) return { created: false }
-
-  const choice = await select({
-    message: 'Source for this app?',
-    options: [{ value: 'none', label: 'None', hint: 'Public repo or local path' }, ...options],
-  })
-  if (choice === 'none') return { created: false }
-  if (choice.startsWith('setup:')) {
-    const created = await runSourceSetup(cfg, paths, choice.slice('setup:'.length))
-    if (!created) throw new CliError('cancelled', 'source setup did not complete; add cancelled')
-    return { value: created, created: true }
-  }
-  return choice.startsWith('existing:')
-    ? { value: choice.slice('existing:'.length), created: false }
-    : { created: false }
-}
-
-/** Creates spinner-backed inspection callbacks for the add flow. */
-function createInspectionObserver() {
-  const progress = cliIsTextOutput() ? spinner() : null
-  let active = false
-  return {
-    observer: {
-      onStateChange: (state: string) => {
-        if (!progress) return
-        if (state === 'inputs_ready') {
-          active = true
-          progress.start('preparing repo')
-        }
-        if (state === 'repo_prepared') progress.message('inspecting docker-compose')
-        if (state === 'compose_inspected' && active) {
-          active = false
-          progress.stop('compose inspected')
-        }
-      },
-      warn: (message: string) => cliIsTextOutput() && consola.warn(message),
-    },
-    stop: () => {
-      if (!progress || !active) return
-      active = false
-      progress.stop('compose inspected')
-    },
-    fail: () => {
-      if (!progress || !active) return
-      active = false
-      progress.stop('inspection failed')
-    },
   }
 }
 

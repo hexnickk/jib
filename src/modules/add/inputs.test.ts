@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import type { promptSelect } from '@jib/tui'
-import { gatherAddInputs } from './inputs.ts'
+import { addGatherInputs } from './inputs.ts'
 
-describe('gatherAddInputs', () => {
+describe('addGatherInputs', () => {
   test('parses runtime, build, and shared config entries', async () => {
-    const inputs = await gatherAddInputs({
+    const inputs = await addGatherInputs({
       repo: 'owner/blog',
       env: ['DATABASE_URL=postgres://db'],
       'build-arg': ['VITE_HOST_URL=https://example.com'],
@@ -19,7 +19,7 @@ describe('gatherAddInputs', () => {
   })
 
   test('merges duplicate keys across compatible scopes', async () => {
-    const inputs = await gatherAddInputs({
+    const inputs = await addGatherInputs({
       repo: 'owner/blog',
       env: ['PUBLIC_URL=https://example.com'],
       'build-arg': ['PUBLIC_URL=https://example.com'],
@@ -32,7 +32,7 @@ describe('gatherAddInputs', () => {
 
   test('rejects conflicting duplicate values', async () => {
     await expect(
-      gatherAddInputs({
+      addGatherInputs({
         repo: 'owner/blog',
         env: ['PUBLIC_URL=https://app.example.com'],
         'build-arg': ['PUBLIC_URL=https://cdn.example.com'],
@@ -41,7 +41,7 @@ describe('gatherAddInputs', () => {
   })
 
   test('prompts for persist paths for docker hub repos in interactive mode', async () => {
-    const inputs = await gatherAddInputs(
+    const inputs = await addGatherInputs(
       { repo: 'https://hub.docker.com/r/n8nio/n8n' },
       {
         isInteractive: () => true,
@@ -53,7 +53,7 @@ describe('gatherAddInputs', () => {
   })
 
   test('normalizes docker hub owner-name shorthand when backend is dockerhub', async () => {
-    const inputs = await gatherAddInputs(
+    const inputs = await addGatherInputs(
       { repo: 'n8nio/n8n', backend: 'dockerhub' },
       { isInteractive: () => false },
     )
@@ -63,7 +63,7 @@ describe('gatherAddInputs', () => {
 
   test('prompts for backend before repo in interactive mode', async () => {
     const prompts: string[] = []
-    const inputs = await gatherAddInputs(
+    const inputs = await addGatherInputs(
       {},
       {
         isInteractive: () => true,
@@ -82,7 +82,7 @@ describe('gatherAddInputs', () => {
   })
 
   test('normalizes github URLs when backend is github', async () => {
-    const inputs = await gatherAddInputs(
+    const inputs = await addGatherInputs(
       {
         repo: 'https://github.com/hexnickk/blog',
         backend: 'github',

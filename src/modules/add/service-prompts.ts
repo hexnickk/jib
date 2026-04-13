@@ -9,15 +9,14 @@ import {
   promptSelect,
   promptString,
 } from '@jib/tui'
-import { mergeConfigEntries, scopeCovers, scopeLabel } from './config-entries.ts'
+import { addMergeConfigEntries, addScopeCovers, addScopeLabel } from './config-entries.ts'
 import {
-  assignCliDomainsToServices,
-  parseEnvEntry,
-  requiredConfigScopes,
-  shouldDefaultExposeService,
-  splitCommaValues,
-  summarizeComposeServices,
-  validateEnvEntry,
+  addParseEnvEntry,
+  addRequiredConfigScopes,
+  addShouldDefaultExposeService,
+  addSplitCommaValues,
+  addSummarizeComposeServices,
+  addValidateEnvEntry,
 } from './guided.ts'
 import type { ConfigEntry, ConfigScope } from './types.ts'
 
@@ -28,40 +27,13 @@ const MANUAL_CONFIG_LINES = [
   'Press Enter on a blank line when finished.',
 ]
 
-export async function collectDomains(
-  domains: ParsedDomain[],
-  serviceNames: string[],
-): Promise<ParsedDomain[]> {
-  if (serviceNames.length <= 1 || !isInteractive()) {
-    const assigned = assignCliDomainsToServices(domains, serviceNames)
-    if (assigned.issues.length > 0) {
-      throw new MissingInputError('missing required input for jib add', assigned.issues)
-    }
-    return assigned.domains
-  }
-  const out: ParsedDomain[] = []
-  for (const domain of domains) {
-    out.push(
-      domain.service
-        ? domain
-        : {
-            ...domain,
-            service: await promptSelect({
-              message: `Which service should handle ${domain.host}?`,
-              options: serviceNames.map((name) => ({ value: name, label: name })),
-            }),
-          },
-    )
-  }
-  return out
-}
-
-export async function promptForServices(
+/** Prompts for per-service exposure and config values during the guided add flow. */
+export async function addPromptForServices(
   domains: ParsedDomain[],
   composeServices: ComposeService[],
   initialEntries: ConfigEntry[],
 ) {
-  const summaries = summarizeComposeServices(composeServices)
+  const summaries = addSummarizeComposeServices(composeServices)
   const provided = new Map(initialEntries.map((entry) => [entry.key, entry]))
   const issues: { field: string; message: string }[] = []
   const answers = []
@@ -73,11 +45,11 @@ export async function promptForServices(
       (isInteractive() &&
         (await promptConfirm({
           message: `Expose service "${service.name}" with a domain?`,
-          initialValue: shouldDefaultExposeService(service, summaries.length),
+          initialValue: addShouldDefaultExposeService(service, summaries.length),
         })))
     const domainHosts =
       isInteractive() && expose && existingDomains.length === 0
-        ? splitCommaValues(
+        ? addSplitCommaValues(
             await promptString({
               message: `Domain(s) for service "${service.name}" (comma-separated)`,
               placeholder: 'app.example.com',
@@ -85,9 +57,9 @@ export async function promptForServices(
           )
         : []
 
-    const requiredEntries = [...requiredConfigScopes(service)].filter(([key, requiredScope]) => {
+    const requiredEntries = [...addRequiredConfigScopes(service)].filter(([key, requiredScope]) => {
       const existing = provided.get(key)
-      return !(existing && scopeCovers(existing.scope, requiredScope))
+      return !(existing && addScopeCovers(existing.scope, requiredScope))
     })
 
     const configEntries: ConfigEntry[] = []
@@ -95,7 +67,7 @@ export async function promptForServices(
       for (const [key, requiredScope] of requiredEntries) {
         issues.push({
           field: `env.${key}`,
-          message: `${service.name} requires ${key} for ${scopeLabel(requiredScope)}; rerun with --env ${key}=VALUE, --build-arg ${key}=VALUE, or --build-env ${key}=VALUE`,
+          message: `${service.name} requires ${key} for ${addScopeLabel(requiredScope)}; rerun with --env ${key}=VALUE, --build-arg ${key}=VALUE, or --build-env ${key}=VALUE`,
         })
       }
     } else if (requiredEntries.length > 0) {
@@ -131,10 +103,10 @@ export async function promptForServices(
         title: `Additional runtime environment variables for "${service.name}"`,
         lines: MANUAL_CONFIG_LINES,
         promptLabel: 'var',
-        validateLine: validateEnvEntry,
+        validateLine: addValidateEnvEntry,
       })
       for (const raw of manual) {
-        const base = parseEnvEntry(raw)
+        const base = addParseEnvEntry(raw)
         const existing = provided.get(base.key)
         const entry = { ...base, scope: existing?.scope ?? 'runtime' }
         configEntries.push(entry)
@@ -152,7 +124,7 @@ export async function promptForServices(
 }
 
 function mergeEntry(existing: ConfigEntry | undefined, next: ConfigEntry): ConfigEntry {
-  return mergeConfigEntries(existing ? [existing, next] : [next])[0] as ConfigEntry
+  return addMergeConfigEntries(existing ? [existing, next] : [next])[0] as ConfigEntry
 }
 
 function scopeSummaryLabel(scope: ConfigScope): string {
@@ -186,8 +158,8 @@ function scopeOptions(recommended: ConfigScope) {
   ) as ConfigScope[]
   return order.map((scope) =>
     scope === recommended
-      ? { value: scope, label: scopeLabel(scope), hint: 'Recommended' }
-      : { value: scope, label: scopeLabel(scope) },
+      ? { value: scope, label: addScopeLabel(scope), hint: 'Recommended' }
+      : { value: scope, label: addScopeLabel(scope) },
   )
 }
 

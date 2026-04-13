@@ -1,29 +1,29 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  assignCliDomainsToServices,
-  mergeGuidedServiceAnswers,
-  parseEnvEntry,
-  renderAddPlanSummary,
-  requiredConfigScopes,
-  shouldDefaultExposeService,
-  splitCommaValues,
-  summarizeComposeServices,
-  validateEnvEntry,
+  addAssignCliDomainsToServices,
+  addMergeGuidedServiceAnswers,
+  addParseEnvEntry,
+  addRenderPlanSummary,
+  addRequiredConfigScopes,
+  addShouldDefaultExposeService,
+  addSplitCommaValues,
+  addSummarizeComposeServices,
+  addValidateEnvEntry,
 } from './guided.ts'
 
 describe('guided add helpers', () => {
   test('single-service web app can collect a domain and scoped config', () => {
-    const services = summarizeComposeServices([
+    const services = addSummarizeComposeServices([
       { name: 'web', ports: ['8080:80'], expose: [], envRefs: [], buildArgRefs: [] },
     ])
 
     const [service] = services
     expect(service).toBeDefined()
     expect(
-      shouldDefaultExposeService(service as NonNullable<typeof service>, services.length),
+      addShouldDefaultExposeService(service as NonNullable<typeof service>, services.length),
     ).toBe(true)
 
-    const merged = mergeGuidedServiceAnswers(
+    const merged = addMergeGuidedServiceAnswers(
       [],
       ['web'],
       [
@@ -48,7 +48,7 @@ describe('guided add helpers', () => {
   })
 
   test('multi-service app merges repeated config keys across scopes', () => {
-    const merged = mergeGuidedServiceAnswers(
+    const merged = addMergeGuidedServiceAnswers(
       [{ host: 'app.example.com', service: 'web' }],
       ['web', 'worker'],
       [
@@ -71,7 +71,7 @@ describe('guided add helpers', () => {
   })
 
   test('worker-only app remains valid without ingress', () => {
-    const merged = mergeGuidedServiceAnswers(
+    const merged = addMergeGuidedServiceAnswers(
       [],
       ['worker'],
       [{ service: 'worker', expose: false }],
@@ -83,7 +83,7 @@ describe('guided add helpers', () => {
   })
 
   test('multi-service cli domains must name a service in non-interactive mode', () => {
-    const assigned = assignCliDomainsToServices([{ host: 'demo.example.com' }], ['web', 'api'])
+    const assigned = addAssignCliDomainsToServices([{ host: 'demo.example.com' }], ['web', 'api'])
 
     expect(assigned.domains).toEqual([{ host: 'demo.example.com' }])
     expect(assigned.issues).toEqual([
@@ -97,7 +97,7 @@ describe('guided add helpers', () => {
 
   test('requiredConfigScopes merges runtime and build references for the same key', () => {
     expect(
-      requiredConfigScopes({
+      addRequiredConfigScopes({
         name: 'web',
         publishesPorts: true,
         envRefs: ['PUBLIC_URL', 'DATABASE_URL'],
@@ -112,7 +112,7 @@ describe('guided add helpers', () => {
   })
 
   test('summary renders services plus runtime and build config expectations', () => {
-    const summary = renderAddPlanSummary({
+    const summary = addRenderPlanSummary({
       app: 'demo',
       composeFiles: ['compose.yml'],
       services: [
@@ -136,13 +136,13 @@ describe('guided add helpers', () => {
   })
 
   test('env entry parser accepts KEY=VALUE format and rejects missing equals', () => {
-    expect(parseEnvEntry('API_KEY=secret')).toEqual({ key: 'API_KEY', value: 'secret' })
-    expect(validateEnvEntry('API_KEY=secret')).toBeUndefined()
-    expect(validateEnvEntry('API_KEY')).toContain('expected KEY=VALUE')
+    expect(addParseEnvEntry('API_KEY=secret')).toEqual({ key: 'API_KEY', value: 'secret' })
+    expect(addValidateEnvEntry('API_KEY=secret')).toBeUndefined()
+    expect(addValidateEnvEntry('API_KEY')).toContain('expected KEY=VALUE')
   })
 
   test('comma splitter treats missing optional prompt input as empty', () => {
-    expect(splitCommaValues(undefined)).toEqual([])
-    expect(splitCommaValues(null)).toEqual([])
+    expect(addSplitCommaValues(undefined)).toEqual([])
+    expect(addSplitCommaValues(null)).toEqual([])
   })
 })

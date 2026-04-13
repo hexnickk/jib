@@ -1,5 +1,5 @@
 import type { Step } from '../tx/run.ts'
-import { configEntriesToRuntime } from './config-entries.ts'
+import { addConfigEntriesToRuntime } from './config-entries.ts'
 import {
   type AddFlowError,
   ClaimIngressError,
@@ -9,7 +9,7 @@ import {
 } from './flow-errors.ts'
 import type { AddRunContext } from './steps.ts'
 
-export const writeConfigStep: Step<AddRunContext, { configWritten: true }, AddFlowError> = {
+export const addWriteConfigStep: Step<AddRunContext, { configWritten: true }, AddFlowError> = {
   name: 'config',
   async up(ctx) {
     try {
@@ -41,14 +41,14 @@ export const writeConfigStep: Step<AddRunContext, { configWritten: true }, AddFl
   },
 }
 
-export const writeSecretsStep: Step<
+export const addWriteSecretsStep: Step<
   AddRunContext,
   { envFile: string; keys: string[] },
   AddFlowError
 > = {
   name: 'secrets',
   async up(ctx) {
-    const runtimeEntries = configEntriesToRuntime(ctx.guided.configEntries)
+    const runtimeEntries = addConfigEntriesToRuntime(ctx.guided.configEntries)
     const keys: string[] = []
     for (const entry of runtimeEntries) {
       try {
@@ -69,7 +69,7 @@ export const writeSecretsStep: Step<
   },
 }
 
-export const claimIngressStep: Step<AddRunContext, undefined, AddFlowError> = {
+export const addClaimIngressStep: Step<AddRunContext, undefined, AddFlowError> = {
   name: 'ingress',
   async up(ctx) {
     try {

@@ -1,22 +1,22 @@
 import { ValidationError } from '@jib/errors'
 import type { ConfigEntry, ConfigScope, EnvEntry } from './types.ts'
 
-export function includesRuntime(scope: ConfigScope): boolean {
+export function addIncludesRuntime(scope: ConfigScope): boolean {
   return scope === 'runtime' || scope === 'both'
 }
 
-export function includesBuild(scope: ConfigScope): boolean {
+export function addIncludesBuild(scope: ConfigScope): boolean {
   return scope === 'build' || scope === 'both'
 }
 
-export function scopeCovers(scope: ConfigScope, required: ConfigScope): boolean {
+export function addScopeCovers(scope: ConfigScope, required: ConfigScope): boolean {
   return (
-    (!includesRuntime(required) || includesRuntime(scope)) &&
-    (!includesBuild(required) || includesBuild(scope))
+    (!addIncludesRuntime(required) || addIncludesRuntime(scope)) &&
+    (!addIncludesBuild(required) || addIncludesBuild(scope))
   )
 }
 
-export function mergeConfigEntries(entries: ConfigEntry[]): ConfigEntry[] {
+export function addMergeConfigEntries(entries: ConfigEntry[]): ConfigEntry[] {
   const merged = new Map<string, ConfigEntry>()
   for (const entry of entries) {
     const existing = merged.get(entry.key)
@@ -32,42 +32,44 @@ export function mergeConfigEntries(entries: ConfigEntry[]): ConfigEntry[] {
     merged.set(entry.key, {
       key: entry.key,
       value: entry.value,
-      scope: unionScopes(existing.scope, entry.scope),
+      scope: addUnionScopes(existing.scope, entry.scope),
     })
   }
   return [...merged.values()]
 }
 
-export function configEntriesToBuildArgs(
+export function addConfigEntriesToBuildArgs(
   entries: ConfigEntry[],
 ): Record<string, string> | undefined {
   const out = Object.fromEntries(
-    entries.filter((entry) => includesBuild(entry.scope)).map((entry) => [entry.key, entry.value]),
+    entries
+      .filter((entry) => addIncludesBuild(entry.scope))
+      .map((entry) => [entry.key, entry.value]),
   )
   return Object.keys(out).length > 0 ? out : undefined
 }
 
-export function configEntriesToRuntime(entries: ConfigEntry[]): EnvEntry[] {
+export function addConfigEntriesToRuntime(entries: ConfigEntry[]): EnvEntry[] {
   return entries
-    .filter((entry) => includesRuntime(entry.scope))
+    .filter((entry) => addIncludesRuntime(entry.scope))
     .map(({ key, value }) => ({ key, value }))
 }
 
-export function unionScopes(left: ConfigScope, right: ConfigScope): ConfigScope {
+export function addUnionScopes(left: ConfigScope, right: ConfigScope): ConfigScope {
   if (left === right) return left
-  return includesRuntime(left) || includesRuntime(right)
-    ? includesBuild(left) || includesBuild(right)
+  return addIncludesRuntime(left) || addIncludesRuntime(right)
+    ? addIncludesBuild(left) || addIncludesBuild(right)
       ? 'both'
       : 'runtime'
     : 'build'
 }
 
-export function inferScope(runtimeRef: boolean, buildRef: boolean): ConfigScope {
+export function addInferScope(runtimeRef: boolean, buildRef: boolean): ConfigScope {
   if (runtimeRef && buildRef) return 'both'
   return buildRef ? 'build' : 'runtime'
 }
 
-export function scopeLabel(scope: ConfigScope): string {
+export function addScopeLabel(scope: ConfigScope): string {
   switch (scope) {
     case 'runtime':
       return 'runtime only'

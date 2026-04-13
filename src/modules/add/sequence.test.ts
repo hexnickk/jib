@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { CliError } from '@jib/cli'
-import { type RolledBackAddError, runAddSequence } from './sequence.ts'
+import { type AddRolledBackError, addRunSequence } from './sequence.ts'
 import type { AddFlowResult } from './types.ts'
 
 const addResult: AddFlowResult = {
@@ -15,10 +15,10 @@ const addResult: AddFlowResult = {
   secretsWritten: 1,
 }
 
-describe('runAddSequence', () => {
+describe('addRunSequence', () => {
   test('runs add then deploy without rollback on success', async () => {
     const calls: string[] = []
-    const result = await runAddSequence(
+    const result = await addRunSequence(
       async () => {
         calls.push('add')
         return addResult
@@ -46,7 +46,7 @@ describe('runAddSequence', () => {
   test('rolls back when deploy fails', async () => {
     const calls: string[] = []
     await expect(
-      runAddSequence(
+      addRunSequence(
         async () => {
           calls.push('add')
           return addResult
@@ -62,8 +62,8 @@ describe('runAddSequence', () => {
       ),
     ).rejects.toMatchObject({
       message: 'deploy failed',
-      name: 'RolledBackAddError',
-    } satisfies Partial<RolledBackAddError>)
+      name: 'AddRolledBackError',
+    } satisfies Partial<AddRolledBackError>)
 
     expect(calls).toEqual(['add', 'deploy', 'rollback'])
   })
@@ -71,7 +71,7 @@ describe('runAddSequence', () => {
   test('rolls back if interrupted after add completes', async () => {
     const calls: string[] = []
     await expect(
-      runAddSequence(
+      addRunSequence(
         async () => {
           calls.push('add')
           return addResult
@@ -93,9 +93,9 @@ describe('runAddSequence', () => {
       ),
     ).rejects.toMatchObject({
       message: 'add cancelled',
-      name: 'RolledBackAddError',
+      name: 'AddRolledBackError',
       original: { code: 'cancelled', message: 'add cancelled' } satisfies Partial<CliError>,
-    } satisfies Partial<RolledBackAddError>)
+    } satisfies Partial<AddRolledBackError>)
 
     expect(calls).toEqual(['add', 'rollback'])
   })
@@ -104,7 +104,7 @@ describe('runAddSequence', () => {
     const calls: string[] = []
     let interrupted = false
 
-    const result = await runAddSequence(
+    const result = await addRunSequence(
       async () => {
         calls.push('add')
         return addResult
