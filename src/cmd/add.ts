@@ -1,15 +1,3 @@
-import { CliError, cliIsTextOutput } from '@jib/cli'
-import { type App, ConfigError, configLoad, configLoadContext } from '@jib/config'
-import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
-import type { Paths } from '@jib/paths'
-import { sourcesPreflightSelection } from '@jib/sources'
-import {
-  tuiIsInteractive,
-  tuiPromptConfirmResult,
-  tuiPromptSelectResult,
-  tuiSpinner,
-} from '@jib/tui'
-import { DEFAULT_TIMEOUT_MS, runDeploy } from '../deploy/run.ts'
 import {
   AddRolledBackError,
   CancelledAddError,
@@ -21,13 +9,25 @@ import {
   addResolveAppName,
   addRun,
   addRunSequence,
-} from '../modules/add/index.ts'
+} from '@/flows/add/index.ts'
 import {
   addNormalizeDeployError,
   addRenderResult,
   addRollbackApp,
   addTrapInterrupt,
-} from '../modules/add/runtime.ts'
+} from '@/flows/add/runtime.ts'
+import { DEFAULT_TIMEOUT_MS, runDeploy } from '@/flows/deploy/run.ts'
+import { CliError, cliIsTextOutput } from '@jib/cli'
+import { type App, ConfigError, configLoad, configLoadContext } from '@jib/config'
+import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
+import type { Paths } from '@jib/paths'
+import { sourcesPreflightSelection } from '@jib/sources'
+import {
+  tuiIsInteractive,
+  tuiPromptConfirmResult,
+  tuiPromptSelectResult,
+  tuiSpinner,
+} from '@jib/tui'
 import type { AddCommandArgv } from './add-args.ts'
 import { addCommandOptions } from './add-args.ts'
 import { addChooseInitialSource, addCreateInspectionObserver } from './add-support.ts'

@@ -1,15 +1,15 @@
+import {
+  RemoveMissingAppError,
+  RemoveWriteConfigError,
+  removeApp,
+  removeCreateSupport,
+} from '@/flows/remove/index.ts'
 import { cliCanPrompt, cliCreateMissingInputError, cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
 import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { tuiPromptConfirmResult, tuiSpinner } from '@jib/tui'
 import { consola } from 'consola'
-import {
-  RemoveMissingAppError,
-  RemoveWriteConfigError,
-  removeApp,
-  removeCreateSupport,
-} from '../modules/remove/index.ts'
 import type { CliCommand } from './command.ts'
 
 const cliRemoveCommand = {

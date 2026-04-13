@@ -1,39 +1,127 @@
 import { JibError } from '@jib/errors'
 
-function asError(cause: unknown): Error {
-  return cause instanceof Error ? cause : new Error(String(cause))
+function cloudflaredErrorOptions(error: unknown): ErrorOptions | undefined {
+  return error === undefined ? undefined : { cause: error }
 }
 
-export class CloudflaredSetupPromptError extends JibError {
-  readonly step: 'replace' | 'token'
+function cloudflaredErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
 
-  constructor(step: 'replace' | 'token', cause: unknown) {
-    const error = asError(cause)
-    const action =
-      step === 'replace' ? 'confirm tunnel token replacement' : 'read tunnel token input'
-    super('cloudflared_setup_prompt', `failed to ${action}: ${error.message}`, { cause: error })
-    this.step = step
+export class CloudflaredInstallError extends JibError {
+  constructor(message: string, options?: ErrorOptions)
+  constructor(code: string, message: string, options?: ErrorOptions)
+  constructor(
+    codeOrMessage: string,
+    messageOrOptions?: string | ErrorOptions,
+    options?: ErrorOptions,
+  ) {
+    if (typeof messageOrOptions === 'string') {
+      super(codeOrMessage, messageOrOptions, options)
+      return
+    }
+    super('cloudflared.install', codeOrMessage, messageOrOptions)
   }
 }
 
-export class CloudflaredSetupSaveTokenError extends JibError {
-  constructor(cause: unknown) {
-    const error = asError(cause)
-    super('cloudflared_setup_save_token', error.message, { cause: error })
-  }
-}
-
-export class CloudflaredStartError extends JibError {
-  readonly detail: string
-  readonly keptExisting: boolean
-
-  constructor(detail: string, keptExisting: boolean, options?: ErrorOptions) {
+export class CloudflaredInstallCreateDirError extends CloudflaredInstallError {
+  constructor(path: string, error: unknown) {
     super(
-      'cloudflared_setup_start',
-      detail ? `cloudflared failed to start: ${detail}` : 'cloudflared failed to start',
-      options,
+      'cloudflared.install_create_dir',
+      `create ${path}: ${cloudflaredErrorMessage(error)}`,
+      cloudflaredErrorOptions(error),
     )
-    this.detail = detail
-    this.keptExisting = keptExisting
+  }
+}
+
+export class CloudflaredInstallWriteComposeError extends CloudflaredInstallError {
+  constructor(path: string, error: unknown) {
+    super(
+      'cloudflared.install_write_compose',
+      `write ${path}: ${cloudflaredErrorMessage(error)}`,
+      cloudflaredErrorOptions(error),
+    )
+  }
+}
+
+export class CloudflaredInstallWriteUnitError extends CloudflaredInstallError {
+  constructor(path: string, error: unknown) {
+    super(
+      'cloudflared.install_write_unit',
+      `write ${path}: ${cloudflaredErrorMessage(error)}`,
+      cloudflaredErrorOptions(error),
+    )
+  }
+}
+
+export class CloudflaredInstallReloadError extends CloudflaredInstallError {
+  constructor(error: unknown) {
+    super(
+      'cloudflared.install_reload',
+      `systemctl daemon-reload: ${cloudflaredErrorMessage(error)}`,
+      cloudflaredErrorOptions(error),
+    )
+  }
+}
+
+export class CloudflaredUninstallError extends JibError {
+  constructor(message: string, options?: ErrorOptions)
+  constructor(code: string, message: string, options?: ErrorOptions)
+  constructor(
+    codeOrMessage: string,
+    messageOrOptions?: string | ErrorOptions,
+    options?: ErrorOptions,
+  ) {
+    if (typeof messageOrOptions === 'string') {
+      super(codeOrMessage, messageOrOptions, options)
+      return
+    }
+    super('cloudflared.uninstall', codeOrMessage, messageOrOptions)
+  }
+}
+
+export class CloudflaredUninstallDisableError extends CloudflaredUninstallError {
+  constructor(service: string, error: unknown) {
+    super(
+      'cloudflared.uninstall_disable',
+      `systemctl disable --now ${service}: ${cloudflaredErrorMessage(error)}`,
+      cloudflaredErrorOptions(error),
+    )
+  }
+}
+
+export class CloudflaredUninstallRemoveUnitError extends CloudflaredUninstallError {
+  constructor(path: string, error: unknown) {
+    super(
+      'cloudflared.uninstall_remove_unit',
+      `remove ${path}: ${cloudflaredErrorMessage(error)}`,
+      cloudflaredErrorOptions(error),
+    )
+  }
+}
+
+export class CloudflaredUninstallRemoveComposeError extends CloudflaredUninstallError {
+  constructor(path: string, error: unknown) {
+    super(
+      'cloudflared.uninstall_remove_compose',
+      `remove ${path}: ${cloudflaredErrorMessage(error)}`,
+      cloudflaredErrorOptions(error),
+    )
+  }
+}
+
+export class CloudflaredUninstallReloadError extends CloudflaredUninstallError {
+  constructor(error: unknown) {
+    super(
+      'cloudflared.uninstall_reload',
+      `systemctl daemon-reload: ${cloudflaredErrorMessage(error)}`,
+      cloudflaredErrorOptions(error),
+    )
+  }
+}
+
+export class CloudflaredSaveTunnelTokenError extends JibError {
+  constructor(message: string, options?: ErrorOptions) {
+    super('cloudflared.save_tunnel_token', message, options)
   }
 }

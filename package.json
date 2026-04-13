@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": ["modules/*"],
   "engines": {
     "bun": "1.3.11"
   },
@@ -25,20 +24,6 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.8.2",
-    "@jib-module/cloudflared": "workspace:*",
-    "@jib-module/watcher": "workspace:*",
-    "@jib/cli": "workspace:*",
-    "@jib/config": "workspace:*",
-    "@jib/deploy": "workspace:*",
-    "@jib/docker": "workspace:*",
-    "@jib/errors": "workspace:*",
-    "@jib/ingress": "workspace:*",
-    "@jib/logging": "workspace:*",
-    "@jib/paths": "workspace:*",
-    "@jib/secrets": "workspace:*",
-    "@jib/sources": "workspace:*",
-    "@jib/state": "workspace:*",
-    "@jib/tui": "workspace:*",
     "consola": "^3.2.3",
     "drizzle-orm": "^0.45.2",
     "yaml": "^2.8.3",

@@ -1,3 +1,11 @@
+import { initConfigureOptionalModules } from '@/flows/init/optional.ts'
+import { initReconcileOptionalModules } from '@/flows/init/reconcile.ts'
+import {
+  initDescribeModules,
+  initInstalledOptionalModules,
+  initPendingOptionalModuleNames,
+  initUnseenOptionalModules,
+} from '@/flows/init/registry.ts'
 import {
   CliError,
   cliCanPrompt,
@@ -10,14 +18,6 @@ import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
 import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import { hasBootstrapState } from '../migrations/service.ts'
-import { initConfigureOptionalModules } from '../modules/init/optional.ts'
-import { initReconcileOptionalModules } from '../modules/init/reconcile.ts'
-import {
-  initDescribeModules,
-  initInstalledOptionalModules,
-  initPendingOptionalModuleNames,
-  initUnseenOptionalModules,
-} from '../modules/init/registry.ts'
 import type { CliCommand } from './command.ts'
 
 /** Returns a typed error until the machine has completed the bootstrap migration. */

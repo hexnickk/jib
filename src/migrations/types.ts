@@ -1,8 +1,8 @@
+import type { InitContext } from '@/flows/init/types.ts'
 import { configLoad } from '@jib/config'
 import { loggingCreateLogger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import type { JibDb } from '@jib/state'
-import type { InitContext } from '../modules/init/types.ts'
 
 export interface MigrationContext {
   db: JibDb

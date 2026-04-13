@@ -1,8 +1,7 @@
 import { cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
-import { deployUpApp } from '@jib/deploy'
+import { deployCreateDeps, deployUpApp } from '@jib/deploy'
 import { consola } from 'consola'
-import { deployCreateDeps } from '../deploy/deps.ts'
 import type { CliCommand } from './command.ts'
 
 const cliUpCommand = {

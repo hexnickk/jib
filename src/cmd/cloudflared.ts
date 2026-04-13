@@ -1,8 +1,8 @@
+import { cloudflaredRunSetup, cloudflaredRunSetupResult } from '@/flows/cloudflared/setup.ts'
 import { cloudflaredReadStatus } from '@jib-module/cloudflared'
 import { cliIsTextOutput } from '@jib/cli'
 import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
-import { cloudflaredRunSetup, cloudflaredRunSetupResult } from '../modules/cloudflared/setup.ts'
 import type { CliCommand } from './command.ts'
 
 /** Writes the cloudflared status block used in text mode. */

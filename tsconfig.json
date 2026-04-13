@@ -3,6 +3,12 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@jib/*": ["src/modules/*/index.ts", "src/modules/*"],
+      "@jib-module/*": ["src/modules/*/index.ts", "src/modules/*"]
+    },
     "lib": ["ESNext"],
     "types": ["bun"],
     "strict": true,
@@ -22,6 +28,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "modules/**/*.ts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

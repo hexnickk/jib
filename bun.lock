@@ -6,20 +6,6 @@
       "name": "jib",
       "dependencies": {
         "@clack/prompts": "^0.8.2",
-        "@jib-module/cloudflared": "workspace:*",
-        "@jib-module/watcher": "workspace:*",
-        "@jib/cli": "workspace:*",
-        "@jib/config": "workspace:*",
-        "@jib/deploy": "workspace:*",
-        "@jib/docker": "workspace:*",
-        "@jib/errors": "workspace:*",
-        "@jib/ingress": "workspace:*",
-        "@jib/logging": "workspace:*",
-        "@jib/paths": "workspace:*",
-        "@jib/secrets": "workspace:*",
-        "@jib/sources": "workspace:*",
-        "@jib/state": "workspace:*",
-        "@jib/tui": "workspace:*",
         "consola": "^3.2.3",
         "drizzle-orm": "^0.45.2",
         "yaml": "^2.8.3",
@@ -32,124 +18,6 @@
         "@types/yargs": "^17.0.35",
         "drizzle-kit": "^0.31.10",
         "typescript": "^5.6.3",
-      },
-    },
-    "modules/cli": {
-      "name": "@jib/cli",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/errors": "workspace:*",
-        "@jib/logging": "workspace:*",
-      },
-    },
-    "modules/cloudflared": {
-      "name": "@jib-module/cloudflared",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/config": "workspace:*",
-        "@jib/logging": "workspace:*",
-        "@jib/paths": "workspace:*",
-      },
-    },
-    "modules/config": {
-      "name": "@jib/config",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/errors": "workspace:*",
-        "@jib/paths": "workspace:*",
-      },
-    },
-    "modules/deploy": {
-      "name": "@jib/deploy",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/config": "workspace:*",
-        "@jib/docker": "workspace:*",
-        "@jib/errors": "workspace:*",
-        "@jib/logging": "workspace:*",
-        "@jib/paths": "workspace:*",
-        "@jib/state": "workspace:*",
-      },
-    },
-    "modules/docker": {
-      "name": "@jib/docker",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/config": "workspace:*",
-        "@jib/errors": "workspace:*",
-        "@jib/paths": "workspace:*",
-        "yaml": "*",
-      },
-    },
-    "modules/errors": {
-      "name": "@jib/errors",
-      "version": "0.0.0",
-    },
-    "modules/ingress": {
-      "name": "@jib/ingress",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/config": "workspace:*",
-        "@jib/logging": "workspace:*",
-        "@jib/paths": "workspace:*",
-      },
-    },
-    "modules/logging": {
-      "name": "@jib/logging",
-      "version": "0.0.0",
-      "dependencies": {
-        "consola": "*",
-      },
-    },
-    "modules/paths": {
-      "name": "@jib/paths",
-      "version": "0.0.0",
-    },
-    "modules/secrets": {
-      "name": "@jib/secrets",
-      "version": "0.0.0",
-    },
-    "modules/sources": {
-      "name": "@jib/sources",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/cli": "workspace:*",
-        "@jib/config": "workspace:*",
-        "@jib/errors": "workspace:*",
-        "@jib/logging": "workspace:*",
-        "@jib/paths": "workspace:*",
-        "@jib/tui": "workspace:*",
-      },
-    },
-    "modules/state": {
-      "name": "@jib/state",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/errors": "workspace:*",
-        "@jib/paths": "workspace:*",
-        "@jib/sources": "workspace:*",
-        "drizzle-orm": "*",
-      },
-    },
-    "modules/tui": {
-      "name": "@jib/tui",
-      "version": "0.0.0",
-      "dependencies": {
-        "@clack/prompts": "*",
-        "@jib/cli": "workspace:*",
-        "@jib/errors": "workspace:*",
-      },
-    },
-    "modules/watcher": {
-      "name": "@jib-module/watcher",
-      "version": "0.0.0",
-      "dependencies": {
-        "@jib/config": "workspace:*",
-        "@jib/deploy": "workspace:*",
-        "@jib/logging": "workspace:*",
-        "@jib/paths": "workspace:*",
-        "@jib/sources": "workspace:*",
-        "@jib/state": "workspace:*",
       },
     },
   },
@@ -233,34 +101,6 @@
     "@esbuild/win32-ia32": ["@esbuild/win32-ia32@0.25.12", "", { "os": "win32", "cpu": "ia32" }, "sha512-HkqnmmBoCbCwxUKKNPBixiWDGCpQGVsrQfJoVGYLPT41XWF8lHuE5N6WhVia2n4o5QK5M4tYr21827fNhi4byQ=="],
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
-
-    "@jib-module/cloudflared": ["@jib-module/cloudflared@workspace:modules/cloudflared"],
-
-    "@jib-module/watcher": ["@jib-module/watcher@workspace:modules/watcher"],
-
-    "@jib/cli": ["@jib/cli@workspace:modules/cli"],
-
-    "@jib/config": ["@jib/config@workspace:modules/config"],
-
-    "@jib/deploy": ["@jib/deploy@workspace:modules/deploy"],
-
-    "@jib/docker": ["@jib/docker@workspace:modules/docker"],
-
-    "@jib/errors": ["@jib/errors@workspace:modules/errors"],
-
-    "@jib/ingress": ["@jib/ingress@workspace:modules/ingress"],
-
-    "@jib/logging": ["@jib/logging@workspace:modules/logging"],
-
-    "@jib/paths": ["@jib/paths@workspace:modules/paths"],
-
-    "@jib/secrets": ["@jib/secrets@workspace:modules/secrets"],
-
-    "@jib/sources": ["@jib/sources@workspace:modules/sources"],
-
-    "@jib/state": ["@jib/state@workspace:modules/state"],
-
-    "@jib/tui": ["@jib/tui@workspace:modules/tui"],
 
     "@types/bun": ["@types/bun@1.3.11", "", { "dependencies": { "bun-types": "1.3.11" } }, "sha512-5vPne5QvtpjGpsGYXiFyycfpDF2ECyPcTSsFBMa0fraoxiQyMJ3SmuQIGhzPg2WJuWxVBoxWJ2kClYTcw/4fAg=="],
 
