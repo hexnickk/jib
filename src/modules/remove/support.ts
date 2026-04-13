@@ -9,12 +9,13 @@ import { Store } from '@jib/state'
 import { RemoveWriteConfigError } from './errors.ts'
 import type { RemoveSupport } from './types.ts'
 
-export interface DefaultRemoveSupportOptions {
+export interface RemoveSupportOptions {
   paths: Paths
   releaseIngress(appName: string): Promise<void>
 }
 
-export function createRemoveSupport(options: DefaultRemoveSupportOptions): RemoveSupport {
+/** Creates the default remove support implementation backed by app modules. */
+export function removeCreateSupport(options: RemoveSupportOptions): RemoveSupport {
   const secrets = createSecretsManager(options.paths.secretsDir)
   const store = new Store(options.paths.stateDir)
 
@@ -54,45 +55,5 @@ export function createRemoveSupport(options: DefaultRemoveSupportOptions): Remov
       if (!result) return undefined
       return new RemoveWriteConfigError(configFile, { cause: result })
     },
-  }
-}
-
-export class DefaultRemoveSupport implements RemoveSupport {
-  private readonly support: RemoveSupport
-
-  constructor(options: DefaultRemoveSupportOptions) {
-    this.support = createRemoveSupport(options)
-  }
-
-  releaseIngress(appName: string) {
-    return this.support.releaseIngress(appName)
-  }
-
-  stopApp(cfg: Config, appName: string, quiet: boolean) {
-    return this.support.stopApp(cfg, appName, quiet)
-  }
-
-  removeCheckout(appName: string, repo: string) {
-    return this.support.removeCheckout(appName, repo)
-  }
-
-  removeSecrets(appName: string) {
-    return this.support.removeSecrets(appName)
-  }
-
-  removeState(appName: string) {
-    return this.support.removeState(appName)
-  }
-
-  removeOverride(appName: string) {
-    return this.support.removeOverride(appName)
-  }
-
-  removeManagedCompose(appName: string) {
-    return this.support.removeManagedCompose(appName)
-  }
-
-  writeConfig(configFile: string, cfg: Config) {
-    return this.support.writeConfig(configFile, cfg)
   }
 }

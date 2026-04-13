@@ -4,7 +4,12 @@ import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { promptConfirm, spinner } from '@jib/tui'
 import { consola } from 'consola'
-import { DefaultRemoveSupport, RemoveMissingAppError, runRemove } from '../modules/remove/index.ts'
+import {
+  RemoveMissingAppError,
+  RemoveWriteConfigError,
+  removeApp,
+  removeCreateSupport,
+} from '../modules/remove/index.ts'
 import type { CliCommand } from './command.ts'
 
 const cliRemoveCommand = {
@@ -35,9 +40,9 @@ const cliRemoveCommand = {
       if (!ok) return { app: appName, removed: false }
     }
 
-    const result = await runRemove(
+    const result = await removeApp(
       {
-        support: new DefaultRemoveSupport({
+        support: removeCreateSupport({
           paths,
           releaseIngress: (nextAppName) => removeReleaseIngress(paths, nextAppName),
         }),
@@ -50,6 +55,7 @@ const cliRemoveCommand = {
       { appName, cfg, configFile: paths.configFile, quiet: !cliIsTextOutput() },
     )
     if (result instanceof RemoveMissingAppError) return result
+    if (result instanceof RemoveWriteConfigError) return result
     if (cliIsTextOutput()) consola.success(`removed ${appName}`)
     return { app: appName, removed: true }
   },

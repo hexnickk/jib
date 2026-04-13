@@ -5,7 +5,6 @@ import {
   RemoveMissingAppError as ServiceRemoveMissingAppError,
   RemoveWriteConfigError as ServiceRemoveWriteConfigError,
   removeApp,
-  runRemove,
 } from './service.ts'
 import type { RemoveSupport } from './types.ts'
 
@@ -19,7 +18,7 @@ const cfg: Config = {
   },
 }
 
-describe('runRemove', () => {
+describe('removeApp', () => {
   test('re-exports typed errors from service for compatibility', () => {
     expect(ServiceRemoveMissingAppError).toBe(RemoveMissingAppError)
     expect(ServiceRemoveWriteConfigError).toBe(RemoveWriteConfigError)
@@ -146,7 +145,7 @@ describe('runRemove', () => {
     expect((result as RemoveWriteConfigError).code).toBe('remove_write_config')
   })
 
-  test('keeps runRemove as a throwing compatibility wrapper for config write errors', async () => {
+  test('returns a typed config write error without throwing', async () => {
     const support: RemoveSupport = {
       releaseIngress: async () => undefined,
       stopApp: async () => undefined,
@@ -158,8 +157,8 @@ describe('runRemove', () => {
       writeConfig: async (configFile) => new RemoveWriteConfigError(configFile),
     }
 
-    await expect(
-      runRemove(
+    expect(
+      await removeApp(
         { support },
         {
           appName: 'demo',
@@ -168,6 +167,6 @@ describe('runRemove', () => {
           quiet: true,
         },
       ),
-    ).rejects.toBeInstanceOf(RemoveWriteConfigError)
+    ).toBeInstanceOf(RemoveWriteConfigError)
   })
 })

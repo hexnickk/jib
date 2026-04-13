@@ -42,15 +42,6 @@ export async function removeApp(
   return { app: params.appName, removed: true }
 }
 
-export async function runRemove(
-  ctx: RemoveRunContext,
-  params: RemoveParams,
-): Promise<RemoveResult | RemoveMissingAppError> {
-  const result = await removeApp(ctx, params)
-  if (result instanceof RemoveWriteConfigError) throw result
-  return result
-}
-
 async function runBestEffort(
   ctx: RemoveRunContext,
   label: string,
