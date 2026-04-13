@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
 import { credsPath, getPaths } from '@jib/paths'
-import { inferredOptionalModules, reconcileOptionalModules } from './reconcile.ts'
+import { initInferredOptionalModules, initReconcileOptionalModules } from './reconcile.ts'
 
 async function readConfig(file: string): Promise<Config> {
   const result = await configLoad(file)
@@ -30,7 +30,7 @@ async function withTmpConfig<T>(fn: (cfg: Config, root: string) => Promise<T>): 
   }
 }
 
-describe('reconcileOptionalModules', () => {
+describe('initReconcileOptionalModules', () => {
   test('infers cloudflared when a tunnel token already exists', async () => {
     await withTmpConfig(async (cfg, root) => {
       const paths = getPaths(root)
@@ -38,9 +38,9 @@ describe('reconcileOptionalModules', () => {
       await mkdir(join(root, 'secrets', '_jib', 'cloudflare'), { recursive: true })
       await writeFile(tokenPath, 'TUNNEL_TOKEN=abc\n')
 
-      expect(inferredOptionalModules(cfg, paths)).toEqual({ cloudflared: true })
+      expect(initInferredOptionalModules(cfg, paths)).toEqual({ cloudflared: true })
 
-      const next = await reconcileOptionalModules(cfg, paths)
+      const next = await initReconcileOptionalModules(cfg, paths)
       if (next instanceof Error) throw next
       expect(next.modules).toEqual({ cloudflared: true })
     })
@@ -54,7 +54,7 @@ describe('reconcileOptionalModules', () => {
       await writeFile(tokenPath, 'TUNNEL_TOKEN=abc\n')
 
       const writes: Config[] = []
-      const next = await reconcileOptionalModules(cfg, paths, {
+      const next = await initReconcileOptionalModules(cfg, paths, {
         writeConfig: async (_file: string, updated: Config) => {
           writes.push(structuredClone(updated))
           return undefined
@@ -82,8 +82,8 @@ describe('reconcileOptionalModules', () => {
         apps: {},
       } satisfies Config
 
-      expect(inferredOptionalModules(cfg, paths)).toEqual({})
-      expect(await reconcileOptionalModules(cfg, paths)).toBe(cfg)
+      expect(initInferredOptionalModules(cfg, paths)).toEqual({})
+      expect(await initReconcileOptionalModules(cfg, paths)).toBe(cfg)
     })
   })
 })

@@ -6,7 +6,7 @@ interface ReconcileDeps {
   writeConfig?: (configFile: string, config: Config) => Promise<undefined | Error>
 }
 
-export function inferredOptionalModules(config: Config, paths: Paths): Record<string, true> {
+export function initInferredOptionalModules(config: Config, paths: Paths): Record<string, true> {
   const inferred: Record<string, true> = {}
 
   if (config.modules.cloudflared === undefined && cloudflaredHasTunnelToken(paths)) {
@@ -16,12 +16,12 @@ export function inferredOptionalModules(config: Config, paths: Paths): Record<st
   return inferred
 }
 
-export async function reconcileOptionalModules(
+export async function initReconcileOptionalModules(
   config: Config,
   paths: Paths,
   deps: ReconcileDeps = {},
 ): Promise<Config | Error> {
-  const inferred = inferredOptionalModules(config, paths)
+  const inferred = initInferredOptionalModules(config, paths)
   if (Object.keys(inferred).length === 0) return config
 
   const next: Config = {

@@ -10,13 +10,13 @@ import { configLoad } from '@jib/config'
 import { getPaths } from '@jib/paths'
 import { intro, note, outro } from '@jib/tui'
 import { hasBootstrapState } from '../migrations/service.ts'
-import { configureOptionalModules } from '../modules/init/optional.ts'
-import { reconcileOptionalModules } from '../modules/init/reconcile.ts'
+import { initConfigureOptionalModules } from '../modules/init/optional.ts'
+import { initReconcileOptionalModules } from '../modules/init/reconcile.ts'
 import {
-  describeModules,
-  installedOptionalModules,
-  pendingOptionalModuleNames,
-  unseenOptionalModules,
+  initDescribeModules,
+  initInstalledOptionalModules,
+  initPendingOptionalModuleNames,
+  initUnseenOptionalModules,
 } from '../modules/init/registry.ts'
 import type { CliCommand } from './command.ts'
 
@@ -53,12 +53,12 @@ const cliInitCommand = {
     if (args.check) {
       let config = await configLoad(paths.configFile)
       if (config instanceof Error) return config
-      const reconciled = await reconcileOptionalModules(config, paths, {
+      const reconciled = await initReconcileOptionalModules(config, paths, {
         writeConfig: async () => undefined,
       })
       if (reconciled instanceof Error) return reconciled
       config = reconciled
-      const pending = pendingOptionalModuleNames(config)
+      const pending = initPendingOptionalModuleNames(config)
       if (cliIsTextOutput()) {
         if (pending.length === 0) {
           note('No optional modules are waiting for setup.', 'Optional modules')
@@ -69,17 +69,19 @@ const cliInitCommand = {
         }
       }
       return {
-        enabledOptionalModules: installedOptionalModules(config).map((mod) => mod.manifest.name),
+        enabledOptionalModules: initInstalledOptionalModules(config).map(
+          (mod) => mod.manifest.name,
+        ),
         optionalModulesPending: pending,
       }
     }
 
     let config = await configLoad(paths.configFile)
     if (config instanceof Error) return config
-    const reconciled = await reconcileOptionalModules(config, paths)
+    const reconciled = await initReconcileOptionalModules(config, paths)
     if (reconciled instanceof Error) return reconciled
     config = reconciled
-    const unseen = unseenOptionalModules(config)
+    const unseen = initUnseenOptionalModules(config)
 
     if (unseen.length === 0) {
       if (cliIsTextOutput()) {
@@ -87,14 +89,16 @@ const cliInitCommand = {
         outro('nothing to do')
       }
       return {
-        enabledOptionalModules: installedOptionalModules(config).map((mod) => mod.manifest.name),
+        enabledOptionalModules: initInstalledOptionalModules(config).map(
+          (mod) => mod.manifest.name,
+        ),
         optionalModulesPending: [],
       }
     }
 
     if (cliIsTextOutput()) {
       note(
-        `Choose which optional pieces you want Jib to manage now.\n${describeModules(unseen).join('\n')}`,
+        `Choose which optional pieces you want Jib to manage now.\n${initDescribeModules(unseen).join('\n')}`,
         'Optional modules',
       )
     }
@@ -110,7 +114,8 @@ const cliInitCommand = {
       )
     }
 
-    await configureOptionalModules(config, paths, unseen)
+    const configureError = await initConfigureOptionalModules(config, paths, unseen)
+    if (configureError instanceof Error) return configureError
     const finalConfig = await configLoad(paths.configFile)
     if (finalConfig instanceof Error) return finalConfig
     if (cliIsTextOutput()) {
@@ -119,8 +124,12 @@ const cliInitCommand = {
     }
 
     return {
-      enabledOptionalModules: installedOptionalModules(finalConfig).map((mod) => mod.manifest.name),
-      optionalModulesPending: unseenOptionalModules(finalConfig).map((mod) => mod.manifest.name),
+      enabledOptionalModules: initInstalledOptionalModules(finalConfig).map(
+        (mod) => mod.manifest.name,
+      ),
+      optionalModulesPending: initUnseenOptionalModules(finalConfig).map(
+        (mod) => mod.manifest.name,
+      ),
     }
   },
 } satisfies CliCommand

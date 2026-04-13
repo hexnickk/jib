@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import {
-  ALL_MODULES,
-  installedOptionalModules,
-  optionalModules,
-  pendingOptionalModuleNames,
-  requiredModules,
-  resolveModules,
-  unseenOptionalModules,
+  INIT_ALL_MODULES,
+  initInstalledOptionalModules,
+  initOptionalModules,
+  initPendingOptionalModuleNames,
+  initRequiredModules,
+  initResolveModules,
+  initUnseenOptionalModules,
 } from './registry.ts'
 
 const REQUIRED_NAMES = ['watcher', 'ingress']
@@ -19,59 +19,59 @@ function configWith(modules: Record<string, boolean>): Config {
 
 describe('module registry', () => {
   test('all first-party modules are present in dependency order', () => {
-    expect(ALL_MODULES.map((mod) => mod.manifest.name)).toEqual([
+    expect(INIT_ALL_MODULES.map((mod) => mod.manifest.name)).toEqual([
       'watcher',
       'ingress',
       'cloudflared',
     ])
   })
 
-  test('requiredModules returns the core install set', () => {
-    const names = requiredModules().map((m) => m.manifest.name)
+  test('initRequiredModules returns the core install set', () => {
+    const names = initRequiredModules().map((m) => m.manifest.name)
     expect(names).toEqual(REQUIRED_NAMES)
   })
 
-  test('optionalModules returns the opt-in module set', () => {
-    const names = optionalModules().map((m) => m.manifest.name)
+  test('initOptionalModules returns the opt-in module set', () => {
+    const names = initOptionalModules().map((m) => m.manifest.name)
     expect(names).toEqual(OPTIONAL_NAMES)
   })
 
-  test('resolveModules looks up by name', () => {
-    const mods = resolveModules(['ingress', 'cloudflared'])
+  test('initResolveModules looks up by name', () => {
+    const mods = initResolveModules(['ingress', 'cloudflared'])
     expect(mods.map((m) => m.manifest.name)).toEqual(['ingress', 'cloudflared'])
   })
 
-  test('resolveModules ignores unknown names', () => {
-    const mods = resolveModules(['ingress', 'nonexistent'])
+  test('initResolveModules ignores unknown names', () => {
+    const mods = initResolveModules(['ingress', 'nonexistent'])
     expect(mods.map((m) => m.manifest.name)).toEqual(['ingress'])
   })
 
-  test('installedOptionalModules returns modules with true', () => {
+  test('initInstalledOptionalModules returns modules with true', () => {
     const config = configWith({ cloudflared: true })
-    const names = installedOptionalModules(config).map((m) => m.manifest.name)
+    const names = initInstalledOptionalModules(config).map((m) => m.manifest.name)
     expect(names).toEqual(['cloudflared'])
   })
 
-  test('unseenOptionalModules returns modules not in config.modules', () => {
+  test('initUnseenOptionalModules returns modules not in config.modules', () => {
     const config = configWith({ cloudflared: true })
-    const names = unseenOptionalModules(config).map((m) => m.manifest.name)
+    const names = initUnseenOptionalModules(config).map((m) => m.manifest.name)
     expect(names).toEqual([])
   })
 
-  test('unseenOptionalModules returns all when modules is empty', () => {
+  test('initUnseenOptionalModules returns all when modules is empty', () => {
     const config = configWith({})
-    const names = unseenOptionalModules(config).map((m) => m.manifest.name)
+    const names = initUnseenOptionalModules(config).map((m) => m.manifest.name)
     expect(names).toEqual(OPTIONAL_NAMES)
   })
 
-  test('unseenOptionalModules returns none when all are decided', () => {
+  test('initUnseenOptionalModules returns none when all are decided', () => {
     const config = configWith({ cloudflared: true })
-    const names = unseenOptionalModules(config).map((m) => m.manifest.name)
+    const names = initUnseenOptionalModules(config).map((m) => m.manifest.name)
     expect(names).toEqual([])
   })
 
-  test('pendingOptionalModuleNames returns undecided optional module names', () => {
-    expect(pendingOptionalModuleNames(configWith({}))).toEqual(['cloudflared'])
-    expect(pendingOptionalModuleNames(configWith({ cloudflared: false }))).toEqual([])
+  test('initPendingOptionalModuleNames returns undecided optional module names', () => {
+    expect(initPendingOptionalModuleNames(configWith({}))).toEqual(['cloudflared'])
+    expect(initPendingOptionalModuleNames(configWith({ cloudflared: false }))).toEqual([])
   })
 })

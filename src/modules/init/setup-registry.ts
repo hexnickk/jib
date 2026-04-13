@@ -7,6 +7,6 @@ const SETUPS: Readonly<Record<string, ModuleSetup>> = {
   cloudflared: ({ paths }) => runCloudflaredSetup(paths),
 }
 
-export function resolveModuleSetup(name: string): ModuleSetup | undefined {
+export function initResolveModuleSetup(name: string): ModuleSetup | undefined {
   return SETUPS[name]
 }

@@ -3,7 +3,7 @@ import type { Config } from '@jib/config'
 import { loggingCreateLogger } from '@jib/logging'
 import { getPaths } from '@jib/paths'
 import { InitModuleInstallError } from './errors.ts'
-import { runInstallsTx, runInstallsTxResult } from './install.ts'
+import { initRunInstallsTx } from './install.ts'
 import type { ModLike } from './registry.ts'
 import type { InitContext } from './types.ts'
 
@@ -31,7 +31,7 @@ function mod(
   return result
 }
 
-describe('runInstallsTx', () => {
+describe('initRunInstallsTx', () => {
   test('happy path: every module installs in order', async () => {
     const log: string[] = []
     const mods = [
@@ -46,7 +46,7 @@ describe('runInstallsTx', () => {
       }),
     ]
 
-    await runInstallsTx(mods, ctx)
+    expect(await initRunInstallsTx(mods, ctx)).toBeUndefined()
 
     expect(log).toEqual(['install:a', 'install:b', 'install:c'])
   })
@@ -87,7 +87,7 @@ describe('runInstallsTx', () => {
       }),
     ]
 
-    const error = await runInstallsTxResult(mods, ctx)
+    const error = await initRunInstallsTx(mods, ctx)
 
     expect(error).toBeInstanceOf(InitModuleInstallError)
     expect(error?.message).toBe('c blew up')
@@ -121,7 +121,7 @@ describe('runInstallsTx', () => {
       }),
     ]
 
-    const error = await runInstallsTxResult(mods, ctx)
+    const error = await initRunInstallsTx(mods, ctx)
 
     expect(error).toBeInstanceOf(InitModuleInstallError)
     expect(error?.message).toBe('c blew up')
@@ -146,7 +146,7 @@ describe('runInstallsTx', () => {
       }),
     ]
 
-    const error = await runInstallsTxResult(mods, ctx)
+    const error = await initRunInstallsTx(mods, ctx)
 
     expect(error).toBeInstanceOf(InitModuleInstallError)
     expect(error?.message).toBe('c blew up')
@@ -164,20 +164,20 @@ describe('runInstallsTx', () => {
       }),
     ]
 
-    const error = await runInstallsTxResult(mods, ctx)
+    const error = await initRunInstallsTx(mods, ctx)
 
     expect(error).toBeInstanceOf(InitModuleInstallError)
     expect(error?.message).toBe('b blew up')
     expect(log).toEqual(['install:a'])
   })
 
-  test('throwing wrapper preserves the typed install error', async () => {
+  test('returns the typed install error for failing installs', async () => {
     const mods = [
       mod('broken', async () => {
         throw new Error('broken install')
       }),
     ]
 
-    await expect(runInstallsTx(mods, ctx)).rejects.toBeInstanceOf(InitModuleInstallError)
+    expect(await initRunInstallsTx(mods, ctx)).toBeInstanceOf(InitModuleInstallError)
   })
 })

@@ -1,5 +1,6 @@
 import { log } from '@jib/tui'
-import { InitModuleInstallError, toInitModuleInstallError } from './errors.ts'
+import { toInitModuleInstallError } from './errors.ts'
+import type { InitModuleInstallError } from './errors.ts'
 import type { ModLike } from './registry.ts'
 import type { InitContext } from './types.ts'
 
@@ -22,7 +23,7 @@ async function rollbackInstalls(installed: ModLike[], ctx: InitContext): Promise
   }
 }
 
-export async function runInstallsTxResult(
+export async function initRunInstallsTx(
   mods: ModLike[],
   ctx: InitContext,
 ): Promise<InitModuleInstallError | undefined> {
@@ -42,17 +43,5 @@ export async function runInstallsTxResult(
       await rollbackInstalls(installed, ctx)
       return toInitModuleInstallError(mod.manifest.name, error)
     }
-  }
-}
-
-/**
- * Install every module in `mods` in order. On the first failure, walk the
- * already-installed set in reverse and call each module's `uninstall()` as
- * best-effort rollback.
- */
-export async function runInstallsTx(mods: ModLike[], ctx: InitContext): Promise<void> {
-  const error = await runInstallsTxResult(mods, ctx)
-  if (error instanceof InitModuleInstallError) {
-    throw error
   }
 }

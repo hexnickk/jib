@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import {
   type FirstPartyModule,
-  optionalModules,
-  requiredModules,
-  resolveModules,
+  initOptionalModules,
+  initRequiredModules,
+  initResolveModules,
 } from './module-registry.ts'
 import type { InitContext } from './types.ts'
 
@@ -26,16 +26,16 @@ describe('module registry projections', () => {
     })
     const registry = [requiredOnly, optionalOnly, installedOptional] as const
 
-    expect(requiredModules(registry).map((mod) => mod.manifest.name)).toEqual(['required-only'])
-    expect(optionalModules(registry).map((mod) => mod.manifest.name)).toEqual([
+    expect(initRequiredModules(registry).map((mod) => mod.manifest.name)).toEqual(['required-only'])
+    expect(initOptionalModules(registry).map((mod) => mod.manifest.name)).toEqual([
       'optional-only',
       'installed-optional',
     ])
     expect(
-      resolveModules(['installed-optional', 'required-only'], registry).map(
+      initResolveModules(['installed-optional', 'required-only'], registry).map(
         (mod) => mod.manifest.name,
       ),
     ).toEqual(['required-only', 'installed-optional'])
-    expect(typeof resolveModules(['installed-optional'], registry)[0]?.install).toBe('function')
+    expect(typeof initResolveModules(['installed-optional'], registry)[0]?.install).toBe('function')
   })
 })

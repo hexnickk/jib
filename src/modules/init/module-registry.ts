@@ -7,25 +7,25 @@ export type { FirstPartyModule } from './types.ts'
 /** Static first-party module registry for bun build --compile visibility. */
 export const MODULES: readonly FirstPartyModule[] = [watcherMod, ingressMod, cloudflaredMod]
 
-export function allModules(
+export function initAllModules(
   registry: readonly FirstPartyModule[] = MODULES,
 ): readonly FirstPartyModule[] {
   return registry
 }
 
-export function requiredModules(
+export function initRequiredModules(
   registry: readonly FirstPartyModule[] = MODULES,
 ): FirstPartyModule[] {
   return registry.filter((mod) => mod.manifest.required)
 }
 
-export function optionalModules(
+export function initOptionalModules(
   registry: readonly FirstPartyModule[] = MODULES,
 ): FirstPartyModule[] {
   return registry.filter((mod) => !mod.manifest.required)
 }
 
-export function resolveModules(
+export function initResolveModules(
   names: readonly string[],
   registry: readonly FirstPartyModule[] = MODULES,
 ): FirstPartyModule[] {

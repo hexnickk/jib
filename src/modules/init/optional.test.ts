@@ -9,12 +9,7 @@ import {
   OptionalModuleChoicePersistError,
   OptionalModuleSetupError,
 } from './errors.ts'
-import {
-  configureOptionalModules,
-  configureOptionalModulesResult,
-  persistModuleChoice,
-  persistModuleChoiceResult,
-} from './optional.ts'
+import { initConfigureOptionalModules, initPersistModuleChoice } from './optional.ts'
 import type { ModLike } from './registry.ts'
 
 async function readConfig(file: string): Promise<Config> {
@@ -46,7 +41,7 @@ function mod(name: string): ModLike {
 }
 
 describe('optional module configuration', () => {
-  test('persistModuleChoice preserves unrelated config edits', async () => {
+  test('initPersistModuleChoice preserves unrelated config edits', async () => {
     await withTmpConfig(async (_, root) => {
       const file = join(root, 'config.yml')
       expect(
@@ -59,14 +54,17 @@ describe('optional module configuration', () => {
         } satisfies Config),
       ).toBeUndefined()
 
-      const updated = await persistModuleChoice(file, 'cloudflared', true)
+      const updated = await initPersistModuleChoice(file, 'cloudflared', true)
+      if (updated instanceof OptionalModuleChoicePersistError) {
+        throw new Error('expected updated config')
+      }
       expect(updated.modules.cloudflared).toBe(true)
       expect(updated.sources.demo).toEqual({ driver: 'github', type: 'key' })
     })
   })
 
-  test('persistModuleChoiceResult returns a typed error when persistence fails', async () => {
-    const error = await persistModuleChoiceResult('/tmp/missing.yml', 'cloudflared', true, {
+  test('initPersistModuleChoice returns a typed error when persistence fails', async () => {
+    const error = await initPersistModuleChoice('/tmp/missing.yml', 'cloudflared', true, {
       loadConfig: async () => {
         throw new Error('config missing')
       },
@@ -79,23 +77,25 @@ describe('optional module configuration', () => {
     expect(error.message).toBe('config missing')
   })
 
-  test('configureOptionalModules preserves setup-written config before enabling the module', async () => {
+  test('initConfigureOptionalModules preserves setup-written config before enabling the module', async () => {
     await withTmpConfig(async (cfg, root) => {
       const paths = getPaths(root)
       const mods: ModLike[] = [mod('source-auth')]
 
-      await configureOptionalModules(cfg, paths, mods, {
-        promptOptionalModule: async () => true,
-        resolveModuleSetup: (name) =>
-          name === 'source-auth'
-            ? async (ctx) => {
-                const next = await readConfig(ctx.paths.configFile)
-                next.sources.demo = { driver: 'github', type: 'key' }
-                expect(await configWrite(ctx.paths.configFile, next)).toBeUndefined()
-                return true
-              }
-            : undefined,
-      })
+      expect(
+        await initConfigureOptionalModules(cfg, paths, mods, {
+          promptOptionalModule: async () => true,
+          resolveModuleSetup: (name) =>
+            name === 'source-auth'
+              ? async (ctx) => {
+                  const next = await readConfig(ctx.paths.configFile)
+                  next.sources.demo = { driver: 'github', type: 'key' }
+                  expect(await configWrite(ctx.paths.configFile, next)).toBeUndefined()
+                  return true
+                }
+              : undefined,
+        }),
+      ).toBeUndefined()
 
       const final = await readConfig(paths.configFile)
       expect(final.modules).toEqual({ 'source-auth': true })
@@ -103,7 +103,7 @@ describe('optional module configuration', () => {
     })
   })
 
-  test('configureOptionalModules rolls back install when setup does not complete', async () => {
+  test('initConfigureOptionalModules rolls back install when setup does not complete', async () => {
     await withTmpConfig(async (cfg, root) => {
       const paths = getPaths(root)
       const calls: string[] = []
@@ -119,7 +119,7 @@ describe('optional module configuration', () => {
         },
       ]
 
-      const error = await configureOptionalModulesResult(cfg, paths, mods, {
+      const error = await initConfigureOptionalModules(cfg, paths, mods, {
         promptOptionalModule: async () => true,
         resolveModuleSetup: () => async () => false,
       })
@@ -136,12 +136,12 @@ describe('optional module configuration', () => {
     })
   })
 
-  test('configureOptionalModules does not enable a module when setup does not complete', async () => {
+  test('initConfigureOptionalModules does not enable a module when setup does not complete', async () => {
     await withTmpConfig(async (cfg, root) => {
       const paths = getPaths(root)
       const mods: ModLike[] = [mod('cloudflared')]
 
-      const error = await configureOptionalModulesResult(cfg, paths, mods, {
+      const error = await initConfigureOptionalModules(cfg, paths, mods, {
         promptOptionalModule: async () => true,
         resolveModuleSetup: () => async () => false,
       })
@@ -157,13 +157,13 @@ describe('optional module configuration', () => {
     })
   })
 
-  test('configureOptionalModules keeps earlier choices when a later setup fails', async () => {
+  test('initConfigureOptionalModules keeps earlier choices when a later setup fails', async () => {
     await withTmpConfig(async (cfg, root) => {
       const paths = getPaths(root)
       const mods: ModLike[] = [mod('cloudflared'), mod('source-auth')]
       const answers = [true, true]
 
-      const error = await configureOptionalModulesResult(cfg, paths, mods, {
+      const error = await initConfigureOptionalModules(cfg, paths, mods, {
         promptOptionalModule: async () => answers.shift() ?? false,
         resolveModuleSetup: (name) =>
           name === 'source-auth'
@@ -188,7 +188,7 @@ describe('optional module configuration', () => {
     })
   })
 
-  test('configureOptionalModulesResult converts thrown install dependency failures', async () => {
+  test('initConfigureOptionalModules converts thrown install dependency failures', async () => {
     await withTmpConfig(async (cfg, root) => {
       const paths = getPaths(root)
       const mods: ModLike[] = [
@@ -198,10 +198,10 @@ describe('optional module configuration', () => {
         },
       ]
 
-      const error = await configureOptionalModulesResult(cfg, paths, mods, {
+      const error = await initConfigureOptionalModules(cfg, paths, mods, {
         promptOptionalModule: async () => true,
         resolveModuleSetup: () => undefined,
-        runInstallsTxResult: async () => {
+        runInstallsTx: async () => {
           throw new Error('install dependency blew up')
         },
       })
@@ -215,17 +215,17 @@ describe('optional module configuration', () => {
     })
   })
 
-  test('configureOptionalModules wrapper still throws typed setup errors', async () => {
+  test('initConfigureOptionalModules returns typed setup errors', async () => {
     await withTmpConfig(async (cfg, root) => {
       const paths = getPaths(root)
       const mods: ModLike[] = [mod('cloudflared')]
 
-      await expect(
-        configureOptionalModules(cfg, paths, mods, {
+      expect(
+        await initConfigureOptionalModules(cfg, paths, mods, {
           promptOptionalModule: async () => true,
           resolveModuleSetup: () => async () => false,
         }),
-      ).rejects.toBeInstanceOf(OptionalModuleSetupError)
+      ).toBeInstanceOf(OptionalModuleSetupError)
     })
   })
 })

@@ -10,16 +10,17 @@ import {
   toOptionalModuleChoicePersistError,
   toOptionalModuleSetupError,
 } from './errors.ts'
-import { runInstallsTxResult } from './install.ts'
-import { type ModLike, promptOptionalModule } from './registry.ts'
-import { resolveModuleSetup } from './setup-registry.ts'
+import { initRunInstallsTx } from './install.ts'
+import { initPromptOptionalModule } from './prompt.ts'
+import type { ModLike } from './registry.ts'
+import { initResolveModuleSetup } from './setup-registry.ts'
 import type { InitContext } from './types.ts'
 
 interface OptionalModuleDeps {
   loadConfig?: (configFile: string) => Promise<Config | ConfigError>
-  promptOptionalModule?: typeof promptOptionalModule
-  resolveModuleSetup?: typeof resolveModuleSetup
-  runInstallsTxResult?: typeof runInstallsTxResult
+  promptOptionalModule?: typeof initPromptOptionalModule
+  resolveModuleSetup?: typeof initResolveModuleSetup
+  runInstallsTx?: typeof initRunInstallsTx
   writeConfig?: (configFile: string, config: Config) => Promise<undefined | Error>
 }
 
@@ -37,20 +38,7 @@ async function rollbackModuleInstall(mod: ModLike, ctx: InitContext): Promise<vo
   }
 }
 
-export async function persistModuleChoice(
-  configFile: string,
-  name: string,
-  enabled: boolean,
-  deps: OptionalModuleDeps = {},
-): Promise<Config> {
-  const result = await persistModuleChoiceResult(configFile, name, enabled, deps)
-  if (result instanceof OptionalModuleChoicePersistError) {
-    throw result
-  }
-  return result
-}
-
-export async function persistModuleChoiceResult(
+export async function initPersistModuleChoice(
   configFile: string,
   name: string,
   enabled: boolean,
@@ -74,33 +62,21 @@ export async function persistModuleChoiceResult(
   }
 }
 
-export async function configureOptionalModules(
-  config: Config,
-  paths: Paths,
-  candidates: readonly ModLike[],
-  deps: OptionalModuleDeps = {},
-): Promise<void> {
-  const error = await configureOptionalModulesResult(config, paths, candidates, deps)
-  if (error instanceof Error) {
-    throw error
-  }
-}
-
-export async function configureOptionalModulesResult(
+export async function initConfigureOptionalModules(
   config: Config,
   paths: Paths,
   candidates: readonly ModLike[],
   deps: OptionalModuleDeps = {},
 ): Promise<InitOptionalModuleError | undefined> {
-  const ask = deps.promptOptionalModule ?? promptOptionalModule
-  const setupFor = deps.resolveModuleSetup ?? resolveModuleSetup
-  const installTx = deps.runInstallsTxResult ?? runInstallsTxResult
+  const ask = deps.promptOptionalModule ?? initPromptOptionalModule
+  const setupFor = deps.resolveModuleSetup ?? initResolveModuleSetup
+  const installTx = deps.runInstallsTx ?? initRunInstallsTx
 
   let current = config
   for (const mod of candidates) {
     const enabled = await ask(mod)
     if (!enabled) {
-      const persisted = await persistModuleChoiceResult(
+      const persisted = await initPersistModuleChoice(
         paths.configFile,
         mod.manifest.name,
         false,
@@ -147,12 +123,7 @@ export async function configureOptionalModulesResult(
       }
     }
 
-    const persisted = await persistModuleChoiceResult(
-      paths.configFile,
-      mod.manifest.name,
-      true,
-      deps,
-    )
+    const persisted = await initPersistModuleChoice(paths.configFile, mod.manifest.name, true, deps)
     if (persisted instanceof OptionalModuleChoicePersistError) {
       if (mod.install) await rollbackModuleInstall(mod, ctx)
       return persisted
