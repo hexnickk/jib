@@ -1,18 +1,17 @@
 import { mkdir, rm } from 'node:fs/promises'
 import type { App, Config } from '@jib/config'
-import { type Paths, dockerHubImage, pathExists, repoPath } from '@jib/paths'
-import { ensureCheckout, sourceErrorOptions } from './checkout.ts'
+import { type Paths, dockerHubImage, repoPath } from '@jib/paths'
+import { sourcesErrorOptions } from './checkout.ts'
 import {
-  SourceLocalCheckoutError,
   SourceLocalRepoError,
   SourceMissingAppError,
   SourceProbeError,
   SourceRemoteResolveError,
-  SourceRemoteSyncError,
   SourceWorkdirPrepareError,
 } from './errors.ts'
 import * as git from './git.ts'
 import { resolveSourceDriverResult } from './registry.ts'
+import { sourcesSyncLocalCheckout, sourcesSyncRemoteCheckout } from './sync.ts'
 import type {
   InspectionCheckout,
   PreparedSource,
@@ -56,22 +55,28 @@ export async function sourcesResolve(
   const driver = resolveSourceDriverResult(cfg, app)
   if (driver instanceof Error) return driver
 
+  let remote: Awaited<ReturnType<typeof driver.resolve>>
   try {
-    const remote = await driver.resolve(cfg, app, paths)
-    const branch =
-      target.branch ??
-      existing?.branch ??
-      (await git.defaultBranch(remote.url, remote.env)) ??
-      app.branch
-    return {
-      app: app.branch === branch ? app : { ...app, branch },
-      branch,
-      ref: ref ?? branch,
-      workdir,
-      ...remote,
-    }
+    remote = await driver.resolve(cfg, app, paths)
   } catch (error) {
-    return new SourceRemoteResolveError(target.app, sourceErrorOptions(error))
+    return new SourceRemoteResolveError(target.app, sourcesErrorOptions(error))
+  }
+
+  const defaultBranch =
+    target.branch || existing?.branch
+      ? undefined
+      : await git.sourcesGitDefaultBranch(remote.url, remote.env)
+  if (defaultBranch instanceof Error) {
+    return new SourceRemoteResolveError(target.app, sourcesErrorOptions(defaultBranch))
+  }
+
+  const branch = target.branch ?? existing?.branch ?? defaultBranch ?? app.branch
+  return {
+    app: app.branch === branch ? app : { ...app, branch },
+    branch,
+    ref: ref ?? branch,
+    workdir,
+    ...remote,
   }
 }
 
@@ -90,37 +95,22 @@ export async function sourcesSync(
     try {
       await mkdir(workdir, { recursive: true, mode: 0o750 })
     } catch (error) {
-      return new SourceWorkdirPrepareError(target.app, workdir, sourceErrorOptions(error))
+      return new SourceWorkdirPrepareError(target.app, workdir, sourcesErrorOptions(error))
     }
     return { workdir, sha: app.image }
   }
 
   if (app.repo === 'local') {
-    const workdir = repoPath(paths, target.app, app.repo)
-    try {
-      if (!(await pathExists(workdir)) || !(await git.isRepo(workdir))) {
-        return new SourceLocalCheckoutError(target.app, workdir)
-      }
-      await git.checkout(workdir, ref ?? app.branch)
-      return { workdir, sha: await git.currentSHA(workdir) }
-    } catch (error) {
-      return new SourceLocalCheckoutError(target.app, workdir, sourceErrorOptions(error))
-    }
+    return sourcesSyncLocalCheckout(
+      target.app,
+      repoPath(paths, target.app, app.repo),
+      ref ?? app.branch,
+    )
   }
 
   const source = await sourcesResolve(cfg, paths, target, ref)
   if (source instanceof Error) return source
-
-  try {
-    await ensureCheckout(source.workdir, source.url, source.branch, source.env)
-    await source.applyAuth(source.workdir)
-    await git.fetch(source.workdir, source.ref, source.env)
-    const sha = await git.fetchedSHA(source.workdir)
-    await git.checkout(source.workdir, sha)
-    return { workdir: source.workdir, sha }
-  } catch (error) {
-    return new SourceRemoteSyncError(target.app, source.ref, sourceErrorOptions(error))
-  }
+  return sourcesSyncRemoteCheckout(target.app, source)
 }
 
 /** Prepares a checkout for compose inspection and returns the inspection workdir. */
@@ -147,13 +137,16 @@ export async function sourcesProbe(
 
   const source = await sourcesResolve(cfg, paths, target)
   if (source instanceof Error) return source
-  const lsRemote = deps.lsRemote ?? git.lsRemote
+  const lsRemote = deps.lsRemote ?? git.sourcesGitLsRemote
 
   try {
     const sha = await lsRemote(source.url, source.ref, source.env)
+    if (sha instanceof Error) {
+      return new SourceProbeError(target.app, source.ref, sourcesErrorOptions(sha))
+    }
     return sha ? { branch: source.branch, workdir: source.workdir, sha } : null
   } catch (error) {
-    return new SourceProbeError(target.app, source.ref, sourceErrorOptions(error))
+    return new SourceProbeError(target.app, source.ref, sourcesErrorOptions(error))
   }
 }
 

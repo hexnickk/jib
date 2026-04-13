@@ -20,6 +20,7 @@ export type {
   ProbeSourceDeps,
   ResolvedSource,
   SourceDriver,
+  SourceLsRemote,
   SourceProbe,
   SourceSelectOption,
   SourceSetupOption,

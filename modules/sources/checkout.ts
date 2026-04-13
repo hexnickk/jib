@@ -2,32 +2,36 @@ import { rm } from 'node:fs/promises'
 import { pathExists } from '@jib/paths'
 import * as git from './git.ts'
 
-export function sourceErrorOptions(error: unknown): ErrorOptions {
-  return { cause: error instanceof Error ? error : new Error(String(error)) }
+/** Converts an unknown source failure into `ErrorOptions` cause metadata. */
+export function sourcesErrorOptions(error: unknown): ErrorOptions | undefined {
+  return error === undefined ? undefined : { cause: error }
 }
 
-export async function ensureCheckout(
+/** Ensures `workdir` is a usable checkout and returns a typed git error on failure. */
+export async function sourcesEnsureCheckout(
   workdir: string,
   url: string,
   branch: string,
   env: git.GitEnv,
-): Promise<void> {
+): Promise<Error | undefined> {
   if (await pathExists(workdir)) {
-    const [repoReady, hasRemote] = await Promise.all([git.isRepo(workdir), git.hasRemote(workdir)])
+    const [repoReady, hasRemote] = await Promise.all([
+      git.sourcesGitIsRepo(workdir),
+      git.sourcesGitHasRemote(workdir),
+    ])
     if (!repoReady || !hasRemote) {
       await rm(workdir, { recursive: true, force: true })
     }
   }
 
   if (!(await pathExists(workdir))) {
-    try {
-      await git.clone(url, workdir, { branch, env })
-    } catch (error) {
+    const cloneError = await git.sourcesGitClone(url, workdir, { branch, env })
+    if (cloneError instanceof Error) {
       await rm(workdir, { recursive: true, force: true })
-      throw error
+      return cloneError
     }
     return
   }
 
-  await git.setRemoteURL(workdir, url)
+  return git.sourcesGitSetRemoteUrl(workdir, url)
 }

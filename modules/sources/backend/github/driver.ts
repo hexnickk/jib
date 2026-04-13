@@ -1,7 +1,7 @@
 import type { App, Config, Source } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import { isExternalRepoURL, pathExists } from '@jib/paths'
-import { configureSSHKey } from '../../git.ts'
+import { sourcesGitConfigureSshKey } from '../../git.ts'
 import type { DriverSourceStatus, ResolvedDriverSource, SourceDriver } from '../../types.ts'
 import { appPemPath, applyAuth, refreshAuth } from './auth.ts'
 import { deployKeyPaths } from './keygen.ts'
@@ -30,7 +30,7 @@ export async function githubResolveSource(
 ): Promise<ResolvedDriverSource> {
   const external = isExternalRepoURL(app.repo)
   const auth = !external && app.source ? await refreshAuth(app.source, cfg, app, paths) : undefined
-  const env = auth?.sshKeyPath ? configureSSHKey(auth.sshKeyPath) : {}
+  const env = auth?.sshKeyPath ? sourcesGitConfigureSshKey(auth.sshKeyPath) : {}
   const url =
     auth?.token && !external ? httpsCloneURL(app.repo, auth.token) : githubCloneUrl(app, cfg)
 

@@ -1,7 +1,7 @@
 import type { App, Config, Source } from '@jib/config'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
-import type { GitEnv, lsRemote } from './git.ts'
+import type { GitEnv } from './git.ts'
 
 export interface SourceTarget {
   app: string
@@ -82,5 +82,7 @@ export interface SourceDriver {
 }
 
 export interface ProbeSourceDeps {
-  lsRemote?: typeof lsRemote
+  lsRemote?: SourceLsRemote
 }
+
+export type SourceLsRemote = (url: string, ref?: string, env?: GitEnv) => Promise<string | Error>

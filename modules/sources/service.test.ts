@@ -11,6 +11,9 @@ import {
   SourceLocalRepoError,
   SourceMissingAppError,
   SourceMissingConfigError,
+  SourceProbeError,
+  SourceRemoteResolveError,
+  SourceRemoteSyncError,
 } from './errors.ts'
 import {
   sourcesCloneForInspection,
@@ -235,5 +238,51 @@ describe('sources service', () => {
 
     expect(result).toBeInstanceOf(SourceLocalCheckoutError)
     expect(await sourcesProbe(configFor('local'), paths, { app: 'demo' })).toBeNull()
+  })
+
+  test('returns a typed remote resolve error when default branch lookup fails', async () => {
+    const root = await makeTempRoot('jib-root-')
+    const paths = getPaths(root)
+    const cfg: Config = {
+      config_version: 3,
+      poll_interval: '5m',
+      modules: {},
+      sources: {},
+      apps: {},
+    }
+    const result = await sourcesResolve(cfg, paths, {
+      app: 'demo',
+      repo: join(root, 'missing-upstream'),
+    })
+
+    expect(result).toBeInstanceOf(SourceRemoteResolveError)
+  })
+
+  test('returns a typed remote sync error when clone fails', async () => {
+    const root = await makeTempRoot('jib-root-')
+    const paths = getPaths(root)
+    const missingRepo = join(root, 'missing-upstream')
+    const result = await sourcesSync(configFor(join(root, 'missing-upstream')), paths, {
+      app: 'demo',
+    })
+
+    expect(result).toBeInstanceOf(SourceRemoteSyncError)
+    expect(await pathExists(repoPath(paths, 'demo', missingRepo))).toBe(false)
+  })
+
+  test('returns a typed probe error when lsRemote returns an error result', async () => {
+    const upstream = await makeUpstream('jib-probe-fail')
+    const root = await makeTempRoot('jib-root-')
+    const paths = getPaths(root)
+    const result = await sourcesProbe(
+      configFor(upstream),
+      paths,
+      { app: 'demo' },
+      {
+        lsRemote: async () => new Error('permission denied'),
+      },
+    )
+
+    expect(result).toBeInstanceOf(SourceProbeError)
   })
 })
