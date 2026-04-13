@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { cliSetRuntime } from '@jib/cli'
 import { ValidationError } from '@jib/errors'
 import { TuiNotInteractiveError } from './errors.ts'
-import { assertInteractive, assertInteractiveResult, isInteractive } from './interactive.ts'
+import {
+  tuiAssertInteractive,
+  tuiAssertInteractiveResult,
+  tuiIsInteractive,
+} from './interactive.ts'
 
 const stdin = process.stdin as { isTTY: boolean | undefined }
 const stdout = process.stdout as { isTTY: boolean | undefined }
@@ -37,21 +41,21 @@ describe('isInteractive', () => {
     stdin.isTTY = true
     stdout.isTTY = true
     setTestRuntime()
-    expect(isInteractive()).toBe(false)
+    expect(tuiIsInteractive()).toBe(false)
   })
 
   test('false when stdin not a TTY', () => {
     stdin.isTTY = false
     stdout.isTTY = true
     setTestRuntime()
-    expect(isInteractive()).toBe(false)
+    expect(tuiIsInteractive()).toBe(false)
   })
 
   test('true when both TTYs and env unset', () => {
     stdin.isTTY = true
     stdout.isTTY = true
     setTestRuntime()
-    expect(isInteractive()).toBe(true)
+    expect(tuiIsInteractive()).toBe(true)
   })
 
   test('assertInteractiveResult returns a typed error in non-interactive mode', () => {
@@ -60,7 +64,7 @@ describe('isInteractive', () => {
     stdout.isTTY = true
     setTestRuntime()
 
-    const error = assertInteractiveResult()
+    const error = tuiAssertInteractiveResult()
 
     expect(error).toBeInstanceOf(TuiNotInteractiveError)
     expect(error).toBeInstanceOf(ValidationError)
@@ -72,6 +76,6 @@ describe('isInteractive', () => {
     stdin.isTTY = true
     stdout.isTTY = true
     setTestRuntime()
-    expect(() => assertInteractive()).toThrow(TuiNotInteractiveError)
+    expect(() => tuiAssertInteractive()).toThrow(TuiNotInteractiveError)
   })
 })

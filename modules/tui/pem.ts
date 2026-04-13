@@ -8,15 +8,15 @@ function isBoundary(line: string, kind: 'BEGIN' | 'END'): boolean {
   return line.startsWith(`-----${kind} `) && line.endsWith('-----')
 }
 
-export type ReadPemBlockError =
+export type TuiReadPemBlockError =
   | TuiPemInvalidStartError
   | TuiPemMissingBeginError
   | TuiPemMissingEndError
 
-export async function readPemBlockResult(
+export async function tuiReadPemBlockResult(
   lines: AsyncIterable<string>,
   maxLines = 200,
-): Promise<ReadPemBlockError | string> {
+): Promise<TuiReadPemBlockError | string> {
   const out: string[] = []
 
   for await (const line of lines) {
@@ -35,8 +35,15 @@ export async function readPemBlockResult(
   return out.join('\n')
 }
 
-export async function readPemBlock(lines: AsyncIterable<string>, maxLines = 200): Promise<string> {
-  const result = await readPemBlockResult(lines, maxLines)
+export async function tuiReadPemBlock(
+  lines: AsyncIterable<string>,
+  maxLines = 200,
+): Promise<string> {
+  const result = await tuiReadPemBlockResult(lines, maxLines)
   if (result instanceof Error) throw result
   return result
 }
+
+export { tuiReadPemBlock as readPemBlock }
+export { tuiReadPemBlockResult as readPemBlockResult }
+export type { TuiReadPemBlockError as ReadPemBlockError }

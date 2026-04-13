@@ -1,8 +1,8 @@
 import { createInterface } from 'node:readline'
 import * as clack from '@clack/prompts'
 import { TuiPromptCancelledError, TuiPromptTooManyLinesError, isTuiPemReadError } from './errors.ts'
-import { assertInteractiveResult } from './interactive.ts'
-import { readPemBlockResult } from './pem.ts'
+import { tuiAssertInteractiveResult } from './interactive.ts'
+import { tuiReadPemBlockResult } from './pem.ts'
 
 export { intro, outro, spinner, log, note } from '@clack/prompts'
 
@@ -28,7 +28,7 @@ type LinesOpts = {
  * delegates here so the interactive/cancel/return shape lives in one place.
  */
 async function ask<T>(fn: () => Promise<T | symbol>): Promise<T> {
-  const interactiveError = assertInteractiveResult()
+  const interactiveError = tuiAssertInteractiveResult()
   if (interactiveError) throw interactiveError
   const value = await fn()
   if (clack.isCancel(value)) throw new TuiPromptCancelledError()
@@ -49,7 +49,7 @@ function mapOptions<T extends string>(
   )
 }
 
-export function promptString(opts: StrOpts): Promise<string> {
+export function tuiPromptString(opts: StrOpts): Promise<string> {
   return ask(() =>
     clack.text({
       message: opts.message,
@@ -60,7 +60,7 @@ export function promptString(opts: StrOpts): Promise<string> {
   )
 }
 
-export function promptStringOptional(opts: StrOpts): Promise<string> {
+export function tuiPromptStringOptional(opts: StrOpts): Promise<string> {
   return ask<string | undefined>(() =>
     clack.text({
       message: opts.message,
@@ -84,8 +84,8 @@ async function readLine(rl: ReturnType<typeof createInterface>, prompt: string):
   })
 }
 
-export async function promptLines(opts: LinesOpts): Promise<string[]> {
-  const interactiveError = assertInteractiveResult()
+export async function tuiPromptLines(opts: LinesOpts): Promise<string[]> {
+  const interactiveError = tuiAssertInteractiveResult()
   if (interactiveError) throw interactiveError
   const maxLines = opts.maxLines ?? 100
   clack.note(opts.lines.join('\n'), opts.title)
@@ -108,7 +108,7 @@ export async function promptLines(opts: LinesOpts): Promise<string[]> {
   throw new TuiPromptTooManyLinesError(maxLines)
 }
 
-export async function promptInt(opts: IntOpts): Promise<number> {
+export async function tuiPromptInt(opts: IntOpts): Promise<number> {
   const v = await ask(() =>
     clack.text({
       message: opts.message,
@@ -125,11 +125,11 @@ export async function promptInt(opts: IntOpts): Promise<number> {
   return Number(v)
 }
 
-export function promptPassword(opts: { message: string }): Promise<string> {
+export function tuiPromptPassword(opts: { message: string }): Promise<string> {
   return ask(() => clack.password({ message: opts.message }))
 }
 
-export function promptSelect<T extends string>(opts: SelectOpts<T>): Promise<T> {
+export function tuiPromptSelect<T extends string>(opts: SelectOpts<T>): Promise<T> {
   const options = mapOptions(opts.options) as Parameters<typeof clack.select<T>>[0]['options']
   return ask<T>(() =>
     clack.select<T>({
@@ -140,7 +140,7 @@ export function promptSelect<T extends string>(opts: SelectOpts<T>): Promise<T> 
   )
 }
 
-export function promptMultiSelect<T extends string>(opts: SelectOpts<T>): Promise<T[]> {
+export function tuiPromptMultiSelect<T extends string>(opts: SelectOpts<T>): Promise<T[]> {
   const options = mapOptions(opts.options) as Parameters<typeof clack.multiselect<T>>[0]['options']
   return ask<T[]>(() => clack.multiselect<T>({ message: opts.message, options, required: false }))
 }
@@ -150,15 +150,15 @@ export function promptMultiSelect<T extends string>(opts: SelectOpts<T>): Promis
  * `-----END ... KEY-----`, then returns the full block. Uses raw
  * readline so pasted multiline text works because clack has no multiline input.
  */
-export async function promptPEM(opts: { message: string }): Promise<string> {
-  const interactiveError = assertInteractiveResult()
+export async function tuiPromptPEM(opts: { message: string }): Promise<string> {
+  const interactiveError = tuiAssertInteractiveResult()
   if (interactiveError) throw interactiveError
   while (true) {
     clack.log.info(`${opts.message} (paste full PEM block)`)
     const rl = createInterface({ input: process.stdin })
-    let pem: Awaited<ReturnType<typeof readPemBlockResult>>
+    let pem: Awaited<ReturnType<typeof tuiReadPemBlockResult>>
     try {
-      pem = await readPemBlockResult(rl)
+      pem = await tuiReadPemBlockResult(rl)
     } finally {
       rl.close()
     }
@@ -166,7 +166,7 @@ export async function promptPEM(opts: { message: string }): Promise<string> {
     if (!(pem instanceof Error)) return pem
     if (!isTuiPemReadError(pem)) throw pem
     clack.log.warning(pem.message)
-    const retry = await promptConfirm({
+    const retry = await tuiPromptConfirm({
       message: 'Try pasting the PEM again?',
       initialValue: true,
     })
@@ -174,11 +174,23 @@ export async function promptPEM(opts: { message: string }): Promise<string> {
   }
 }
 
-export function promptConfirm(opts: ConfirmOpts): Promise<boolean> {
+export function tuiPromptConfirm(opts: ConfirmOpts): Promise<boolean> {
   return ask(() =>
     clack.confirm({
       message: opts.message,
       ...(opts.initialValue !== undefined && { initialValue: opts.initialValue }),
     }),
   )
+}
+
+export {
+  tuiPromptConfirm as promptConfirm,
+  tuiPromptInt as promptInt,
+  tuiPromptLines as promptLines,
+  tuiPromptMultiSelect as promptMultiSelect,
+  tuiPromptPEM as promptPEM,
+  tuiPromptPassword as promptPassword,
+  tuiPromptSelect as promptSelect,
+  tuiPromptString as promptString,
+  tuiPromptStringOptional as promptStringOptional,
 }
