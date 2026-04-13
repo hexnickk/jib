@@ -49,10 +49,9 @@ export async function sourcesSyncRemoteCheckout(
     return new SourceRemoteSyncError(appName, source.ref, sourcesErrorOptions(error))
   }
 
-  try {
-    await source.applyAuth(source.workdir)
-  } catch (error) {
-    return new SourceRemoteSyncError(appName, source.ref, sourcesErrorOptions(error))
+  const authError = await source.applyAuth(source.workdir)
+  if (authError instanceof Error) {
+    return new SourceRemoteSyncError(appName, source.ref, sourcesErrorOptions(authError))
   }
 
   const fetchError = await git.sourcesGitFetch(source.workdir, source.ref, source.env)

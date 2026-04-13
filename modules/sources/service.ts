@@ -55,11 +55,9 @@ export async function sourcesResolve(
   const driver = resolveSourceDriverResult(cfg, app)
   if (driver instanceof Error) return driver
 
-  let remote: Awaited<ReturnType<typeof driver.resolve>>
-  try {
-    remote = await driver.resolve(cfg, app, paths)
-  } catch (error) {
-    return new SourceRemoteResolveError(target.app, sourcesErrorOptions(error))
+  const remote = await driver.resolve(cfg, app, paths)
+  if (remote instanceof Error) {
+    return new SourceRemoteResolveError(target.app, sourcesErrorOptions(remote))
   }
 
   const defaultBranch =

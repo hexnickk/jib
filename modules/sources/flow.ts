@@ -21,8 +21,8 @@ export interface SourceRecoveryDeps {
     message: string
     options: { value: SourceChoice; label: string; hint?: string }[]
     initialValue?: SourceChoice
-  }) => Promise<SourceChoice>
-  promptConfirm?: (opts: { message: string; initialValue?: boolean }) => Promise<boolean>
+  }) => Promise<SourceChoice | Error>
+  promptConfirm?: (opts: { message: string; initialValue?: boolean }) => Promise<boolean | Error>
   runSetup?: (cfg: Config, paths: Paths, value: string) => Promise<string | null>
 }
 
@@ -77,6 +77,7 @@ export async function sourcesSetupRef(
       label: option.label,
     })),
   })
+  if (choice instanceof Error) return choice
   return choice.startsWith('setup:')
     ? sourcesCreateSetupRef(choice as Extract<SourceChoice, `setup:${string}`>, cfg, paths, deps)
     : null
@@ -152,6 +153,7 @@ export async function sourcesMaybeRecover(
     options: sourcesBuildChoices(cfg),
     ...(hasCurrentSource ? { initialValue: `existing:${currentSource}` as SourceChoice } : {}),
   })
+  if (choice instanceof Error) return choice
 
   if (choice.startsWith('existing:')) return choice.slice('existing:'.length)
   if (!choice.startsWith('setup:')) return null
@@ -170,6 +172,7 @@ export async function sourcesMaybeRecover(
     message: `After finishing setup for "${created}", retry the clone now?`,
     initialValue: true,
   })
+  if (confirmed instanceof Error) return confirmed
   return confirmed ? created : new SourceSetupCancelledError('add cancelled')
 }
 

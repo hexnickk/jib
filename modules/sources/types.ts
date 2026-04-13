@@ -32,13 +32,13 @@ export interface ResolvedSource {
   ref: string
   url: string
   workdir: string
-  applyAuth: (workdir: string) => Promise<void>
+  applyAuth: (workdir: string) => Promise<undefined | Error>
 }
 
 export interface ResolvedDriverSource {
   env: GitEnv
   url: string
-  applyAuth: (workdir: string) => Promise<void>
+  applyAuth: (workdir: string) => Promise<undefined | Error>
 }
 
 export interface SourceSetupOption {
@@ -74,7 +74,7 @@ export interface SourceDriver {
   name: string
   setupLabel?: string
   setup?: (ctx: SourceSetupContext) => Promise<string | null>
-  resolve(cfg: Config, app: App, paths: Paths): Promise<ResolvedDriverSource>
+  resolve(cfg: Config, app: App, paths: Paths): Promise<ResolvedDriverSource | Error>
   supportsRepo(repo: string): boolean
   isAuthFailure(error: unknown): boolean
   describe(source: Source): string
