@@ -24,7 +24,7 @@ const CREDS_DIR_MODE = '2770'
  * overrides the default `/opt/jib`; callers may pass an explicit root for
  * tests. Shared disk state is the contract.
  */
-export function getPaths(root?: string): Paths {
+export function pathsGetPaths(root?: string): Paths {
   const base = root ?? process.env.JIB_ROOT ?? DEFAULT_ROOT
   return {
     root: base,
@@ -41,12 +41,14 @@ export function getPaths(root?: string): Paths {
   }
 }
 
+export { pathsGetPaths as getPaths }
+
 /**
  * Returns true for repo strings that are already complete clone URLs
  * (file://, ssh://, http(s)://, git://, git@host:…, or absolute paths).
  * These bypass GitHub URL construction and land under `repos/external/<app>`.
  */
-export function isExternalRepoURL(repo: string): boolean {
+export function pathsIsExternalRepoURL(repo: string): boolean {
   return (
     repo.startsWith('/') ||
     repo.startsWith('file://') ||
@@ -58,52 +60,63 @@ export function isExternalRepoURL(repo: string): boolean {
   )
 }
 
+export { pathsIsExternalRepoURL as isExternalRepoURL }
+
 /**
  * On-disk path for an app's git checkout. Local repos land under
  * `repos/local/<app>`, external URLs under `repos/external/<app>`, and
  * GitHub `owner/name` repos under `repos/github/<owner>/<name>`.
  */
-export function repoPath(paths: Paths, app: string, repo: string): string {
+export function pathsRepoPath(paths: Paths, app: string, repo: string): string {
   if (repo === '' || repo === 'local') {
     return join(paths.reposDir, 'local', app)
   }
-  if (isExternalRepoURL(repo)) {
+  if (pathsIsExternalRepoURL(repo)) {
     return join(paths.reposDir, 'external', app)
   }
   return join(paths.reposDir, 'github', repo)
 }
 
+export { pathsRepoPath as repoPath }
+
 /**
  * Path for a jib-managed credential under `secrets/_jib/<kind>/<name>`.
  * Mirrors Go `CredsPath`.
  */
-export function credsPath(paths: Paths, kind: string, name: string): string {
+export function pathsCredsPath(paths: Paths, kind: string, name: string): string {
   return join(paths.secretsDir, '_jib', kind, name)
 }
 
+export { pathsCredsPath as credsPath }
+
 /** Deterministic path for an app's jib-managed generated compose file. */
-export function managedComposePath(paths: Paths, app: string): string {
+export function pathsManagedComposePath(paths: Paths, app: string): string {
   return join(paths.composeDir, `${app}.yml`)
 }
+
+export { pathsManagedComposePath as managedComposePath }
 
 /**
  * Creates credential directories beneath the shared `secrets/_jib` tree.
  * Existing directories are left alone so a non-root CLI does not try to chmod
  * root-owned paths; migrations repair older installs in place.
  */
-export async function ensureCredsDir(paths: Paths, kind: string): Promise<string> {
-  const ensured = await ensureCredsDirResult(paths, kind)
+export async function pathsEnsureCredsDir(paths: Paths, kind: string): Promise<string> {
+  const ensured = await pathsEnsureCredsDirResult(paths, kind)
   if (ensured instanceof EnsureCredsDirError) throw ensured
   return ensured
 }
 
-export async function ensureCredsDirResult(
+export { pathsEnsureCredsDir as ensureCredsDir }
+
+/** Ensures the credential directory exists and returns a typed error on failure. */
+export async function pathsEnsureCredsDirResult(
   paths: Paths,
   kind: string,
 ): Promise<EnsureCredsDirError | string> {
   const baseDir = join(paths.secretsDir, '_jib')
   const dir = join(baseDir, kind)
-  const baseExists = await pathExistsResult(baseDir)
+  const baseExists = await pathsPathExistsResult(baseDir)
   if (baseExists instanceof PathLookupError) {
     return new EnsureCredsDirError(kind, baseDir, { cause: baseExists })
   }
@@ -111,7 +124,7 @@ export async function ensureCredsDirResult(
     const created = await createCredsDir(kind, baseDir)
     if (created instanceof EnsureCredsDirError) return created
   }
-  const dirExists = await pathExistsResult(dir)
+  const dirExists = await pathsPathExistsResult(dir)
   if (dirExists instanceof PathLookupError) {
     return new EnsureCredsDirError(kind, dir, { cause: dirExists })
   }
@@ -122,14 +135,19 @@ export async function ensureCredsDirResult(
   return dir
 }
 
+export { pathsEnsureCredsDirResult as ensureCredsDirResult }
+
 /** Returns true if a file or directory exists at `path`. */
-export async function pathExists(path: string): Promise<boolean> {
-  const exists = await pathExistsResult(path)
+export async function pathsPathExists(path: string): Promise<boolean> {
+  const exists = await pathsPathExistsResult(path)
   if (exists instanceof PathLookupError) throw exists
   return exists
 }
 
-export async function pathExistsResult(path: string): Promise<boolean | PathLookupError> {
+export { pathsPathExists as pathExists }
+
+/** Returns true for existing files and directories, or a typed error on stat failures. */
+export async function pathsPathExistsResult(path: string): Promise<boolean | PathLookupError> {
   try {
     await stat(path)
     return true
@@ -138,6 +156,8 @@ export async function pathExistsResult(path: string): Promise<boolean | PathLook
     return new PathLookupError(path, { cause: toError(error) })
   }
 }
+
+export { pathsPathExistsResult as pathExistsResult }
 
 async function createCredsDir(kind: string, dir: string): Promise<EnsureCredsDirError | undefined> {
   try {

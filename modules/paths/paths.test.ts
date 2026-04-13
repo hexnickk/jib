@@ -4,13 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EnsureCredsDirError, PathLookupError } from './errors.ts'
 import {
-  credsPath,
-  ensureCredsDir,
-  ensureCredsDirResult,
-  getPaths,
-  managedComposePath,
-  pathExistsResult,
-  repoPath,
+  pathsCredsPath,
+  pathsEnsureCredsDir,
+  pathsEnsureCredsDirResult,
+  pathsGetPaths,
+  pathsManagedComposePath,
+  pathsPathExistsResult,
+  pathsRepoPath,
 } from './paths.ts'
 
 const tempRoots: string[] = []
@@ -28,7 +28,7 @@ async function createTempRoot(): Promise<string> {
   return root
 }
 
-describe('getPaths', () => {
+describe('pathsGetPaths', () => {
   const prev = process.env.JIB_ROOT
 
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe('getPaths', () => {
   })
 
   test('default root is /opt/jib', () => {
-    const p = getPaths()
+    const p = pathsGetPaths()
     expect(p.root).toBe('/opt/jib')
     expect(p.configFile).toBe('/opt/jib/config.yml')
     expect(p.stateDir).toBe('/opt/jib/state')
@@ -55,50 +55,52 @@ describe('getPaths', () => {
 
   test('$JIB_ROOT overrides default', () => {
     process.env.JIB_ROOT = '/tmp/jib-test'
-    expect(getPaths().root).toBe('/tmp/jib-test')
-    expect(getPaths().configFile).toBe('/tmp/jib-test/config.yml')
+    expect(pathsGetPaths().root).toBe('/tmp/jib-test')
+    expect(pathsGetPaths().configFile).toBe('/tmp/jib-test/config.yml')
   })
 
   test('explicit root wins over env', () => {
     process.env.JIB_ROOT = '/tmp/ignored'
-    expect(getPaths('/srv/jib').root).toBe('/srv/jib')
+    expect(pathsGetPaths('/srv/jib').root).toBe('/srv/jib')
   })
 })
 
-describe('repoPath', () => {
-  const p = getPaths('/opt/jib')
+describe('pathsRepoPath', () => {
+  const p = pathsGetPaths('/opt/jib')
 
   test('local repo', () => {
-    expect(repoPath(p, 'myapp', 'local')).toBe('/opt/jib/repos/local/myapp')
+    expect(pathsRepoPath(p, 'myapp', 'local')).toBe('/opt/jib/repos/local/myapp')
   })
   test('empty repo treated as local', () => {
-    expect(repoPath(p, 'myapp', '')).toBe('/opt/jib/repos/local/myapp')
+    expect(pathsRepoPath(p, 'myapp', '')).toBe('/opt/jib/repos/local/myapp')
   })
   test('github repo', () => {
-    expect(repoPath(p, 'myapp', 'hexnickk/jib')).toBe('/opt/jib/repos/github/hexnickk/jib')
+    expect(pathsRepoPath(p, 'myapp', 'hexnickk/jib')).toBe('/opt/jib/repos/github/hexnickk/jib')
   })
 })
 
-describe('credsPath', () => {
+describe('pathsCredsPath', () => {
   test('groups by kind and name', () => {
-    const p = getPaths('/opt/jib')
-    expect(credsPath(p, 'github-app', 'prod.pem')).toBe('/opt/jib/secrets/_jib/github-app/prod.pem')
+    const p = pathsGetPaths('/opt/jib')
+    expect(pathsCredsPath(p, 'github-app', 'prod.pem')).toBe(
+      '/opt/jib/secrets/_jib/github-app/prod.pem',
+    )
   })
 })
 
-describe('managedComposePath', () => {
+describe('pathsManagedComposePath', () => {
   test('uses a predictable jib-managed location', () => {
-    const p = getPaths('/opt/jib')
-    expect(managedComposePath(p, 'demo')).toBe('/opt/jib/compose/demo.yml')
+    const p = pathsGetPaths('/opt/jib')
+    expect(pathsManagedComposePath(p, 'demo')).toBe('/opt/jib/compose/demo.yml')
   })
 })
 
-describe('ensureCredsDir', () => {
+describe('pathsEnsureCredsDir', () => {
   test('creates group-writable setgid credential directories', async () => {
     const root = await createTempRoot()
-    const p = getPaths(root)
+    const p = pathsGetPaths(root)
 
-    const dir = await ensureCredsDir(p, 'github-app')
+    const dir = await pathsEnsureCredsDir(p, 'github-app')
     const info = await stat(dir)
 
     expect(dir).toBe(join(root, 'secrets', '_jib', 'github-app'))
@@ -107,11 +109,11 @@ describe('ensureCredsDir', () => {
 
   test('returns typed errors when directory creation fails', async () => {
     const root = await createTempRoot()
-    const p = getPaths(root)
+    const p = pathsGetPaths(root)
 
     await writeFile(p.secretsDir, 'blocked')
 
-    const result = await ensureCredsDirResult(p, 'github-app')
+    const result = await pathsEnsureCredsDirResult(p, 'github-app')
 
     expect(result).toBeInstanceOf(EnsureCredsDirError)
     if (result instanceof EnsureCredsDirError) {
@@ -121,11 +123,11 @@ describe('ensureCredsDir', () => {
   })
 })
 
-describe('pathExistsResult', () => {
+describe('pathsPathExistsResult', () => {
   test('returns false for a missing path', async () => {
     const root = await createTempRoot()
 
-    expect(await pathExistsResult(join(root, 'missing'))).toBe(false)
+    expect(await pathsPathExistsResult(join(root, 'missing'))).toBe(false)
   })
 
   test('returns false when a parent path is not a directory', async () => {
@@ -134,7 +136,7 @@ describe('pathExistsResult', () => {
 
     await writeFile(file, 'blocked')
 
-    expect(await pathExistsResult(join(file, 'child'))).toBe(false)
+    expect(await pathsPathExistsResult(join(file, 'child'))).toBe(false)
   })
 
   test('returns typed errors for stat failures', async () => {
@@ -147,7 +149,7 @@ describe('pathExistsResult', () => {
     await chmod(parent, 0)
 
     try {
-      const result = await pathExistsResult(target)
+      const result = await pathsPathExistsResult(target)
 
       expect(result).toBeInstanceOf(PathLookupError)
       if (result instanceof PathLookupError) {

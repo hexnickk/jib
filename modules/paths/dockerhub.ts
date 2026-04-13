@@ -1,6 +1,7 @@
 const IMAGE_REF_RE = /^[A-Za-z0-9._/-]+(?::[A-Za-z0-9._-]+)?$/
 
-export function dockerHubImage(repo: string): string | null {
+/** Normalizes a Docker Hub repo URL or image ref into a pullable image name. */
+export function pathsDockerHubImage(repo: string): string | null {
   if (repo.startsWith('docker://')) return normalizeImage(repo.slice('docker://'.length))
   if (repo.startsWith('dockerhub://')) return normalizeImage(repo.slice('dockerhub://'.length))
   if (!repo.startsWith('https://hub.docker.com/')) return null
@@ -11,9 +12,14 @@ export function dockerHubImage(repo: string): string | null {
   return null
 }
 
-export function isDockerHubRepo(repo: string): boolean {
-  return dockerHubImage(repo) !== null
+export { pathsDockerHubImage as dockerHubImage }
+
+/** Returns true when the repo string points at a Docker Hub image or page. */
+export function pathsIsDockerHubRepo(repo: string): boolean {
+  return pathsDockerHubImage(repo) !== null
 }
+
+export { pathsIsDockerHubRepo as isDockerHubRepo }
 
 function normalizeImage(value: string): string | null {
   return value.length > 0 && IMAGE_REF_RE.test(value) ? value : null
