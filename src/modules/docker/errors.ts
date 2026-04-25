@@ -74,3 +74,36 @@ export class DockerCommandError extends JibError {
     this.name = 'DockerCommandError'
   }
 }
+
+export class DockerInstallUnsupportedPlatformError extends JibError {
+  constructor(detail: string) {
+    super('docker_install_unsupported_platform', `automatic Docker install unsupported: ${detail}`)
+    this.name = 'DockerInstallUnsupportedPlatformError'
+  }
+}
+
+export class DockerInstallCommandError extends JibError {
+  constructor(
+    readonly step: string,
+    readonly args: readonly string[],
+    detail: string,
+    options?: ErrorOptions,
+  ) {
+    super('docker_install_command_failed', `Docker install ${step}: ${detail}`, options)
+    this.name = 'DockerInstallCommandError'
+  }
+}
+
+export class DockerInstallReadFileError extends JibError {
+  constructor(path: string, message: string, options?: ErrorOptions) {
+    super('docker_install_read_file', `Docker install read ${path}: ${message}`, options)
+    this.name = 'DockerInstallReadFileError'
+  }
+}
+
+export class DockerInstallWriteFileError extends JibError {
+  constructor(path: string, message: string, options?: ErrorOptions) {
+    super('docker_install_write_file', `Docker install write ${path}: ${message}`, options)
+    this.name = 'DockerInstallWriteFileError'
+  }
+}

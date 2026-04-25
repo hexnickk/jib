@@ -33,11 +33,22 @@ export {
   DockerCommandError,
   DockerDomainServiceNotFoundError,
   DockerDomainServiceRequiredError,
+  DockerInstallCommandError,
+  DockerInstallReadFileError,
+  DockerInstallUnsupportedPlatformError,
+  DockerInstallWriteFileError,
   DockerServiceSelectionRequiredError,
   ExecArgsMissingAppError,
   ExecArgsMissingCommandError,
   RunArgsMissingAppError,
 } from './errors.ts'
+export {
+  dockerEnsureInstalledResult,
+  dockerRuntimeReady,
+  type DockerInstallCommandResult,
+  type DockerInstallResultError,
+} from './install.ts'
+export { dockerParseOsRelease, dockerSelectAptRepository } from './install-plan.ts'
 export {
   type ComposeInspection,
   type ComposeInspectionCode,

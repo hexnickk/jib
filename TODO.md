@@ -2,6 +2,20 @@
 
 - add documentation
 
+# 25 April
+
+- [x] Suggest how to reload groups during initial installation
+- [x] There should be a suggestion how to get this token
+  ◇  Enable optional module "cloudflared"? Cloudflare Tunnel daemon (optional)
+  │  Yes
+  │
+  ◆  cloudflared
+  │
+  ◆  Tunnel token (or full "cloudflared service install <token>" command)
+  │  _
+  └
+- [x] jib-watcher & jib-cloudflared are disabled at the start
+
 # 11 April
 
 - [x] split cloudflared modules into app/cli/module
