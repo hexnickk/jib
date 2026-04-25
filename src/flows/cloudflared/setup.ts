@@ -49,8 +49,9 @@ export async function cloudflaredRunSetup(
   paths: Paths,
   deps: CloudflaredSetupDeps = {},
 ): Promise<boolean> {
-  const result = await cloudflaredRunSetupResult(paths, deps)
-  return renderSetupResult(result, deps.logger ?? tuiLog)
+  const logger = deps.logger ?? tuiLog
+  const result = await cloudflaredRunSetupResult(paths, { ...deps, logger })
+  return renderSetupResult(result, logger)
 }
 
 /** Runs tunnel setup and returns a structured outcome for CLI callers. */
@@ -79,6 +80,7 @@ export async function cloudflaredRunSetupResult(
 
   let raw: string
   try {
+    logTokenInstructions(deps.logger)
     const token = await password({
       message: 'Tunnel token (or full "cloudflared service install <token>" command)',
     })
@@ -97,6 +99,7 @@ export async function cloudflaredRunSetupResult(
   return startService(false, enableService)
 }
 
+/** Starts the managed cloudflared service and converts startup failures into typed results. */
 async function startService(
   keptExisting: boolean,
   enableService: typeof cloudflaredEnableService,
@@ -114,16 +117,18 @@ async function startService(
   }
 }
 
+/** Prints where Cloudflare exposes tunnel tokens before the password prompt is shown. */
+function logTokenInstructions(logger: CloudflaredSetupLogger | undefined): void {
+  if (!logger) return
+  logger.info('Get a token at dash.cloudflare.com → Zero Trust → Networks → Connectors,')
+  logger.info('then create a tunnel and copy the install command or token.')
+}
+
 /** Turns the structured setup result into the existing user-facing log flow. */
 function renderSetupResult(
   result: CloudflaredSetupResult,
   logger: CloudflaredSetupLogger,
 ): boolean {
-  if (shouldShowSetupIntro(result)) {
-    logger.info('Create a tunnel at dash.cloudflare.com → Zero Trust → Tunnels,')
-    logger.info('then paste the install command or just the token.')
-  }
-
   if (
     result instanceof CloudflaredSetupPromptError ||
     result instanceof CloudflaredSetupSaveTokenError
@@ -150,13 +155,4 @@ function renderSetupResult(
   logger.success('tunnel token saved')
   logger.success('cloudflared started')
   return true
-}
-
-/** Decides whether the setup banner still helps after a partial failure. */
-function shouldShowSetupIntro(result: CloudflaredSetupResult): boolean {
-  if (result instanceof CloudflaredSetupSaveTokenError) return true
-  if (result instanceof CloudflaredSetupPromptError) return result.step === 'token'
-  if (result instanceof CloudflaredStartError) return !result.keptExisting
-  if (result.status === 'skipped') return true
-  return !result.keptExisting
 }

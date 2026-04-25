@@ -51,7 +51,10 @@ describe('cloudflaredRunSetupResult', () => {
     })
 
     expect(result).toEqual({ status: 'skipped', reason: 'invalid_token' })
-    expect(logger.messages).toEqual([])
+    expect(logger.messages).toEqual([
+      'info:Get a token at dash.cloudflare.com → Zero Trust → Networks → Connectors,',
+      'info:then create a tunnel and copy the install command or token.',
+    ])
   })
 
   test('returns typed save errors when token persistence fails', async () => {
@@ -99,8 +102,8 @@ describe('cloudflaredRunSetup', () => {
 
     expect(ok).toBe(true)
     expect(logger.messages).toEqual([
-      'info:Create a tunnel at dash.cloudflare.com → Zero Trust → Tunnels,',
-      'info:then paste the install command or just the token.',
+      'info:Get a token at dash.cloudflare.com → Zero Trust → Networks → Connectors,',
+      'info:then create a tunnel and copy the install command or token.',
       'success:tunnel token saved',
       'success:cloudflared started',
     ])
@@ -150,8 +153,8 @@ describe('cloudflaredRunSetup', () => {
 
     expect(ok).toBe(false)
     expect(logger.messages).toEqual([
-      'info:Create a tunnel at dash.cloudflare.com → Zero Trust → Tunnels,',
-      'info:then paste the install command or just the token.',
+      'info:Get a token at dash.cloudflare.com → Zero Trust → Networks → Connectors,',
+      'info:then create a tunnel and copy the install command or token.',
       'warning:tunnel token setup skipped: failed to read tunnel token input: cancelled',
     ])
   })
