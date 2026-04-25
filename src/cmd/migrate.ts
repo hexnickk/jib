@@ -27,7 +27,7 @@ const cliMigrateCommand = {
       )
       if (result.sessionReloadRecommended) {
         tuiNote(
-          'You were added to the `jib` group. Start a new login session for group-based access to apply; until then, keep using `sudo`.',
+          'You were added to the `jib` group. Reload group membership with `newgrp jib`, or start a new login session; until then, keep using `sudo`.',
           'Next steps',
         )
       }
