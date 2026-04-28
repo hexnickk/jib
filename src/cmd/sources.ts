@@ -2,7 +2,7 @@ import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
 import { sourcesSetupRef } from '@jib/sources'
 import { tuiPromptSelectResult } from '@jib/tui'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 const cliSourcesCommands = [
   {

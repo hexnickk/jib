@@ -8,7 +8,7 @@ import {
   secretsUpsert,
 } from '@jib/secrets'
 import { consola } from 'consola'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 /** Loads the shared secrets command context from the managed config. */
 async function loadSecretsContext() {

@@ -2,7 +2,7 @@ import { DEFAULT_TIMEOUT_MS, runDeploy } from '@/flows/deploy/run.ts'
 import { cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
 import { consola } from 'consola'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 const cliDeployCommand = {
   command: 'deploy <app>',

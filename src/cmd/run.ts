@@ -1,5 +1,5 @@
 import { dockerHandleShell, dockerParseRunArgs } from '@jib/docker'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 /** Reads the raw run argv tail so docker shell parsing can preserve passthrough syntax. */
 function readRunTail(): string[] {

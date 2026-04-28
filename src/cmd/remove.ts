@@ -10,7 +10,7 @@ import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { tuiPromptConfirmResult, tuiSpinner } from '@jib/tui'
 import { consola } from 'consola'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 const cliRemoveCommand = {
   command: 'remove <app>',

@@ -1,5 +1,5 @@
 import { dockerHandleShell, dockerParseExecArgs } from '@jib/docker'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 /** Reads the raw exec argv tail so docker shell parsing can preserve passthrough syntax. */
 function readExecTail(): string[] {

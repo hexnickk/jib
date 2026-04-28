@@ -6,7 +6,6 @@ export interface CliIssue {
 }
 
 export interface CliErrorOptions extends ErrorOptions {
-  details?: unknown
   exitCode?: number
   hint?: string
   issues?: CliIssue[]
@@ -18,18 +17,15 @@ export interface NormalizedCliError {
   exitCode: number
   hint?: string
   issues?: CliIssue[]
-  details?: unknown
 }
 
 export class CliError extends JibError {
-  readonly details: unknown | undefined
   readonly exitCode: number
   readonly hint: string | undefined
   readonly issues: CliIssue[] | undefined
 
   constructor(code: string, message: string, options: CliErrorOptions = {}) {
     super(code, message, options)
-    this.details = options.details
     this.exitCode = options.exitCode ?? 1
     this.hint = options.hint
     this.issues = options.issues
@@ -50,14 +46,6 @@ export class InvalidInteractiveModeError extends CliError {
   }
 }
 
-export class InvalidOutputModeError extends CliError {
-  constructor(value: string) {
-    super('invalid_output_mode', `invalid --output value "${value}"`, {
-      hint: 'expected one of: text, json',
-    })
-  }
-}
-
 /** Creates a typed error for commands that are missing required interactive input. */
 export function cliCreateMissingInputError(message: string, issues: CliIssue[]): MissingInputError {
   return new MissingInputError(message, issues)
@@ -72,7 +60,6 @@ export function cliNormalizeError(error: unknown): NormalizedCliError {
       exitCode: error.exitCode,
       ...(error.hint !== undefined && { hint: error.hint }),
       ...(error.issues !== undefined && { issues: error.issues }),
-      ...(error.details !== undefined && { details: error.details }),
     }
   }
   if (error instanceof JibError) {

@@ -1,18 +1,18 @@
 #!/usr/bin/env bun
 import {
-  CliError,
-  cliApplyRuntimeArgv,
-  cliIsJsonOutput,
+  type CliRuntime,
+  type InteractiveMode,
+  cliInteractiveModes,
   cliNormalizeError,
   cliReadRuntime,
+  cliSetRuntime,
 } from '@jib/cli'
+import type { ArgumentsCamelCase, Argv } from 'yargs'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import pkg from '../package.json' with { type: 'json' }
 import addCommand from './cmd/add.ts'
 import cloudflaredCommands from './cmd/cloudflared.ts'
-import type { CliCommand, CliGlobalArgv } from './cmd/command.ts'
-import { cliRegisterCommands } from './cmd/command.ts'
 import deployCommand from './cmd/deploy.ts'
 import downCommand from './cmd/down.ts'
 import execCommand from './cmd/exec.ts'
@@ -24,6 +24,7 @@ import runCommand from './cmd/run.ts'
 import secretsCommands from './cmd/secrets.ts'
 import sourcesCommands from './cmd/sources.ts'
 import statusCommand from './cmd/status.ts'
+import type { CliCommand, CliGlobalArgv } from './cmd/types.ts'
 import upCommand from './cmd/up.ts'
 import watchCommand from './cmd/watch.ts'
 
@@ -59,32 +60,6 @@ function writeCliText(stream: NodeJS.WriteStream, value: string): void {
   stream.write(text.endsWith('\n') ? text : `${text}\n`)
 }
 
-/** Recursively strips ANSI escape sequences from JSON payloads. */
-function sanitizeCliJson(value: unknown): unknown {
-  if (typeof value === 'string') return stripAnsiText(value)
-  if (Array.isArray(value)) return value.map(sanitizeCliJson)
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, sanitizeCliJson(entry)]),
-    )
-  }
-  return value
-}
-
-/** Writes a JSON response with ANSI-free string fields. */
-function writeCliJson(stream: NodeJS.WriteStream, value: unknown): void {
-  stream.write(`${JSON.stringify(sanitizeCliJson(value), null, 2)}\n`)
-}
-
-/** Renders a successful CLI response in text or JSON mode. */
-function writeCliSuccess(value: unknown): void {
-  if (cliIsJsonOutput()) {
-    writeCliJson(process.stdout, { ok: true, data: value ?? null })
-    return
-  }
-  if (typeof value === 'string') writeCliText(process.stdout, value)
-}
-
 /** Renders a normalized CLI error in text mode. */
 function writeCliTextError(error: ReturnType<typeof cliNormalizeError>): void {
   writeCliText(process.stderr, error.message)
@@ -96,24 +71,17 @@ function writeCliTextError(error: ReturnType<typeof cliNormalizeError>): void {
 /** Renders a CLI error and exits with the normalized exit code. */
 function exitCliError(error: unknown): never {
   const normalized = cliNormalizeError(error)
-  if (cliIsJsonOutput()) writeCliJson(process.stderr, { ok: false, error: normalized })
-  else writeCliTextError(normalized)
+  writeCliTextError(normalized)
   process.exit(normalized.exitCode)
 }
 
 /** Builds the shared yargs option map for global CLI runtime flags. */
-function createCliRuntimeOptions(runtime: Exclude<ReturnType<typeof cliReadRuntime>, Error>) {
+function createCliRuntimeOptions(runtime: CliRuntime) {
   return {
     interactive: {
-      type: 'string' as const,
+      choices: cliInteractiveModes,
       default: runtime.interactive,
-      description: 'Prompt mode: auto|always|never',
-      global: true,
-    },
-    output: {
-      type: 'string' as const,
-      default: runtime.output,
-      description: 'Output mode: text|json',
+      description: 'Prompt mode',
       global: true,
     },
     debug: {
@@ -125,76 +93,85 @@ function createCliRuntimeOptions(runtime: Exclude<ReturnType<typeof cliReadRunti
   }
 }
 
-/** Parses only the global runtime flags so help/version honor text vs json output. */
-function readCliRuntimeArgv(rawArgs: string[]) {
-  const runtime = cliReadRuntime()
-  if (runtime instanceof Error) throw runtime
-  return yargs(rawArgs)
-    .exitProcess(false)
-    .help(false)
-    .version(false)
-    .parserConfiguration({ 'populate--': true })
-    .options(createCliRuntimeOptions(runtime))
-    .parseSync(rawArgs) as CliGlobalArgv
+/** Reads a yargs-validated prompt mode without preempting yargs choice errors. */
+function readParsedInteractiveMode(value: unknown): InteractiveMode | undefined {
+  return typeof value === 'string' && cliInteractiveModes.includes(value as InteractiveMode)
+    ? (value as InteractiveMode)
+    : undefined
+}
+
+/** Registers one command and records its return value for top-level error handling. */
+function registerCliCommand<TArgs extends {}>(
+  parser: Argv<CliGlobalArgv>,
+  command: CliCommand<TArgs>,
+  onResult: (value: unknown) => void,
+): Argv<CliGlobalArgv> {
+  const handleCommand = async (argv: ArgumentsCamelCase<CliGlobalArgv & TArgs>) => {
+    onResult(await command.run(argv))
+  }
+  if (!command.builder || typeof command.builder === 'function') {
+    return parser.command<CliGlobalArgv & TArgs>(
+      command.command,
+      command.describe,
+      command.builder ?? ((builder) => builder),
+      handleCommand,
+    )
+  }
+  return parser.command(command.command, command.describe, command.builder, async (argv) => {
+    await handleCommand(argv as ArgumentsCamelCase<CliGlobalArgv & TArgs>)
+  })
 }
 
 /** Builds the root yargs parser with global runtime options and command registration. */
-function createCliParser(rawArgs: string[], onResult: (value: unknown) => void) {
-  const runtime = cliReadRuntime()
-  if (runtime instanceof Error) throw runtime
-  return cliRegisterCommands(
-    yargs(rawArgs)
-      .scriptName('jib')
-      .exitProcess(false)
-      .showHelpOnFail(false)
-      .parserConfiguration({ 'populate--': true })
-      .strict()
-      .demandCommand(1)
-      .recommendCommands()
-      .options(createCliRuntimeOptions(runtime))
-      .middleware((argv) => {
-        const nextRuntime = cliApplyRuntimeArgv(argv as CliGlobalArgv)
-        if (nextRuntime instanceof Error) throw nextRuntime
-      }, true)
-      .fail((message, error) => {
-        throw error ?? new CliError('invalid_cli_usage', message || 'invalid CLI usage')
+function createCliParser(
+  rawArgs: string[],
+  runtime: CliRuntime,
+  onResult: (value: unknown) => void,
+): Argv<CliGlobalArgv> {
+  const parser = yargs(rawArgs)
+    .scriptName('jib')
+    .usage('$0 <command>')
+    .showHelpOnFail(true)
+    .parserConfiguration({ 'populate--': true })
+    .strict()
+    .recommendCommands()
+    .options(createCliRuntimeOptions(runtime))
+    .middleware((argv) => {
+      const nextRuntime = cliSetRuntime({
+        interactive: readParsedInteractiveMode(argv.interactive) ?? runtime.interactive,
+        debug: typeof argv.debug === 'boolean' ? argv.debug : runtime.debug,
+        stdinTty: runtime.stdinTty,
+        stdoutTty: runtime.stdoutTty,
       })
-      .help()
-      .version(pkg.version),
-    cliCommands,
-    onResult,
+      if (nextRuntime instanceof Error) exitCliError(nextRuntime)
+    }, true)
+    .help()
+    .version(pkg.version)
+  parser.command(
+    '$0',
+    false,
+    (builder) => builder,
+    () => {
+      parser.showHelp('log')
+    },
   )
+  for (const command of cliCommands) registerCliCommand(parser, command, onResult)
+  return parser
 }
 
+const runtime = cliReadRuntime()
+if (runtime instanceof Error) exitCliError(runtime)
+
 const rawArgs = hideBin(process.argv)
-let cliOutput = ''
-let cliHelpRequested = false
-let cliVersionRequested = false
 let cliResult: unknown = undefined
-let cliParseError: Error | undefined
 
 try {
-  const startupRuntime = cliApplyRuntimeArgv(readCliRuntimeArgv(rawArgs))
-  if (startupRuntime instanceof Error) exitCliError(startupRuntime)
-  await createCliParser(rawArgs, (value) => {
+  const cliParser = createCliParser(rawArgs, runtime, (value) => {
     cliResult = value
-  }).parseAsync(rawArgs, {}, (error, argv, output) => {
-    cliParseError = error ?? undefined
-    cliHelpRequested = Boolean(argv?.help)
-    cliVersionRequested = Boolean(argv?.version)
-    cliOutput = output
   })
+  await cliParser.parseAsync()
 } catch (error) {
   exitCliError(error)
 }
 
-if (cliParseError) exitCliError(cliParseError)
 if (cliResult instanceof Error) exitCliError(cliResult)
-if (cliOutput) {
-  if (cliVersionRequested)
-    writeCliSuccess(cliIsJsonOutput() ? { version: cliOutput.trim() } : cliOutput)
-  else if (cliHelpRequested) writeCliSuccess(cliIsJsonOutput() ? { usage: cliOutput } : cliOutput)
-  else writeCliSuccess(cliOutput)
-  process.exit(0)
-}
-writeCliSuccess(cliResult)

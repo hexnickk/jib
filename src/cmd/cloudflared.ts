@@ -3,7 +3,7 @@ import { cloudflaredReadStatus } from '@jib-module/cloudflared'
 import { cliIsTextOutput } from '@jib/cli'
 import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 /** Writes the cloudflared status block used in text mode. */
 function writeCloudflaredStatusText(status: ReturnType<typeof cloudflaredReadStatus>): void {

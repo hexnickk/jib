@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test'
-import { cliSetRuntime } from '@jib/cli'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import { DeployPrepareError } from './errors.ts'
@@ -29,10 +28,19 @@ const paths: Paths = {
   stateDir: '/opt/jib/state',
 }
 
+/** Creates a no-op spinner so deploy unit tests do not write progress output. */
+function createNoopSpinner() {
+  return {
+    start() {},
+    message() {},
+    stop() {},
+  }
+}
+
 describe('runDeploy', () => {
   test('returns prepared and deployed shas on success', async () => {
-    cliSetRuntime({ output: 'json' })
     const result = await runDeploy(cfg, paths, 'demo', undefined, 1000, {
+      createSpinner: createNoopSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: async () => ({ deployedSHA: 'deadbeef12345678', durationMs: 42 }),
     })
@@ -47,9 +55,9 @@ describe('runDeploy', () => {
   })
 
   test('wraps source prep failures as deploy_failed', async () => {
-    cliSetRuntime({ output: 'json' })
     await expect(
       runDeploy(cfg, paths, 'demo', undefined, 1000, {
+        createSpinner: createNoopSpinner,
         sync: async () => {
           throw new Error('git clone failed')
         },
@@ -61,8 +69,8 @@ describe('runDeploy', () => {
   })
 
   test('returns a typed prepare error instead of throwing for expected sync failures', async () => {
-    cliSetRuntime({ output: 'json' })
     const result = await runDeployResult(cfg, paths, 'demo', undefined, 1000, {
+      createSpinner: createNoopSpinner,
       sync: async () => {
         throw new Error('git clone failed')
       },
@@ -76,9 +84,9 @@ describe('runDeploy', () => {
   })
 
   test('permission failures hint to repair the managed tree', async () => {
-    cliSetRuntime({ output: 'json' })
     await expect(
       runDeploy(cfg, paths, 'demo', undefined, 1000, {
+        createSpinner: createNoopSpinner,
         sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
         deployPrepared: async () => {
           throw new Error("EACCES: permission denied, open '/opt/jib/overrides/demo.yml'")

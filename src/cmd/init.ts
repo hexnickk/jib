@@ -18,7 +18,7 @@ import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
 import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import { hasBootstrapState } from '../migrations/service.ts'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 /** Returns a typed error until the machine has completed the bootstrap migration. */
 function initCheckMigration(rootReady: boolean): CliError | undefined {

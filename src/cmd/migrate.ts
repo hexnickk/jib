@@ -3,7 +3,7 @@ import { cliCheckLinuxHost, cliCheckRootHost, cliIsTextOutput } from '@jib/cli'
 import { pathsGetPaths } from '@jib/paths'
 import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import { runPendingMigrations } from '../migrations/service.ts'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 const cliMigrateCommand = {
   command: 'migrate',

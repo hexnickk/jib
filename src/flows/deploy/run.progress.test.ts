@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test'
-import { cliSetRuntime } from '@jib/cli'
+import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import { DeployExecuteError, DeployTimeoutError } from './errors.ts'
@@ -29,15 +28,20 @@ const paths: Paths = {
   stateDir: '/opt/jib/state',
 }
 
-afterEach(() => {
-  cliSetRuntime({ output: 'json' })
-})
+/** Creates a no-op spinner for tests that only assert deploy errors. */
+function createNoopSpinner() {
+  return {
+    start() {},
+    message() {},
+    stop() {},
+  }
+}
 
 describe('runDeploy progress and timeout', () => {
   test('times out slow deploys with a deploy_failed cli error', async () => {
-    cliSetRuntime({ output: 'json' })
     await expect(
       runDeploy(cfg, paths, 'demo', undefined, 5, {
+        createSpinner: createNoopSpinner,
         sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
         deployPrepared: async () => {
           await new Promise((resolve) => setTimeout(resolve, 50))
@@ -52,8 +56,8 @@ describe('runDeploy progress and timeout', () => {
   })
 
   test('returns a typed timeout error from the result-first api', async () => {
-    cliSetRuntime({ output: 'json' })
     const result = await runDeployResult(cfg, paths, 'demo', undefined, 5, {
+      createSpinner: createNoopSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: async () => {
         await new Promise((resolve) => setTimeout(resolve, 50))
@@ -69,8 +73,8 @@ describe('runDeploy progress and timeout', () => {
   })
 
   test('returns a typed execute error when deploy throws before returning a promise', async () => {
-    cliSetRuntime({ output: 'json' })
     const result = await runDeployResult(cfg, paths, 'demo', undefined, 1000, {
+      createSpinner: createNoopSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: () => {
         throw new Error('engine setup failed')
@@ -84,8 +88,7 @@ describe('runDeploy progress and timeout', () => {
     })
   })
 
-  test('text mode reports spinner start, progress, and stop messages in order', async () => {
-    cliSetRuntime({ output: 'text' })
+  test('reports spinner start, progress, and stop messages in order', async () => {
     const events: string[] = []
     const createSpinner = () => ({
       start(value: string) {

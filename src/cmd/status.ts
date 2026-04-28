@@ -8,7 +8,7 @@ import {
   stateCollectServices,
   stateCollectSources,
 } from '@jib/state'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 /** Renders a human-readable relative time for the status screen. */
 function timeAgo(iso: string): string {

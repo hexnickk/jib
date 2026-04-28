@@ -1,25 +1,14 @@
-import { InvalidInteractiveModeError, InvalidOutputModeError } from './errors.ts'
+import { InvalidInteractiveModeError } from './errors.ts'
 
 export const cliInteractiveModes = ['auto', 'always', 'never'] as const
-export const cliOutputModes = ['text', 'json'] as const
 
 export type InteractiveMode = (typeof cliInteractiveModes)[number]
-export type OutputMode = (typeof cliOutputModes)[number]
 
 export interface CliRuntime {
   interactive: InteractiveMode
-  output: OutputMode
   debug: boolean
   stdinTty: boolean
   stdoutTty: boolean
-}
-
-export type CliRuntimeParseError = InvalidInteractiveModeError | InvalidOutputModeError
-
-export interface CliRuntimeArgv {
-  interactive?: unknown
-  output?: unknown
-  debug?: unknown
 }
 
 let currentCliRuntime: CliRuntime | null = null
@@ -39,35 +28,18 @@ export function cliReadInteractiveMode(
   return new InvalidInteractiveModeError(value)
 }
 
-/** Parses a raw output-mode string into a typed mode or a typed error. */
-export function cliReadOutputMode(
-  value: string | undefined,
-): OutputMode | InvalidOutputModeError | undefined {
-  if (value === undefined) return undefined
-  if (value === 'text' || value === 'json') return value
-  return new InvalidOutputModeError(value)
-}
-
 /** Reads the default interactive mode from env, honoring JIB_NON_INTERACTIVE. */
 function readDefaultCliInteractiveMode(): InteractiveMode | InvalidInteractiveModeError {
   if (process.env.JIB_NON_INTERACTIVE) return 'never'
   return cliReadInteractiveMode(process.env.JIB_INTERACTIVE) ?? 'auto'
 }
 
-/** Reads the default output mode from env. */
-function readDefaultCliOutputMode(): OutputMode | InvalidOutputModeError {
-  return cliReadOutputMode(process.env.JIB_OUTPUT) ?? 'text'
-}
-
 /** Reads the baseline runtime from env defaults and current TTY state. */
-function readDefaultCliRuntime(): CliRuntime | CliRuntimeParseError {
+function readDefaultCliRuntime(): CliRuntime | InvalidInteractiveModeError {
   const interactive = readDefaultCliInteractiveMode()
   if (interactive instanceof Error) return interactive
-  const output = readDefaultCliOutputMode()
-  if (output instanceof Error) return output
   return {
     interactive,
-    output,
     debug: parseTruthyCliEnv(process.env.JIB_DEBUG),
     stdinTty: Boolean(process.stdin.isTTY),
     stdoutTty: Boolean(process.stdout.isTTY),
@@ -75,7 +47,7 @@ function readDefaultCliRuntime(): CliRuntime | CliRuntimeParseError {
 }
 
 /** Applies explicit overrides on top of the default runtime snapshot. */
-function resolveCliRuntime(runtime: Partial<CliRuntime>): CliRuntime | CliRuntimeParseError {
+function resolveCliRuntime(runtime: Partial<CliRuntime>): CliRuntime | InvalidInteractiveModeError {
   const defaults = readDefaultCliRuntime()
   if (defaults instanceof Error) return defaults
   return { ...defaults, ...runtime }
@@ -88,7 +60,9 @@ function syncCliDebugEnv(debug: boolean): void {
 }
 
 /** Stores a partial runtime and returns the fully materialized runtime. */
-export function cliSetRuntime(runtime: Partial<CliRuntime>): CliRuntime | CliRuntimeParseError {
+export function cliSetRuntime(
+  runtime: Partial<CliRuntime>,
+): CliRuntime | InvalidInteractiveModeError {
   const nextRuntime = resolveCliRuntime(runtime)
   if (nextRuntime instanceof Error) return nextRuntime
   currentCliRuntime = nextRuntime
@@ -97,27 +71,8 @@ export function cliSetRuntime(runtime: Partial<CliRuntime>): CliRuntime | CliRun
 }
 
 /** Reads the current runtime or builds one from env defaults when unset. */
-export function cliReadRuntime(): CliRuntime | CliRuntimeParseError {
+export function cliReadRuntime(): CliRuntime | InvalidInteractiveModeError {
   return currentCliRuntime ?? readDefaultCliRuntime()
-}
-
-/** Applies parsed yargs runtime options on top of the current CLI runtime. */
-export function cliApplyRuntimeArgv(argv: CliRuntimeArgv): CliRuntime | CliRuntimeParseError {
-  const current = cliReadRuntime()
-  if (current instanceof Error) return current
-  const interactive = cliReadInteractiveMode(
-    typeof argv.interactive === 'string' ? argv.interactive : undefined,
-  )
-  if (interactive instanceof Error) return interactive
-  const output = cliReadOutputMode(typeof argv.output === 'string' ? argv.output : undefined)
-  if (output instanceof Error) return output
-  return cliSetRuntime({
-    interactive: interactive ?? current.interactive,
-    output: output ?? current.output,
-    debug: typeof argv.debug === 'boolean' ? argv.debug : current.debug,
-    stdinTty: current.stdinTty,
-    stdoutTty: current.stdoutTty,
-  })
 }
 
 /** Returns the active runtime when parsing succeeded, otherwise null. */
@@ -144,14 +99,9 @@ export function cliDescribePromptBlock(): string | null {
   return !runtime.stdinTty || !runtime.stdoutTty ? 'interactive prompts require a TTY' : null
 }
 
-/** Returns whether CLI output should be written as JSON. */
-export function cliIsJsonOutput(): boolean {
-  return readReadyCliRuntime()?.output === 'json'
-}
-
-/** Returns whether CLI output should be written as text. */
+/** Returns whether CLI output should be written as text in the text-only CLI. */
 export function cliIsTextOutput(): boolean {
-  return !cliIsJsonOutput()
+  return true
 }
 
 /** Returns whether debug logging is currently enabled. */

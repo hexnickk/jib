@@ -3,10 +3,9 @@ import { loggingCreateLogger } from '@jib/logging'
 import { LogLevels } from 'consola'
 import {
   InvalidInteractiveModeError,
-  InvalidOutputModeError,
-  cliApplyRuntimeArgv,
   cliCreateMissingInputError,
   cliNormalizeError,
+  cliReadInteractiveMode,
   cliReadRuntime,
   cliSetRuntime,
 } from './index.ts'
@@ -14,33 +13,40 @@ import {
 const envSnapshot = {
   JIB_NON_INTERACTIVE: process.env.JIB_NON_INTERACTIVE,
   JIB_INTERACTIVE: process.env.JIB_INTERACTIVE,
-  JIB_OUTPUT: process.env.JIB_OUTPUT,
   JIB_DEBUG: process.env.JIB_DEBUG,
 }
 
+/** Restores one environment variable to its test-suite starting value. */
+function restoreEnv(name: keyof typeof envSnapshot): void {
+  const value = envSnapshot[name]
+  if (value === undefined) Reflect.deleteProperty(process.env, name)
+  else process.env[name] = value
+}
+
 afterEach(() => {
-  process.env.JIB_NON_INTERACTIVE = envSnapshot.JIB_NON_INTERACTIVE
-  process.env.JIB_INTERACTIVE = envSnapshot.JIB_INTERACTIVE
-  process.env.JIB_OUTPUT = envSnapshot.JIB_OUTPUT
-  process.env.JIB_DEBUG = envSnapshot.JIB_DEBUG
+  restoreEnv('JIB_NON_INTERACTIVE')
+  restoreEnv('JIB_INTERACTIVE')
   cliSetRuntime({
     interactive: 'auto',
-    output: 'text',
     debug: false,
     stdinTty: true,
     stdoutTty: true,
   })
+  restoreEnv('JIB_DEBUG')
 })
 
-describe('cliApplyRuntimeArgv', () => {
-  test('prefers explicit argv over env defaults', () => {
+describe('cli runtime', () => {
+  test('prefers explicit runtime overrides over env defaults', () => {
     process.env.JIB_INTERACTIVE = 'never'
-    process.env.JIB_OUTPUT = 'json'
-    const runtime = cliApplyRuntimeArgv({ interactive: 'always', output: 'text', debug: true })
+    const runtime = cliSetRuntime({
+      interactive: 'always',
+      debug: true,
+      stdinTty: true,
+      stdoutTty: true,
+    })
     expect(runtime).not.toBeInstanceOf(Error)
     if (runtime instanceof Error) throw runtime
     expect(runtime.interactive).toBe('always')
-    expect(runtime.output).toBe('text')
     expect(runtime.debug).toBe(true)
 
     const current = cliReadRuntime()
@@ -49,20 +55,17 @@ describe('cliApplyRuntimeArgv', () => {
     expect(current.debug).toBe(true)
   })
 
-  test('respects env defaults when argv omits runtime flags', () => {
+  test('respects env defaults when overrides omit runtime flags', () => {
     process.env.JIB_NON_INTERACTIVE = '1'
-    process.env.JIB_OUTPUT = 'json'
     const runtime = cliSetRuntime({ stdinTty: true, stdoutTty: true })
     expect(runtime).not.toBeInstanceOf(Error)
     if (runtime instanceof Error) throw runtime
     expect(runtime.interactive).toBe('never')
-    expect(runtime.output).toBe('json')
   })
 
   test('clears debug env cleanly when debug is disabled', () => {
     const enabled = cliSetRuntime({
       interactive: 'auto',
-      output: 'text',
       debug: true,
       stdinTty: true,
       stdoutTty: true,
@@ -72,7 +75,6 @@ describe('cliApplyRuntimeArgv', () => {
 
     const disabled = cliSetRuntime({
       interactive: 'auto',
-      output: 'text',
       debug: false,
       stdinTty: true,
       stdoutTty: true,
@@ -82,13 +84,13 @@ describe('cliApplyRuntimeArgv', () => {
   })
 
   test('returns a typed error for an invalid interactive mode', () => {
-    expect(cliApplyRuntimeArgv({ interactive: 'bad' })).toBeInstanceOf(InvalidInteractiveModeError)
+    expect(cliReadInteractiveMode('bad')).toBeInstanceOf(InvalidInteractiveModeError)
   })
 
-  test('returns a typed error for an invalid output env value', () => {
-    process.env.JIB_OUTPUT = 'yaml'
+  test('returns a typed error for an invalid interactive env value', () => {
+    process.env.JIB_INTERACTIVE = 'bad'
     expect(cliSetRuntime({ stdinTty: true, stdoutTty: true })).toBeInstanceOf(
-      InvalidOutputModeError,
+      InvalidInteractiveModeError,
     )
   })
 })
@@ -97,7 +99,6 @@ describe('loggingCreateLogger', () => {
   test('reflects runtime debug changes', () => {
     cliSetRuntime({
       interactive: 'auto',
-      output: 'text',
       debug: false,
       stdinTty: true,
       stdoutTty: true,
@@ -106,7 +107,6 @@ describe('loggingCreateLogger', () => {
 
     cliSetRuntime({
       interactive: 'auto',
-      output: 'text',
       debug: true,
       stdinTty: true,
       stdoutTty: true,

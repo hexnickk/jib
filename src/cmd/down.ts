@@ -2,7 +2,7 @@ import { cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
 import { deployCreateDeps, deployDownApp } from '@jib/deploy'
 import { consola } from 'consola'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 const cliDownCommand = {
   command: 'down <app>',

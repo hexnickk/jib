@@ -47,49 +47,41 @@ async function runEntry(root: string, entrypoint: string, args: string[]) {
 }
 
 describe('execution contract', () => {
-  test('non-interactive add without app returns structured JSON', async () => {
+  test('non-interactive add without app returns text errors', async () => {
     await withTmpRoot(async (root) => {
-      const result = await runCli(root, ['--interactive=never', '--output=json', 'add'])
+      const result = await runCli(root, ['--interactive=never', 'add'])
       expect(result.exitCode).toBe(1)
       expect(result.stdout).toBe('')
-      const parsed = JSON.parse(result.stderr)
-      expect(parsed.ok).toBe(false)
-      expect(parsed.error.code).toBe('missing_input')
-      expect(parsed.error.issues).toEqual([
-        { field: 'app', message: 'provide <app> or rerun with interactive prompts enabled' },
-      ])
+      expect(result.stderr).toContain('missing required input for jib add')
+      expect(result.stderr).toContain(
+        'app: provide <app> or rerun with interactive prompts enabled',
+      )
+      expect(result.stderr).not.toContain('stack')
     })
   })
 
-  test('help and version honor json output mode', async () => {
+  test('help and version render text', async () => {
     await withTmpRoot(async (root) => {
-      const version = await runCli(root, ['--output=json', '--version'])
+      const version = await runCli(root, ['--version'])
       expect(version.exitCode).toBe(0)
       expect(version.stderr).toBe('')
-      expect(JSON.parse(version.stdout)).toEqual({
-        ok: true,
-        data: { version: '0.1.0' },
-      })
+      expect(version.stdout.trim()).toBe('0.1.0')
 
-      const help = await runCli(root, ['--output=json', '--help'])
+      const help = await runCli(root, ['--help'])
       expect(help.exitCode).toBe(0)
       expect(help.stderr).toBe('')
-      const parsedHelp = JSON.parse(help.stdout)
-      expect(parsedHelp.ok).toBe(true)
-      expect(parsedHelp.data.usage).toContain('jib <command>')
+      expect(help.stdout).toContain('jib <command>')
+      expect(help.stdout).toContain('Commands:')
     })
   })
 
-  test('status returns pure json payload in json mode', async () => {
+  test('root invocation renders help instead of failing', async () => {
     await withTmpRoot(async (root) => {
-      const result = await runCli(root, ['--interactive=never', '--output=json', 'status'])
-      expect(result.exitCode).toBe(0)
-      expect(result.stderr).toBe('')
-      const parsed = JSON.parse(result.stdout)
-      expect(parsed.ok).toBe(true)
-      expect(Array.isArray(parsed.data.services)).toBe(true)
-      expect(Array.isArray(parsed.data.sources)).toBe(true)
-      expect(Array.isArray(parsed.data.apps)).toBe(true)
+      const textHelp = await runCli(root, [])
+      expect(textHelp.exitCode).toBe(0)
+      expect(textHelp.stderr).toBe('')
+      expect(textHelp.stdout).toContain('jib <command>')
+      expect(textHelp.stdout).toContain('Commands:')
     })
   })
 
@@ -112,7 +104,7 @@ describe('execution contract', () => {
     })
   })
 
-  test('status renders apps as labeled text blocks in text mode', async () => {
+  test('status renders apps as labeled text blocks', async () => {
     await withTmpRoot(async (root) => {
       expect(
         await configWrite(join(root, 'config.yml'), {
@@ -139,15 +131,37 @@ describe('execution contract', () => {
     })
   })
 
-  test('invalid root runtime flag is normalized instead of crashing', async () => {
+  test('unknown command prints help and fails', async () => {
     await withTmpRoot(async (root) => {
-      const result = await runCli(root, ['--output=xml', 'status'])
+      const result = await runCli(root, ['wat'])
       expect(result.exitCode).toBe(1)
-      expect(result.stdout).toBe('')
-      expect(result.stderr).toContain('invalid --output value "xml"')
+      expect(result.stdout.trim()).toBe('')
+      expect(result.stderr).toContain('jib <command>')
+      expect(result.stderr).toContain('Unknown argument: wat')
+    })
+  })
+
+  test('invalid root runtime flag prints help instead of crashing', async () => {
+    await withTmpRoot(async (root) => {
+      const result = await runCli(root, ['--interactive=bad', 'status'])
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout.trim()).toBe('')
+      expect(result.stderr).toContain('jib status')
+      expect(result.stderr).toContain('Invalid values')
+      expect(result.stderr).toContain('interactive')
       expect(result.stderr).not.toContain('[error]')
       expect(result.stderr).not.toContain('error:')
       expect(result.stderr).not.toContain('stack')
+    })
+  })
+
+  test('output mode flag is not registered', async () => {
+    await withTmpRoot(async (root) => {
+      const result = await runCli(root, ['--output=json', 'status'])
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout.trim()).toBe('')
+      expect(result.stderr).toContain('jib status')
+      expect(result.stderr).toContain('Unknown argument: output')
     })
   })
 })

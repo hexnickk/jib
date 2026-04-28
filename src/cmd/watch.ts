@@ -2,7 +2,7 @@ import { watcherRunPollCycle, watcherRunPoller } from '@jib-module/watcher'
 import { configLoad } from '@jib/config'
 import { loggingCreateLogger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 const cliWatchCommand = {
   command: 'watch',

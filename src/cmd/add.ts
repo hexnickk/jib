@@ -31,7 +31,7 @@ import {
 import type { AddCommandArgv } from './add-args.ts'
 import { addCommandOptions } from './add-args.ts'
 import { addChooseInitialSource, addCreateInspectionObserver } from './add-support.ts'
-import type { CliCommand } from './command.ts'
+import type { CliCommand } from './types.ts'
 
 const cliAddCommand = {
   command: 'add [app]',

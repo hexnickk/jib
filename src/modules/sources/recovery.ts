@@ -44,7 +44,7 @@ export async function sourcesRunSetup(
   return driver.setup({ config: cfg, logger: loggingCreateLogger('sources'), paths })
 }
 
-/** Collects source status rows for text and JSON status output. */
+/** Collects source status rows for the CLI status view. */
 export async function sourcesCollectStatuses(cfg: Config, paths: Paths): Promise<SourceStatus[]> {
   const results: SourceStatus[] = []
   for (const [name, source] of Object.entries(cfg.sources)) {
