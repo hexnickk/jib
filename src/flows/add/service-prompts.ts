@@ -1,4 +1,3 @@
-import { MissingInputError } from '@jib/cli'
 import type { ParsedDomain } from '@jib/config'
 import type { ComposeService } from '@jib/docker'
 import {
@@ -7,12 +6,13 @@ import {
   tuiPromptConfirmResult,
   tuiPromptLinesResult,
   tuiPromptSelectResult,
+  tuiPromptStringOptionalResult,
   tuiPromptStringResult,
 } from '@jib/tui'
 import { addMergeConfigEntries, addScopeCovers, addScopeLabel } from './config-entries.ts'
 import {
+  addDetectedConfigScopes,
   addParseEnvEntry,
-  addRequiredConfigScopes,
   addShouldDefaultExposeService,
   addSplitCommaValues,
   addSummarizeComposeServices,
@@ -33,13 +33,12 @@ export async function addPromptForServices(
   composeServices: ComposeService[],
   initialEntries: ConfigEntry[],
 ): Promise<
-  | MissingInputError
   | Error
   | { service: string; expose: boolean; domainHosts: string[]; configEntries: ConfigEntry[] }[]
 > {
   const summaries = addSummarizeComposeServices(composeServices)
   const provided = new Map(initialEntries.map((entry) => [entry.key, entry]))
-  const issues: { field: string; message: string }[] = []
+  const skippedConfigKeys = new Set<string>()
   const answers = []
 
   for (const service of summaries) {
@@ -63,41 +62,29 @@ export async function addPromptForServices(
       nextDomainHosts = addSplitCommaValues(hosts)
     }
 
-    const requiredEntries = [...addRequiredConfigScopes(service)].filter(([key, requiredScope]) => {
+    const detectedEntries = [...addDetectedConfigScopes(service)].filter(([key, scope]) => {
+      if (skippedConfigKeys.has(key)) return false
       const existing = provided.get(key)
-      return !(existing && addScopeCovers(existing.scope, requiredScope))
+      return !(existing && addScopeCovers(existing.scope, scope))
     })
 
     const configEntries: ConfigEntry[] = []
-    if (!tuiIsInteractive()) {
-      for (const [key, requiredScope] of requiredEntries) {
-        issues.push({
-          field: `env.${key}`,
-          message: `${service.name} requires ${key} for ${addScopeLabel(requiredScope)}; rerun with --env ${key}=VALUE, --build-arg ${key}=VALUE, or --build-env ${key}=VALUE`,
-        })
-      }
-    } else if (requiredEntries.length > 0) {
-      const useRecommended = await confirmRecommendedScopes(service.name, requiredEntries)
+    if (tuiIsInteractive() && detectedEntries.length > 0) {
+      const useRecommended = await confirmRecommendedScopes(service.name, detectedEntries)
       if (useRecommended instanceof Error) return useRecommended
-      for (const [key, requiredScope] of requiredEntries) {
+      for (const [key, detectedScope] of detectedEntries) {
         const existing = provided.get(key)
         const scope = useRecommended
-          ? requiredScope
-          : await promptRequiredScope(service.name, key, requiredScope)
+          ? detectedScope
+          : await promptDetectedScope(service.name, key, detectedScope)
         if (scope instanceof Error) return scope
-        const entry = {
-          key,
-          value: existing?.value ?? '',
-          scope,
-        } satisfies ConfigEntry
-        if (!existing?.value) {
-          const value = await tuiPromptStringResult({
-            message: `Value for ${key}`,
-            placeholder: scope === 'build' ? 'https://example.com' : 'secret-or-value',
-          })
-          if (value instanceof Error) return value
-          entry.value = value
+        const value = existing?.value ?? (await promptOptionalConfigValue(key, scope))
+        if (value instanceof Error) return value
+        if (!existing && value.length === 0) {
+          skippedConfigKeys.add(key)
+          continue
         }
+        const entry = { key, value, scope } satisfies ConfigEntry
         configEntries.push(entry)
         provided.set(key, mergeEntry(existing, entry))
       }
@@ -133,9 +120,6 @@ export async function addPromptForServices(
     answers.push({ service: service.name, expose, domainHosts: nextDomainHosts, configEntries })
   }
 
-  if (issues.length > 0) {
-    return new MissingInputError('missing required input for jib add', issues)
-  }
   return answers
 }
 
@@ -180,7 +164,14 @@ function scopeOptions(recommended: ConfigScope) {
   )
 }
 
-async function promptRequiredScope(
+async function promptOptionalConfigValue(key: string, scope: ConfigScope): Promise<string | Error> {
+  return await tuiPromptStringOptionalResult({
+    message: `Value for ${key} (optional, leave blank to skip)`,
+    placeholder: scope === 'build' ? 'https://example.com' : 'secret-or-value',
+  })
+}
+
+async function promptDetectedScope(
   service: string,
   key: string,
   recommended: ConfigScope,

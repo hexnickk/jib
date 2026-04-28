@@ -83,8 +83,8 @@ export function addAssignCliDomainsToServices(
   return { domains: nextDomains, issues }
 }
 
-/** Infers the required config scopes for one summarized compose service. */
-export function addRequiredConfigScopes(service: AddServiceSummary): Map<string, ConfigScope> {
+/** Infers the config scopes referenced by one summarized compose service. */
+export function addDetectedConfigScopes(service: AddServiceSummary): Map<string, ConfigScope> {
   const out = new Map<string, ConfigScope>()
   for (const key of service.envRefs ?? []) out.set(key, addInferScope(true, out.has(key)))
   for (const key of service.buildArgRefs ?? []) {

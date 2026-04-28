@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
   addAssignCliDomainsToServices,
+  addDetectedConfigScopes,
   addMergeGuidedServiceAnswers,
   addParseEnvEntry,
   addRenderPlanSummary,
-  addRequiredConfigScopes,
   addShouldDefaultExposeService,
   addSplitCommaValues,
   addSummarizeComposeServices,
@@ -98,9 +98,9 @@ describe('guided add helpers', () => {
     ])
   })
 
-  test('requiredConfigScopes merges runtime and build references for the same key', () => {
+  test('detectedConfigScopes merges runtime and build references for the same key', () => {
     expect(
-      addRequiredConfigScopes({
+      addDetectedConfigScopes({
         name: 'web',
         publishesPorts: true,
         envRefs: ['PUBLIC_URL', 'DATABASE_URL'],

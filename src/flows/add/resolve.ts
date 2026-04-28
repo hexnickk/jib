@@ -6,7 +6,7 @@ import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
 import { addParseApp } from './app.ts'
 import { GENERATED_COMPOSE_FILE, addPersistGeneratedCompose } from './compose-scaffold.ts'
-import { addConfigEntriesToBuildArgs } from './config-entries.ts'
+import { addConfigEntriesToBuildArgs, addMergeConfigEntries } from './config-entries.ts'
 import { addCollectDomains } from './domains.ts'
 import { addMergeGuidedServiceAnswers } from './guided.ts'
 import { addPromptForServices } from './service-prompts.ts'
@@ -24,7 +24,9 @@ export async function addCollectGuidedInputs(
   if (answers instanceof Error) return answers
   const guided = addMergeGuidedServiceAnswers(domains, serviceNames, answers, inputs.ingressDefault)
   if (guided instanceof Error) return guided
-  return guided
+  const configEntries = addMergeConfigEntries([...inputs.configEntries, ...guided.configEntries])
+  if (configEntries instanceof Error) return configEntries
+  return { domains: guided.domains, configEntries }
 }
 
 /** Builds the fully resolved app config once compose inspection and prompts are done. */
