@@ -18,6 +18,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 Environment=JIB_ROOT=${vars.jibRoot}
+UMask=0002
 ExecStart=${vars.binPath} watch
 Restart=on-failure
 RestartSec=5

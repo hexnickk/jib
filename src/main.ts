@@ -46,6 +46,7 @@ const cliCommands: CliCommand[] = [
   ...cloudflaredCommands,
 ]
 
+const SHARED_FILE_UMASK = 0o002
 const ESC = String.fromCharCode(27)
 const ANSI_ESCAPE_RE = new RegExp(`${ESC}(?:[@-Z\\-_]|\\[[0-?]*[ -/]*[@-~])`, 'g')
 
@@ -91,6 +92,11 @@ function createCliRuntimeOptions(runtime: CliRuntime) {
       global: true,
     },
   }
+}
+
+/** Keeps root-run git/docker side effects writable by the shared jib group. */
+function configureSharedFileUmask(): void {
+  process.umask(SHARED_FILE_UMASK)
 }
 
 /** Reads a yargs-validated prompt mode without preempting yargs choice errors. */
@@ -158,6 +164,8 @@ function createCliParser(
   for (const command of cliCommands) registerCliCommand(parser, command, onResult)
   return parser
 }
+
+configureSharedFileUmask()
 
 const runtime = cliReadRuntime()
 if (runtime instanceof Error) exitCliError(runtime)

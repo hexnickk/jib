@@ -16,6 +16,8 @@ export class ValidateSudoersError extends MigrationError {}
 
 export class AddUserToGroupError extends MigrationError {}
 
+export class RepairPermissionsError extends MigrationError {}
+
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }

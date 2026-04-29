@@ -1,5 +1,12 @@
+import { RepairPermissionsError } from './errors.ts'
 import { GROUP, migrationEnsureGroupResult, migrationEnsureUserInGroupResult } from './helpers.ts'
 import type { JibMigration } from './types.ts'
+
+interface PermissionRepairResult {
+  exitCode: number
+  stdout: { toString(): string }
+  stderr: { toString(): string }
+}
 
 export const m0003_ensure_group: JibMigration = {
   id: '0003_ensure_group',
@@ -8,9 +15,20 @@ export const m0003_ensure_group: JibMigration = {
     const groupError = await migrationEnsureGroupResult(GROUP)
     if (groupError) throw groupError
 
-    await Bun.$`chown -R root:${GROUP} ${ctx.paths.root}`.quiet().nothrow()
-    await Bun.$`chmod -R g+rwXs ${ctx.paths.root}`.quiet().nothrow()
-    await Bun.$`chmod 640 ${ctx.paths.configFile}`.quiet().nothrow()
+    runPermissionRepair('own managed tree', ['chown', '-R', `root:${GROUP}`, ctx.paths.root])
+    runPermissionRepair('allow shared group access', ['chmod', '-R', 'g+rwX', ctx.paths.root])
+    runPermissionRepair('keep managed directories setgid', [
+      'find',
+      ctx.paths.root,
+      '-type',
+      'd',
+      '-exec',
+      'chmod',
+      'g+s',
+      '{}',
+      '+',
+    ])
+    runPermissionRepair('restrict config file', ['chmod', '640', ctx.paths.configFile])
 
     const sudoUser = process.env.SUDO_USER
     if (sudoUser && sudoUser !== 'root') {
@@ -18,4 +36,19 @@ export const m0003_ensure_group: JibMigration = {
       if (userError) throw userError
     }
   },
+}
+
+/** Runs one migration permission repair command and throws a typed error on failure. */
+function runPermissionRepair(label: string, args: readonly string[]): void {
+  const result = Bun.spawnSync([...args], { stdout: 'pipe', stderr: 'pipe' })
+  if (result.exitCode === 0) return
+  throw new RepairPermissionsError(`${label}: ${migrationCommandDetail(result)}`)
+}
+
+function migrationCommandDetail(result: PermissionRepairResult): string {
+  return (
+    result.stderr.toString().trim() ||
+    result.stdout.toString().trim() ||
+    `command exited with code ${result.exitCode}`
+  )
 }
