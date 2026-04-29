@@ -1,7 +1,13 @@
 import { chown, rename, unlink, writeFile } from 'node:fs/promises'
-import { ValidateSudoersError, WriteSudoersError, errorMessage } from './errors.ts'
+import {
+  AddUserToGroupError,
+  ValidateSudoersError,
+  WriteSudoersError,
+  errorMessage,
+} from './errors.ts'
 
 export const GROUP = 'jib'
+export const DOCKER_GROUP = 'docker'
 export const SUDOERS_PATH = '/etc/sudoers.d/jib'
 
 export const MINIMAL_CONFIG = `config_version: 3
@@ -21,6 +27,16 @@ interface SudoersDeps {
   rename?: (from: string, to: string) => Promise<void>
   unlink?: (path: string) => Promise<void>
   writeFile?: (path: string, content: string, options?: { mode?: number }) => Promise<void>
+}
+
+interface MigrationCommandResult {
+  exitCode: number
+  stdout: { toString(): string }
+  stderr: { toString(): string }
+}
+
+interface UserGroupDeps {
+  run?: (args: readonly string[]) => Promise<MigrationCommandResult> | MigrationCommandResult
 }
 
 export function buildSudoersContent(): string {
@@ -95,4 +111,72 @@ export async function writeValidatedSudoers(
 ): Promise<void> {
   const result = await writeValidatedSudoersResult(path, content, deps)
   if (result instanceof Error) throw result
+}
+
+/**
+ * Ensures a system group exists. Input is the target group name; side effects
+ * are `getent` and possibly `groupadd` unless a test runner is injected.
+ * Returns a typed migration error instead of throwing on host command failures.
+ */
+export async function migrationEnsureGroupResult(
+  group: string,
+  deps: UserGroupDeps = {},
+): Promise<AddUserToGroupError | undefined> {
+  const run = deps.run ?? migrationRunCommand
+  const groupResult = await run(['getent', 'group', group])
+  if (groupResult.exitCode === 0) return
+
+  const createResult = await run(['groupadd', '--system', group])
+  if (createResult.exitCode !== 0) {
+    return new AddUserToGroupError(
+      `failed to create group "${group}": ${migrationCommandDetail(createResult)}`,
+    )
+  }
+}
+
+/**
+ * Ensures a user is listed as a member of a system group. Inputs are a login
+ * name and group name; side effects are group creation, `id`, and possibly
+ * `usermod` unless a test runner is injected. Returns a typed migration error.
+ */
+export async function migrationEnsureUserInGroupResult(
+  user: string,
+  group: string,
+  deps: UserGroupDeps = {},
+): Promise<AddUserToGroupError | undefined> {
+  const run = deps.run ?? migrationRunCommand
+  const groupError = await migrationEnsureGroupResult(group, deps)
+  if (groupError) return groupError
+
+  const currentGroups = await run(['id', '-nG', user])
+  if (currentGroups.exitCode !== 0) {
+    return new AddUserToGroupError(
+      `failed to read groups for user "${user}": ${migrationCommandDetail(currentGroups)}`,
+    )
+  }
+  if (currentGroups.stdout.toString().trim().split(/\s+/).includes(group)) return
+
+  const addResult = await run(['usermod', '-aG', group, user])
+  if (addResult.exitCode !== 0) {
+    return new AddUserToGroupError(
+      `failed to add user "${user}" to group "${group}": ${migrationCommandDetail(addResult)}`,
+    )
+  }
+}
+
+function migrationRunCommand(args: readonly string[]): MigrationCommandResult {
+  const result = Bun.spawnSync([...args], { stderr: 'pipe', stdout: 'pipe' })
+  return {
+    exitCode: result.exitCode,
+    stdout: { toString: () => result.stdout.toString() },
+    stderr: { toString: () => result.stderr.toString() },
+  }
+}
+
+function migrationCommandDetail(result: MigrationCommandResult): string {
+  return (
+    result.stderr.toString().trim() ||
+    result.stdout.toString().trim() ||
+    `command exited with code ${result.exitCode}`
+  )
 }

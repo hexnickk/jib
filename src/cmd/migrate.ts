@@ -25,9 +25,11 @@ const cliMigrateCommand = {
           ? `applied ${result.appliedMigrations.length} migration(s)`
           : 'nothing to do',
       )
-      if (result.sessionReloadRecommended) {
+      if (result.sessionReloadGroups.length > 0) {
+        const label = result.sessionReloadGroups.length === 1 ? 'group' : 'groups'
+        const groups = result.sessionReloadGroups.map((group) => `\`${group}\``).join(', ')
         tuiNote(
-          'You were added to the `jib` group. Reload group membership with `newgrp jib`, or start a new login session; until then, keep using `sudo`.',
+          `You were added to new ${label}: ${groups}. Start a new login session so the memberships are active; until then, keep using \`sudo\`.`,
           'Next steps',
         )
       }

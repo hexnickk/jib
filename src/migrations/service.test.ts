@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathsGetPaths } from '@jib/paths'
-import { hasBootstrapState, userInGroup } from './service.ts'
+import { hasBootstrapState, migrationMissingUserGroups, userInGroup } from './service.ts'
 
 describe('hasBootstrapState', () => {
   test('returns false when config exists without migration state', async () => {
@@ -28,6 +28,24 @@ describe('hasBootstrapState', () => {
     } finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('migrationMissingUserGroups', () => {
+  test('returns groups that need a new login session after migration', () => {
+    expect(
+      migrationMissingUserGroups('demo', ['jib', 'docker'], {
+        run: (args) => ({
+          exitCode: 0,
+          stdout: { toString: () => (args.includes('demo') ? 'wheel jib\n' : '') },
+        }),
+      }),
+    ).toEqual(['docker'])
+  })
+
+  test('skips root and missing sudo users', () => {
+    expect(migrationMissingUserGroups(undefined, ['jib', 'docker'])).toEqual([])
+    expect(migrationMissingUserGroups('root', ['jib', 'docker'])).toEqual([])
   })
 })
 

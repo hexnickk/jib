@@ -5,9 +5,10 @@ import type { Paths } from '@jib/paths'
 import { stateOpenDb } from '@jib/state'
 import type { JibDb } from '@jib/state'
 import { type RunMigrationError, RunPendingMigrationsError, errorMessage } from './errors.ts'
+import { DOCKER_GROUP, GROUP } from './helpers.ts'
 import { migrations, runJibMigrationsResult } from './index.ts'
 
-const GROUP = 'jib'
+const SESSION_RELOAD_GROUPS = [GROUP, DOCKER_GROUP]
 
 interface GroupCheckDeps {
   run?: (args: string[]) => { exitCode: number; stdout: { toString(): string } }
@@ -15,7 +16,7 @@ interface GroupCheckDeps {
 
 export interface MigrationRunResult {
   appliedMigrations: string[]
-  sessionReloadRecommended: boolean
+  sessionReloadGroups: string[]
 }
 
 export function hasBootstrapState(paths: Paths): boolean {
@@ -33,11 +34,24 @@ export function userInGroup(
   return result.stdout.toString().trim().split(/\s+/).includes(group)
 }
 
+/**
+ * Returns the groups that the sudo-invoking user still lacks. Undefined/root
+ * users do not need session refresh guidance because root already has access.
+ */
+export function migrationMissingUserGroups(
+  user: string | undefined,
+  groups: string[] = SESSION_RELOAD_GROUPS,
+  deps: GroupCheckDeps = {},
+): string[] {
+  if (!user || user === 'root') return []
+  return groups.filter((group) => !userInGroup(user, group, deps))
+}
+
 export async function runPendingMigrationsResult(
   paths: Paths,
 ): Promise<MigrationRunResult | RunMigrationError | RunPendingMigrationsError> {
   const sudoUser = process.env.SUDO_USER
-  const hadJibGroup = sudoUser ? userInGroup(sudoUser) : false
+  const missingGroupsBefore = migrationMissingUserGroups(sudoUser)
 
   try {
     await mkdir(paths.root, { recursive: true, mode: 0o750 })
@@ -64,11 +78,11 @@ export async function runPendingMigrationsResult(
   const appliedMigrations = await runJibMigrationsResult({ db, paths }, migrations)
   if (appliedMigrations instanceof Error) return appliedMigrations
 
-  const hasJibGroup = sudoUser ? userInGroup(sudoUser) : false
-  return {
-    appliedMigrations,
-    sessionReloadRecommended: Boolean(sudoUser && !hadJibGroup && hasJibGroup),
-  }
+  const missingGroupsAfter = migrationMissingUserGroups(sudoUser)
+  const sessionReloadGroups = missingGroupsBefore.filter(
+    (group) => !missingGroupsAfter.includes(group),
+  )
+  return { appliedMigrations, sessionReloadGroups }
 }
 
 export async function runPendingMigrations(paths: Paths): Promise<MigrationRunResult> {
