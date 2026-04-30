@@ -3,11 +3,10 @@ import {
   type CliRuntime,
   type InteractiveMode,
   cliInteractiveModes,
-  cliNormalizeError,
   cliReadRuntime,
   cliSetRuntime,
 } from '@jib/cli'
-import type { ArgumentsCamelCase, Argv } from 'yargs'
+import type { Argv, CommandModule } from 'yargs'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import pkg from '../package.json' with { type: 'json' }
@@ -16,6 +15,7 @@ import cloudflaredCommands from './cmd/cloudflared.ts'
 import deployCommand from './cmd/deploy.ts'
 import downCommand from './cmd/down.ts'
 import execCommand from './cmd/exec.ts'
+import { cmdExitError } from './cmd/handler.ts'
 import initCommand from './cmd/init.ts'
 import migrateCommand from './cmd/migrate.ts'
 import removeCommand from './cmd/remove.ts'
@@ -24,11 +24,11 @@ import runCommand from './cmd/run.ts'
 import secretsCommands from './cmd/secrets.ts'
 import sourcesCommands from './cmd/sources.ts'
 import statusCommand from './cmd/status.ts'
-import type { CliCommand, CliGlobalArgv } from './cmd/types.ts'
 import upCommand from './cmd/up.ts'
 import watchCommand from './cmd/watch.ts'
 
-const cliCommands: CliCommand[] = [
+// Commands have different argv shapes; `never` keeps this registry on yargs types without a custom command union.
+const cliCommands: CommandModule<Record<string, unknown>, never>[] = [
   migrateCommand,
   initCommand,
   addCommand,
@@ -47,34 +47,6 @@ const cliCommands: CliCommand[] = [
 ]
 
 const SHARED_FILE_UMASK = 0o002
-const ESC = String.fromCharCode(27)
-const ANSI_ESCAPE_RE = new RegExp(`${ESC}(?:[@-Z\\-_]|\\[[0-?]*[ -/]*[@-~])`, 'g')
-
-/** Removes ANSI escape sequences before writing to a non-TTY stream. */
-function stripAnsiText(value: string): string {
-  return value.replaceAll(ANSI_ESCAPE_RE, '')
-}
-
-/** Writes a single line of text, stripping color when the stream is not a TTY. */
-function writeCliText(stream: NodeJS.WriteStream, value: string): void {
-  const text = stream.isTTY ? value : stripAnsiText(value)
-  stream.write(text.endsWith('\n') ? text : `${text}\n`)
-}
-
-/** Renders a normalized CLI error in text mode. */
-function writeCliTextError(error: ReturnType<typeof cliNormalizeError>): void {
-  writeCliText(process.stderr, error.message)
-  for (const issue of error.issues ?? [])
-    writeCliText(process.stderr, `${issue.field}: ${issue.message}`)
-  if (error.hint) writeCliText(process.stderr, error.hint)
-}
-
-/** Renders a CLI error and exits with the normalized exit code. */
-function exitCliError(error: unknown): never {
-  const normalized = cliNormalizeError(error)
-  writeCliTextError(normalized)
-  process.exit(normalized.exitCode)
-}
 
 /** Builds the shared yargs option map for global CLI runtime flags. */
 function createCliRuntimeOptions(runtime: CliRuntime) {
@@ -106,34 +78,8 @@ function readParsedInteractiveMode(value: unknown): InteractiveMode | undefined 
     : undefined
 }
 
-/** Registers one command and records its return value for top-level error handling. */
-function registerCliCommand<TArgs extends {}>(
-  parser: Argv<CliGlobalArgv>,
-  command: CliCommand<TArgs>,
-  onResult: (value: unknown) => void,
-): Argv<CliGlobalArgv> {
-  const handleCommand = async (argv: ArgumentsCamelCase<CliGlobalArgv & TArgs>) => {
-    onResult(await command.run(argv))
-  }
-  if (!command.builder || typeof command.builder === 'function') {
-    return parser.command<CliGlobalArgv & TArgs>(
-      command.command,
-      command.describe,
-      command.builder ?? ((builder) => builder),
-      handleCommand,
-    )
-  }
-  return parser.command(command.command, command.describe, command.builder, async (argv) => {
-    await handleCommand(argv as ArgumentsCamelCase<CliGlobalArgv & TArgs>)
-  })
-}
-
 /** Builds the root yargs parser with global runtime options and command registration. */
-function createCliParser(
-  rawArgs: string[],
-  runtime: CliRuntime,
-  onResult: (value: unknown) => void,
-): Argv<CliGlobalArgv> {
+function createCliParser(rawArgs: string[], runtime: CliRuntime): Argv {
   const parser = yargs(rawArgs)
     .scriptName('jib')
     .usage('$0 <command>')
@@ -149,7 +95,7 @@ function createCliParser(
         stdinTty: runtime.stdinTty,
         stdoutTty: runtime.stdoutTty,
       })
-      if (nextRuntime instanceof Error) exitCliError(nextRuntime)
+      if (nextRuntime instanceof Error) cmdExitError(nextRuntime)
     }, true)
     .help()
     .version(pkg.version)
@@ -161,25 +107,20 @@ function createCliParser(
       parser.showHelp('log')
     },
   )
-  for (const command of cliCommands) registerCliCommand(parser, command, onResult)
+  for (const command of cliCommands) parser.command(command)
   return parser
 }
 
 configureSharedFileUmask()
 
 const runtime = cliReadRuntime()
-if (runtime instanceof Error) exitCliError(runtime)
+if (runtime instanceof Error) cmdExitError(runtime)
 
 const rawArgs = hideBin(process.argv)
-let cliResult: unknown = undefined
 
 try {
-  const cliParser = createCliParser(rawArgs, runtime, (value) => {
-    cliResult = value
-  })
+  const cliParser = createCliParser(rawArgs, runtime)
   await cliParser.parseAsync()
 } catch (error) {
-  exitCliError(error)
+  cmdExitError(error)
 }
-
-if (cliResult instanceof Error) exitCliError(cliResult)

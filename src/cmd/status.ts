@@ -8,7 +8,8 @@ import {
   stateCollectServices,
   stateCollectSources,
 } from '@jib/state'
-import type { CliCommand } from './types.ts'
+import type { CommandModule } from 'yargs'
+import { cmdCreateHandler } from './handler.ts'
 
 /** Renders a human-readable relative time for the status screen. */
 function timeAgo(iso: string): string {
@@ -83,27 +84,30 @@ function printApps(apps: AppStatus[]): void {
 const cliStatusCommand = {
   command: 'status',
   describe: 'Show server status: services, sources, apps',
-  async run() {
-    const loaded = await configLoadContext()
-    if (loaded instanceof Error) return loaded
-    const { cfg, paths } = loaded
-    const hasCloudflared = cfg.modules?.cloudflared === true
-    const [services, sources, apps] = await Promise.all([
-      stateCollectServices(hasCloudflared),
-      stateCollectSources(cfg, paths),
-      stateCollectApps(cfg, paths),
-    ])
-    if (apps instanceof Error) return apps
+  handler: cmdCreateHandler(statusRunCommand),
+} satisfies CommandModule
 
-    if (cliIsTextOutput()) {
-      printServices(services)
-      printSources(sources)
-      printApps(apps)
-      return
-    }
+/** Collects status data and writes the text status view when text output is enabled. */
+async function statusRunCommand() {
+  const loaded = await configLoadContext()
+  if (loaded instanceof Error) return loaded
+  const { cfg, paths } = loaded
+  const hasCloudflared = cfg.modules?.cloudflared === true
+  const [services, sources, apps] = await Promise.all([
+    stateCollectServices(hasCloudflared),
+    stateCollectSources(cfg, paths),
+    stateCollectApps(cfg, paths),
+  ])
+  if (apps instanceof Error) return apps
 
-    return { services, sources, apps }
-  },
-} satisfies CliCommand
+  if (cliIsTextOutput()) {
+    printServices(services)
+    printSources(sources)
+    printApps(apps)
+    return
+  }
+
+  return { services, sources, apps }
+}
 
 export default cliStatusCommand

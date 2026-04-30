@@ -1,5 +1,6 @@
 import { dockerHandleShell, dockerParseExecArgs } from '@jib/docker'
-import type { CliCommand } from './types.ts'
+import type { CommandModule } from 'yargs'
+import { cmdCreateHandler } from './handler.ts'
 
 /** Reads the raw exec argv tail so docker shell parsing can preserve passthrough syntax. */
 function readExecTail(): string[] {
@@ -22,11 +23,14 @@ const cliExecCommand = {
         array: true,
         describe: 'Command to execute after --',
       }),
-  async run() {
-    const parsed = dockerParseExecArgs(readExecTail())
-    if (parsed instanceof Error) return parsed
-    return await dockerHandleShell(parsed, 'exec')
-  },
-} satisfies CliCommand
+  handler: cmdCreateHandler(execRunCommand),
+} satisfies CommandModule
+
+/** Runs docker exec passthrough parsing and returns a shell result or typed error. */
+async function execRunCommand() {
+  const parsed = dockerParseExecArgs(readExecTail())
+  if (parsed instanceof Error) return parsed
+  return await dockerHandleShell(parsed, 'exec')
+}
 
 export default cliExecCommand

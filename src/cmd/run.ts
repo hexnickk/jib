@@ -1,5 +1,6 @@
 import { dockerHandleShell, dockerParseRunArgs } from '@jib/docker'
-import type { CliCommand } from './types.ts'
+import type { CommandModule } from 'yargs'
+import { cmdCreateHandler } from './handler.ts'
 
 /** Reads the raw run argv tail so docker shell parsing can preserve passthrough syntax. */
 function readRunTail(): string[] {
@@ -22,11 +23,14 @@ const cliRunCommand = {
         array: true,
         describe: 'Command to run after --',
       }),
-  async run() {
-    const parsed = dockerParseRunArgs(readRunTail())
-    if (parsed instanceof Error) return parsed
-    return await dockerHandleShell(parsed, 'run')
-  },
-} satisfies CliCommand
+  handler: cmdCreateHandler(runRunCommand),
+} satisfies CommandModule
+
+/** Runs docker run passthrough parsing and returns a shell result or typed error. */
+async function runRunCommand() {
+  const parsed = dockerParseRunArgs(readRunTail())
+  if (parsed instanceof Error) return parsed
+  return await dockerHandleShell(parsed, 'run')
+}
 
 export default cliRunCommand

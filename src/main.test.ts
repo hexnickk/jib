@@ -72,6 +72,7 @@ describe('execution contract', () => {
       expect(help.stderr).toBe('')
       expect(help.stdout).toContain('jib <command>')
       expect(help.stdout).toContain('Commands:')
+      expect(help.stdout).not.toContain('jib watch')
     })
   })
 
@@ -82,6 +83,7 @@ describe('execution contract', () => {
       expect(textHelp.stderr).toBe('')
       expect(textHelp.stdout).toContain('jib <command>')
       expect(textHelp.stdout).toContain('Commands:')
+      expect(textHelp.stdout).not.toContain('jib watch')
     })
   })
 

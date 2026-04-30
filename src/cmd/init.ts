@@ -17,8 +17,9 @@ import {
 import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
 import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
+import type { ArgumentsCamelCase, CommandModule } from 'yargs'
 import { hasBootstrapState } from '../migrations/service.ts'
-import type { CliCommand } from './types.ts'
+import { cmdCreateHandler } from './handler.ts'
 
 /** Returns a typed error until the machine has completed the bootstrap migration. */
 function initCheckMigration(rootReady: boolean): CliError | undefined {
@@ -37,101 +38,98 @@ const cliInitCommand = {
       description: 'Print pending optional module setup without making changes',
     },
   },
-  async run(args) {
-    const linuxError = cliCheckLinuxHost('init')
-    if (linuxError) return linuxError
-    if (!args.check) {
-      const rootError = cliCheckRootHost('init')
-      if (rootError) return rootError
-    }
+  handler: cmdCreateHandler(initRunCommand),
+} satisfies CommandModule<Record<string, unknown>, { check?: boolean }>
 
-    const paths = pathsGetPaths()
-    const migrationError = initCheckMigration(hasBootstrapState(paths))
-    if (migrationError) return migrationError
-    if (cliIsTextOutput()) tuiIntro('jib init')
+/** Runs optional module setup and returns a setup summary or typed error. */
+async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
+  const linuxError = cliCheckLinuxHost('init')
+  if (linuxError) return linuxError
+  if (!args.check) {
+    const rootError = cliCheckRootHost('init')
+    if (rootError) return rootError
+  }
 
-    if (args.check) {
-      let config = await configLoad(paths.configFile)
-      if (config instanceof Error) return config
-      const reconciled = await initReconcileOptionalModules(config, paths, {
-        writeConfig: async () => undefined,
-      })
-      if (reconciled instanceof Error) return reconciled
-      config = reconciled
-      const pending = initPendingOptionalModuleNames(config)
-      if (cliIsTextOutput()) {
-        if (pending.length === 0) {
-          tuiNote('No optional modules are waiting for setup.', 'Optional modules')
-          tuiOutro('nothing to do')
-        } else {
-          tuiNote(`Pending optional modules: ${pending.join(', ')}`, 'Optional modules')
-          tuiOutro('run `sudo jib init` to configure them')
-        }
-      }
-      return {
-        enabledOptionalModules: initInstalledOptionalModules(config).map(
-          (mod) => mod.manifest.name,
-        ),
-        optionalModulesPending: pending,
-      }
-    }
+  const paths = pathsGetPaths()
+  const migrationError = initCheckMigration(hasBootstrapState(paths))
+  if (migrationError) return migrationError
+  if (cliIsTextOutput()) tuiIntro('jib init')
 
+  if (args.check) {
     let config = await configLoad(paths.configFile)
     if (config instanceof Error) return config
-    const reconciled = await initReconcileOptionalModules(config, paths)
+    const reconciled = await initReconcileOptionalModules(config, paths, {
+      writeConfig: async () => undefined,
+    })
     if (reconciled instanceof Error) return reconciled
     config = reconciled
-    const unseen = initUnseenOptionalModules(config)
-
-    if (unseen.length === 0) {
-      if (cliIsTextOutput()) {
+    const pending = initPendingOptionalModuleNames(config)
+    if (cliIsTextOutput()) {
+      if (pending.length === 0) {
         tuiNote('No optional modules are waiting for setup.', 'Optional modules')
         tuiOutro('nothing to do')
-      }
-      return {
-        enabledOptionalModules: initInstalledOptionalModules(config).map(
-          (mod) => mod.manifest.name,
-        ),
-        optionalModulesPending: [],
+      } else {
+        tuiNote(`Pending optional modules: ${pending.join(', ')}`, 'Optional modules')
+        tuiOutro('run `sudo jib init` to configure them')
       }
     }
-
-    if (cliIsTextOutput()) {
-      tuiNote(
-        `Choose which optional pieces you want Jib to manage now.\n${initDescribeModules(unseen).join('\n')}`,
-        'Optional modules',
-      )
-    }
-
-    if (!cliCanPrompt()) {
-      return cliCreateMissingInputError(
-        'missing optional module choices for jib init',
-        unseen.map((mod) => ({
-          field: `modules.${mod.manifest.name}`,
-          message:
-            'set this module to true or false in config, or rerun with interactive prompts enabled',
-        })),
-      )
-    }
-
-    const configureError = await initConfigureOptionalModules(config, paths, unseen)
-    if (configureError instanceof Error) return configureError
-    const finalConfig = await configLoad(paths.configFile)
-    if (finalConfig instanceof Error) return finalConfig
-    if (cliIsTextOutput()) {
-      tuiOutro('modules configured')
-      tuiNote('Next: run `jib status` to confirm services are healthy.', 'Next steps')
-    }
-
     return {
-      enabledOptionalModules: initInstalledOptionalModules(finalConfig).map(
-        (mod) => mod.manifest.name,
-      ),
-      optionalModulesPending: initUnseenOptionalModules(finalConfig).map(
-        (mod) => mod.manifest.name,
-      ),
+      enabledOptionalModules: initInstalledOptionalModules(config).map((mod) => mod.manifest.name),
+      optionalModulesPending: pending,
     }
-  },
-} satisfies CliCommand
+  }
+
+  let config = await configLoad(paths.configFile)
+  if (config instanceof Error) return config
+  const reconciled = await initReconcileOptionalModules(config, paths)
+  if (reconciled instanceof Error) return reconciled
+  config = reconciled
+  const unseen = initUnseenOptionalModules(config)
+
+  if (unseen.length === 0) {
+    if (cliIsTextOutput()) {
+      tuiNote('No optional modules are waiting for setup.', 'Optional modules')
+      tuiOutro('nothing to do')
+    }
+    return {
+      enabledOptionalModules: initInstalledOptionalModules(config).map((mod) => mod.manifest.name),
+      optionalModulesPending: [],
+    }
+  }
+
+  if (cliIsTextOutput()) {
+    tuiNote(
+      `Choose which optional pieces you want Jib to manage now.\n${initDescribeModules(unseen).join('\n')}`,
+      'Optional modules',
+    )
+  }
+
+  if (!cliCanPrompt()) {
+    return cliCreateMissingInputError(
+      'missing optional module choices for jib init',
+      unseen.map((mod) => ({
+        field: `modules.${mod.manifest.name}`,
+        message:
+          'set this module to true or false in config, or rerun with interactive prompts enabled',
+      })),
+    )
+  }
+
+  const configureError = await initConfigureOptionalModules(config, paths, unseen)
+  if (configureError instanceof Error) return configureError
+  const finalConfig = await configLoad(paths.configFile)
+  if (finalConfig instanceof Error) return finalConfig
+  if (cliIsTextOutput()) {
+    tuiOutro('modules configured')
+    tuiNote('Next: run `jib status` to confirm services are healthy.', 'Next steps')
+  }
+
+  return {
+    enabledOptionalModules: initInstalledOptionalModules(finalConfig).map(
+      (mod) => mod.manifest.name,
+    ),
+    optionalModulesPending: initUnseenOptionalModules(finalConfig).map((mod) => mod.manifest.name),
+  }
+}
 
 export default cliInitCommand
