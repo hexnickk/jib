@@ -1,66 +1,35 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { cliSetRuntime } from '@jib/cli'
+import { describe, expect, test } from 'bun:test'
+import type { CliRuntime } from '@jib/cli'
 import { ValidationError } from '@jib/errors'
 import { TuiNotInteractiveError } from './errors.ts'
 import { tuiAssertInteractiveResult, tuiIsInteractive } from './interactive.ts'
 
-const stdin = process.stdin as { isTTY: boolean | undefined }
-const stdout = process.stdout as { isTTY: boolean | undefined }
-
-function setTestRuntime() {
-  const runtime = cliSetRuntime({
-    ...(stdin.isTTY !== undefined ? { stdinTty: stdin.isTTY } : {}),
-    ...(stdout.isTTY !== undefined ? { stdoutTty: stdout.isTTY } : {}),
-  })
-  if (runtime instanceof Error) throw runtime
+/** Builds an explicit CLI runtime so TUI tests do not mutate process globals. */
+function runtime(overrides: Partial<CliRuntime> = {}): CliRuntime {
+  return {
+    interactive: 'auto',
+    debug: false,
+    stdinTty: true,
+    stdoutTty: true,
+    ...overrides,
+  }
 }
 
 describe('isInteractive', () => {
-  const envPrev = process.env.JIB_NON_INTERACTIVE
-  const stdinPrev = stdin.isTTY
-  const stdoutPrev = stdout.isTTY
-
-  beforeEach(() => {
-    Reflect.deleteProperty(process.env, 'JIB_NON_INTERACTIVE')
-  })
-
-  afterEach(() => {
-    if (envPrev === undefined) Reflect.deleteProperty(process.env, 'JIB_NON_INTERACTIVE')
-    else process.env.JIB_NON_INTERACTIVE = envPrev
-    stdin.isTTY = stdinPrev
-    stdout.isTTY = stdoutPrev
-    setTestRuntime()
-  })
-
-  test('false when JIB_NON_INTERACTIVE set', () => {
-    process.env.JIB_NON_INTERACTIVE = '1'
-    stdin.isTTY = true
-    stdout.isTTY = true
-    setTestRuntime()
-    expect(tuiIsInteractive()).toBe(false)
+  test('false when runtime disables prompts', () => {
+    expect(tuiIsInteractive(runtime({ interactive: 'never' }))).toBe(false)
   })
 
   test('false when stdin not a TTY', () => {
-    stdin.isTTY = false
-    stdout.isTTY = true
-    setTestRuntime()
-    expect(tuiIsInteractive()).toBe(false)
+    expect(tuiIsInteractive(runtime({ stdinTty: false }))).toBe(false)
   })
 
-  test('true when both TTYs and env unset', () => {
-    stdin.isTTY = true
-    stdout.isTTY = true
-    setTestRuntime()
-    expect(tuiIsInteractive()).toBe(true)
+  test('true when both TTYs and prompts allowed', () => {
+    expect(tuiIsInteractive(runtime())).toBe(true)
   })
 
   test('assertInteractiveResult returns a typed error in non-interactive mode', () => {
-    process.env.JIB_NON_INTERACTIVE = '1'
-    stdin.isTTY = true
-    stdout.isTTY = true
-    setTestRuntime()
-
-    const error = tuiAssertInteractiveResult()
+    const error = tuiAssertInteractiveResult(runtime({ interactive: 'never' }))
 
     expect(error).toBeInstanceOf(TuiNotInteractiveError)
     expect(error).toBeInstanceOf(ValidationError)

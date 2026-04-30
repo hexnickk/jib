@@ -81,22 +81,30 @@ function readReadyCliRuntime(): CliRuntime | null {
   return runtime instanceof Error ? null : runtime
 }
 
+/** Returns whether a resolved runtime allows prompts on its configured stdio streams. */
+export function cliRuntimeCanPrompt(runtime: CliRuntime): boolean {
+  if (runtime.interactive === 'never') return false
+  return runtime.stdinTty && runtime.stdoutTty
+}
+
+/** Explains why a resolved runtime blocks prompts, or returns null when prompting is allowed. */
+export function cliRuntimeDescribePromptBlock(runtime: CliRuntime): string | null {
+  if (runtime.interactive === 'never') {
+    return 'interactive prompts are disabled by --interactive=never'
+  }
+  return !runtime.stdinTty || !runtime.stdoutTty ? 'interactive prompts require a TTY' : null
+}
+
 /** Returns whether prompting is currently allowed. */
 export function cliCanPrompt(): boolean {
   const runtime = readReadyCliRuntime()
-  if (!runtime) return false
-  if (runtime.interactive === 'never') return false
-  return runtime.stdinTty && runtime.stdoutTty
+  return runtime ? cliRuntimeCanPrompt(runtime) : false
 }
 
 /** Explains why prompting is blocked, or returns null when prompting is allowed. */
 export function cliDescribePromptBlock(): string | null {
   const runtime = cliReadRuntime()
-  if (runtime instanceof Error) return runtime.message
-  if (runtime.interactive === 'never') {
-    return 'interactive prompts are disabled by --interactive=never'
-  }
-  return !runtime.stdinTty || !runtime.stdoutTty ? 'interactive prompts require a TTY' : null
+  return runtime instanceof Error ? runtime.message : cliRuntimeDescribePromptBlock(runtime)
 }
 
 /** Returns whether CLI output should be written as text in the text-only CLI. */

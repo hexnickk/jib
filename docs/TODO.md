@@ -2,7 +2,13 @@
 
 - [ ] add SKILLS.md
 - [ ] `jib watch` should be removed from a list of commands
-- [ ] jib remove didn't work
+- [ ] `jib logs` doesn't exists
+- [ ] move away from bun
+
+# 29 April
+
+- [x] looks like user aren't added to a docker group during installation
+- [x] jib remove didn't work
   ```
   hexnickk@hexrunner:~$ jib remove chaindynamicsltd-landing
   │
@@ -49,12 +55,6 @@
   rm: cannot remove '/opt/jib/repos/github/chaindynamicsltd/landing/.gitignore': Permission denied
   ...
   ```
-- [ ] `jib logs` doesn't exists
-- [ ] move away from bun
-
-# 29 April
-
-- [x] looks like user aren't added to a docker group during installation
 
 # 28 April
 
