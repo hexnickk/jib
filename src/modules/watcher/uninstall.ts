@@ -9,17 +9,29 @@ interface WatcherContext {
   paths: Paths
 }
 
-/** Stops the unit, deletes it, and reloads systemd, returning a typed error on failure. */
+interface WatcherUninstallDeps {
+  unitPath?: string
+  serviceName?: string
+}
+
+/**
+ * Stops the watcher unit, deletes it, and reloads systemd.
+ * Inputs are the runtime context plus optional path/name overrides for isolated tests.
+ * Output is undefined on success or a typed remove error; side effects run systemctl and remove the unit file.
+ */
 export async function watcherUninstallResult(
   ctx: WatcherContext,
+  deps: WatcherUninstallDeps = {},
 ): Promise<WatcherUninstallRemoveUnitError | undefined> {
-  ctx.logger.info(`systemctl disable --now ${SERVICE_NAME}`)
-  await Bun.$`sudo systemctl disable --now ${SERVICE_NAME}`.nothrow().quiet()
-  ctx.logger.info(`removing ${UNIT_PATH}`)
+  const unitPath = deps.unitPath ?? UNIT_PATH
+  const serviceName = deps.serviceName ?? SERVICE_NAME
+  ctx.logger.info(`systemctl disable --now ${serviceName}`)
+  await Bun.$`sudo systemctl disable --now ${serviceName}`.nothrow().quiet()
+  ctx.logger.info(`removing ${unitPath}`)
   try {
-    await rm(UNIT_PATH, { force: true })
+    await rm(unitPath, { force: true })
   } catch (error) {
-    return new WatcherUninstallRemoveUnitError(UNIT_PATH, error)
+    return new WatcherUninstallRemoveUnitError(unitPath, error)
   }
   await Bun.$`sudo systemctl daemon-reload`.nothrow().quiet()
 }
