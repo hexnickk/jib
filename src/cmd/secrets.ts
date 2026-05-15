@@ -22,21 +22,29 @@ async function loadSecretsContext() {
 
 const cliSecretsCommands = [
   {
-    command: 'secrets set <app> <pair>',
-    describe: 'Set a secret (KEY=VALUE)',
-    handler: cmdCreateHandler(secretsSetRunCommand),
-  } satisfies CommandModule<Record<string, unknown>, { app: string; pair: string }>,
-  {
-    command: 'secrets list [app]',
-    describe: 'Show secrets for an app (or all apps)',
-    handler: cmdCreateHandler(secretsListRunCommand),
-  } satisfies CommandModule<Record<string, unknown>, { app?: string }>,
-  {
-    command: 'secrets delete <app> <key>',
-    describe: 'Remove a secret key',
-    handler: cmdCreateHandler(secretsDeleteRunCommand),
-  } satisfies CommandModule<Record<string, unknown>, { app: string; key: string }>,
-] satisfies CommandModule<Record<string, unknown>, never>[]
+    command: 'secrets',
+    describe: 'Manage app secrets',
+    builder: (parser) =>
+      parser
+        .command({
+          command: 'set <app> <pair>',
+          describe: 'Set a secret (KEY=VALUE)',
+          handler: cmdCreateHandler(secretsSetRunCommand),
+        } satisfies CommandModule<Record<string, unknown>, { app: string; pair: string }>)
+        .command({
+          command: 'list [app]',
+          describe: 'Show secrets for an app (or all apps)',
+          handler: cmdCreateHandler(secretsListRunCommand),
+        } satisfies CommandModule<Record<string, unknown>, { app?: string }>)
+        .command({
+          command: 'delete <app> <key>',
+          describe: 'Remove a secret key',
+          handler: cmdCreateHandler(secretsDeleteRunCommand),
+        } satisfies CommandModule<Record<string, unknown>, { app: string; key: string }>)
+        .demandCommand(1),
+    handler: () => undefined,
+  },
+] satisfies CommandModule<Record<string, unknown>, unknown>[]
 
 /** Sets a secret key-value pair and returns the mutation payload or typed error. */
 async function secretsSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: string }>) {

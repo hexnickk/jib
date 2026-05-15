@@ -27,8 +27,8 @@ import statusCommand from './cmd/status.ts'
 import upCommand from './cmd/up.ts'
 import watchCommand from './cmd/watch.ts'
 
-// Commands have different argv shapes; `never` keeps this registry on yargs types without a custom command union.
-const cliCommands: CommandModule<Record<string, unknown>, never>[] = [
+// Commands have different argv shapes; erase per-command argv types at the root registry boundary.
+const cliCommands = [
   migrateCommand,
   initCommand,
   addCommand,
@@ -107,7 +107,7 @@ function createCliParser(rawArgs: string[], runtime: CliRuntime): Argv {
       parser.showHelp('log')
     },
   )
-  for (const command of cliCommands) parser.command(command)
+  for (const command of cliCommands) parser.command(command as CommandModule)
   return parser
 }
 

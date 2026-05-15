@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { configWrite } from '@jib/config'
@@ -103,6 +103,36 @@ describe('execution contract', () => {
       expect(missingCommand.exitCode).toBe(1)
       expect(missingCommand.stderr).toContain('command required after app')
       expect(missingCommand.stderr).not.toContain('app "demo" not found in config')
+    })
+  })
+
+  test('secrets subcommands dispatch by action name', async () => {
+    await withTmpRoot(async (root) => {
+      expect(
+        await configWrite(join(root, 'config.yml'), {
+          config_version: 3,
+          poll_interval: '5m',
+          modules: {},
+          sources: {},
+          apps: {
+            demo: {
+              repo: 'acme/demo',
+              branch: 'main',
+              env_file: '.env',
+              domains: [],
+            },
+          },
+        } satisfies Config),
+      ).toBeUndefined()
+
+      const setResult = await runCli(root, ['secrets', 'set', 'demo', 'TOKEN=secret'])
+      expect(setResult.exitCode).toBe(0)
+      expect(setResult.stderr).toBe('')
+      expect(await readFile(join(root, 'secrets', 'demo', '.env'), 'utf8')).toBe('TOKEN=secret\n')
+
+      const listResult = await runCli(root, ['secrets', 'list', 'demo'])
+      expect(listResult.exitCode).toBe(0)
+      expect(listResult.stderr).toBe('')
     })
   })
 
