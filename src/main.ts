@@ -25,6 +25,7 @@ import secretsCommands from './cmd/secrets.ts'
 import sourcesCommands from './cmd/sources.ts'
 import statusCommand from './cmd/status.ts'
 import upCommand from './cmd/up.ts'
+import updateCommand from './cmd/update.ts'
 import watchCommand from './cmd/watch.ts'
 
 // Commands have different argv shapes; erase per-command argv types at the root registry boundary.
@@ -40,6 +41,7 @@ const cliCommands = [
   execCommand,
   runCommand,
   statusCommand,
+  updateCommand,
   watchCommand,
   ...sourcesCommands,
   ...secretsCommands,
