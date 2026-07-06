@@ -1,50 +1,56 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 import { writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathsGetPaths } from '@jib/paths'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-const originalDollar = Bun.$
-
-type ShellLike = Promise<{ exitCode: number; stdout: Buffer; stderr: Buffer }> & {
-  quiet(): ShellLike
+type ShellLike = Promise<{ exitCode: number; stdout: string; stderr: string }> & {
   nothrow(): ShellLike
+  quiet(): ShellLike
 }
 
-function fakeShell(result = { exitCode: 0, stdout: Buffer.from(''), stderr: Buffer.from('') }) {
+type FakeDollar = (parts: TemplateStringsArray, ...values: unknown[]) => ShellLike
+
+function fakeShell(result = { exitCode: 0, stdout: '', stderr: '' }) {
   const promise = Promise.resolve(result) as ShellLike
-  promise.quiet = () => promise
   promise.nothrow = () => promise
+  promise.quiet = () => promise
   return promise
 }
 
+/** Installs a zx `$` mock before dynamically importing the module under test. */
+function mockZxDollar(fakeDollar: FakeDollar): void {
+  vi.doMock('zx', () => ({ $: fakeDollar }))
+}
+
 beforeEach(() => {
-  mock.restore()
+  vi.doUnmock('zx')
+  vi.resetModules()
+  vi.restoreAllMocks()
 })
 
 afterEach(() => {
-  mock.restore()
-  ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = originalDollar
+  vi.doUnmock('zx')
+  vi.resetModules()
+  vi.restoreAllMocks()
 })
 
 describe('github keygen helpers', () => {
   test('generateDeployKey shells out and returns the public key text', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-keygen-'))
     const paths = pathsGetPaths(root)
-    ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = ((
-      parts: TemplateStringsArray,
-      ...values: string[]
-    ) => {
+    mockZxDollar((parts, ...values) => {
       const command = parts.join(' ')
       if (!command.includes('ssh-keygen -t ed25519 -f')) return fakeShell()
       const privateKey = values[0]
-      if (!privateKey) throw new Error('private key path missing in test shell stub')
+      if (typeof privateKey !== 'string')
+        throw new Error('private key path missing in test shell stub')
       const publicKey = `${privateKey}.pub`
       writeFileSync(privateKey, 'PRIVATE KEY\n')
       writeFileSync(publicKey, 'ssh-ed25519 AAAA test\n')
       return fakeShell()
-    }) as unknown as typeof Bun.$
+    })
 
     const { githubGenerateDeployKey } = await import('./keygen.ts')
     const pubKey = await githubGenerateDeployKey('demo', paths)
@@ -54,12 +60,9 @@ describe('github keygen helpers', () => {
   })
 
   test('keyFingerprint trims the ssh-keygen output', async () => {
-    ;(Bun as typeof Bun & { $: typeof Bun.$ }).$ = (() =>
-      fakeShell({
-        exitCode: 0,
-        stdout: Buffer.from('256 SHA256:abc demo (ED25519)\n'),
-        stderr: Buffer.from(''),
-      })) as unknown as typeof Bun.$
+    mockZxDollar(() =>
+      fakeShell({ exitCode: 0, stdout: '256 SHA256:abc demo (ED25519)\n', stderr: '' }),
+    )
     const { githubReadKeyFingerprint } = await import('./keygen.ts')
 
     expect(await githubReadKeyFingerprint('/tmp/demo.pub')).toBe('256 SHA256:abc demo (ED25519)')

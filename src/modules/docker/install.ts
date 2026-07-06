@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { $ } from '@/libs/shell'
 import {
   DockerInstallCommandError,
   DockerInstallReadFileError,
@@ -183,14 +184,14 @@ async function dockerCommandSucceeds(
   }
 }
 
-/** Executes a command through the injected runner or Bun.spawnSync. */
+/** Executes a command through the injected runner or zx sync. */
 function dockerRun(
   deps: DockerInstallDeps,
   args: readonly string[],
 ): Promise<DockerInstallCommandResult> | DockerInstallCommandResult {
   if (deps.run) return deps.run(args)
-  const result = Bun.spawnSync([...args], { stderr: 'pipe', stdout: 'pipe' })
-  return { exitCode: result.exitCode, stderr: result.stderr, stdout: result.stdout }
+  const result = $.sync`${args}`
+  return { exitCode: result.exitCode ?? 0, stderr: result.stderr, stdout: result.stdout }
 }
 
 function dockerCommandDetail(result: DockerInstallCommandResult): string {

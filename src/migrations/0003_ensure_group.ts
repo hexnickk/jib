@@ -1,9 +1,10 @@
+import { $ } from '@/libs/shell'
 import { RepairPermissionsError } from './errors.ts'
 import { GROUP, migrationEnsureGroupResult, migrationEnsureUserInGroupResult } from './helpers.ts'
 import type { JibMigration } from './types.ts'
 
 interface PermissionRepairResult {
-  exitCode: number
+  exitCode: number | null
   stdout: { toString(): string }
   stderr: { toString(): string }
 }
@@ -40,8 +41,8 @@ export const m0003_ensure_group: JibMigration = {
 
 /** Runs one migration permission repair command and throws a typed error on failure. */
 function runPermissionRepair(label: string, args: readonly string[]): void {
-  const result = Bun.spawnSync([...args], { stdout: 'pipe', stderr: 'pipe' })
-  if (result.exitCode === 0) return
+  const result = $.sync`${args}`
+  if ((result.exitCode ?? 0) === 0) return
   throw new RepairPermissionsError(`${label}: ${migrationCommandDetail(result)}`)
 }
 

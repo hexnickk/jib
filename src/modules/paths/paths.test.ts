@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { EnsureCredsDirError, PathLookupError } from './errors.ts'
 import {
   pathsCredsPath,
@@ -31,10 +31,11 @@ describe('pathsGetPaths', () => {
   const prev = process.env.JIB_ROOT
 
   beforeEach(() => {
-    process.env.JIB_ROOT = undefined
+    Reflect.deleteProperty(process.env, 'JIB_ROOT')
   })
   afterEach(() => {
-    process.env.JIB_ROOT = prev
+    if (prev === undefined) Reflect.deleteProperty(process.env, 'JIB_ROOT')
+    else process.env.JIB_ROOT = prev
   })
 
   test('default root is /opt/jib', () => {

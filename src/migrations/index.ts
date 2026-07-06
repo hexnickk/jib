@@ -1,4 +1,4 @@
-import { jibMigrations } from '@jib/state'
+import { stateListMigrations, stateRecordMigration } from '@jib/state'
 import { RunMigrationError, errorMessage } from './errors.ts'
 import type { JibMigration, MigrationContext } from './types.ts'
 
@@ -11,13 +11,7 @@ export async function runJibMigrationsResult(
   ctx: MigrationContext,
   list: JibMigration[],
 ): Promise<string[] | RunMigrationError> {
-  const existing = new Set(
-    ctx.db
-      .select({ id: jibMigrations.id })
-      .from(jibMigrations)
-      .all()
-      .map((r) => r.id),
-  )
+  const existing = new Set(stateListMigrations(ctx.db).map((row) => row.id))
 
   const applied: string[] = []
   for (const m of list) {
@@ -32,7 +26,7 @@ export async function runJibMigrationsResult(
     }
 
     try {
-      ctx.db.insert(jibMigrations).values({ id: m.id }).run()
+      stateRecordMigration(ctx.db, m.id)
     } catch (error) {
       return new RunMigrationError(`failed to record migration ${m.id}: ${errorMessage(error)}`, {
         cause: error instanceof Error ? error : undefined,

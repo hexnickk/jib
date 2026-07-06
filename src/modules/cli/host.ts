@@ -1,4 +1,4 @@
-import { readlinkSync } from 'node:fs'
+import { $ } from '@/libs/shell'
 import { CliError } from './errors.ts'
 import { cliCanPrompt } from './runtime.ts'
 
@@ -27,24 +27,17 @@ export function cliCheckRootHost(commandName: string): CliError | undefined {
     )
   }
 
-  let bin: string
-  try {
-    bin = readlinkSync('/proc/self/exe')
-  } catch (error) {
-    return new CliError('root_reexec_failed', 'failed to locate the current jib binary', {
-      cause: error,
-    })
+  const entrypoint = process.argv[1]
+  if (!entrypoint) {
+    return new CliError('root_reexec_failed', 'failed to locate the current jib entrypoint')
   }
 
-  try {
-    const result = Bun.spawnSync(['sudo', bin, ...process.argv.slice(2)], {
-      stdio: ['inherit', 'inherit', 'inherit'],
-    })
-    process.exit(result.exitCode)
-  } catch (error) {
-    return new CliError('root_reexec_failed', 'failed to re-run jib with sudo', {
-      cause: error,
-      hint: 'rerun with sudo manually and inspect the local sudo configuration',
-    })
-  }
+  const result = $.sync({ stdio: 'inherit', nothrow: true })`${[
+    'sudo',
+    process.execPath,
+    ...process.execArgv,
+    entrypoint,
+    ...process.argv.slice(2),
+  ]}`
+  process.exit(result.exitCode ?? 0)
 }

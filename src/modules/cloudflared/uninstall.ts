@@ -1,5 +1,6 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import { $ } from '@/libs/shell'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import {
@@ -23,7 +24,7 @@ interface CloudflaredUninstallDeps {
 }
 
 interface CloudflaredCommandResultLike {
-  exitCode: number
+  exitCode: number | null
   stderr: { toString(): string }
   stdout: { toString(): string }
 }
@@ -43,10 +44,8 @@ export async function cloudflaredUninstallResult(
   const dir = ctx.paths.cloudflaredDir
   const serviceName = deps.serviceName ?? CLOUDFLARED_SERVICE_NAME
   const unitPath = deps.unitPath ?? CLOUDFLARED_UNIT_PATH
-  const disableNow =
-    deps.disableNow ?? (() => Bun.$`sudo systemctl disable --now ${serviceName}`.nothrow().quiet())
-  const daemonReload =
-    deps.daemonReload ?? (() => Bun.$`sudo systemctl daemon-reload`.nothrow().quiet())
+  const disableNow = deps.disableNow ?? (() => $`sudo systemctl disable --now ${serviceName}`)
+  const daemonReload = deps.daemonReload ?? (() => $`sudo systemctl daemon-reload`)
   let disableError: CloudflaredUninstallDisableError | undefined
 
   log.info(`systemctl disable --now ${serviceName}`)
@@ -89,11 +88,12 @@ export async function cloudflaredUninstallResult(
 
 function cloudflaredCommandFailure(result: unknown): string | undefined {
   if (!isCloudflaredCommandResult(result)) return undefined
-  if (result.exitCode === 0) return undefined
+  const exitCode = result.exitCode ?? 0
+  if (exitCode === 0) return undefined
   return (
     result.stderr.toString().trim() ||
     result.stdout.toString().trim() ||
-    `command exited with code ${result.exitCode}`
+    `command exited with code ${exitCode}`
   )
 }
 

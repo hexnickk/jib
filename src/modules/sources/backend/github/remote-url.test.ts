@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { githubRemoteHttpsCloneUrl, githubRemoteSshCloneUrl } from './remote-url.ts'
 
 describe('githubRemoteSshCloneUrl', () => {

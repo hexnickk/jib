@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test'
 import type { tuiPromptSelectResult } from '@jib/tui'
+import { describe, expect, test } from 'vitest'
 import { addGatherInputs } from './inputs.ts'
 
 describe('addGatherInputs', () => {

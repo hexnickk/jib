@@ -1,9 +1,8 @@
 # Binaries
 /dist/
 
-# Bun / Node
+# Node
 node_modules/
-.bun/
 
 # IDE
 .idea/

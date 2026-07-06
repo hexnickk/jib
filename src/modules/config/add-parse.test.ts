@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { configParseDomain, configParseHealth } from './add-parse.ts'
 import { ParseDomainArgError, ParseHealthArgError } from './errors.ts'
 

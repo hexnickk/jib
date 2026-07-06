@@ -1,4 +1,3 @@
-import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -7,6 +6,7 @@ import type { DockerExec, ExecResult } from '@jib/docker'
 import { loggingCreateLogger } from '@jib/logging'
 import { pathsGetPaths, pathsRepoPath } from '@jib/paths'
 import { stateCreateStore, stateLoad } from '@jib/state'
+import { describe, expect, test } from 'vitest'
 import { DeployDiskSpaceError, DeployMissingAppError } from './errors.ts'
 import { deployApp, deployUpApp } from './service.ts'
 

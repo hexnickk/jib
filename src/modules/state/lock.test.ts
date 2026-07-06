@@ -1,7 +1,7 @@
-import { describe, expect, test } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { describe, expect, test } from 'vitest'
 import { LockError } from './errors.ts'
 import { stateAcquireLock } from './lock.ts'
 
@@ -70,7 +70,7 @@ describe('stateAcquireLock result errors', () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-lock-'))
     const blockedDir = join(root, 'blocked')
     try {
-      await Bun.write(blockedDir, 'not a directory')
+      await writeFile(blockedDir, 'not a directory')
       const result = await stateAcquireLock(blockedDir, 'app1')
       expect(result).toBeInstanceOf(LockError)
     } finally {

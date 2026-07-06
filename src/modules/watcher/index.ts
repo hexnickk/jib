@@ -11,6 +11,8 @@ export {
   WatcherInstallWriteUnitError,
   WatcherProbeAppError,
   WatcherSyncAppError,
+  WatcherUninstallDisableError,
+  WatcherUninstallReloadError,
   WatcherUninstallRemoveUnitError,
 } from './errors.ts'
 export { watcherInstallResult } from './install.ts'

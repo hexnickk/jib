@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { CliError } from '@jib/cli'
 import type { Config } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
+import { afterEach, describe, expect, test } from 'vitest'
 import { addChooseInitialSource } from './add-support.ts'
 
 const cfg = {

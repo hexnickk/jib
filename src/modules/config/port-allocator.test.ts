@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from 'bun:test'
 import net from 'node:net'
+import { afterEach, describe, expect, test } from 'vitest'
 import { PortExhaustedError } from './errors.ts'
 import { type PortAllocatorConfig, configAllocatePort } from './port-allocator.ts'
 

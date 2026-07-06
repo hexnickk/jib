@@ -8,7 +8,7 @@ export interface ComposeConfig {
   files: string[]
   envFile?: string
   override?: string
-  /** Injected exec, defaults to Bun.$ — tests pass a stub. */
+  /** Injected exec, defaults to zx-backed docker execution — tests pass a stub. */
   exec?: DockerExec
 }
 

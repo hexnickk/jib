@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, test } from 'bun:test'
 import { cliSetRuntime } from '@jib/cli'
 import type { ComposeService } from '@jib/docker'
+import { afterEach, describe, expect, test } from 'vitest'
 import { addCollectGuidedInputs } from './resolve.ts'
 import type { AddInputs, ConfigEntry } from './types.ts'
 

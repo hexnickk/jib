@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { IngressMissingPortError } from './errors.ts'
 import { ingressBuildClaim, ingressClaim } from './service.ts'
 

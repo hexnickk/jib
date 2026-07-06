@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test'
 import { CliError, cliNormalizeError } from '@jib/cli'
+import { describe, expect, test } from 'vitest'
 import { PrepareRepoError } from './flow-errors.ts'
 import { addNormalizeError } from './index.ts'
 import { addNormalizeDeployError } from './runtime.ts'

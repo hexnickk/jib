@@ -1,8 +1,8 @@
-import { describe, expect, test } from 'bun:test'
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathsGetPaths } from '@jib/paths'
+import { describe, expect, test } from 'vitest'
 import {
   CloudflaredSaveTunnelTokenError,
   cloudflaredEnableService,
@@ -58,7 +58,7 @@ describe('cloudflared service helpers', () => {
   test('cloudflaredSaveTunnelToken returns a typed filesystem error', async () => {
     await withTmpPaths(async (root) => {
       const paths = pathsGetPaths(root)
-      await Bun.write(join(root, 'secrets'), 'not-a-directory')
+      await writeFile(join(root, 'secrets'), 'not-a-directory')
 
       const result = await cloudflaredSaveTunnelToken(paths, 'eyJhIjoiNzQ')
 

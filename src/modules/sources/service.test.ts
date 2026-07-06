@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { pathsGetPaths, pathsPathExistsResult, pathsRepoPath } from '@jib/paths'
-import { $ } from 'bun'
+import { afterEach, describe, expect, test } from 'vitest'
+import { $ } from 'zx'
 import {
   SourceDriverNotRegisteredError,
   SourceLocalCheckoutError,

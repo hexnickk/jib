@@ -1,7 +1,7 @@
-import { describe, expect, test } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { describe, expect, test } from 'vitest'
 import { StateError } from './errors.ts'
 import { stateEmpty } from './schema.ts'
 import { stateCreateStore, stateLoad, stateRecordFailure, stateRemove, stateSave } from './store.ts'
@@ -66,7 +66,7 @@ describe('state store', () => {
 
   test('load rejects corrupt JSON', async () => {
     await withStore(async (s, dir) => {
-      await Bun.write(join(dir, 'web.json'), '{not json')
+      await writeFile(join(dir, 'web.json'), '{not json')
       expect(await stateLoad(s, 'web')).toBeInstanceOf(StateError)
     })
   })
@@ -76,7 +76,7 @@ describe('loadState', () => {
   test('returns typed error for corrupt JSON', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'jib-state-'))
     try {
-      await Bun.write(join(dir, 'web.json'), '{not json')
+      await writeFile(join(dir, 'web.json'), '{not json')
       const state = await stateLoad(stateCreateStore(dir), 'web')
       expect(state).toBeInstanceOf(StateError)
     } finally {
@@ -88,7 +88,7 @@ describe('loadState', () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-state-'))
     const blockedDir = join(root, 'blocked')
     try {
-      await Bun.write(blockedDir, 'not a directory')
+      await writeFile(blockedDir, 'not a directory')
       const error = await stateSave(stateCreateStore(blockedDir), 'web', stateEmpty('web'))
       expect(error).toBeInstanceOf(StateError)
     } finally {

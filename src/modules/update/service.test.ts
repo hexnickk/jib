@@ -1,46 +1,22 @@
-import { describe, expect, test } from 'bun:test'
-import { basename } from 'node:path'
+import { describe, expect, test } from 'vitest'
 import { UpdateError, updateRunResult } from './index.ts'
 
-function responseJson(value: unknown, status = 200): Response {
-  return new Response(JSON.stringify(value), { status })
-}
-
-function responseBytes(value: string, status = 200): Response {
-  return new Response(new TextEncoder().encode(value), { status })
-}
-
 describe('updateRunResult', () => {
-  test('downloads and installs the latest GitHub release to the default prefix', async () => {
-    const urls: string[] = []
+  test('updates from npm and runs Linux maintenance', async () => {
     const commands: Array<{ command: string[]; sudo?: boolean }> = []
 
     const result = await updateRunResult({
       platform: 'linux',
-      arch: 'x64',
-      fetch: async (url) => {
-        urls.push(String(url))
-        return urls.length === 1 ? responseJson({ tag_name: 'v1.2.3' }) : responseBytes('binary')
-      },
       runCommand: async (command, options) => {
         commands.push({ command, ...(options?.sudo !== undefined ? { sudo: options.sudo } : {}) })
         return 0
       },
     })
 
-    const downloadedPath = commands[0]?.command[3]
     expect(result).toBeUndefined()
-    expect(urls).toEqual([
-      'https://api.github.com/repos/hexnickk/jib/releases/latest',
-      'https://github.com/hexnickk/jib/releases/download/v1.2.3/jib-bun-linux-x64',
-    ])
-    expect(basename(downloadedPath ?? '')).toBe('jib-bun-linux-x64')
     expect(commands).toEqual([
-      {
-        command: ['install', '-m', '0755', downloadedPath ?? '', '/usr/local/bin/jib'],
-        sudo: true,
-      },
-      { command: ['/usr/local/bin/jib', 'migrate'], sudo: true },
+      { command: ['npm', 'install', '-g', 'deployjib'] },
+      { command: ['jib', 'migrate'], sudo: true },
       {
         command: [
           'sh',
@@ -49,37 +25,24 @@ describe('updateRunResult', () => {
         ],
       },
       { command: ['systemctl', 'restart', 'jib-watcher.service'], sudo: true },
-      { command: ['/usr/local/bin/jib', 'init', '--check', '--interactive=never'], sudo: true },
+      { command: ['jib', 'init', '--check', '--interactive=never'], sudo: true },
     ])
   })
 
-  test('uses the darwin arm64 release asset on supported mac hosts', async () => {
-    const urls: string[] = []
+  test('uses the provided npm package spec and skips Linux maintenance on macOS', async () => {
     const commands: string[][] = []
 
     const result = await updateRunResult({
       platform: 'darwin',
-      arch: 'arm64',
-      fetch: async (url) => {
-        urls.push(String(url))
-        return urls.length === 1 ? responseJson({ tag_name: 'v2.0.0' }) : responseBytes('binary')
-      },
+      packageSpec: 'deployjib@2.0.0',
       runCommand: async (command) => {
         commands.push(command)
         return 0
       },
     })
 
-    const downloadedPath = commands[0]?.[3]
     expect(result).toBeUndefined()
-    expect(urls).toEqual([
-      'https://api.github.com/repos/hexnickk/jib/releases/latest',
-      'https://github.com/hexnickk/jib/releases/download/v2.0.0/jib-bun-darwin-arm64',
-    ])
-    expect(basename(downloadedPath ?? '')).toBe('jib-bun-darwin-arm64')
-    expect(commands).toEqual([
-      ['install', '-m', '0755', downloadedPath ?? '', '/usr/local/bin/jib'],
-    ])
+    expect(commands).toEqual([['npm', 'install', '-g', 'deployjib@2.0.0']])
   })
 
   test('skips watcher restart when the service is not active', async () => {
@@ -87,11 +50,6 @@ describe('updateRunResult', () => {
 
     const result = await updateRunResult({
       platform: 'linux',
-      arch: 'arm64',
-      fetch: async (url) =>
-        String(url).includes('/releases/latest')
-          ? responseJson({ tag_name: 'v1.2.3' })
-          : responseBytes('binary'),
       runCommand: async (command) => {
         commands.push(command)
         return command[0] === 'sh' ? 1 : 0
@@ -102,17 +60,13 @@ describe('updateRunResult', () => {
     expect(commands).not.toContainEqual(['systemctl', 'restart', 'jib-watcher.service'])
   })
 
-  test('returns a typed error when a release download fails', async () => {
+  test('returns a typed error when npm install fails', async () => {
     const result = await updateRunResult({
       platform: 'linux',
-      arch: 'x64',
-      fetch: async (url) =>
-        String(url).includes('/releases/latest')
-          ? responseJson({ tag_name: 'v1.2.3' })
-          : responseBytes('missing', 404),
+      runCommand: async (command) => (command[0] === 'npm' ? 1 : 0),
     })
 
     expect(result).toBeInstanceOf(UpdateError)
-    expect(result?.message).toContain('download failed: HTTP 404')
+    expect(result?.message).toContain('npm install exited with status 1')
   })
 })

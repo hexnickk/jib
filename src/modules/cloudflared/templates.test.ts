@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import {
   CLOUDFLARED_SERVICE_NAME,
   CLOUDFLARED_UNIT_PATH,

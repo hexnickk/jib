@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'bun:test'
 import { CloudflaredSaveTunnelTokenError } from '@jib-module/cloudflared'
 import { pathsGetPaths } from '@jib/paths'
+import { describe, expect, test } from 'vitest'
 import {
   CloudflaredSetupPromptError,
   CloudflaredSetupSaveTokenError,

@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Logger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import {
   CloudflaredInstallReloadError,
   CloudflaredInstallWriteUnitError,
@@ -75,11 +75,11 @@ describe('cloudflared install/uninstall', () => {
 
     try {
       await mkdir(paths.cloudflaredDir, { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(paths.cloudflaredDir, 'docker-compose.yml'),
         'services:\n  cloudflared:\n',
       )
-      await Bun.write(unitPath, 'unit')
+      await writeFile(unitPath, 'unit')
 
       const result = await cloudflaredUninstallResult(
         { logger, paths },
@@ -161,11 +161,11 @@ describe('cloudflared install/uninstall', () => {
 
     try {
       await mkdir(paths.cloudflaredDir, { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(paths.cloudflaredDir, 'docker-compose.yml'),
         'services:\n  cloudflared:\n',
       )
-      await Bun.write(unitPath, 'unit')
+      await writeFile(unitPath, 'unit')
 
       const result = await cloudflaredUninstallResult(
         { logger, paths },
@@ -204,11 +204,11 @@ describe('cloudflared install/uninstall', () => {
 
     try {
       await mkdir(paths.cloudflaredDir, { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(paths.cloudflaredDir, 'docker-compose.yml'),
         'services:\n  cloudflared:\n',
       )
-      await Bun.write(unitPath, 'unit')
+      await writeFile(unitPath, 'unit')
 
       const result = await cloudflaredUninstallResult(
         { logger, paths },
@@ -246,7 +246,7 @@ describe('cloudflared install/uninstall', () => {
 
     try {
       await mkdir(paths.cloudflaredDir, { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(paths.cloudflaredDir, 'docker-compose.yml'),
         'services:\n  cloudflared:\n',
       )

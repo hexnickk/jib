@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, test } from 'bun:test'
 import { loggingCreateLogger } from '@jib/logging'
 import { LogLevels } from 'consola'
+import { afterEach, describe, expect, test } from 'vitest'
 import {
   InvalidInteractiveModeError,
   cliCreateMissingInputError,

@@ -1,6 +1,6 @@
 export { LockError, StateError } from './errors.ts'
 export type { JibDb } from './db.ts'
-export { stateOpenDb } from './db.ts'
+export { stateListMigrations, stateOpenDb, stateRecordMigration } from './db.ts'
 export type { AppStatus, ContainerStatus, ServiceStatus } from './collect.ts'
 export {
   stateCollectApps,
@@ -10,6 +10,7 @@ export {
   stateNormalizeUnitStatus,
 } from './collect.ts'
 export { jibMigrations } from './tables.ts'
+export type { JibMigrationRow } from './tables.ts'
 export { stateAcquireLock } from './lock.ts'
 export type { Release } from './lock.ts'
 export { AppStateSchema, CURRENT_SCHEMA_VERSION, stateEmpty } from './schema.ts'

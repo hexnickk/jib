@@ -1,4 +1,5 @@
 import { chown, rename, unlink, writeFile } from 'node:fs/promises'
+import { $ } from '@/libs/shell'
 import {
   AddUserToGroupError,
   ValidateSudoersError,
@@ -61,7 +62,10 @@ export async function writeValidatedSudoersResult(
   const write = deps.writeFile ?? writeFile
   const check =
     deps.check ??
-    ((checkPath: string) => Bun.spawnSync(['visudo', '-cf', checkPath]) as VisudoCheckResult)
+    ((checkPath: string) => {
+      const result = $.sync`visudo -cf ${checkPath}`
+      return { exitCode: result.exitCode ?? 0, stderr: result.stderr }
+    })
   const move = deps.rename ?? rename
   const setOwner = deps.chown ?? chown
   const remove = deps.unlink ?? unlink
@@ -165,12 +169,8 @@ export async function migrationEnsureUserInGroupResult(
 }
 
 function migrationRunCommand(args: readonly string[]): MigrationCommandResult {
-  const result = Bun.spawnSync([...args], { stderr: 'pipe', stdout: 'pipe' })
-  return {
-    exitCode: result.exitCode,
-    stdout: { toString: () => result.stdout.toString() },
-    stderr: { toString: () => result.stderr.toString() },
-  }
+  const result = $.sync`${args}`
+  return { exitCode: result.exitCode ?? 0, stdout: result.stdout, stderr: result.stderr }
 }
 
 function migrationCommandDetail(result: MigrationCommandResult): string {

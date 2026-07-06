@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test'
 import type { App, Config } from '@jib/config'
+import { describe, expect, test } from 'vitest'
 import { githubCloneUrl } from './driver.ts'
 
 const cfg = {

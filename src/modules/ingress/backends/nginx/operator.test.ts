@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { NginxIngressReloadError } from '../../errors.ts'
 import type { ExecFn, ExecResult } from '../../exec.ts'
 import { ingressCreateNginxOperator } from './operator.ts'

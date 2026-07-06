@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { $ } from '@/libs/shell'
 import type { Paths } from '@jib/paths'
 import { stateOpenDb } from '@jib/state'
 import type { JibDb } from '@jib/state'
@@ -28,7 +29,12 @@ export function userInGroup(
   group: string = GROUP,
   deps: GroupCheckDeps = {},
 ): boolean {
-  const run = deps.run ?? ((args) => Bun.spawnSync(args))
+  const run =
+    deps.run ??
+    ((args) => {
+      const result = $.sync`${args}`
+      return { exitCode: result.exitCode ?? 0, stdout: result.stdout }
+    })
   const result = run(['id', '-nG', user])
   if (result.exitCode !== 0) return false
   return result.stdout.toString().trim().split(/\s+/).includes(group)

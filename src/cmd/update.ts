@@ -4,7 +4,7 @@ import { cmdCreateHandler } from './handler.ts'
 
 const updateCommand = {
   command: 'update',
-  describe: 'Update jib from the latest GitHub release',
+  describe: 'Update jib from npm',
   handler: cmdCreateHandler(() => updateRunResult()),
 } satisfies CommandModule
 

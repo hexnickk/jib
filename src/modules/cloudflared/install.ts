@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { $ } from '@/libs/shell'
 import type { Logger } from '@jib/logging'
 import { type Paths, pathsCredsPath } from '@jib/paths'
 import {
@@ -53,7 +54,7 @@ export async function cloudflaredInstallResult(
   const renderCompose = deps.composeYaml ?? cloudflaredComposeYaml
   const renderUnit = deps.systemdUnit ?? cloudflaredSystemdUnit
   const unitPath = deps.unitPath ?? CLOUDFLARED_UNIT_PATH
-  const daemonReload = deps.daemonReload ?? (() => Bun.$`sudo systemctl daemon-reload`.quiet())
+  const daemonReload = deps.daemonReload ?? (() => $`sudo systemctl daemon-reload`)
 
   log.info(`creating ${dir}`)
   try {

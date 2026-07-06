@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
+import { describe, expect, test } from 'vitest'
 import { SystemdServiceStartError, systemdStartConfiguredManagedServicesResult } from './index.ts'
 
 function configWith(modules: Record<string, boolean>): Config {

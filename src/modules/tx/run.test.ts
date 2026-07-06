@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { type Step, TxRollbackError, txRunSteps } from './run.ts'
 
 class FlowError extends Error {}

@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from 'bun:test'
 import { LogLevels } from 'consola'
+import { afterEach, describe, expect, test } from 'vitest'
 
 import { loggingCreateLogger } from './index'
 

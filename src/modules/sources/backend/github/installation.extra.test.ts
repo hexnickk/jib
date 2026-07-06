@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { generateKeyPairSync } from 'node:crypto'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { githubInstallationFindForOrg, githubInstallationList } from './installation.ts'
 
 const { privateKey } = generateKeyPairSync('rsa', {

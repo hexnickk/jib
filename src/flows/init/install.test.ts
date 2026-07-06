@@ -1,7 +1,7 @@
-import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { loggingCreateLogger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
+import { describe, expect, test } from 'vitest'
 import { InitModuleInstallError } from './errors.ts'
 import { initRunInstallsTx } from './install.ts'
 import type { ModLike } from './registry.ts'

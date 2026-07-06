@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
+import { $ } from '@/libs/shell'
 import { type Paths, pathsCredsPath, pathsEnsureCredsDirResult } from '@jib/paths'
 import { CloudflaredSaveTunnelTokenError } from './errors.ts'
 import { CLOUDFLARED_SERVICE_NAME } from './templates.ts'
@@ -62,9 +63,7 @@ export async function cloudflaredEnableService(
   deps: CloudflaredEnableServiceDeps = {},
 ): Promise<CloudflaredEnableServiceResult> {
   try {
-    const run =
-      deps.run ??
-      (() => Bun.$`sudo systemctl enable --now ${CLOUDFLARED_SERVICE_NAME}`.quiet().nothrow())
+    const run = deps.run ?? (() => $`sudo systemctl enable --now ${CLOUDFLARED_SERVICE_NAME}`)
     const result = await run()
     return {
       ok: result.exitCode === 0,

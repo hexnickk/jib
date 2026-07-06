@@ -12,7 +12,7 @@ import { ingressInstall, manifest as ingressManifest, ingressUninstall } from '@
 import type { FirstPartyModule } from './types.ts'
 export type { FirstPartyModule } from './types.ts'
 
-/** Static first-party module registry for bun build --compile visibility. */
+/** Static first-party module registry for bundled CLI visibility. */
 export const MODULES: readonly FirstPartyModule[] = [
   {
     manifest: watcherManifest,

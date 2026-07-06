@@ -1,8 +1,8 @@
-import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathsGetPaths } from '@jib/paths'
+import { describe, expect, test } from 'vitest'
 import { hasBootstrapState, migrationMissingUserGroups, userInGroup } from './service.ts'
 
 describe('hasBootstrapState', () => {
