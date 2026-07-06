@@ -3,7 +3,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+
+vi.mock('@jib/tui', () => ({
+  tuiLog: {
+    info() {},
+    success() {},
+    warning() {},
+  },
+}))
 import {
   InitModuleInstallError,
   OptionalModuleChoicePersistError,

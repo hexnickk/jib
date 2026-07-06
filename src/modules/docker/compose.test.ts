@@ -88,6 +88,18 @@ describe('dockerCreateCompose', () => {
     expect(calls[0]?.tty).toBe(true)
   })
 
+  test('logs maps follow, tail, and service args', async () => {
+    const { compose, calls } = make()
+    await compose.logs('web', { follow: true, tail: 100 })
+    expect(calls[0]?.args.slice(-5)).toEqual(['logs', '-f', '--tail', '100', 'web'])
+  })
+
+  test('logs can target all services', async () => {
+    const { compose, calls } = make()
+    await compose.logs()
+    expect(calls[0]?.args.slice(-1)).toEqual(['logs'])
+  })
+
   test('throws JibError on non-zero exit', async () => {
     const exec: DockerExec = async () => ({ stdout: '', stderr: 'boom', exitCode: 2 })
     const compose = dockerCreateCompose({ app: 'demo', dir: '.', files: [], exec })

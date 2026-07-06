@@ -19,6 +19,7 @@ import execCommand from './cmd/exec.ts'
 import { cmdExitError } from './cmd/handler.ts'
 import ingressCommands from './cmd/ingress.ts'
 import initCommand from './cmd/init.ts'
+import logsCommand from './cmd/logs.ts'
 import migrateCommand from './cmd/migrate.ts'
 import removeCommand from './cmd/remove.ts'
 import restartCommand from './cmd/restart.ts'
@@ -42,6 +43,7 @@ const cliCommands = [
   restartCommand,
   execCommand,
   runCommand,
+  logsCommand,
   statusCommand,
   updateCommand,
   watchCommand,

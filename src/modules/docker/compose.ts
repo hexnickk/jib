@@ -129,7 +129,7 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
       })
     },
     async logs(service?: string, opts: { follow?: boolean; tail?: number } = {}) {
-      const args = ['docker', ...baseArgs(), 'logs']
+      const args = ['docker', ...baseArgs(), ...envArgs(), 'logs']
       if (opts.follow) args.push('-f')
       if (opts.tail && opts.tail > 0) args.push('--tail', String(opts.tail))
       if (service) args.push(service)
