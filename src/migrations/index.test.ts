@@ -1,11 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathsGetPaths } from '@jib/paths'
-import { stateOpenDb } from '@jib/state'
+import { stateListMigrations, stateOpenDb } from '@jib/state'
 import type { JibDb } from '@jib/state'
-import { jibMigrations } from '@jib/state'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { RunMigrationError } from './errors.ts'
 import { runJibMigrations, runJibMigrationsResult } from './index.ts'
 import type { JibMigration, MigrationContext } from './types.ts'
@@ -64,7 +63,7 @@ describe('runJibMigrations', () => {
 
   test('records migration IDs in jib_migrations table', async () => {
     await runJibMigrations(ctx, [migration('x', () => {}), migration('y', () => {})])
-    const rows = db.select().from(jibMigrations).all()
+    const rows = stateListMigrations(db)
     expect(rows.map((r) => r.id).sort()).toEqual(['x', 'y'])
     for (const r of rows) expect(r.at).toBeTruthy()
   })
@@ -84,7 +83,7 @@ describe('runJibMigrations', () => {
     expect(result.message).toContain('migration b failed')
     expect(result.message).toContain('boom')
     expect(log).toEqual(['a'])
-    const rows = db.select().from(jibMigrations).all()
+    const rows = stateListMigrations(db)
     expect(rows.map((r) => r.id)).toEqual(['a'])
   })
 

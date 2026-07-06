@@ -1,32 +1,19 @@
-.PHONY: build test lint fmt dev install-all clean
+.PHONY: build test lint fmt dev clean bootstrap
 
-CLI_BIN := dist/jib
-PREFIX ?= /usr/local/bin
-
-# `bun build --compile` rewrites the output file in place, which fails on
-# virtiofs-backed workspaces (devcontainer bind mount). Compile into a tmpfs
-# scratch dir first, then `install` the finished binary onto the mount.
 build:
-	@mkdir -p dist
-	@tmp="$$(mktemp -d)" && \
-		bun build --compile src/main.ts --outfile "$$tmp/jib" && \
-		install -m 0755 "$$tmp/jib" $(CLI_BIN) && \
-		rm -rf "$$tmp"
+	npm run build
 
 test:
-	bun test
+	npm test
 
 lint:
-	bun x biome check .
+	npm run lint
 
 fmt:
-	bun x biome format --write .
+	npm run fmt
 
 dev:
-	bun run src/main.ts
-
-install-all: build
-	sudo install -m 0755 $(CLI_BIN) $(PREFIX)/jib
+	npm run dev --
 
 clean:
 	rm -rf dist

@@ -1,7 +1,7 @@
-import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { loggingCreateLogger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
+import { describe, expect, test } from 'vitest'
 import { WatcherDeployAppError, WatcherSyncAppError } from './errors.ts'
 import {
   type PollAppDeps,

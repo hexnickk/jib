@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test'
 import type { Domain } from '@jib/config'
+import { describe, expect, test } from 'vitest'
 import { deployBuildOverrideServices } from './override.ts'
 
 const parsed = (...names: string[]) => names.map((name) => ({ name }))

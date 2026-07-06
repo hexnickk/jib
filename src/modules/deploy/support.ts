@@ -1,5 +1,6 @@
 import { stat, symlink, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
+import { $ } from '@/libs/shell'
 import type { App } from '@jib/config'
 import {
   type DockerCompose,
@@ -17,7 +18,6 @@ import {
   stateRecordFailure,
   stateSave,
 } from '@jib/state'
-import { $ } from 'bun'
 import {
   DeployDiskCheckError,
   DeployLockAcquireError,
@@ -101,9 +101,9 @@ export async function deployReadDiskFree(
   return deployRunOrReturnError(
     async () => {
       if (deps.diskFree) return deps.diskFree(path)
-      const res = await $`df -B1 --output=avail ${path}`.quiet().nothrow()
-      if (res.exitCode !== 0) return Number.POSITIVE_INFINITY
-      const line = res.stdout.toString().trim().split('\n')[1] ?? '0'
+      const result = await $`df -B1 --output=avail ${path}`
+      if (result.exitCode !== 0) return Number.POSITIVE_INFINITY
+      const line = result.stdout.trim().split('\n')[1] ?? '0'
       return Number(line.trim())
     },
     (message, options) => new DeployDiskCheckError(message, options),

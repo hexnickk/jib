@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from 'bun:test'
 import type { ComposeService } from '@jib/docker'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 function service(partial: Partial<ComposeService> = {}): ComposeService {
   return {
@@ -13,13 +13,15 @@ function service(partial: Partial<ComposeService> = {}): ComposeService {
 }
 
 afterEach(() => {
-  mock.restore()
+  vi.doUnmock('@jib/tui')
+  vi.resetModules()
+  vi.restoreAllMocks()
 })
 
 describe('addPromptForServices', () => {
   test('lets detected compose env values be left blank', async () => {
     const optionalPrompts: string[] = []
-    mock.module('@jib/tui', () => ({
+    vi.doMock('@jib/tui', () => ({
       tuiIsInteractive: () => true,
       tuiNote: () => undefined,
       tuiPromptConfirmResult: async (opts: { message: string }) =>

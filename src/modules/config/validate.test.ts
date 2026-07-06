@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { ValidateConfigError } from './errors.ts'
 import { ConfigSchema } from './schema.ts'
 import { configParseDuration, configValidate, configValidateRepo } from './validate.ts'

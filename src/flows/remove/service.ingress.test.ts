@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
+import { describe, expect, test } from 'vitest'
 import { removeApp } from './service.ts'
 import type { RemoveSupport } from './types.ts'
 

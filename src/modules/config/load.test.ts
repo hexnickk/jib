@@ -1,7 +1,7 @@
-import { describe, expect, test } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { describe, expect, test } from 'vitest'
 import { ConfigError, ParseConfigError, ReadConfigError } from './errors.ts'
 import { configLoad } from './load.ts'
 import type { Config } from './schema.ts'
@@ -54,7 +54,7 @@ describe('configLoad/configWrite', () => {
   test('configLoad returns ParseConfigError on bad YAML', async () => {
     await withTmp(async (dir) => {
       const path = join(dir, 'bad.yml')
-      await Bun.write(path, 'foo: [bar')
+      await writeFile(path, 'foo: [bar')
       expect(await configLoad(path)).toBeInstanceOf(ParseConfigError)
     })
   })

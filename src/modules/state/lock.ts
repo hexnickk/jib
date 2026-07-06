@@ -1,5 +1,8 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { Readable } from 'node:stream'
+import { $ } from '@/libs/shell'
+import type { ProcessPromise } from 'zx'
 import { LockError } from './errors.ts'
 
 export interface LockOptions {
@@ -13,8 +16,7 @@ export type Release = () => Promise<void>
 /**
  * Acquires an exclusive flock on `<dir>/<app>.lock` by spawning `flock` wrapped
  * around a shell that blocks on stdin. The child holds the lock; writing to
- * its stdin (via the returned `Release`) lets the shell exit cleanly. No FFI,
- * no races with Bun's fd handling.
+ * its stdin (via the returned `Release`) lets the shell exit cleanly.
  */
 export async function stateAcquireLock(
   dir: string,
@@ -34,20 +36,14 @@ export async function stateAcquireLock(
   const path = join(dir, `${app}.lock`)
 
   const flags = blocking ? ['-x', '-w', Math.ceil(timeoutMs / 1000).toString()] : ['-x', '-n']
-  const proc = Bun.spawn(['flock', ...flags, path, 'sh', '-c', 'echo READY; read _'], {
-    stdin: 'pipe',
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
+  const command = ['flock', ...flags, path, 'sh', '-c', 'echo READY; read _']
+  const proc = $({ stdio: ['pipe', 'pipe', 'pipe'], quiet: true })`${command}`
+  const settled = proc.catch(() => undefined)
 
-  const ready = await waitForReady(proc)
+  const ready = await waitForReady(proc.stdout)
   if (!ready) {
-    try {
-      proc.kill()
-    } catch {
-      // already exited
-    }
-    await proc.exited.catch(() => undefined)
+    await proc.kill().catch(() => undefined)
+    await settled
     const msg = blocking
       ? `timed out waiting for lock on ${app}`
       : `lock on ${app} is held by another process`
@@ -55,27 +51,16 @@ export async function stateAcquireLock(
   }
 
   return async () => {
-    try {
-      proc.stdin.end()
-    } catch {
-      // already closed
-    }
-    await proc.exited
+    proc.stdin.end()
+    await settled
   }
 }
 
-async function waitForReady(proc: Bun.Subprocess<'pipe', 'pipe', 'pipe'>): Promise<boolean> {
-  const reader = proc.stdout.getReader()
-  const decoder = new TextDecoder()
+async function waitForReady(stdout: ProcessPromise['stdout'] | Readable): Promise<boolean> {
   let buf = ''
-  try {
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) return false
-      buf += decoder.decode(value)
-      if (buf.includes('READY')) return true
-    }
-  } finally {
-    reader.releaseLock()
+  for await (const chunk of stdout) {
+    buf += chunk.toString()
+    if (buf.includes('READY')) return true
   }
+  return false
 }

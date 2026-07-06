@@ -10,7 +10,7 @@
       "@jib-module/*": ["src/modules/*/index.ts", "src/modules/*"]
     },
     "lib": ["ESNext"],
-    "types": ["bun"],
+    "types": ["node", "vitest/globals"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,

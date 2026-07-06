@@ -1,9 +1,9 @@
-import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
 import { pathsCredsPath, pathsGetPaths } from '@jib/paths'
+import { describe, expect, test } from 'vitest'
 import { initInferredOptionalModules, initReconcileOptionalModules } from './reconcile.ts'
 
 async function readConfig(file: string): Promise<Config> {

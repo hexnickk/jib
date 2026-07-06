@@ -1,4 +1,5 @@
 import { chmod, readFile, stat } from 'node:fs/promises'
+import { $ } from '@/libs/shell'
 import { type Paths, pathsCredsPath, pathsEnsureCredsDirResult } from '@jib/paths'
 import {
   GitHubDeployKeyExistsError,
@@ -35,11 +36,10 @@ export async function githubGenerateDeployKey(name: string, paths: Paths): Promi
   const ensured = await pathsEnsureCredsDirResult(paths, 'github-key')
   if (ensured instanceof Error) return ensured
   const comment = `jib-${name}`
-  const res = await Bun.$`ssh-keygen -t ed25519 -f ${privateKey} -N "" -C ${comment}`
-    .quiet()
-    .nothrow()
-  if (res.exitCode !== 0) {
-    return new GitHubDeployKeyGenerateError(`ssh-keygen failed: ${res.stderr.toString()}`)
+  const generated = await $`ssh-keygen -t ed25519 -f ${privateKey} -N "" -C ${comment}`
+
+  if (generated.exitCode !== 0) {
+    return new GitHubDeployKeyGenerateError(`ssh-keygen failed: ${githubKeygenDetail(generated)}`)
   }
   try {
     await chmod(privateKey, 0o640)
@@ -54,11 +54,21 @@ export async function githubGenerateDeployKey(name: string, paths: Paths): Promi
 
 /** Parses the fingerprint line printed by `ssh-keygen -l -f <pub>`. */
 export async function githubReadKeyFingerprint(pubKeyPath: string): Promise<string | Error> {
-  const res = await Bun.$`ssh-keygen -l -f ${pubKeyPath}`.quiet().nothrow()
-  if (res.exitCode !== 0) {
-    return new GitHubKeyFingerprintError(res.stderr.toString())
-  }
-  return res.stdout.toString().trim()
+  const result = await $`ssh-keygen -l -f ${pubKeyPath}`
+  if (result.exitCode !== 0) return new GitHubKeyFingerprintError(githubKeygenDetail(result))
+  return result.stdout.toString().trim()
+}
+
+function githubKeygenDetail(result: {
+  exitCode: number | null
+  stdout: string
+  stderr: string
+}): string {
+  return (
+    result.stderr.trim() ||
+    result.stdout.trim() ||
+    `command exited with code ${result.exitCode ?? 1}`
+  )
 }
 
 async function exists(path: string): Promise<boolean> {

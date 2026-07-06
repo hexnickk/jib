@@ -1,10 +1,10 @@
-import { describe, expect, test } from 'bun:test'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CliError } from '@jib/cli'
 import type { App, Config } from '@jib/config'
 import { pathsGetPaths, pathsManagedComposePath } from '@jib/paths'
+import { describe, expect, test } from 'vitest'
 import { GENERATED_COMPOSE_FILE } from './compose-scaffold.ts'
 import { addCreatePlanner } from './planner.ts'
 

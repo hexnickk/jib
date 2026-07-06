@@ -1,3 +1,4 @@
+import { $ } from '@/libs/shell'
 import { type Config, configLoad } from '@jib/config'
 import { SystemdServiceStartError } from './errors.ts'
 
@@ -47,19 +48,14 @@ export async function systemdStartManagedUnitResult(
   }
 }
 
-/** Executes systemctl through the injected runner or Bun.spawnSync for migration/repair use. */
+/** Executes systemctl through the injected runner or zx sync for migration/repair use. */
 function systemdRun(
   deps: SystemdManagedServicesDeps,
   args: readonly string[],
 ): Promise<CommandResultLike> | CommandResultLike {
-  try {
-    if (deps.run) return deps.run(args)
-    const result = Bun.spawnSync([...args], { stderr: 'pipe', stdout: 'pipe' })
-    return { exitCode: result.exitCode, stderr: result.stderr, stdout: result.stdout }
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    return { exitCode: 1, stderr: Buffer.from(detail), stdout: Buffer.from('') }
-  }
+  if (deps.run) return deps.run(args)
+  const result = $.sync`${args}`
+  return { exitCode: result.exitCode ?? 0, stderr: result.stderr, stdout: result.stdout }
 }
 
 function systemdCommandDetail(result: CommandResultLike): string {

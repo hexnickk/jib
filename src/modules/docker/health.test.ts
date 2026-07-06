@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { dockerAllHealthy, dockerBuildEndpoint, dockerCheckHealth } from './health.ts'
 
 function mockFetch(sequence: Array<{ status: number } | { throw: Error }>): {

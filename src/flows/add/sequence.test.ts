@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test'
 import type { CliError } from '@jib/cli'
+import { describe, expect, test } from 'vitest'
 import { type AddRolledBackError, addRunSequence } from './sequence.ts'
 import type { AddFlowResult } from './types.ts'
 

@@ -1,7 +1,7 @@
+import { $ } from '@/libs/shell'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import { type SourceStatus, sourcesCollectStatuses } from '@jib/sources'
-import { $ } from 'bun'
 import { StateError } from './errors.ts'
 import { stateCreateStore, stateLoad } from './store.ts'
 
@@ -48,9 +48,9 @@ export function stateNormalizeUnitStatus(output: string, exitCode: number): stri
 }
 
 async function checkUnit(name: string): Promise<ServiceStatus> {
-  const res = await $`systemctl is-active ${name}`.quiet().nothrow()
-  const output = res.stdout.toString() || res.stderr.toString()
-  const status = stateNormalizeUnitStatus(output, res.exitCode)
+  const result = await $`systemctl is-active ${name}`
+  const output = result.stdout || result.stderr
+  const status = stateNormalizeUnitStatus(output, result.exitCode ?? 1)
   return { name, active: status === 'active', status }
 }
 
@@ -83,9 +83,9 @@ export async function stateCollectApps(
 }
 
 async function collectContainers(app: string): Promise<ContainerStatus[]> {
-  const res = await $`docker compose -p jib-${app} ps --format json`.quiet().nothrow()
+  const res = await $`docker compose -p jib-${app} ps --format json`
   if (res.exitCode !== 0) return []
-  const stdout = res.stdout.toString().trim()
+  const stdout = res.stdout.trim()
   if (!stdout) return []
   try {
     return stdout

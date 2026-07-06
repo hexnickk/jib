@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
+import { describe, expect, test } from 'vitest'
 import { RemoveMissingAppError, RemoveWriteConfigError } from './errors.ts'
 import {
   RemoveMissingAppError as ServiceRemoveMissingAppError,

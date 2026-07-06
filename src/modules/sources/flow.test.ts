@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'bun:test'
 import type { Config } from '@jib/config'
 import { type Paths, pathsGetPaths } from '@jib/paths'
+import { describe, expect, test } from 'vitest'
 import {
   sourcesBuildChoices,
   sourcesIsAuthFailure,

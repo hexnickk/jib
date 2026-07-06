@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { Logger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const logger = {
   info() {},
@@ -12,17 +12,21 @@ const logger = {
 } as unknown as Logger
 
 beforeEach(() => {
-  mock.restore()
+  vi.doUnmock('./backends/index.ts')
+  vi.resetModules()
+  vi.restoreAllMocks()
 })
 
 afterEach(() => {
-  mock.restore()
+  vi.doUnmock('./backends/index.ts')
+  vi.resetModules()
+  vi.restoreAllMocks()
 })
 
 describe('ingress install/uninstall delegation', () => {
   test('install forwards to the default backend hook', async () => {
     const calls: string[] = []
-    mock.module('./backends/index.ts', () => ({
+    vi.doMock('./backends/index.ts', () => ({
       ingressCreateOperator() {
         throw new Error('unused in test')
       },
@@ -49,7 +53,7 @@ describe('ingress install/uninstall delegation', () => {
 
   test('uninstall forwards to the default backend hook', async () => {
     const calls: string[] = []
-    mock.module('./backends/index.ts', () => ({
+    vi.doMock('./backends/index.ts', () => ({
       ingressCreateOperator() {
         throw new Error('unused in test')
       },

@@ -1,4 +1,4 @@
-import { mkdir, stat } from 'node:fs/promises'
+import { chmod, mkdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { EnsureCredsDirError, PathLookupError } from './errors.ts'
 
@@ -130,7 +130,7 @@ export async function pathsPathExistsResult(path: string): Promise<boolean | Pat
 async function createCredsDir(kind: string, dir: string): Promise<EnsureCredsDirError | undefined> {
   try {
     await mkdir(dir, { recursive: true, mode: 0o770 })
-    await Bun.$`chmod ${CREDS_DIR_MODE} ${dir}`.quiet()
+    await chmod(dir, Number.parseInt(CREDS_DIR_MODE, 8))
   } catch (error) {
     return new EnsureCredsDirError(kind, dir, { cause: toError(error) })
   }

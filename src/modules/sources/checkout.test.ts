@@ -1,7 +1,8 @@
-import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { describe, expect, test } from 'vitest'
+import { $ } from 'zx'
 import { sourcesEnsureCheckout } from './checkout.ts'
 import { sourcesGitHasRemote, sourcesGitIsRepo } from './git.ts'
 
@@ -12,12 +13,12 @@ describe('sourcesEnsureCheckout', () => {
     const workdir = join(workdirRoot, 'demo')
 
     try {
-      await Bun.$`git init -b main ${upstream}`.quiet()
-      await Bun.$`git -C ${upstream} config user.email test@jib.local`.quiet()
-      await Bun.$`git -C ${upstream} config user.name test`.quiet()
+      await $`git init -b main ${upstream}`.quiet()
+      await $`git -C ${upstream} config user.email test@jib.local`.quiet()
+      await $`git -C ${upstream} config user.name test`.quiet()
       await writeFile(join(upstream, 'README.md'), 'upstream\n')
-      await Bun.$`git -C ${upstream} add README.md`.quiet()
-      await Bun.$`git -C ${upstream} commit -m initial`.quiet()
+      await $`git -C ${upstream} add README.md`.quiet()
+      await $`git -C ${upstream} commit -m initial`.quiet()
 
       await mkdir(workdir, { recursive: true })
       await writeFile(join(workdir, 'README.md'), 'stale checkout\n')

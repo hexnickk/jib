@@ -1,4 +1,4 @@
-import { $ } from 'bun'
+import { $ } from '@/libs/shell'
 import { GitHubRemoteSetTokenError } from './errors.ts'
 
 /** Canonical SSH clone URL for `owner/repo`. */
@@ -29,8 +29,12 @@ export async function githubRemoteSetToken(
   token: string,
 ): Promise<GitHubRemoteSetTokenError | undefined> {
   const url = githubRemoteHttpsCloneUrl(repo, token)
-  const res = await $`git -C ${repoDir} remote set-url origin ${url}`.quiet().nothrow()
-  if (res.exitCode !== 0) {
-    return new GitHubRemoteSetTokenError(res.stderr.toString())
+  const result = await $`git -C ${repoDir} remote set-url origin ${url}`
+  if (result.exitCode !== 0) {
+    return new GitHubRemoteSetTokenError(
+      result.stderr.trim() ||
+        result.stdout.trim() ||
+        `command exited with code ${result.exitCode ?? 1}`,
+    )
   }
 }

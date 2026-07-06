@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test'
 import type { App } from '@jib/config'
+import { describe, expect, test } from 'vitest'
 import { addMakeDeps, addMakeParams } from './service.test-support.ts'
 
 describe('add flow rollback', () => {

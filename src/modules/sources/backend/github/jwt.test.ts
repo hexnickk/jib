@@ -1,11 +1,11 @@
-import { describe, expect, test } from 'bun:test'
 import { createVerify, generateKeyPairSync } from 'node:crypto'
+import { describe, expect, test } from 'vitest'
 import { GitHubJwtSignError } from './errors.ts'
 import { githubJwtCreateApp } from './jwt.ts'
 
 /**
  * Roundtrip: sign a JWT with a freshly generated RSA keypair, then verify the
- * signature with the public half. This catches any future Bun regression in
+ * signature with the public half. This catches any future runtime regression in
  * Node's `crypto.createSign('RSA-SHA256')` path.
  */
 describe('createAppJWT', () => {

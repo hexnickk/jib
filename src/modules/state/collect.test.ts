@@ -1,9 +1,9 @@
-import { describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
+import { describe, expect, test } from 'vitest'
 import { stateCollectApps, stateManagedServiceNames, stateNormalizeUnitStatus } from './collect.ts'
 import { StateError } from './errors.ts'
 
@@ -43,7 +43,7 @@ describe('stateCollectApps', () => {
     const paths = pathsGetPaths(root)
     try {
       await mkdir(paths.stateDir, { recursive: true })
-      await Bun.write(join(paths.stateDir, 'web.json'), '{not json')
+      await writeFile(join(paths.stateDir, 'web.json'), '{not json')
       const cfg = {
         config_version: 3,
         poll_interval: '5m',

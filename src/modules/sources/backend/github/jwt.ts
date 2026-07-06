@@ -7,7 +7,7 @@ import {
 
 /**
  * Base64url encoder — GitHub JWT headers/payloads use the URL-safe variant
- * with `=` padding stripped. Node/Bun's `Buffer.toString('base64url')` handles
+ * with `=` padding stripped. Node's `Buffer.toString('base64url')` handles
  * this natively, but we keep it in one place for clarity.
  */
 function base64url(data: string | Buffer): string {

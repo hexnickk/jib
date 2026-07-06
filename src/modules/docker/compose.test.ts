@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { dockerCreateCompose } from './compose.ts'
 import type { DockerExec, ExecResult } from './exec.ts'
 

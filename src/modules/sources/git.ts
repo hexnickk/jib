@@ -1,7 +1,11 @@
+import { $ } from '@/libs/shell'
 import { JibError } from '@jib/errors'
-import { $ } from 'bun'
 
-type ShellOutput = Awaited<ReturnType<ReturnType<typeof $>['nothrow']>>
+interface ShellOutput {
+  exitCode: number | null
+  stdout: string
+  stderr: string
+}
 
 export interface GitEnv {
   GIT_SSH_COMMAND?: string
@@ -24,9 +28,8 @@ function commandFailure(out: ShellOutput, label: string): SourceGitCommandError 
 
 async function run(args: string[], env: GitEnv = {}, dir?: string): Promise<ShellOutput> {
   const mergedEnv = { ...process.env, ...env } as Record<string, string>
-  return dir
-    ? $`git -C ${dir} ${args}`.env(mergedEnv).quiet().nothrow()
-    : $`git ${args}`.env(mergedEnv).quiet().nothrow()
+  const command = dir ? ['git', '-C', dir, ...args] : ['git', ...args]
+  return await $({ env: mergedEnv, quiet: true })`${command}`
 }
 
 /** Clones a repo into `dir`, returning a typed git error on failure. */

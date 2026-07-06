@@ -68,6 +68,26 @@ export class WatcherInstallEnableError extends JibError {
   }
 }
 
+export class WatcherUninstallDisableError extends JibError {
+  constructor(service: string, error: unknown) {
+    super(
+      'watcher.uninstall_disable',
+      `systemctl disable --now ${service}: ${watcherErrorMessage(error)}`,
+      watcherErrorOptions(error),
+    )
+  }
+}
+
+export class WatcherUninstallReloadError extends JibError {
+  constructor(error: unknown) {
+    super(
+      'watcher.uninstall_reload',
+      `systemctl daemon-reload: ${watcherErrorMessage(error)}`,
+      watcherErrorOptions(error),
+    )
+  }
+}
+
 export class WatcherUninstallRemoveUnitError extends JibError {
   constructor(path: string, error: unknown) {
     super(

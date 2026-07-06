@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
+import { afterEach, describe, expect, test } from 'vitest'
 import { dockerComposeFor } from './compose-for.ts'
 import { DockerAppNotFoundError } from './errors.ts'
 
