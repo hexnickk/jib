@@ -1,6 +1,6 @@
 {
   "name": "${localWorkspaceFolderBasename}",
   "build": { "dockerfile": "Dockerfile" },
-  "postCreateCommand": "./scripts/bootstrap.sh",
+  "postCreateCommand": "make bootstrap",
   "remoteUser": "user"
 }

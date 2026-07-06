@@ -30,3 +30,8 @@ install-all: build
 
 clean:
 	rm -rf dist
+
+bootstrap:
+	./scripts/bootstrap-node.sh
+	./scripts/bootstrap.sh
+	./scripts/bootstrap-tmux.sh
