@@ -1,7 +1,15 @@
 import type { Config } from '@jib/config'
 import { loggingCreateLogger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+
+vi.mock('@jib/tui', () => ({
+  tuiLog: {
+    info() {},
+    success() {},
+    warning() {},
+  },
+}))
 import { InitModuleInstallError } from './errors.ts'
 import { initRunInstallsTx } from './install.ts'
 import type { ModLike } from './registry.ts'
