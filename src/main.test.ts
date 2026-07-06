@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { configWrite } from '@jib/config'
@@ -58,6 +58,25 @@ async function runEntry(root: string, entrypoint: string, args: string[]) {
   return { exitCode, stdout, stderr }
 }
 
+async function writeDemoAppConfig(root: string): Promise<void> {
+  expect(
+    await configWrite(join(root, 'config.yml'), {
+      config_version: 3,
+      poll_interval: '5m',
+      modules: {},
+      sources: {},
+      apps: {
+        demo: {
+          repo: 'acme/demo',
+          branch: 'main',
+          env_file: '.env',
+          domains: [],
+        },
+      },
+    } satisfies Config),
+  ).toBeUndefined()
+}
+
 describe('execution contract', () => {
   test('non-interactive add without app returns text errors', async () => {
     await withTmpRoot(async (root) => {
@@ -72,13 +91,17 @@ describe('execution contract', () => {
     })
   })
 
-  test('help and version render text', async () => {
+  test('version renders text', async () => {
     await withTmpRoot(async (root) => {
       const version = await runCli(root, ['--version'])
       expect(version.exitCode).toBe(0)
       expect(version.stderr).toBe('')
       expect(version.stdout.trim()).toBe(pkg.version)
+    })
+  })
 
+  test('help renders text', async () => {
+    await withTmpRoot(async (root) => {
       const help = await runCli(root, ['--help'])
       expect(help.exitCode).toBe(0)
       expect(help.stderr).toBe('')
@@ -99,18 +122,26 @@ describe('execution contract', () => {
     })
   })
 
-  test('exec and run accept passthrough arguments instead of rejecting the app positional', async () => {
+  test('exec accepts passthrough arguments instead of rejecting the app positional', async () => {
     await withTmpRoot(async (root) => {
       const execResult = await runCli(root, ['exec', 'demo', '--', 'echo', 'ok'])
       expect(execResult.exitCode).toBe(1)
       expect(execResult.stderr).toContain('app "demo" not found in config')
       expect(execResult.stderr).not.toContain('Unknown argument: demo')
+    })
+  })
 
+  test('run accepts passthrough arguments instead of rejecting the app positional', async () => {
+    await withTmpRoot(async (root) => {
       const runResult = await runCli(root, ['run', 'demo', '--', 'echo', 'ok'])
       expect(runResult.exitCode).toBe(1)
       expect(runResult.stderr).toContain('app "demo" not found in config')
       expect(runResult.stderr).not.toContain('Unknown argument: demo')
+    })
+  })
 
+  test('exec reports missing passthrough command before app lookup', async () => {
+    await withTmpRoot(async (root) => {
       const missingCommand = await runCli(root, ['exec', 'demo', '--'])
       expect(missingCommand.exitCode).toBe(1)
       expect(missingCommand.stderr).toContain('command required after app')
@@ -118,29 +149,22 @@ describe('execution contract', () => {
     })
   })
 
-  test('secrets subcommands dispatch by action name', async () => {
+  test('secrets set dispatches by action name', async () => {
     await withTmpRoot(async (root) => {
-      expect(
-        await configWrite(join(root, 'config.yml'), {
-          config_version: 3,
-          poll_interval: '5m',
-          modules: {},
-          sources: {},
-          apps: {
-            demo: {
-              repo: 'acme/demo',
-              branch: 'main',
-              env_file: '.env',
-              domains: [],
-            },
-          },
-        } satisfies Config),
-      ).toBeUndefined()
+      await writeDemoAppConfig(root)
 
       const setResult = await runCli(root, ['secrets', 'set', 'demo', 'TOKEN=secret'])
       expect(setResult.exitCode).toBe(0)
       expect(setResult.stderr).toBe('')
       expect(await readFile(join(root, 'secrets', 'demo', '.env'), 'utf8')).toBe('TOKEN=secret\n')
+    })
+  })
+
+  test('secrets list dispatches by action name', async () => {
+    await withTmpRoot(async (root) => {
+      await writeDemoAppConfig(root)
+      await mkdir(join(root, 'secrets', 'demo'), { recursive: true })
+      await writeFile(join(root, 'secrets', 'demo', '.env'), 'TOKEN=secret\n')
 
       const listResult = await runCli(root, ['secrets', 'list', 'demo'])
       expect(listResult.exitCode).toBe(0)
