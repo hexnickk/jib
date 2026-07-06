@@ -51,4 +51,11 @@ describe('ConfigSchema', () => {
     })
     expect(cfg.apps.worker?.domains).toEqual([])
   })
+
+  test('ingress max body size defaults and normalizes common suffixes', () => {
+    const withDefault = ConfigSchema.parse({ ...minimal, ingress: {} })
+    expect(withDefault.ingress?.max_body_size).toBe('10m')
+    const cfg = ConfigSchema.parse({ ...minimal, ingress: { max_body_size: '25mb' } })
+    expect(cfg.ingress?.max_body_size).toBe('25m')
+  })
 })

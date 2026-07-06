@@ -1,5 +1,6 @@
 export * from './load.ts'
 export * from './schema.ts'
+export * from './byte-size.ts'
 export * from './validate.ts'
 export * from './write.ts'
 export * from './add-parse.ts'

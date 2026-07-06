@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { ingressGetExec } from '../../exec.ts'
 import type { IngressHook } from '../types.ts'
+import { ingressWriteNginxGlobalConfig } from './config.ts'
 
 /**
  * Jib-owned snippet that pulls every file under `$JIB_ROOT/nginx/` into the
@@ -44,6 +45,8 @@ export const ingressInstall: IngressHook = async (ctx) => {
 
   log.info(`creating ${ctx.paths.nginxDir}`)
   await mkdir(ctx.paths.nginxDir, { recursive: true, mode: 0o755 })
+  log.info('writing global ingress config')
+  await ingressWriteNginxGlobalConfig(ctx.paths.nginxDir, ctx.config)
 
   const desired = includeSnippet(ctx.paths.nginxDir)
   let existing = ''

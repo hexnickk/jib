@@ -8,6 +8,7 @@ import { m0009_install_sudoers } from './0009_install_sudoers.ts'
 import { m0010_expand_sudoers_for_nginx } from './0010_expand_sudoers_for_nginx.ts'
 import { m0011_repair_managed_secret_permissions } from './0011_repair_managed_secret_permissions.ts'
 import { m0012_start_managed_services } from './0012_start_managed_services.ts'
+import { m0013_apply_ingress_body_limit } from './0013_apply_ingress_body_limit.ts'
 import type { JibMigration } from './types.ts'
 
 export const migrations: JibMigration[] = [
@@ -21,4 +22,5 @@ export const migrations: JibMigration[] = [
   m0010_expand_sudoers_for_nginx,
   m0011_repair_managed_secret_permissions,
   m0012_start_managed_services,
+  m0013_apply_ingress_body_limit,
 ]

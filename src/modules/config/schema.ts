@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DEFAULT_INGRESS_MAX_BODY_SIZE, configNormalizeByteSize } from './byte-size.ts'
 
 /** Accepts either a string or an array of strings; normalizes to `string[]`. */
 export const StringOrSlice = z
@@ -12,6 +13,22 @@ export const GitHubSourceSchema = z.object({
 })
 
 export const SourceSchema = z.discriminatedUnion('driver', [GitHubSourceSchema])
+
+export const ByteSizeSchema = z.string().transform((value, ctx) => {
+  const normalized = configNormalizeByteSize(value)
+  if (!normalized) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'must be an integer byte size like 1048576, 10m, or 10mb',
+    })
+    return z.NEVER
+  }
+  return normalized
+})
+
+export const IngressConfigSchema = z.object({
+  max_body_size: ByteSizeSchema.default(DEFAULT_INGRESS_MAX_BODY_SIZE),
+})
 
 // NOTE: `port` is the *host* port jib proxies to, and is only needed when a
 // service has ingress. It is optional at parse time because `jib add`
@@ -65,11 +82,13 @@ export const ConfigSchema = z.object({
   modules: z.record(z.string(), z.boolean()).optional().default({}),
   sources: z.record(z.string(), SourceSchema).optional().default({}),
   apps: z.record(z.string(), AppSchema).default({}),
+  ingress: IngressConfigSchema.optional(),
   tunnel: TunnelConfigSchema.optional(),
 })
 
 export type GitHubSource = z.infer<typeof GitHubSourceSchema>
 export type Source = z.infer<typeof SourceSchema>
+export type IngressConfig = z.infer<typeof IngressConfigSchema>
 export type Domain = z.infer<typeof DomainSchema>
 export type HealthCheck = z.infer<typeof HealthCheckSchema>
 export type PreDeployHook = z.infer<typeof PreDeployHookSchema>
