@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import type { DockerExec, ExecResult } from '@jib/docker'
-import { loggingCreateLogger } from '@jib/logging'
+import type { Logger } from '@jib/logging'
 import { pathsGetPaths, pathsRepoPath } from '@jib/paths'
 import { stateCreateStore, stateLoad } from '@jib/state'
 import { describe, expect, test } from 'vitest'
@@ -71,10 +71,19 @@ async function mkEnv() {
   await mkdir(join(root, 'state'), { recursive: true })
   const paths = pathsGetPaths(root)
   const store = stateCreateStore(paths.stateDir)
-  return { paths, store, log: loggingCreateLogger('test') }
+  return { paths, store, log: silentLogger }
 }
 
 const noProgress = { emit: () => {} }
+
+const silentLogger = {
+  info() {},
+  warn() {},
+  error() {},
+  success() {},
+  debug() {},
+  box() {},
+} as unknown as Logger
 
 describe('deployApp', () => {
   test('happy path emits success + records state', async () => {
