@@ -45,7 +45,10 @@ export async function watcherUninstallResult(
     const detail = watcherCommandFailure(result)
     if (detail) disableError = new WatcherUninstallDisableError(serviceName, detail)
   } catch (error) {
-    disableError = new WatcherUninstallDisableError(serviceName, watcherErrorMessage(error))
+    disableError = new WatcherUninstallDisableError(
+      serviceName,
+      error instanceof Error ? error.message : String(error),
+    )
   }
 
   ctx.logger.info(`removing ${unitPath}`)
@@ -61,7 +64,7 @@ export async function watcherUninstallResult(
     const detail = watcherCommandFailure(result)
     if (detail) return new WatcherUninstallReloadError(detail)
   } catch (error) {
-    return new WatcherUninstallReloadError(watcherErrorMessage(error))
+    return new WatcherUninstallReloadError(error instanceof Error ? error.message : String(error))
   }
 
   return disableError
@@ -89,8 +92,4 @@ function isWatcherCommandResult(result: unknown): result is {
     'stdout' in result &&
     'stderr' in result
   )
-}
-
-function watcherErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }
