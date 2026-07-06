@@ -149,24 +149,24 @@ describe('execution contract', () => {
     })
   })
 
-  test('secrets set dispatches by action name', async () => {
+  test('env set dispatches by action name', async () => {
     await withTmpRoot(async (root) => {
       await writeDemoAppConfig(root)
 
-      const setResult = await runCli(root, ['secrets', 'set', 'demo', 'TOKEN=secret'])
+      const setResult = await runCli(root, ['env', 'set', 'demo', 'TOKEN=secret'])
       expect(setResult.exitCode).toBe(0)
       expect(setResult.stderr).toBe('')
       expect(await readFile(join(root, 'secrets', 'demo', '.env'), 'utf8')).toBe('TOKEN=secret\n')
     })
   })
 
-  test('secrets list dispatches by action name', async () => {
+  test('env list dispatches by action name', async () => {
     await withTmpRoot(async (root) => {
       await writeDemoAppConfig(root)
       await mkdir(join(root, 'secrets', 'demo'), { recursive: true })
       await writeFile(join(root, 'secrets', 'demo', '.env'), 'TOKEN=secret\n')
 
-      const listResult = await runCli(root, ['secrets', 'list', 'demo'])
+      const listResult = await runCli(root, ['env', 'list', 'demo'])
       expect(listResult.exitCode).toBe(0)
       expect(listResult.stderr).toBe('')
     })

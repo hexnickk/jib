@@ -11,8 +11,8 @@ import { consola } from 'consola'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
 import { cmdCreateHandler } from './handler.ts'
 
-/** Loads the shared secrets command context from the managed config. */
-async function loadSecretsContext() {
+/** Loads the shared env command context from the managed config. */
+async function loadEnvContext() {
   const loaded = await configLoadContext()
   if (loaded instanceof Error) return loaded
   const { cfg, paths } = loaded
@@ -20,44 +20,44 @@ async function loadSecretsContext() {
   return { cfg, paths, secrets }
 }
 
-const cliSecretsCommands = [
+const cliEnvCommands = [
   {
-    command: 'secrets',
-    describe: 'Manage app secrets',
+    command: 'env',
+    describe: 'Manage app environment variables',
     builder: (parser) =>
       parser
         .command({
           command: 'set <app> <pair>',
-          describe: 'Set a secret (KEY=VALUE)',
-          handler: cmdCreateHandler(secretsSetRunCommand),
+          describe: 'Set an environment variable (KEY=VALUE)',
+          handler: cmdCreateHandler(envSetRunCommand),
         } satisfies CommandModule<Record<string, unknown>, { app: string; pair: string }>)
         .command({
           command: 'list [app]',
-          describe: 'Show secrets for an app (or all apps)',
-          handler: cmdCreateHandler(secretsListRunCommand),
+          describe: 'Show environment variables for an app (or all apps)',
+          handler: cmdCreateHandler(envListRunCommand),
         } satisfies CommandModule<Record<string, unknown>, { app?: string }>)
         .command({
           command: 'delete <app> <key>',
-          describe: 'Remove a secret key',
-          handler: cmdCreateHandler(secretsDeleteRunCommand),
+          describe: 'Remove an environment variable',
+          handler: cmdCreateHandler(envDeleteRunCommand),
         } satisfies CommandModule<Record<string, unknown>, { app: string; key: string }>)
         .demandCommand(1),
     handler: () => undefined,
   },
 ] satisfies CommandModule<Record<string, unknown>, unknown>[]
 
-/** Sets a secret key-value pair and returns the mutation payload or typed error. */
-async function secretsSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: string }>) {
+/** Sets an env key-value pair and returns the mutation payload or typed error. */
+async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: string }>) {
   const appName = String(args.app)
   const pair = String(args.pair)
-  const loaded = await loadSecretsContext()
+  const loaded = await loadEnvContext()
   if (loaded instanceof Error) return loaded
   const { cfg, secrets } = loaded
   const appCfg = cfg.apps[appName]
   if (!appCfg) return new CliError('missing_app', `app "${appName}" not found in config`)
   const separator = pair.indexOf('=')
   if (separator < 1) {
-    return new CliError('invalid_secret_pair', `invalid format "${pair}" — expected KEY=VALUE`)
+    return new CliError('invalid_env_pair', `invalid format "${pair}" — expected KEY=VALUE`)
   }
   const key = pair.slice(0, separator)
   const value = pair.slice(separator + 1)
@@ -67,10 +67,10 @@ async function secretsSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair
   return { app: appName, key, updated: true }
 }
 
-/** Lists secrets for one app or all apps and returns masked entries or typed error. */
-async function secretsListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
+/** Lists env variables for one app or all apps and returns masked entries or typed error. */
+async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
   const requestedApp = typeof args.app === 'string' ? args.app : undefined
-  const loaded = await loadSecretsContext()
+  const loaded = await loadEnvContext()
   if (loaded instanceof Error) return loaded
   const { cfg, secrets } = loaded
   const apps = requestedApp ? [requestedApp] : Object.keys(cfg.apps).sort()
@@ -103,7 +103,7 @@ async function secretsListRunCommand(args: ArgumentsCamelCase<{ app?: string }>)
   if (cliIsTextOutput()) {
     for (const item of items) {
       if (!item.path) {
-        consola.log(`${item.app} no secrets`)
+        consola.log(`${item.app} no env`)
         continue
       }
       consola.log(`${item.app} ${item.path}`)
@@ -112,25 +112,25 @@ async function secretsListRunCommand(args: ArgumentsCamelCase<{ app?: string }>)
   }
 
   if (missingApp && requestedApp) {
-    return new CliError('missing_secrets', `app "${requestedApp}" has no secrets configured`)
+    return new CliError('missing_env', `app "${requestedApp}" has no env configured`)
   }
   return { apps: items }
 }
 
-/** Deletes a secret key and returns the mutation payload or typed error. */
-async function secretsDeleteRunCommand(args: ArgumentsCamelCase<{ app: string; key: string }>) {
+/** Deletes an env key and returns the mutation payload or typed error. */
+async function envDeleteRunCommand(args: ArgumentsCamelCase<{ app: string; key: string }>) {
   const appName = String(args.app)
   const key = String(args.key)
-  const loaded = await loadSecretsContext()
+  const loaded = await loadEnvContext()
   if (loaded instanceof Error) return loaded
   const { cfg, secrets } = loaded
   const appCfg = cfg.apps[appName]
   if (!appCfg) return new CliError('missing_app', `app "${appName}" not found in config`)
   const removed = await secretsRemove(secrets, appName, key, appCfg.env_file)
   if (removed instanceof Error) return removed
-  if (!removed) return new CliError('missing_secret_key', `key "${key}" not found in ${appName}`)
+  if (!removed) return new CliError('missing_env_key', `key "${key}" not found in ${appName}`)
   if (cliIsTextOutput()) consola.success(`deleted ${key} from ${appName}`)
   return { app: appName, key, removed: true }
 }
 
-export default cliSecretsCommands
+export default cliEnvCommands

@@ -14,6 +14,7 @@ import addCommand from './cmd/add.ts'
 import cloudflaredCommands from './cmd/cloudflared.ts'
 import deployCommand from './cmd/deploy.ts'
 import downCommand from './cmd/down.ts'
+import envCommands from './cmd/env.ts'
 import execCommand from './cmd/exec.ts'
 import { cmdExitError } from './cmd/handler.ts'
 import ingressCommands from './cmd/ingress.ts'
@@ -22,7 +23,6 @@ import migrateCommand from './cmd/migrate.ts'
 import removeCommand from './cmd/remove.ts'
 import restartCommand from './cmd/restart.ts'
 import runCommand from './cmd/run.ts'
-import secretsCommands from './cmd/secrets.ts'
 import sourcesCommands from './cmd/sources.ts'
 import statusCommand from './cmd/status.ts'
 import upCommand from './cmd/up.ts'
@@ -46,7 +46,7 @@ const cliCommands = [
   updateCommand,
   watchCommand,
   ...sourcesCommands,
-  ...secretsCommands,
+  ...envCommands,
   ...cloudflaredCommands,
 ]
 
