@@ -42,10 +42,10 @@ export const addCommandOptions = {
       'host=<domain>[,port=<port>][,service=<name>][,ingress=direct|cloudflare-tunnel] (repeatable)',
   },
   env: { type: 'string', description: 'KEY=VALUE runtime env (.env) (repeatable)' },
-  'build-arg': { type: 'string', description: 'KEY=VALUE build arg (app.build_args) (repeatable)' },
+  'build-arg': { type: 'string', description: 'KEY=VALUE build-time env (.env) (repeatable)' },
   'build-env': {
     type: 'string',
-    description: 'KEY=VALUE for both runtime .env and app.build_args (repeatable)',
+    description: 'KEY=VALUE for both runtime and build-time use via .env (repeatable)',
   },
   health: { type: 'string', description: '/path:port (repeatable via comma)' },
 } as const

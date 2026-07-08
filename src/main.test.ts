@@ -69,7 +69,6 @@ async function writeDemoAppConfig(root: string): Promise<void> {
         demo: {
           repo: 'acme/demo',
           branch: 'main',
-          env_file: '.env',
           domains: [],
         },
       },
@@ -184,7 +183,6 @@ describe('execution contract', () => {
             demo: {
               repo: 'acme/demo',
               branch: 'main',
-              env_file: '.env',
               domains: [{ host: 'demo.example.com', port: 20000 }],
             },
           },

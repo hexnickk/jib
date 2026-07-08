@@ -13,6 +13,7 @@ describe('add flow rollback', () => {
     expect(calls).toContain('loadConfig')
     expect(calls).toContain('removeSecret:APP_KEY')
     expect(calls).toContain('removeSecret:PUBLIC_URL')
+    expect(calls).toContain('removeSecret:BUILD_VERSION')
     expect(warnings).toEqual([])
 
     const rollbackConfig = writtenConfigs.at(-1)
@@ -29,7 +30,6 @@ describe('add flow rollback', () => {
       compose: [base.managedCompose],
       services: ['web'],
       domains: [{ host: 'blog.example.com', service: 'web', port: 20000, container_port: 80 }],
-      env_file: '.env',
     } satisfies App
     const { calls, flow } = addMakeDeps('claimRoutes', false, false, false, managedApp)
 
@@ -49,6 +49,7 @@ describe('add flow rollback', () => {
     expect(calls).toContain('loadConfig')
     expect(calls).toContain('removeSecret:APP_KEY')
     expect(calls).toContain('removeSecret:PUBLIC_URL')
+    expect(calls).toContain('removeSecret:BUILD_VERSION')
     expect(warnings).toContain('repo rollback: rollbackRepo failed')
     expect(writtenConfigs.at(-1)?.apps.blog).toBeUndefined()
     expect(writtenConfigs.at(-1)?.apps.worker).toBeDefined()

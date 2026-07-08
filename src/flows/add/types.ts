@@ -87,8 +87,8 @@ export interface AddSupport {
   removeCheckout(appName: string, repo: string): Promise<undefined | Error>
   loadConfig(configFile: string): Promise<Config | Error>
   writeConfig(configFile: string, cfg: Config): Promise<undefined | Error>
-  upsertSecret(appName: string, entry: EnvEntry, envFile: string): Promise<undefined | Error>
-  removeSecret(appName: string, key: string, envFile: string): Promise<undefined | Error>
+  upsertSecret(appName: string, entry: EnvEntry): Promise<undefined | Error>
+  removeSecret(appName: string, key: string): Promise<undefined | Error>
   removeManagedCompose(appName: string): Promise<undefined | Error>
   claimIngress(appName: string, finalApp: App): Promise<undefined | Error>
 }

@@ -38,11 +38,11 @@ export function addCreateDefaultSupport(options: AddDefaultSupportOptions): AddS
     async writeConfig(configFile: string, cfg: Config) {
       return await configWrite(configFile, cfg)
     },
-    async upsertSecret(appName: string, entry: EnvEntry, envFile: string) {
-      return await secretsUpsert(secrets, appName, entry.key, entry.value, envFile)
+    async upsertSecret(appName: string, entry: EnvEntry) {
+      return await secretsUpsert(secrets, appName, entry.key, entry.value)
     },
-    async removeSecret(appName: string, key: string, envFile: string) {
-      const result = await secretsRemove(secrets, appName, key, envFile)
+    async removeSecret(appName: string, key: string) {
+      const result = await secretsRemove(secrets, appName, key)
       return result instanceof Error ? result : undefined
     },
     removeManagedCompose(appName: string) {

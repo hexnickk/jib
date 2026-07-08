@@ -89,7 +89,7 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
     async build(buildArgs: Record<string, string> = {}, opts: { quiet?: boolean } = {}) {
       const args = ['docker', ...baseArgs(), ...envArgs(), 'build']
       await runOrThrow(args, {
-        env: buildArgs,
+        ...(Object.keys(buildArgs).length > 0 ? { env: buildArgs } : {}),
         ...(opts.quiet ? { capture: true } : {}),
       })
     },
@@ -105,7 +105,9 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
         ...(opts.services ?? []),
       ]
       await runOrThrow(args, {
-        ...(opts.buildArgs ? { env: opts.buildArgs } : {}),
+        ...(opts.buildArgs && Object.keys(opts.buildArgs).length > 0
+          ? { env: opts.buildArgs }
+          : {}),
         ...(opts.quiet ? { capture: true } : {}),
       })
     },

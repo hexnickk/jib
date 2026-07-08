@@ -1,5 +1,5 @@
 import { ValidationError } from '@jib/errors'
-import type { ConfigEntry, ConfigScope, EnvEntry } from './types.ts'
+import type { ConfigEntry, ConfigScope } from './types.ts'
 
 /** Returns true when a scope contributes runtime environment variables. */
 export function addIncludesRuntime(scope: ConfigScope): boolean {
@@ -40,25 +40,6 @@ export function addMergeConfigEntries(entries: ConfigEntry[]): ConfigEntry[] | V
     })
   }
   return [...merged.values()]
-}
-
-/** Extracts only build-visible config entries into a build-arg map. */
-export function addConfigEntriesToBuildArgs(
-  entries: ConfigEntry[],
-): Record<string, string> | undefined {
-  const out = Object.fromEntries(
-    entries
-      .filter((entry) => addIncludesBuild(entry.scope))
-      .map((entry) => [entry.key, entry.value]),
-  )
-  return Object.keys(out).length > 0 ? out : undefined
-}
-
-/** Extracts only runtime-visible config entries into env-file entries. */
-export function addConfigEntriesToRuntime(entries: ConfigEntry[]): EnvEntry[] {
-  return entries
-    .filter((entry) => addIncludesRuntime(entry.scope))
-    .map(({ key, value }) => ({ key, value }))
 }
 
 /** Unions two scopes into the smallest scope that covers both. */

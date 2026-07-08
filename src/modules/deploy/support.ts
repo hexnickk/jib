@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { stat, symlink, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { $ } from '@/libs/shell'
@@ -38,11 +39,13 @@ export function deployNewCompose(
 ): DockerCompose {
   const files =
     appCfg.compose && appCfg.compose.length > 0 ? appCfg.compose : ['docker-compose.yml']
+  const envPath = join(deps.paths.secretsDir, app, '.env')
   return dockerCreateCompose({
     app,
     dir: workdir,
     files: [...files],
     override: dockerOverridePath(deps.paths.overridesDir, app),
+    ...(existsSync(envPath) ? { envFile: envPath } : {}),
     ...(deps.dockerExec ? { exec: deps.dockerExec } : {}),
   })
 }
@@ -69,11 +72,9 @@ export async function deploySyncOverride(
 export async function deployLinkSecrets(
   deps: DeployDeps,
   app: string,
-  appCfg: App,
   workdir: string,
 ): Promise<DeploySecretsLinkError | undefined> {
-  const envName = appCfg.env_file ?? '.env'
-  const src = join(deps.paths.secretsDir, app, envName)
+  const src = join(deps.paths.secretsDir, app, '.env')
   try {
     await stat(src)
   } catch (error) {
@@ -84,7 +85,7 @@ export async function deployLinkSecrets(
 
   const result = await deployRunOrReturnError(
     async () => {
-      const dest = join(workdir, envName)
+      const dest = join(workdir, '.env')
       await unlink(dest).catch(() => undefined)
       await symlink(src, dest)
     },

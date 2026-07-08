@@ -34,7 +34,6 @@ function resolveTargetApp(cfg: Config, target: SourceTarget): App | SourceMissin
     repo: image ? 'local' : target.repo,
     branch: target.branch ?? 'main',
     domains: [],
-    env_file: '.env',
     ...(image ? { image } : {}),
     ...(target.source ? { source: target.source } : {}),
   }

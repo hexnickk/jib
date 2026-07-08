@@ -41,15 +41,14 @@ export async function deployRunFlow(
   const overrideError = await deploySyncOverride(deps, cmd.app, appCfg, cmd.workdir)
   if (overrideError) return overrideError
 
-  const secretsError = await deployLinkSecrets(deps, cmd.app, appCfg, cmd.workdir)
+  const secretsError = await deployLinkSecrets(deps, cmd.app, cmd.workdir)
   if (secretsError) return secretsError
 
   try {
     const compose = deployNewCompose(deps, cmd.app, appCfg, cmd.workdir)
-    const buildArgs = appCfg.build_args ?? {}
     if (dockerHasBuildServices(cmd.workdir, appCfg.compose ?? [])) {
       progress.emit('build', `building ${cmd.app}`)
-      await compose.build(buildArgs)
+      await compose.build()
     }
 
     for (const hook of appCfg.pre_deploy ?? []) {
@@ -58,7 +57,7 @@ export async function deployRunFlow(
     }
 
     progress.emit('up', 'starting containers')
-    await compose.up({ services: appCfg.services ?? [], buildArgs })
+    await compose.up({ services: appCfg.services ?? [] })
 
     if (appCfg.health && appCfg.health.length > 0) {
       progress.emit('health', 'running health checks')
@@ -95,7 +94,7 @@ export async function deployResolveAppCompose(
   const workdir = pathsRepoPath(deps.paths, appName, appCfg.repo)
   const overrideError = await deploySyncOverride(deps, appName, appCfg, workdir)
   if (overrideError) return overrideError
-  const secretsError = await deployLinkSecrets(deps, appName, appCfg, workdir)
+  const secretsError = await deployLinkSecrets(deps, appName, workdir)
   if (secretsError) return secretsError
   return { appCfg, compose: deployNewCompose(deps, appName, appCfg, workdir) }
 }

@@ -29,7 +29,6 @@ describe('configLoad/configWrite', () => {
           web: {
             repo: 'hexnickk/web',
             branch: 'main',
-            env_file: '.env',
             domains: [{ host: 'example.com', port: 8080 }],
           },
         },

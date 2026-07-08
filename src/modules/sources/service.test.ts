@@ -68,7 +68,6 @@ function configFor(repo: string): Config {
         repo,
         branch: 'main',
         domains: [],
-        env_file: '.env',
       },
     },
   }
@@ -211,7 +210,6 @@ describe('sources service', () => {
           repo: 'acme/private',
           branch: 'main',
           domains: [],
-          env_file: '.env',
           source: 'missing',
         },
       },

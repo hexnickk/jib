@@ -6,7 +6,7 @@ import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
 import { addParseApp } from './app.ts'
 import { GENERATED_COMPOSE_FILE, addPersistGeneratedCompose } from './compose-scaffold.ts'
-import { addConfigEntriesToBuildArgs, addMergeConfigEntries } from './config-entries.ts'
+import { addMergeConfigEntries } from './config-entries.ts'
 import { addCollectDomains } from './domains.ts'
 import { addMergeGuidedServiceAnswers } from './guided.ts'
 import { addPromptForServices } from './service-prompts.ts'
@@ -42,7 +42,6 @@ export async function addBuildResolvedApp(
 ): Promise<App | Error> {
   const domains = await configAssignPorts(cfg, appName, guided.domains)
   if (domains instanceof Error) return domains
-  const buildArgs = addConfigEntriesToBuildArgs(guided.configEntries)
   const composeFiles = await persistComposeFiles(paths, appName, workdir, inspection.composeFiles)
   const image = pathsDockerHubImage(inputs.repo)
   const parsedApp = addParseApp({
@@ -50,12 +49,10 @@ export async function addBuildResolvedApp(
     ...(image ? { image } : {}),
     branch: args.branch ?? 'main',
     domains,
-    env_file: '.env',
     services: inspection.services.map((service) => service.name),
     compose: composeFiles,
     ...(args.source ? { source: args.source } : {}),
     ...(inputs.healthChecks.length > 0 ? { health: inputs.healthChecks } : {}),
-    ...(buildArgs ? { build_args: buildArgs } : {}),
   })
   if (parsedApp instanceof Error) return parsedApp
   const resolved = dockerResolveFromCompose(

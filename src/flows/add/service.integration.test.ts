@@ -32,7 +32,6 @@ function configYaml(): string {
     '    repo: owner/existing',
     '    branch: main',
     '    domains: []',
-    '    env_file: .env',
     '',
   ].join('\n')
 }
@@ -51,7 +50,7 @@ describe('addRun with addCreateDefaultSupport', () => {
         modules: {},
         sources: {},
         apps: {
-          existing: { repo: 'owner/existing', branch: 'main', domains: [], env_file: '.env' },
+          existing: { repo: 'owner/existing', branch: 'main', domains: [] },
         },
       }
       await mkdir(paths.root, { recursive: true })
@@ -75,8 +74,6 @@ describe('addRun with addCreateDefaultSupport', () => {
         compose: [managedCompose],
         services: ['web'],
         domains: [{ host: 'blog.example.com', service: 'web', port: 20000, container_port: 80 }],
-        env_file: '.env',
-        build_args: { PUBLIC_URL: 'https://blog.example.com' },
       }
       await mkdir(paths.composeDir, { recursive: true })
       await writeFile(managedCompose, 'services:\n  web:\n    image: nginx\n')
@@ -109,7 +106,7 @@ describe('addRun with addCreateDefaultSupport', () => {
             healthChecks: [],
           },
           paths,
-          draftApp: { repo: upstream, branch: 'main', domains: [], env_file: '.env' },
+          draftApp: { repo: upstream, branch: 'main', domains: [] },
         },
       )
 

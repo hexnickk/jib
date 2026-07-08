@@ -96,15 +96,12 @@ apps:
         port: 5000
         ingress: tailscale
 
-  # App with build-time args
+  # App whose compose can read build-time values from secrets/buildargapp/.env
   buildargapp:
     repo: org/buildargapp
     branch: main
     compose: docker-compose.yml
     strategy: restart
-    build_args:
-      VITE_API_URL: https://api.example.com
-      BUILD_VERSION: "1.2.3"
     health:
       - path: /
         port: 9100

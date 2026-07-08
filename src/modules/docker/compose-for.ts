@@ -12,10 +12,9 @@ import { dockerOverridePath } from './override.ts'
  * stitches together declared compose files, and points at jib's managed
  * override file.
  *
- * `--env-file` is only set if the secrets file actually exists on disk —
+ * `--env-file` is only set if the managed secrets file exists on disk —
  * docker compose errors out when pointed at a missing file, and most apps
- * don't need secrets. `env_file: .env` at the app config level is the
- * default value of the schema, not a signal that secrets must exist.
+ * don't need secrets.
  */
 export function dockerComposeFor(
   cfg: Config,
@@ -30,10 +29,8 @@ export function dockerComposeFor(
     appCfg.compose && appCfg.compose.length > 0 ? appCfg.compose : ['docker-compose.yml']
   ).map((f) => (f.startsWith('/') ? f : join(dir, f)))
 
-  const envFileCandidate = appCfg.env_file
-    ? join(paths.secretsDir, app, appCfg.env_file)
-    : undefined
-  const envFile = envFileCandidate && existsSync(envFileCandidate) ? envFileCandidate : undefined
+  const envFileCandidate = join(paths.secretsDir, app, '.env')
+  const envFile = existsSync(envFileCandidate) ? envFileCandidate : undefined
 
   const config: ComposeConfig = {
     app,

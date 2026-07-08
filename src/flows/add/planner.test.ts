@@ -12,7 +12,6 @@ const draftApp: App = {
   repo: 'owner/demo',
   branch: 'main',
   domains: [],
-  env_file: '.env',
 }
 
 const cfg: Config = {

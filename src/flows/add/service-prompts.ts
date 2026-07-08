@@ -22,8 +22,8 @@ import type { ConfigEntry, ConfigScope } from './types.ts'
 
 const MANUAL_CONFIG_LINES = [
   'Enter additional environment variables as KEY=VALUE, one per line.',
-  'New entries are added to the runtime .env file by default.',
-  'If you need extra build args, add them to the app config after add completes.',
+  'New entries are written to the app .env file.',
+  'Compose can use the same .env values for runtime environment and build args.',
   'Press Enter on a blank line when finished.',
 ]
 
@@ -93,7 +93,7 @@ export async function addPromptForServices(
     let addManual = false
     if (tuiIsInteractive()) {
       const confirm = await tuiPromptConfirmResult({
-        message: `Add more runtime environment variables for "${service.name}"?`,
+        message: `Add more .env variables for "${service.name}"?`,
         initialValue: false,
       })
       if (confirm instanceof Error) return confirm
@@ -101,7 +101,7 @@ export async function addPromptForServices(
     }
     if (addManual) {
       const manual = await tuiPromptLinesResult({
-        title: `Additional runtime environment variables for "${service.name}"`,
+        title: `Additional .env variables for "${service.name}"`,
         lines: MANUAL_CONFIG_LINES,
         promptLabel: 'var',
         validateLine: addValidateEnvEntry,
@@ -133,9 +133,9 @@ function scopeSummaryLabel(scope: ConfigScope): string {
     case 'runtime':
       return 'runtime env var'
     case 'build':
-      return 'build arg'
+      return 'build var'
     case 'both':
-      return 'runtime env var + build arg'
+      return 'runtime env var + build var'
   }
 }
 

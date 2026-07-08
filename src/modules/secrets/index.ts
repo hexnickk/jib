@@ -6,7 +6,6 @@ export {
 } from './errors.ts'
 export {
   secretsCheckApp,
-  secretsEnvPath,
   secretsReadMasked,
   secretsRemove,
   secretsRemoveApp,

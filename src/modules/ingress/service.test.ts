@@ -11,7 +11,6 @@ describe('ingress service', () => {
         { host: 'web.example.com', port: 20000, ingress: 'direct' },
         { host: 'edge.example.com', port: 20001, ingress: 'cloudflare-tunnel' },
       ],
-      env_file: '.env',
     })
     expect(claim).toEqual({
       app: 'web',
@@ -27,7 +26,6 @@ describe('ingress service', () => {
       repo: 'acme/web',
       branch: 'main',
       domains: [],
-      env_file: '.env',
     })
     expect(claim).toBeNull()
   })
@@ -37,7 +35,6 @@ describe('ingress service', () => {
       repo: 'acme/web',
       branch: 'main',
       domains: [{ host: 'web.example.com', ingress: 'direct' }],
-      env_file: '.env',
     })
 
     expect(claim).toBeInstanceOf(IngressMissingPortError)
@@ -57,7 +54,6 @@ describe('ingress service', () => {
         repo: 'acme/web',
         branch: 'main',
         domains: [{ host: 'web.example.com', ingress: 'direct' }],
-        env_file: '.env',
       },
     )
 

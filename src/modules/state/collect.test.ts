@@ -54,7 +54,6 @@ describe('stateCollectApps', () => {
             repo: 'local',
             branch: 'main',
             domains: [],
-            env_file: '.env',
           },
         },
       } as Config

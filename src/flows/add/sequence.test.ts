@@ -9,7 +9,6 @@ const addResult: AddFlowResult = {
     branch: 'main',
     compose: ['docker-compose.yml'],
     domains: [],
-    env_file: '.env',
     services: ['blog'],
   },
   secretsWritten: 1,

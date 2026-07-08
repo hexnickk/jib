@@ -51,7 +51,6 @@ export async function deployUpApp(
   const result = await deployRunOrReturnError(() =>
     ready.compose.up({
       services: ready.appCfg.services ?? [],
-      buildArgs: ready.appCfg.build_args ?? {},
     }),
   )
   return result instanceof Error ? result : undefined

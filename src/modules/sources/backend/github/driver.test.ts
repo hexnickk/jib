@@ -18,7 +18,6 @@ function app(source?: string): App {
     repo: 'acme/site',
     branch: 'main',
     domains: [],
-    env_file: '.env',
     ...(source ? { source } : {}),
   }
 }

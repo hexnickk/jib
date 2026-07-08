@@ -13,7 +13,7 @@ describe('add flow state machine', () => {
 
     const result = await flow.run(addMakeParams())
 
-    expect(result).toEqual({ finalApp: addFinalApp, secretsWritten: 2 })
+    expect(result).toEqual({ finalApp: addFinalApp, secretsWritten: 3 })
     expect(states).toEqual([
       'inputs_ready',
       'repo_prepared',
@@ -34,6 +34,7 @@ describe('add flow state machine', () => {
       'writeConfig',
       'upsertSecret:APP_KEY',
       'upsertSecret:PUBLIC_URL',
+      'upsertSecret:BUILD_VERSION',
       'claimRoutes',
     ])
   })

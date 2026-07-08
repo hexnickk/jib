@@ -14,7 +14,7 @@ const cfg: Config = {
   modules: {},
   sources: {},
   apps: {
-    demo: { repo: 'owner/demo', branch: 'main', domains: [], env_file: '.env' },
+    demo: { repo: 'owner/demo', branch: 'main', domains: [] },
   },
 }
 

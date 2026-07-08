@@ -17,7 +17,6 @@ describe('ConfigSchema', () => {
     expect(cfg.config_version).toBe(3)
     expect(cfg.poll_interval).toBe('5m')
     expect(cfg.apps.web?.branch).toBe('main')
-    expect(cfg.apps.web?.env_file).toBe('.env')
   })
 
   test('StringOrSlice normalizes string → string[]', () => {

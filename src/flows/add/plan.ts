@@ -22,7 +22,7 @@ export async function addConfirmPlan(
       services: addSummarizeComposeServices(inspection.services),
       domains: finalApp.domains,
       configEntries,
-      envFile: finalApp.env_file,
+      envFile: '.env',
     }),
   )
   if (!tuiIsInteractive()) return

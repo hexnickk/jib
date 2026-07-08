@@ -15,7 +15,6 @@ export function addBuildDraftApp(
     ...(image ? { image } : {}),
     branch: args.branch ?? 'main',
     domains: [],
-    env_file: '.env',
     ...(!inputs.composeRaw && image ? { compose: [GENERATED_COMPOSE_FILE] } : {}),
     ...(args.source ? { source: args.source } : {}),
     ...(inputs.composeRaw ? { compose: inputs.composeRaw } : {}),

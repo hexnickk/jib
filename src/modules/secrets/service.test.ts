@@ -3,13 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { SecretsReadError, SecretsStatError, SecretsWriteError } from './errors.ts'
-import {
-  secretsCheckApp,
-  secretsEnvPath,
-  secretsReadMasked,
-  secretsRemove,
-  secretsUpsert,
-} from './service.ts'
+import { secretsCheckApp, secretsReadMasked, secretsRemove, secretsUpsert } from './service.ts'
 
 async function withSecretsDir<T>(fn: (ctx: { secretsDir: string }) => Promise<T>): Promise<T> {
   const secretsDir = await mkdtemp(join(tmpdir(), 'jib-secrets-service-'))
@@ -70,7 +64,6 @@ describe('secrets service', () => {
         { key: 'A', masked: '***' },
         { key: 'B', masked: '***' },
       ])
-      expect(secretsEnvPath(ctx, 'web')).toBe(join(ctx.secretsDir, 'web', '.env'))
     })
   })
 })

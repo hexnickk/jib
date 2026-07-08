@@ -61,7 +61,7 @@ async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: st
   }
   const key = pair.slice(0, separator)
   const value = pair.slice(separator + 1)
-  const upsertError = await secretsUpsert(secrets, appName, key, value, appCfg.env_file)
+  const upsertError = await secretsUpsert(secrets, appName, key, value)
   if (upsertError instanceof Error) return upsertError
   if (cliIsTextOutput()) consola.success(`set ${key} for ${appName}`)
   return { app: appName, key, updated: true }
@@ -88,14 +88,14 @@ async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
   for (const appName of apps) {
     const appCfg = cfg.apps[appName]
     if (!appCfg) return new CliError('missing_app', `app "${appName}" not found in config`)
-    const status = await secretsCheckApp(secrets, appName, appCfg.env_file)
+    const status = await secretsCheckApp(secrets, appName)
     if (status instanceof Error) return status
     if (!status.exists) {
       items.push({ app: appName, path: null, entries: [] })
       missingApp = true
       continue
     }
-    const entries = await secretsReadMasked(secrets, appName, appCfg.env_file)
+    const entries = await secretsReadMasked(secrets, appName)
     if (entries instanceof Error) return entries
     items.push({ app: appName, path: status.path, entries })
   }
@@ -126,7 +126,7 @@ async function envDeleteRunCommand(args: ArgumentsCamelCase<{ app: string; key: 
   const { cfg, secrets } = loaded
   const appCfg = cfg.apps[appName]
   if (!appCfg) return new CliError('missing_app', `app "${appName}" not found in config`)
-  const removed = await secretsRemove(secrets, appName, key, appCfg.env_file)
+  const removed = await secretsRemove(secrets, appName, key)
   if (removed instanceof Error) return removed
   if (!removed) return new CliError('missing_env_key', `key "${key}" not found in ${appName}`)
   if (cliIsTextOutput()) consola.success(`deleted ${key} from ${appName}`)

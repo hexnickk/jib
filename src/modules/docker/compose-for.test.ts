@@ -39,7 +39,6 @@ function fixture(): { cfg: Config; paths: Paths } {
         repo: 'local',
         branch: 'main',
         compose: ['compose.yml'],
-        env_file: '.env',
         domains: [],
       },
     },

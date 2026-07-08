@@ -25,11 +25,6 @@ export interface MaskedSecretEntry {
 const FILE_MODE = 0o640
 const DIR_MODE = 0o750
 
-/** Normalizes the env filename so callers can omit it for the default `.env`. */
-function envFileName(name?: string): string {
-  return name && name !== '' ? name : '.env'
-}
-
 /** Splits an env file into mutable lines plus a key-to-line index. */
 function parseEnv(content: string): { lines: string[]; entries: Map<string, number> } {
   const lines = content.split('\n')
@@ -80,18 +75,12 @@ async function writeSecure(path: string, content: string): Promise<undefined | S
   }
 }
 
-/** Returns the managed env-file path for one app under the secrets tree. */
-export function secretsEnvPath(ctx: SecretsContext, app: string, envFile?: string): string {
-  return join(ctx.secretsDir, app, envFileName(envFile))
-}
-
 /** Checks whether an app secrets file exists without treating absence as failure. */
 export async function secretsCheckApp(
   ctx: SecretsContext,
   app: string,
-  envFile?: string,
 ): Promise<AppSecretStatus | SecretsStatError> {
-  const path = secretsEnvPath(ctx, app, envFile)
+  const path = join(ctx.secretsDir, app, '.env')
   try {
     await stat(path)
     return { app, exists: true, path }
@@ -105,9 +94,8 @@ export async function secretsCheckApp(
 export async function secretsReadMasked(
   ctx: SecretsContext,
   app: string,
-  envFile?: string,
 ): Promise<MaskedSecretEntry[] | SecretsReadError> {
-  const path = secretsEnvPath(ctx, app, envFile)
+  const path = join(ctx.secretsDir, app, '.env')
   const content = await readEnvIfPresent(path)
   if (content instanceof SecretsReadError) return content
   if (content === undefined) return new SecretsReadError(path)
@@ -127,12 +115,11 @@ export async function secretsUpsert(
   app: string,
   key: string,
   value: string,
-  envFile?: string,
 ): Promise<undefined | SecretsReadError | SecretsWriteError> {
   const appDir = join(ctx.secretsDir, app)
   const ensured = await ensureAppDir(appDir)
   if (ensured instanceof SecretsWriteError) return ensured
-  const path = secretsEnvPath(ctx, app, envFile)
+  const path = join(ctx.secretsDir, app, '.env')
   const existing = await readEnvIfPresent(path)
   if (existing instanceof SecretsReadError) return existing
   const { lines, entries } = parseEnv(existing ?? '')
@@ -154,9 +141,8 @@ export async function secretsRemove(
   ctx: SecretsContext,
   app: string,
   key: string,
-  envFile?: string,
 ): Promise<boolean | SecretsReadError | SecretsWriteError> {
-  const path = secretsEnvPath(ctx, app, envFile)
+  const path = join(ctx.secretsDir, app, '.env')
   const content = await readEnvIfPresent(path)
   if (content instanceof SecretsReadError) return content
   if (content === undefined) return false

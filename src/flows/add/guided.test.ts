@@ -135,7 +135,7 @@ describe('guided add helpers', () => {
     expect(summary).toContain('web: demo.example.com')
     expect(summary).toContain('worker: internal only')
     expect(summary).toContain('runtime vars (.env): DATABASE_URL, PUBLIC_URL')
-    expect(summary).toContain('build args: VITE_HOST_URL, PUBLIC_URL')
+    expect(summary).toContain('build vars (.env): VITE_HOST_URL, PUBLIC_URL')
   })
 
   test('env entry parser accepts KEY=VALUE format and rejects missing equals', () => {

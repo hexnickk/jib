@@ -16,7 +16,7 @@ const baseCfg: Config = {
   modules: {},
   sources: {},
   apps: {
-    existing: { repo: 'owner/existing', branch: 'main', domains: [], env_file: '.env' },
+    existing: { repo: 'owner/existing', branch: 'main', domains: [] },
   },
 }
 
@@ -26,7 +26,6 @@ const draftApp: App = {
   repo: 'owner/blog',
   branch: 'main',
   domains: [],
-  env_file: '.env',
 }
 
 const inspection: ComposeInspection = {
@@ -49,11 +48,6 @@ export const addFinalApp: App = {
   compose: ['compose.yml'],
   services: ['web'],
   domains: [{ host: 'blog.example.com', service: 'web', port: 20000, container_port: 80 }],
-  env_file: '.env',
-  build_args: {
-    PUBLIC_URL: 'https://blog.example.com',
-    BUILD_VERSION: '1.2.3',
-  },
 }
 
 export function addMakeParams(): AddFlowParams {
@@ -117,7 +111,6 @@ export function addMakeDeps(
           repo: 'owner/worker',
           branch: 'main',
           domains: [],
-          env_file: '.env',
         }
       }
       writtenConfigs.push(structuredClone(cfg))

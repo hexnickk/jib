@@ -64,9 +64,7 @@ export const AppSchema = z.object({
   compose: StringOrSlice.optional(),
   health: z.array(HealthCheckSchema).optional(),
   pre_deploy: z.array(PreDeployHookSchema).optional(),
-  build_args: z.record(z.string(), z.string()).optional(),
   domains: z.array(DomainSchema).default([]),
-  env_file: z.string().default('.env'),
   services: z.array(z.string()).optional(),
 })
 

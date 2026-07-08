@@ -1,5 +1,4 @@
 import type { Step } from '@jib/tx'
-import { addConfigEntriesToRuntime } from './config-entries.ts'
 import {
   type AddFlowError,
   ClaimIngressError,
@@ -39,39 +38,31 @@ export const addWriteConfigStep: Step<AddRunContext, { configWritten: true }, Ad
   },
 }
 
-export const addWriteSecretsStep: Step<
-  AddRunContext,
-  { envFile: string; keys: string[] },
-  AddFlowError
-> = {
+export const addWriteSecretsStep: Step<AddRunContext, { keys: string[] }, AddFlowError> = {
   name: 'secrets',
   async up(ctx) {
-    const runtimeEntries = addConfigEntriesToRuntime(ctx.guided.configEntries)
     const keys: string[] = []
-    for (const entry of runtimeEntries) {
+    for (const { key, value } of ctx.guided.configEntries) {
+      const entry = { key, value }
       try {
-        const error = await ctx.support.upsertSecret(
-          ctx.params.appName,
-          entry,
-          ctx.finalApp.env_file,
-        )
+        const error = await ctx.support.upsertSecret(ctx.params.appName, entry)
         if (!(error instanceof Error)) {
           keys.push(entry.key)
           continue
         }
-        await cleanupWrittenSecrets(ctx, keys, ctx.finalApp.env_file)
+        await cleanupWrittenSecrets(ctx, keys)
         return new SecretWriteError(entry.key, error)
       } catch (cause) {
-        await cleanupWrittenSecrets(ctx, keys, ctx.finalApp.env_file)
+        await cleanupWrittenSecrets(ctx, keys)
         return new SecretWriteError(entry.key, cause)
       }
     }
-    ctx.secretsWritten = runtimeEntries.length
+    ctx.secretsWritten = ctx.guided.configEntries.length
     ctx.observer.onStateChange?.('secrets_written')
-    return { envFile: ctx.finalApp.env_file, keys }
+    return { keys }
   },
   async down(ctx, state) {
-    await cleanupWrittenSecrets(ctx, state.keys, state.envFile)
+    await cleanupWrittenSecrets(ctx, state.keys)
     return undefined
   },
 }
@@ -89,11 +80,10 @@ export const addClaimIngressStep: Step<AddRunContext, undefined, AddFlowError> =
 async function cleanupWrittenSecrets(
   ctx: AddRunContext,
   keys: readonly string[],
-  envFile: string,
 ): Promise<undefined> {
   for (const key of keys) {
     try {
-      const error = await ctx.support.removeSecret(ctx.params.appName, key, envFile)
+      const error = await ctx.support.removeSecret(ctx.params.appName, key)
       if (error instanceof Error) {
         ctx.observer.warn?.(`secret cleanup (${key}): ${error.message}`)
       }

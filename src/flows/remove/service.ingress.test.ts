@@ -13,7 +13,6 @@ const cfg: Config = {
       repo: 'owner/demo',
       branch: 'main',
       domains: [{ host: 'demo.example.com', port: 3000 }],
-      env_file: '.env',
     },
   },
 }

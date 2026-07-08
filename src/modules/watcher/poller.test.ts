@@ -20,7 +20,6 @@ function mkCfg(overrides: Partial<Config> = {}): Config {
         repo: 'acme/demo',
         branch: 'main',
         domains: [{ host: 'demo.example.com', port: 3000 }],
-        env_file: '.env',
       },
     },
     ...overrides,

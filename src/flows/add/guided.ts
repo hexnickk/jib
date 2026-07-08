@@ -156,7 +156,9 @@ export function addRenderPlanSummary(input: {
   lines.push(
     `runtime vars (${input.envFile}): ${runtimeKeys.length > 0 ? runtimeKeys.join(', ') : 'none'}`,
   )
-  lines.push(`build args: ${buildKeys.length > 0 ? buildKeys.join(', ') : 'none'}`)
+  lines.push(
+    `build vars (${input.envFile}): ${buildKeys.length > 0 ? buildKeys.join(', ') : 'none'}`,
+  )
   return lines.join('\n')
 }
 

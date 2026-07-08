@@ -21,7 +21,6 @@ function mkCfg(): Config {
         repo: 'local',
         branch: 'main',
         domains: [{ host: 'demo.example.com', port: 3000 }],
-        env_file: '.env',
       },
     },
   }
@@ -136,15 +135,16 @@ describe('deployApp', () => {
     expect(result).toBeInstanceOf(DeployMissingAppError)
   })
 
-  test('forwards build args to both build and up', async () => {
+  test('uses the managed env file for compose interpolation', async () => {
     const { paths, store, log } = await mkEnv()
     const workdir = await mkWorkdir()
+    await mkdir(join(paths.secretsDir, 'demo'), { recursive: true })
+    await writeFile(
+      join(paths.secretsDir, 'demo', '.env'),
+      'VITE_HOST_URL=https://demo.example.com\n',
+    )
     const calls: Call[] = []
     const cfg = mkCfg()
-    const demo = cfg.apps.demo
-    expect(demo).toBeDefined()
-    if (!demo) return
-    demo.build_args = { VITE_HOST_URL: 'https://demo.example.com' }
 
     const result = await deployApp(
       {
@@ -162,8 +162,10 @@ describe('deployApp', () => {
     expect(result instanceof Error).toBe(false)
     const buildCall = calls.find((call) => call.args.includes('build'))
     const upCall = calls.find((call) => call.args.includes('up'))
-    expect(buildCall?.env).toEqual({ VITE_HOST_URL: 'https://demo.example.com' })
-    expect(upCall?.env).toEqual({ VITE_HOST_URL: 'https://demo.example.com' })
+    expect(buildCall?.env).toBeUndefined()
+    expect(upCall?.env).toBeUndefined()
+    expect(buildCall?.args).toContain('--env-file')
+    expect(buildCall?.args).toContain(join(paths.secretsDir, 'demo', '.env'))
   })
 
   test('insufficient disk space returns a typed error', async () => {
@@ -224,7 +226,6 @@ describe('deployApp', () => {
       repo: 'local',
       branch: 'main',
       domains: [],
-      env_file: '.env',
     }
 
     const result = await deployApp(
@@ -277,7 +278,6 @@ describe('deployUpApp', () => {
       repo: 'local',
       branch: 'main',
       domains: [],
-      env_file: '.env',
     }
     const workdir = pathsRepoPath(paths, 'demo', cfg.apps.demo.repo)
     await mkdir(workdir, { recursive: true })

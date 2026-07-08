@@ -28,7 +28,6 @@ function mkApp(overrides: Partial<App>): App {
     repo: 'local',
     branch: 'main',
     domains: [],
-    env_file: '.env',
     ...overrides,
   } as App
 }
