@@ -77,7 +77,7 @@ export function configValidate(cfg: Config): ValidateConfigError | undefined {
     }
   }
 
-  let needsTunnel = false
+  let needsCloudflared = false
   for (const [name, app] of Object.entries(cfg.apps)) {
     if (!APP_NAME_RE.test(name)) errs.push(`app '${name}': name must match [a-z0-9-]+`)
     const repoErr = configValidateRepo(app.repo)
@@ -92,7 +92,7 @@ export function configValidate(cfg: Config): ValidateConfigError | undefined {
       if (domain.host !== domain.host.toLowerCase() || !DOMAIN_RE.test(domain.host)) {
         errs.push(`app '${name}': invalid hostname "${domain.host}"`)
       }
-      if (domain.ingress === 'cloudflare-tunnel') needsTunnel = true
+      if (domain.ingress === 'cloudflare-tunnel') needsCloudflared = true
     }
     for (const health of app.health ?? []) {
       if (!health.path.startsWith('/')) {
@@ -101,8 +101,8 @@ export function configValidate(cfg: Config): ValidateConfigError | undefined {
     }
   }
 
-  if (needsTunnel && !cfg.tunnel) {
-    errs.push('tunnel: config required when any domain uses cloudflare-tunnel ingress')
+  if (needsCloudflared && cfg.modules.cloudflared !== true) {
+    errs.push('modules.cloudflared: must be enabled when any domain uses cloudflare-tunnel ingress')
   }
 
   return errs.length > 0 ? new ValidateConfigError(errs.join('\n')) : undefined

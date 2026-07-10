@@ -1,10 +1,12 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { configLoad, configWrite } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
 import {
   CloudflaredSaveTunnelTokenError,
+  cloudflaredEnableConfig,
   cloudflaredEnableService,
   cloudflaredHasTunnelToken,
   cloudflaredSaveTunnelToken,
@@ -64,6 +66,26 @@ describe('cloudflared service helpers', () => {
 
       expect(result).toBeInstanceOf(CloudflaredSaveTunnelTokenError)
       expect(result).toHaveProperty('cause')
+    })
+  })
+
+  test('cloudflaredEnableConfig persists desired module enablement', async () => {
+    await withTmpPaths(async (root) => {
+      const paths = pathsGetPaths(root)
+      expect(
+        await configWrite(paths.configFile, {
+          config_version: 3,
+          poll_interval: '5m',
+          modules: {},
+          sources: {},
+          apps: {},
+        }),
+      ).toBeUndefined()
+
+      expect(await cloudflaredEnableConfig(paths)).toBeUndefined()
+      const config = await configLoad(paths.configFile)
+      if (config instanceof Error) throw config
+      expect(config.modules.cloudflared).toBe(true)
     })
   })
 

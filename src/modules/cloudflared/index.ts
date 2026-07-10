@@ -19,6 +19,7 @@ export {
 export { cloudflaredInstallResult } from './install.ts'
 export { cloudflaredUninstallResult } from './uninstall.ts'
 export {
+  cloudflaredEnableConfig,
   cloudflaredEnableService,
   cloudflaredHasTunnelToken,
   cloudflaredSaveTunnelToken,

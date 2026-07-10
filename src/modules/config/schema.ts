@@ -68,12 +68,6 @@ export const AppSchema = z.object({
   services: z.array(z.string()).optional(),
 })
 
-export const TunnelConfigSchema = z.object({
-  provider: z.literal('cloudflare'),
-  tunnel_id: z.string().optional(),
-  account_id: z.string().optional(),
-})
-
 export const ConfigSchema = z.object({
   config_version: z.number().int().positive(),
   poll_interval: z.string().default('5m'),
@@ -81,7 +75,6 @@ export const ConfigSchema = z.object({
   sources: z.record(z.string(), SourceSchema).optional().default({}),
   apps: z.record(z.string(), AppSchema).default({}),
   ingress: IngressConfigSchema.optional(),
-  tunnel: TunnelConfigSchema.optional(),
 })
 
 export type GitHubSource = z.infer<typeof GitHubSourceSchema>
@@ -91,5 +84,4 @@ export type Domain = z.infer<typeof DomainSchema>
 export type HealthCheck = z.infer<typeof HealthCheckSchema>
 export type PreDeployHook = z.infer<typeof PreDeployHookSchema>
 export type App = z.infer<typeof AppSchema>
-export type TunnelConfig = z.infer<typeof TunnelConfigSchema>
 export type Config = z.infer<typeof ConfigSchema>

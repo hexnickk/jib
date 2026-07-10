@@ -1,20 +1,16 @@
 import type { Config } from '@jib/config'
+import type { Paths } from '@jib/paths'
+import { cloudflaredHasTunnelToken } from './service.ts'
 
 export interface CloudflaredStatus {
   configured: boolean
-  accountId: string | null
-  tunnelId: string | null
+  enabled: boolean
+  hasToken: boolean
 }
 
-/** Reads the Cloudflare Tunnel status block from config. */
-export function cloudflaredReadStatus(config: Config): CloudflaredStatus {
-  if (!config.tunnel || config.tunnel.provider !== 'cloudflare') {
-    return { configured: false, tunnelId: null, accountId: null }
-  }
-
-  return {
-    configured: true,
-    tunnelId: config.tunnel.tunnel_id ?? null,
-    accountId: config.tunnel.account_id ?? null,
-  }
+/** Reads Cloudflare readiness from desired module enablement and managed token presence. */
+export function cloudflaredReadStatus(config: Config, paths: Paths): CloudflaredStatus {
+  const enabled = config.modules.cloudflared === true
+  const hasToken = cloudflaredHasTunnelToken(paths)
+  return { configured: enabled && hasToken, enabled, hasToken }
 }

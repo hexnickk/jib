@@ -1,6 +1,8 @@
+import { cloudflaredReadStatus } from '@jib-module/cloudflared'
 import { cliIsTextOutput } from '@jib/cli'
 import { type App, type Config, type Domain, configAssignPorts } from '@jib/config'
 import { type ComposeInspection, dockerResolveFromCompose } from '@jib/docker'
+import { ValidationError } from '@jib/errors'
 import { pathsDockerHubImage } from '@jib/paths'
 import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
@@ -40,6 +42,8 @@ export async function addBuildResolvedApp(
   inspection: ComposeInspection,
   guided: { domains: Domain[]; configEntries: ConfigEntry[] },
 ): Promise<App | Error> {
+  const capabilityError = validateTunnelReadiness(cfg, paths, guided.domains)
+  if (capabilityError) return capabilityError
   const domains = await configAssignPorts(cfg, appName, guided.domains)
   if (domains instanceof Error) return domains
   const composeFiles = await persistComposeFiles(paths, appName, workdir, inspection.composeFiles)
@@ -62,6 +66,27 @@ export async function addBuildResolvedApp(
   )
   if (resolved instanceof Error) return resolved
   return resolved
+}
+
+/** Ensures tunnel routes have both desired module enablement and a managed token. */
+function validateTunnelReadiness(
+  cfg: Config,
+  paths: Paths,
+  domains: Domain[],
+): ValidationError | undefined {
+  if (!domains.some((domain) => domain.ingress === 'cloudflare-tunnel')) return undefined
+  const status = cloudflaredReadStatus(cfg, paths)
+  if (!status.enabled) {
+    return new ValidationError(
+      'cloudflare tunnel ingress requires cloudflared to be enabled; run `sudo jib init`',
+    )
+  }
+  if (!status.hasToken) {
+    return new ValidationError(
+      'cloudflare tunnel ingress requires a tunnel token; run `jib cloudflared setup`',
+    )
+  }
+  return undefined
 }
 
 async function persistComposeFiles(

@@ -75,7 +75,7 @@ describe('configValidate', () => {
     expect(configValidate(base({ poll_interval: 'forever' }))).toBeInstanceOf(ValidateConfigError)
   })
 
-  test('requires tunnel when domain uses cloudflare-tunnel', () => {
+  test('requires cloudflared enablement when a domain uses tunnel ingress', () => {
     const cfg = base({
       apps: {
         web: {
@@ -86,12 +86,12 @@ describe('configValidate', () => {
     })
     const error = configValidate(cfg)
     expect(error).toBeInstanceOf(ValidateConfigError)
-    expect(error?.message).toContain('tunnel')
+    expect(error?.message).toContain('modules.cloudflared')
   })
 
-  test('accepts tunnel-ingress when tunnel config present', () => {
+  test('accepts tunnel ingress when cloudflared is enabled', () => {
     const cfg = base({
-      tunnel: { provider: 'cloudflare' },
+      modules: { cloudflared: true },
       apps: {
         web: {
           repo: 'hexnickk/web',

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { $ } from '@/libs/shell'
+import { type ConfigError, configLoad, configWrite } from '@jib/config'
 import { type Paths, pathsCredsPath, pathsEnsureCredsDirResult } from '@jib/paths'
 import { CloudflaredSaveTunnelTokenError } from './errors.ts'
 import { CLOUDFLARED_SERVICE_NAME } from './templates.ts'
@@ -56,6 +57,17 @@ export async function cloudflaredSaveTunnelToken(
       cause: error,
     })
   }
+}
+
+/** Persists cloudflared as an enabled host capability after successful setup. */
+export async function cloudflaredEnableConfig(paths: Paths): Promise<undefined | ConfigError> {
+  const config = await configLoad(paths.configFile)
+  if (config instanceof Error) return config
+  if (config.modules.cloudflared === true) return undefined
+  return configWrite(paths.configFile, {
+    ...config,
+    modules: { ...config.modules, cloudflared: true },
+  })
 }
 
 /** Enables and starts the systemd unit without surfacing runner exceptions. */
