@@ -4,14 +4,7 @@ import { type DeployError, type DeployResult, deployApp, deployCreateDeps } from
 import type { Paths } from '@jib/paths'
 import { sourcesSync } from '@jib/sources'
 import { tuiSpinner } from '@jib/tui'
-import {
-  DeployExecuteError,
-  DeployPrepareError,
-  type DeployRunError,
-  DeployTimeoutError,
-} from './errors.ts'
-
-export const DEFAULT_TIMEOUT_MS = 5 * 60_000
+import { DeployExecuteError, DeployPrepareError, type DeployRunError } from './errors.ts'
 
 interface DeploySpinner {
   message(value: string): void
@@ -40,10 +33,9 @@ export async function runDeploy(
   paths: Paths,
   app: string,
   ref?: string,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
   deps: DeployRunDeps = {},
 ): Promise<DeployRunResult> {
-  const result = await runDeployResult(cfg, paths, app, ref, timeoutMs, deps)
+  const result = await runDeployResult(cfg, paths, app, ref, deps)
   if (result instanceof Error) throw toCliError(result)
   return result
 }
@@ -54,7 +46,6 @@ export async function runDeployResult(
   paths: Paths,
   app: string,
   ref?: string,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
   deps: DeployRunDeps = {},
 ): Promise<DeployRunError | DeployRunResult> {
   const showProgress = cliIsTextOutput()
@@ -85,14 +76,18 @@ export async function runDeployResult(
     return deployPromise
   }
 
-  const deployed = await deployWithTimeout(deployPromise, timeoutMs)
-  if (deployed instanceof DeployTimeoutError || deployed instanceof DeployExecuteError) {
+  let deployed: DeployError | DeployResult
+  try {
+    deployed = await deployPromise
+  } catch (error) {
     deploySpin?.stop(`[2/2] failed to deploy ${app}`)
-    return deployed
+    return new DeployExecuteError(toErrorMessage(error), { cause: toErrorCause(error) })
   }
   if (deployed instanceof Error) {
     deploySpin?.stop(`[2/2] failed to deploy ${app}`)
-    return new DeployExecuteError(deployed.message, { cause: deployed })
+    return deployed instanceof DeployExecuteError
+      ? deployed
+      : new DeployExecuteError(deployed.message, { cause: deployed })
   }
 
   deploySpin?.stop(
@@ -151,29 +146,6 @@ function startDeployPreparedApp(
   } catch (error) {
     return new DeployExecuteError(toErrorMessage(error), { cause: toErrorCause(error) })
   }
-}
-
-function deployWithTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-): Promise<DeployExecuteError | DeployTimeoutError | T> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(new DeployTimeoutError(timeoutMs)), timeoutMs)
-    promise.then(
-      (value) => {
-        clearTimeout(timer)
-        resolve(value)
-      },
-      (error) => {
-        clearTimeout(timer)
-        resolve(
-          error instanceof DeployExecuteError
-            ? error
-            : new DeployExecuteError(toErrorMessage(error), { cause: toErrorCause(error) }),
-        )
-      },
-    )
-  })
 }
 
 function toCliError(error: DeployRunError): CliError {

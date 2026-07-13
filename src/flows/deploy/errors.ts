@@ -12,10 +12,4 @@ export class DeployExecuteError extends JibError {
   }
 }
 
-export class DeployTimeoutError extends JibError {
-  constructor(timeoutMs: number, options?: ErrorOptions) {
-    super('deploy_timeout', `deploy timed out after ${timeoutMs}ms`, options)
-  }
-}
-
-export type DeployRunError = DeployPrepareError | DeployExecuteError | DeployTimeoutError
+export type DeployRunError = DeployPrepareError | DeployExecuteError

@@ -39,7 +39,7 @@ function createNoopSpinner() {
 
 describe('runDeploy', () => {
   test('returns prepared and deployed shas on success', async () => {
-    const result = await runDeploy(cfg, paths, 'demo', undefined, 1000, {
+    const result = await runDeploy(cfg, paths, 'demo', undefined, {
       createSpinner: createNoopSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: async () => ({ deployedSHA: 'deadbeef12345678', durationMs: 42 }),
@@ -56,7 +56,7 @@ describe('runDeploy', () => {
 
   test('wraps source prep failures as deploy_failed', async () => {
     await expect(
-      runDeploy(cfg, paths, 'demo', undefined, 1000, {
+      runDeploy(cfg, paths, 'demo', undefined, {
         createSpinner: createNoopSpinner,
         sync: async () => {
           throw new Error('git clone failed')
@@ -69,7 +69,7 @@ describe('runDeploy', () => {
   })
 
   test('returns a typed prepare error instead of throwing for expected sync failures', async () => {
-    const result = await runDeployResult(cfg, paths, 'demo', undefined, 1000, {
+    const result = await runDeployResult(cfg, paths, 'demo', undefined, {
       createSpinner: createNoopSpinner,
       sync: async () => {
         throw new Error('git clone failed')
@@ -85,7 +85,7 @@ describe('runDeploy', () => {
 
   test('permission failures hint to repair the managed tree', async () => {
     await expect(
-      runDeploy(cfg, paths, 'demo', undefined, 1000, {
+      runDeploy(cfg, paths, 'demo', undefined, {
         createSpinner: createNoopSpinner,
         sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
         deployPrepared: async () => {

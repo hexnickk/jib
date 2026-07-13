@@ -16,7 +16,7 @@ import {
   addRollbackApp,
   addTrapInterrupt,
 } from '@/flows/add/runtime.ts'
-import { DEFAULT_TIMEOUT_MS, runDeploy } from '@/flows/deploy/run.ts'
+import { runDeploy } from '@/flows/deploy/run.ts'
 import { CliError, cliIsTextOutput } from '@jib/cli'
 import { type App, ConfigError, configLoad, configLoadContext } from '@jib/config'
 import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
@@ -123,8 +123,6 @@ async function addRunCommand(args: ArgumentsCamelCase<AddCommandArgv>) {
           { ...preflight.cfg, apps: { ...preflight.cfg.apps, [appName]: result.finalApp } },
           paths,
           appName,
-          undefined,
-          DEFAULT_TIMEOUT_MS,
         ),
       (result) => addRollbackApp(paths, appName, preflight.cfg, result.finalApp),
       interrupt,

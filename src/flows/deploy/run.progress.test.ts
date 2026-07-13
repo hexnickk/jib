@@ -1,7 +1,7 @@
 import type { Config } from '@jib/config'
 import type { Paths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
-import { DeployExecuteError, DeployTimeoutError } from './errors.ts'
+import { DeployExecuteError } from './errors.ts'
 import { runDeploy, runDeployResult } from './run.ts'
 
 const cfg: Config = {
@@ -37,43 +37,9 @@ function createNoopSpinner() {
   }
 }
 
-describe('runDeploy progress and timeout', () => {
-  test('times out slow deploys with a deploy_failed cli error', async () => {
-    await expect(
-      runDeploy(cfg, paths, 'demo', undefined, 5, {
-        createSpinner: createNoopSpinner,
-        sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
-        deployPrepared: async () => {
-          await new Promise((resolve) => setTimeout(resolve, 50))
-          return { deployedSHA: 'deadbeef12345678', durationMs: 50 }
-        },
-      }),
-    ).rejects.toMatchObject({
-      code: 'deploy_failed',
-      message: 'deploy timed out after 5ms',
-      hint: 'check docker compose output, then retry `jib deploy ...`',
-    })
-  })
-
-  test('returns a typed timeout error from the result-first api', async () => {
-    const result = await runDeployResult(cfg, paths, 'demo', undefined, 5, {
-      createSpinner: createNoopSpinner,
-      sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
-      deployPrepared: async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50))
-        return { deployedSHA: 'deadbeef12345678', durationMs: 50 }
-      },
-    })
-
-    expect(result).toBeInstanceOf(DeployTimeoutError)
-    expect(result).toMatchObject({
-      code: 'deploy_timeout',
-      message: 'deploy timed out after 5ms',
-    })
-  })
-
+describe('runDeploy progress', () => {
   test('returns a typed execute error when deploy throws before returning a promise', async () => {
-    const result = await runDeployResult(cfg, paths, 'demo', undefined, 1000, {
+    const result = await runDeployResult(cfg, paths, 'demo', undefined, {
       createSpinner: createNoopSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: () => {
@@ -102,7 +68,7 @@ describe('runDeploy progress and timeout', () => {
       },
     })
 
-    const result = await runDeploy(cfg, paths, 'demo', undefined, 1000, {
+    const result = await runDeploy(cfg, paths, 'demo', undefined, {
       createSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: async (_deps, _target, progress) => {
