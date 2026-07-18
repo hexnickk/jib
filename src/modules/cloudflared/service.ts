@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { $ } from '@/libs/shell'
-import { type ConfigError, configLoad, configWrite } from '@jib/config'
+import { configLoad, configWrite } from '@jib/config'
+import { InternalError, type JibError } from '@jib/errors'
 import { type Paths, pathsCredsPath, pathsEnsureCredsDirResult } from '@jib/paths'
-import { CloudflaredSaveTunnelTokenError } from './errors.ts'
 import { CLOUDFLARED_SERVICE_NAME } from './templates.ts'
 import { cloudflaredExtractTunnelToken } from './token.ts'
 
@@ -37,33 +37,35 @@ export function cloudflaredHasTunnelToken(paths: Paths): boolean {
 export async function cloudflaredSaveTunnelToken(
   paths: Paths,
   raw: string,
-): Promise<boolean | CloudflaredSaveTunnelTokenError> {
+): Promise<boolean | InternalError> {
   const token = cloudflaredExtractTunnelToken(raw)
-  if (!token) return false
+  if (!token) {
+    return false
+  }
 
   try {
     const path = cloudflaredTunnelTokenPath(paths)
     const ensured = await pathsEnsureCredsDirResult(paths, 'cloudflare')
     if (ensured instanceof Error) {
-      return new CloudflaredSaveTunnelTokenError(`write tunnel token: ${ensured.message}`, {
-        cause: ensured,
-      })
+      return new InternalError(`write tunnel token: ${ensured.message}`, { cause: ensured })
     }
     await writeFile(path, `TUNNEL_TOKEN=${token}\n`, { mode: 0o640 })
     return true
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    return new CloudflaredSaveTunnelTokenError(`write tunnel token: ${message}`, {
-      cause: error,
-    })
+    return new InternalError(`write tunnel token: ${message}`, { cause: error })
   }
 }
 
 /** Persists cloudflared as an enabled host capability after successful setup. */
-export async function cloudflaredEnableConfig(paths: Paths): Promise<undefined | ConfigError> {
+export async function cloudflaredEnableConfig(paths: Paths): Promise<undefined | JibError> {
   const config = await configLoad(paths.configFile)
-  if (config instanceof Error) return config
-  if (config.modules.cloudflared === true) return undefined
+  if (config instanceof Error) {
+    return config
+  }
+  if (config.modules.cloudflared === true) {
+    return undefined
+  }
   return configWrite(paths.configFile, {
     ...config,
     modules: { ...config.modules, cloudflared: true },

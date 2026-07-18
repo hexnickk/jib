@@ -10,7 +10,7 @@ import {
   dockerParseComposeServices,
   dockerWriteOverride,
 } from '@jib/docker'
-import { JibError } from '@jib/errors'
+import { InternalError, JibError } from '@jib/errors'
 import {
   type AppState,
   type StateStore,
@@ -19,14 +19,6 @@ import {
   stateRecordFailure,
   stateSave,
 } from '@jib/state'
-import {
-  DeployDiskCheckError,
-  DeployLockAcquireError,
-  DeployLockReleaseError,
-  DeployOverrideSyncError,
-  DeploySecretsLinkError,
-  DeployUnexpectedError,
-} from './errors.ts'
 import { deployBuildOverrideServices } from './override.ts'
 import type { DeployDeps } from './types.ts'
 
@@ -56,15 +48,12 @@ export async function deploySyncOverride(
   app: string,
   appCfg: App,
   workdir: string,
-): Promise<DeployOverrideSyncError | JibError | undefined> {
-  const result = await deployRunOrReturnError(
-    async () => {
-      const parsed = dockerParseComposeServices(workdir, appCfg.compose ?? [])
-      const services = deployBuildOverrideServices(parsed, appCfg.domains)
-      await dockerWriteOverride(deps.paths.overridesDir, app, services)
-    },
-    (message, options) => new DeployOverrideSyncError(message, options),
-  )
+): Promise<JibError | undefined> {
+  const result = await deployRunOrReturnError(async () => {
+    const parsed = dockerParseComposeServices(workdir, appCfg.compose ?? [])
+    const services = deployBuildOverrideServices(parsed, appCfg.domains)
+    await dockerWriteOverride(deps.paths.overridesDir, app, services)
+  })
   return result instanceof Error ? result : undefined
 }
 
@@ -73,24 +62,23 @@ export async function deployLinkSecrets(
   deps: DeployDeps,
   app: string,
   workdir: string,
-): Promise<DeploySecretsLinkError | undefined> {
+): Promise<JibError | undefined> {
   const src = join(deps.paths.secretsDir, app, '.env')
   try {
     await stat(src)
   } catch (error) {
     const code = typeof error === 'object' && error && 'code' in error ? error.code : undefined
-    if (code === 'ENOENT') return
-    return new DeploySecretsLinkError(messageOf(error), { cause: error })
+    if (code === 'ENOENT') {
+      return
+    }
+    return new InternalError(messageOf(error), { cause: error })
   }
 
-  const result = await deployRunOrReturnError(
-    async () => {
-      const dest = join(workdir, '.env')
-      await unlink(dest).catch(() => undefined)
-      await symlink(src, dest)
-    },
-    (message, options) => new DeploySecretsLinkError(message, options),
-  )
+  const result = await deployRunOrReturnError(async () => {
+    const dest = join(workdir, '.env')
+    await unlink(dest).catch(() => undefined)
+    await symlink(src, dest)
+  })
   return result instanceof Error ? result : undefined
 }
 
@@ -98,27 +86,28 @@ export async function deployLinkSecrets(
 export async function deployReadDiskFree(
   deps: DeployDeps,
   path: string,
-): Promise<DeployDiskCheckError | number> {
-  return deployRunOrReturnError(
-    async () => {
-      if (deps.diskFree) return deps.diskFree(path)
-      const result = await $`df -B1 --output=avail ${path}`
-      if (result.exitCode !== 0) return Number.POSITIVE_INFINITY
-      const line = result.stdout.trim().split('\n')[1] ?? '0'
-      return Number(line.trim())
-    },
-    (message, options) => new DeployDiskCheckError(message, options),
-  )
+): Promise<JibError | number> {
+  return deployRunOrReturnError(async () => {
+    if (deps.diskFree) {
+      return deps.diskFree(path)
+    }
+    const result = await $`df -B1 --output=avail ${path}`
+    if (result.exitCode !== 0) {
+      return Number.POSITIVE_INFINITY
+    }
+    const line = result.stdout.trim().split('\n')[1] ?? '0'
+    return Number(line.trim())
+  })
 }
 
 /** Acquires the non-blocking deploy lock for one app. */
 export async function deployAcquireLock(
   deps: DeployDeps,
   app: string,
-): Promise<(() => Promise<void>) | DeployLockAcquireError | JibError> {
+): Promise<(() => Promise<void>) | JibError> {
   const release = await stateAcquireLock(deps.paths.locksDir, app, { blocking: false })
   if (release instanceof Error) {
-    return new DeployLockAcquireError(app, release.message, { cause: release })
+    return new InternalError(`acquire lock for ${app}: ${release.message}`, { cause: release })
   }
   return release
 }
@@ -127,12 +116,12 @@ export async function deployAcquireLock(
 export async function deployReleaseLock(
   app: string,
   release: () => Promise<void>,
-): Promise<DeployLockReleaseError | JibError | undefined> {
-  const result = await deployRunOrReturnError(
-    () => release(),
-    (message, options) => new DeployLockReleaseError(app, message, options),
-  )
-  return result instanceof Error ? result : undefined
+): Promise<JibError | undefined> {
+  const result = await deployRunOrReturnError(() => release())
+  if (!(result instanceof Error)) {
+    return undefined
+  }
+  return new InternalError(`release lock for ${app}: ${result.message}`, { cause: result })
 }
 
 /** Loads the persisted deploy state for one app. */
@@ -141,7 +130,7 @@ export async function deployReadState(
   app: string,
 ): Promise<AppState | JibError> {
   const result = await stateLoad(store, app)
-  return result instanceof JibError ? result : result
+  return result instanceof Error ? result : result
 }
 
 /** Persists updated deploy state for one app. */
@@ -164,27 +153,21 @@ export async function deployRecordFailure(
   return result instanceof Error ? result : undefined
 }
 
-/** Runs an async deploy helper and converts thrown failures into returned typed errors. */
-export async function deployRunOrReturnError<T, E extends JibError = JibError>(
-  run: () => Promise<T>,
-  fallback?: (message: string, options?: ErrorOptions) => E,
-): Promise<E | JibError | T> {
+/** Runs an async deploy helper and converts thrown failures into shared result errors. */
+export async function deployRunOrReturnError<T>(run: () => Promise<T>): Promise<JibError | T> {
   try {
     return await run()
   } catch (error) {
-    return deployCoerceError(error, fallback)
+    return deployCoerceError(error)
   }
 }
 
-/** Normalizes unknown thrown values into deploy-scoped typed errors. */
-export function deployCoerceError<E extends JibError = JibError>(
-  error: unknown,
-  fallback?: (message: string, options?: ErrorOptions) => E,
-): E | JibError {
-  if (error instanceof JibError) return error
-  const message = messageOf(error)
-  if (fallback) return fallback(message, { cause: error })
-  return new DeployUnexpectedError(message, { cause: error })
+/** Normalizes unknown thrown values into a shared internal error. */
+export function deployCoerceError(error: unknown): JibError {
+  if (error instanceof JibError) {
+    return error
+  }
+  return new InternalError(messageOf(error), { cause: error })
 }
 
 function messageOf(error: unknown): string {

@@ -1,5 +1,5 @@
 import net from 'node:net'
-import { PortExhaustedError } from './errors.ts'
+import { InternalError } from '@jib/errors'
 
 /**
  * Minimal structural shape the allocator needs from a parsed jib config.
@@ -36,17 +36,19 @@ const DEFAULT_RANGE: [number, number] = [20000, 29999]
  * Ports outside the managed range are never *handed out*, but they are
  * tracked so the allocator never hands out a duplicate.
  */
-export async function configAllocatePort(
-  opts: AllocatePortOpts,
-): Promise<number | PortExhaustedError> {
+export async function configAllocatePort(opts: AllocatePortOpts): Promise<number | InternalError> {
   const [lo, hi] = opts.range ?? DEFAULT_RANGE
   const used = configCollectUsedPorts(opts.config)
   for (let port = lo; port <= hi; port++) {
-    if (used.has(port)) continue
-    if (opts.probeHost && !(await configIsPortFree(port))) continue
+    if (used.has(port)) {
+      continue
+    }
+    if (opts.probeHost && !(await configIsPortFree(port))) {
+      continue
+    }
     return port
   }
-  return new PortExhaustedError(
+  return new InternalError(
     `no free port in managed range ${lo}-${hi}: all ${hi - lo + 1} ports in use`,
   )
 }
@@ -55,7 +57,9 @@ function configCollectUsedPorts(config: PortAllocatorConfig): Set<number> {
   const used = new Set<number>()
   for (const app of Object.values(config.apps)) {
     for (const domain of app.domains) {
-      if (typeof domain.port === 'number') used.add(domain.port)
+      if (typeof domain.port === 'number') {
+        used.add(domain.port)
+      }
     }
   }
   return used

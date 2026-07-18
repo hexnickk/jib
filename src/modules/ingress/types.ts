@@ -1,3 +1,5 @@
+import type { JibError } from '@jib/errors'
+
 export interface IngressDomain {
   host: string
   port: number
@@ -18,6 +20,9 @@ export interface IngressOperator {
   claim(
     claim: IngressClaim,
     onProgress?: (progress: IngressProgress) => void,
-  ): Promise<undefined | Error>
-  release(app: string, onProgress?: (progress: IngressProgress) => void): Promise<undefined | Error>
+  ): Promise<JibError | undefined>
+  release(
+    app: string,
+    onProgress?: (progress: IngressProgress) => void,
+  ): Promise<JibError | undefined>
 }

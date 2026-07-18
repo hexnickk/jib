@@ -1,4 +1,4 @@
-import { ParseDomainArgError, ParseHealthArgError, PortExhaustedError } from './errors.ts'
+import { InternalError, ValidationError } from '@jib/errors'
 import { configAllocatePort } from './port-allocator.ts'
 import type { App, Config, Domain } from './schema.ts'
 
@@ -12,22 +12,19 @@ export interface ParsedDomain {
 const VALID_INGRESS = new Set(['direct', 'cloudflare-tunnel'])
 
 /** Parse `host=<domain>[,port=<n>][,service=<name>][,ingress=direct|cloudflare-tunnel]`. */
-export function configParseDomain(
-  raw: string,
-  fallback: string,
-): ParsedDomain | ParseDomainArgError {
+export function configParseDomain(raw: string, fallback: string): ParsedDomain | ValidationError {
   const pairs = new Map<string, string>()
   for (const part of raw.split(',')) {
     const eq = part.indexOf('=')
     if (eq < 1) {
-      return new ParseDomainArgError(`invalid --domain "${raw}" (expected key=value pairs)`)
+      return new ValidationError(`invalid --domain "${raw}" (expected key=value pairs)`)
     }
     pairs.set(part.slice(0, eq), part.slice(eq + 1))
   }
 
   const host = pairs.get('host')
   if (!host) {
-    return new ParseDomainArgError(`invalid --domain "${raw}" (missing required "host" key)`)
+    return new ValidationError(`invalid --domain "${raw}" (missing required "host" key)`)
   }
 
   const out: ParsedDomain = { host }
@@ -35,17 +32,19 @@ export function configParseDomain(
   if (portStr !== undefined) {
     const container_port = Number(portStr)
     if (!Number.isInteger(container_port) || container_port < 1 || container_port > 65535) {
-      return new ParseDomainArgError(`invalid port in --domain "${raw}" (expected integer 1-65535)`)
+      return new ValidationError(`invalid port in --domain "${raw}" (expected integer 1-65535)`)
     }
     out.container_port = container_port
   }
 
   const service = pairs.get('service')
-  if (service) out.service = service
+  if (service) {
+    out.service = service
+  }
 
   const ingress = pairs.get('ingress') ?? fallback
   if (ingress && !VALID_INGRESS.has(ingress)) {
-    return new ParseDomainArgError(
+    return new ValidationError(
       `invalid ingress "${ingress}" in --domain "${raw}" (expected direct|cloudflare-tunnel)`,
     )
   }
@@ -56,23 +55,27 @@ export function configParseDomain(
 }
 
 /** Parse `/path:port` into a health check entry. */
-export function configParseHealth(
-  raw: string,
-): { path: string; port: number } | ParseHealthArgError {
+export function configParseHealth(raw: string): { path: string; port: number } | ValidationError {
   const idx = raw.lastIndexOf(':')
-  if (idx < 1) return new ParseHealthArgError(`invalid --health "${raw}" (expected /path:port)`)
+  if (idx < 1) {
+    return new ValidationError(`invalid --health "${raw}" (expected /path:port)`)
+  }
 
   const path = raw.slice(0, idx)
   const port = Number(raw.slice(idx + 1))
-  if (!path.startsWith('/')) return new ParseHealthArgError(`--health path must start with '/'`)
+  if (!path.startsWith('/')) {
+    return new ValidationError(`--health path must start with '/'`)
+  }
   if (!Number.isInteger(port)) {
-    return new ParseHealthArgError(`invalid port in --health "${raw}"`)
+    return new ValidationError(`invalid port in --health "${raw}"`)
   }
   return { path, port }
 }
 
 export function configToArray(value: string | string[] | undefined): string[] {
-  if (value === undefined) return []
+  if (value === undefined) {
+    return []
+  }
   return Array.isArray(value) ? value : [value]
 }
 
@@ -85,8 +88,10 @@ export async function configAssignPorts(
   cfg: Config,
   app: string,
   domains: Domain[],
-): Promise<Domain[] | PortExhaustedError> {
-  if (domains.length === 0) return []
+): Promise<Domain[] | InternalError> {
+  if (domains.length === 0) {
+    return []
+  }
   const out: Domain[] = []
   const base = (cfg.apps[app] ?? { domains: [] as Domain[] }) as App
   const scratch: Config = {
@@ -98,7 +103,9 @@ export async function configAssignPorts(
       out.push(domain)
     } else {
       const allocated = await configAllocatePort({ config: scratch, probeHost: true })
-      if (allocated instanceof PortExhaustedError) return allocated
+      if (allocated instanceof InternalError) {
+        return allocated
+      }
       out.push({ ...domain, port: allocated })
     }
     const current = scratch.apps[app] as App

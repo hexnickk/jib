@@ -6,7 +6,6 @@ export const manifest = {
 
 export { ingressGetExec } from './exec.ts'
 export { ingressCreateOperator, ingressDefaultBackend } from './backends/index.ts'
-export { IngressMissingPortError, NginxIngressReloadError } from './errors.ts'
 export { ingressBuildClaim, ingressClaim, ingressRelease } from './service.ts'
 export { ingressInstall } from './install.ts'
 export { ingressUninstall } from './uninstall.ts'

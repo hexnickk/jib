@@ -1,4 +1,5 @@
 import type { App, Config, Source } from '@jib/config'
+import type { JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { pathsIsExternalRepoURL, pathsPathExistsResult } from '@jib/paths'
 import { sourcesGitConfigureSshKey } from '../../git.ts'
@@ -18,7 +19,9 @@ const AUTH_FAILURE_SNIPPETS = [
 ]
 
 export function githubCloneUrl(app: App, cfg: Config): string {
-  if (pathsIsExternalRepoURL(app.repo)) return app.repo
+  if (pathsIsExternalRepoURL(app.repo)) {
+    return app.repo
+  }
   const sourceType = app.source ? cfg.sources[app.source]?.type : undefined
   return sourceType === 'key'
     ? githubRemoteSshCloneUrl(app.repo)
@@ -29,11 +32,13 @@ export async function githubResolveSource(
   cfg: Config,
   app: App,
   paths: Paths,
-): Promise<ResolvedDriverSource | Error> {
+): Promise<ResolvedDriverSource | JibError> {
   const external = pathsIsExternalRepoURL(app.repo)
   const auth =
     !external && app.source ? await githubAuthRefresh(app.source, cfg, app, paths) : undefined
-  if (auth instanceof Error) return auth
+  if (auth instanceof Error) {
+    return auth
+  }
   const env = auth?.sshKeyPath ? sourcesGitConfigureSshKey(auth.sshKeyPath) : {}
   const url =
     auth?.token && !external

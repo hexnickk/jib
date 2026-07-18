@@ -1,8 +1,8 @@
 import { $ } from '@/libs/shell'
 import type { Config } from '@jib/config'
+import type { InternalError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { type SourceStatus, sourcesCollectStatuses } from '@jib/sources'
-import { StateError } from './errors.ts'
 import { stateCreateStore, stateLoad } from './store.ts'
 
 export interface ServiceStatus {
@@ -42,16 +42,22 @@ export async function stateCollectServices(hasCloudflared: boolean): Promise<Ser
 /** Normalizes `systemctl is-active` output into a stable display string. */
 export function stateNormalizeUnitStatus(output: string, exitCode: number): string {
   const raw = output.trim()
-  if (!raw) return exitCode === 0 ? 'unknown' : 'unavailable'
+  if (!raw) {
+    return exitCode === 0 ? 'unknown' : 'unavailable'
+  }
   const firstLine = raw.split('\n', 1)[0]?.trim() ?? ''
   return /^[a-z-]+$/.test(firstLine) ? firstLine : 'unavailable'
 }
 
 async function checkUnit(name: string): Promise<ServiceStatus> {
-  const result = await $`systemctl is-active ${name}`
-  const output = result.stdout || result.stderr
-  const status = stateNormalizeUnitStatus(output, result.exitCode ?? 1)
-  return { name, active: status === 'active', status }
+  try {
+    const result = await $`systemctl is-active ${name}`
+    const output = result.stdout || result.stderr
+    const status = stateNormalizeUnitStatus(output, result.exitCode ?? 1)
+    return { name, active: status === 'active', status }
+  } catch {
+    return { name, active: false, status: 'unavailable' }
+  }
 }
 
 /** Collects source-driver status rows for the status screen. */
@@ -63,12 +69,14 @@ export async function stateCollectSources(cfg: Config, paths: Paths): Promise<So
 export async function stateCollectApps(
   cfg: Config,
   paths: Paths,
-): Promise<AppStatus[] | StateError> {
+): Promise<AppStatus[] | InternalError> {
   const store = stateCreateStore(paths.stateDir)
   const results: AppStatus[] = []
   for (const [name, app] of Object.entries(cfg.apps)) {
     const state = await stateLoad(store, name)
-    if (state instanceof StateError) return state
+    if (state instanceof Error) {
+      return state
+    }
     const containers = await collectContainers(name)
     results.push({
       name,
@@ -83,11 +91,15 @@ export async function stateCollectApps(
 }
 
 async function collectContainers(app: string): Promise<ContainerStatus[]> {
-  const res = await $`docker compose -p jib-${app} ps --format json`
-  if (res.exitCode !== 0) return []
-  const stdout = res.stdout.trim()
-  if (!stdout) return []
   try {
+    const res = await $`docker compose -p jib-${app} ps --format json`
+    if (res.exitCode !== 0) {
+      return []
+    }
+    const stdout = res.stdout.trim()
+    if (!stdout) {
+      return []
+    }
     return stdout
       .split('\n')
       .filter(Boolean)

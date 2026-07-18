@@ -1,4 +1,4 @@
-import { MissingInputError } from '@jib/cli'
+import { cliCreateMissingInputError } from '@jib/cli'
 import {
   type App,
   type HealthCheck,
@@ -8,7 +8,7 @@ import {
   configToArray,
   configValidateRepo,
 } from '@jib/config'
-import { ValidationError } from '@jib/errors'
+import { type JibError, ValidationError } from '@jib/errors'
 import {
   tuiIsInteractive,
   tuiPromptSelectResult,
@@ -38,16 +38,18 @@ const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 export async function addResolveAppName(
   app: string | undefined,
   existingApps: Record<string, App>,
-): Promise<string | MissingInputError | ValidationError | Error> {
+): Promise<string | JibError> {
   let value = app
   if (!value) {
     if (!tuiIsInteractive()) {
-      return new MissingInputError('missing required input for jib add', [
+      return cliCreateMissingInputError('missing required input for jib add', [
         { field: 'app', message: 'provide <app> or rerun with interactive prompts enabled' },
       ])
     }
     const prompted = await tuiPromptStringResult({ message: 'App name', placeholder: 'my-app' })
-    if (prompted instanceof Error) return prompted
+    if (prompted instanceof Error) {
+      return prompted
+    }
     value = prompted
   }
 
@@ -75,44 +77,58 @@ export async function addGatherInputs(
     backend?: string
   },
   deps: GatherAddInputsDeps = {},
-): Promise<AddInputs | MissingInputError | ValidationError | Error> {
+): Promise<AddInputs | JibError> {
   const interactive = deps.isInteractive ?? tuiIsInteractive
   const select = deps.promptSelect ?? tuiPromptSelectResult
   const prompt = deps.promptString ?? tuiPromptStringResult
   const promptOptional = deps.promptStringOptional ?? tuiPromptStringOptionalResult
   const backend = await addResolveRepoBackend(args.backend, args.repo, { interactive, select })
-  if (backend instanceof Error) return backend
+  if (backend instanceof Error) {
+    return backend
+  }
   let repo = args.repo
   if (!repo) {
     if (!interactive()) {
-      return new MissingInputError('missing required input for jib add', [
+      return cliCreateMissingInputError('missing required input for jib add', [
         { field: 'repo', message: 'provide --repo or rerun with interactive prompts enabled' },
       ])
     }
     const prompted = await prompt(addRepoPrompt(backend))
-    if (prompted instanceof Error) return prompted
+    if (prompted instanceof Error) {
+      return prompted
+    }
     repo = prompted
   }
   repo = addNormalizeRepo(repo, backend)
   const repoErr = configValidateRepo(repo)
-  if (repoErr) return new ValidationError(`--repo "${repo}" ${repoErr}`)
+  if (repoErr) {
+    return new ValidationError(`--repo "${repo}" ${repoErr}`)
+  }
   const ingressDefault = args.ingress ?? 'direct'
   const composeRaw = args.compose ? addSplitCommaValues(args.compose) : undefined
   const persistPaths = await addResolvePersistPaths(repo, configToArray(args.persist), {
     interactive,
     promptOptional,
   })
-  if (persistPaths instanceof Error) return persistPaths
+  if (persistPaths instanceof Error) {
+    return persistPaths
+  }
   const parsedDomains = parseDomains(configToArray(args.domain), ingressDefault)
-  if (parsedDomains instanceof Error) return parsedDomains
+  if (parsedDomains instanceof Error) {
+    return parsedDomains
+  }
   const healthChecks = parseChecks(configToArray(args.health))
-  if (healthChecks instanceof Error) return healthChecks
+  if (healthChecks instanceof Error) {
+    return healthChecks
+  }
   const configEntries = parseConfigEntries(
     configToArray(args.env),
     configToArray(args['build-arg']),
     configToArray(args['build-env']),
   )
-  if (configEntries instanceof Error) return configEntries
+  if (configEntries instanceof Error) {
+    return configEntries
+  }
   return {
     repo,
     persistPaths,
@@ -131,7 +147,9 @@ function parseDomains(
   const parsed: ParsedDomain[] = []
   for (const domain of rawDomains) {
     const result = configParseDomain(domain, ingressDefault)
-    if (result instanceof Error) return new ValidationError(result.message)
+    if (result instanceof Error) {
+      return new ValidationError(result.message)
+    }
     parsed.push(result)
   }
   return parsed
@@ -141,7 +159,9 @@ function parseChecks(rawHealth: string[]): HealthCheck[] | ValidationError {
   const parsed: HealthCheck[] = []
   for (const entry of rawHealth.flatMap((value) => value.split(','))) {
     const result = configParseHealth(entry)
-    if (result instanceof Error) return new ValidationError(result.message)
+    if (result instanceof Error) {
+      return new ValidationError(result.message)
+    }
     parsed.push(result)
   }
   return parsed
@@ -153,11 +173,17 @@ function parseConfigEntries(
   both: string[],
 ): ConfigEntry[] | ValidationError {
   const runtimeEntries = parseScopedEntries(runtime, 'runtime')
-  if (runtimeEntries instanceof Error) return runtimeEntries
+  if (runtimeEntries instanceof Error) {
+    return runtimeEntries
+  }
   const buildEntries = parseScopedEntries(build, 'build')
-  if (buildEntries instanceof Error) return buildEntries
+  if (buildEntries instanceof Error) {
+    return buildEntries
+  }
   const bothEntries = parseScopedEntries(both, 'both')
-  if (bothEntries instanceof Error) return bothEntries
+  if (bothEntries instanceof Error) {
+    return bothEntries
+  }
   return addMergeConfigEntries([...runtimeEntries, ...buildEntries, ...bothEntries])
 }
 

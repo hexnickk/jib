@@ -1,28 +1,27 @@
-import { DeployMissingAppError } from './errors.ts'
+import { type JibError, NotFoundError } from '@jib/errors'
 import { deployResolveAppCompose, deployRunFlow } from './flow.ts'
-import {
-  deployAcquireLock,
-  deployRecordFailure,
-  deployReleaseLock,
-  deployRunOrReturnError,
-} from './support.ts'
-import type { DeployCmd, DeployDeps, DeployError, DeployResult, ProgressCtx } from './types.ts'
+import { deployAcquireLock, deployRecordFailure, deployReleaseLock } from './support.ts'
+import type { DeployCmd, DeployDeps, DeployResult, ProgressCtx } from './types.ts'
 
 export { MIN_DISK_BYTES } from './types.ts'
-export type { DeployCmd, DeployDeps, DeployError, DeployResult, ProgressCtx } from './types.ts'
+export type { DeployCmd, DeployDeps, DeployResult, ProgressCtx } from './types.ts'
 
 /** Runs the full deploy flow for one prepared app workdir and records deploy state updates. */
 export async function deployApp(
   deps: DeployDeps,
   cmd: DeployCmd,
   progress: ProgressCtx,
-): Promise<DeployError | DeployResult> {
+): Promise<JibError | DeployResult> {
   const appCfg = deps.config.apps[cmd.app]
-  if (!appCfg) return new DeployMissingAppError(cmd.app)
+  if (!appCfg) {
+    return new NotFoundError(`app "${cmd.app}" not found in config`)
+  }
 
   progress.emit('lock', `acquiring lock for ${cmd.app}`)
   const release = await deployAcquireLock(deps, cmd.app)
-  if (release instanceof Error) return release
+  if (release instanceof Error) {
+    return release
+  }
 
   const result = await deployRunFlow(deps, cmd, appCfg, progress)
   if (result instanceof Error) {
@@ -35,7 +34,9 @@ export async function deployApp(
 
   const releaseError = await deployReleaseLock(cmd.app, release)
   if (releaseError) {
-    if (!(result instanceof Error)) return releaseError
+    if (!(result instanceof Error)) {
+      return releaseError
+    }
     deps.log.error(`deploy ${cmd.app} lock release failed: ${releaseError.message}`)
   }
   return result
@@ -45,15 +46,12 @@ export async function deployApp(
 export async function deployUpApp(
   deps: DeployDeps,
   appName: string,
-): Promise<DeployError | undefined> {
+): Promise<JibError | undefined> {
   const ready = await deployResolveAppCompose(deps, appName)
-  if (ready instanceof Error) return ready
-  const result = await deployRunOrReturnError(() =>
-    ready.compose.up({
-      services: ready.appCfg.services ?? [],
-    }),
-  )
-  return result instanceof Error ? result : undefined
+  if (ready instanceof Error) {
+    return ready
+  }
+  return ready.compose.up({ services: ready.appCfg.services ?? [] })
 }
 
 /** Stops one configured app and optionally removes volumes. */
@@ -61,20 +59,22 @@ export async function deployDownApp(
   deps: DeployDeps,
   appName: string,
   removeVolumes = false,
-): Promise<DeployError | undefined> {
+): Promise<JibError | undefined> {
   const ready = await deployResolveAppCompose(deps, appName)
-  if (ready instanceof Error) return ready
-  const result = await deployRunOrReturnError(() => ready.compose.down(removeVolumes))
-  return result instanceof Error ? result : undefined
+  if (ready instanceof Error) {
+    return ready
+  }
+  return ready.compose.down(removeVolumes)
 }
 
 /** Restarts containers for one configured app without changing the deployed SHA. */
 export async function deployRestartApp(
   deps: DeployDeps,
   appName: string,
-): Promise<DeployError | undefined> {
+): Promise<JibError | undefined> {
   const ready = await deployResolveAppCompose(deps, appName)
-  if (ready instanceof Error) return ready
-  const result = await deployRunOrReturnError(() => ready.compose.restart())
-  return result instanceof Error ? result : undefined
+  if (ready instanceof Error) {
+    return ready
+  }
+  return ready.compose.restart()
 }

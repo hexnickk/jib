@@ -1,2 +1,2 @@
 export type { CancelSignal, Step } from './run.ts'
-export { TxRollbackError, txRunSteps } from './run.ts'
+export { txRunSteps } from './run.ts'

@@ -1,24 +1,11 @@
+import { CancelledError, InternalError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { type Step, TxRollbackError, txRunSteps } from './run.ts'
-
-class FlowError extends Error {}
-class CancelledError extends Error {}
-
-describe('TxRollbackError', () => {
-  test('keeps the step name and original cause', () => {
-    const cause = new Error('boom')
-    const error = new TxRollbackError('sync', cause)
-
-    expect(error.stepName).toBe('sync')
-    expect(error.message).toBe('sync rollback: boom')
-    expect(error.cause).toBe(cause)
-  })
-})
+import { type Step, txRunSteps } from './run.ts'
 
 describe('txRunSteps', () => {
   test('runs steps in order without rollback on success', async () => {
     const calls: string[] = []
-    const steps: Step<object, string, FlowError>[] = [
+    const steps: Step<object, string, InternalError>[] = [
       {
         name: 'one',
         async up() {
@@ -39,7 +26,7 @@ describe('txRunSteps', () => {
       },
     ]
 
-    const result = await txRunSteps({}, steps, { cancelled: false }, () => new CancelledError())
+    const result = await txRunSteps({}, steps, { cancelled: false }, () => new CancelledError(''))
 
     expect(result).toBeUndefined()
     expect(calls).toEqual(['up:one', 'up:two'])
@@ -47,7 +34,7 @@ describe('txRunSteps', () => {
 
   test('rolls back completed steps in reverse order after a failure', async () => {
     const calls: string[] = []
-    const steps: Step<object, string, FlowError>[] = [
+    const steps: Step<object, string, InternalError>[] = [
       {
         name: 'one',
         async up() {
@@ -74,24 +61,22 @@ describe('txRunSteps', () => {
         name: 'three',
         async up() {
           calls.push('up:three')
-          return new FlowError('boom')
+          return new InternalError('boom')
         },
       },
     ]
 
-    const result = await txRunSteps({}, steps, { cancelled: false }, () => new CancelledError())
+    const result = await txRunSteps({}, steps, { cancelled: false }, () => new CancelledError(''))
 
-    expect(result).toBeInstanceOf(FlowError)
-    expect((result as Error).message).toBe('boom')
+    expect(result).toBeInstanceOf(InternalError)
+    expect(result?.message).toBe('boom')
     expect(calls).toEqual(['up:one', 'up:two', 'up:three', 'down:two:b', 'down:one:a'])
   })
 
   test('returns cancellation and rolls back completed steps when cancelled mid-flow', async () => {
     const calls: string[] = []
-    const signal = {
-      cancelled: false,
-    }
-    const steps: Step<object, string, FlowError>[] = [
+    const signal = { cancelled: false }
+    const steps: Step<object, string, InternalError>[] = [
       {
         name: 'one',
         async up() {
@@ -121,14 +106,14 @@ describe('txRunSteps', () => {
 
   test('warns and keeps rolling back when a rollback step fails', async () => {
     const warnings: string[] = []
-    const steps: Step<object, string, FlowError>[] = [
+    const steps: Step<object, string, InternalError>[] = [
       {
         name: 'one',
         async up() {
           return 'a'
         },
         async down() {
-          return new Error('down one failed')
+          return new InternalError('down one failed')
         },
       },
       {
@@ -143,7 +128,7 @@ describe('txRunSteps', () => {
       {
         name: 'three',
         async up() {
-          return new FlowError('boom')
+          return new InternalError('boom')
         },
       },
     ]
@@ -152,30 +137,30 @@ describe('txRunSteps', () => {
       {},
       steps,
       { cancelled: false },
-      () => new CancelledError(),
+      () => new CancelledError(''),
       (message) => warnings.push(message),
     )
 
-    expect(result).toBeInstanceOf(FlowError)
+    expect(result).toBeInstanceOf(InternalError)
     expect(warnings).toEqual(['two rollback: down two exploded', 'one rollback: down one failed'])
   })
 
-  test('does not double-prefix rollback warnings for existing tx rollback errors', async () => {
+  test('warns for an already-typed rollback failure', async () => {
     const warnings: string[] = []
-    const steps: Step<object, string, FlowError>[] = [
+    const steps: Step<object, string, InternalError>[] = [
       {
         name: 'one',
         async up() {
           return 'a'
         },
         async down() {
-          return new TxRollbackError('one', new Error('already wrapped'))
+          return new InternalError('already wrapped')
         },
       },
       {
         name: 'two',
         async up() {
-          return new FlowError('boom')
+          return new InternalError('boom')
         },
       },
     ]
@@ -184,7 +169,7 @@ describe('txRunSteps', () => {
       {},
       steps,
       { cancelled: false },
-      () => new CancelledError(),
+      () => new CancelledError(''),
       (message) => warnings.push(message),
     )
 

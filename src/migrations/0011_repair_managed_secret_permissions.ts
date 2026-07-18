@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { $ } from '@/libs/shell'
+import { InternalError } from '@jib/errors'
 import { pathsPathExistsResult } from '@jib/paths'
-import { RepairPermissionsError } from './errors.ts'
 import type { JibMigration } from './types.ts'
 
 /**
@@ -10,10 +10,16 @@ import type { JibMigration } from './types.ts'
  * restore ownership and modes for future non-root CLI writes.
  */
 export async function repairManagedSecretsTree(paths: { secretsDir: string }): Promise<
-  RepairPermissionsError | undefined
+  InternalError | undefined
 > {
   const root = join(paths.secretsDir, '_jib')
-  if ((await pathsPathExistsResult(root)) !== true) return
+  const exists = await pathsPathExistsResult(root)
+  if (exists instanceof Error) {
+    return exists
+  }
+  if (!exists) {
+    return undefined
+  }
 
   return (
     (await runRepairCommand('own managed secret tree', $`chown -R root:jib ${root}`)) ??
@@ -31,9 +37,8 @@ export async function repairManagedSecretsTree(paths: { secretsDir: string }): P
 export const m0011_repair_managed_secret_permissions: JibMigration = {
   id: '0011_repair_managed_secret_permissions',
   description: 'Repair jib-managed secret tree permissions',
-  up: async (ctx) => {
-    const error = await repairManagedSecretsTree(ctx.paths)
-    if (error) throw error
+  async up(ctx) {
+    return await repairManagedSecretsTree(ctx.paths)
   },
 }
 
@@ -41,12 +46,19 @@ export const m0011_repair_managed_secret_permissions: JibMigration = {
 async function runRepairCommand(
   label: string,
   command: Promise<{ exitCode: number | null; stdout: string; stderr: string }>,
-): Promise<RepairPermissionsError | undefined> {
-  const result = await command
-  if ((result.exitCode ?? 0) === 0) return
-  const detail =
-    result.stderr.trim() ||
-    result.stdout.trim() ||
-    `command exited with code ${result.exitCode ?? 1}`
-  return new RepairPermissionsError(`${label}: ${detail}`)
+): Promise<InternalError | undefined> {
+  try {
+    const result = await command
+    if ((result.exitCode ?? 0) === 0) {
+      return undefined
+    }
+    const detail =
+      result.stderr.trim() ||
+      result.stdout.trim() ||
+      `command exited with code ${result.exitCode ?? 1}`
+    return new InternalError(`${label}: ${detail}`)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`${label}: ${message}`, { cause: error })
+  }
 }

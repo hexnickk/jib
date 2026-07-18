@@ -1,10 +1,4 @@
 export {
-  SecretsReadError,
-  SecretsRemoveAppError,
-  SecretsStatError,
-  SecretsWriteError,
-} from './errors.ts'
-export {
   secretsCheckApp,
   secretsReadMasked,
   secretsRemove,

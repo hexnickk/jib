@@ -1,4 +1,4 @@
-import { JibError } from '@jib/errors'
+import { InternalError, type JibError } from '@jib/errors'
 
 /** Cancellation contract checked before and after each transactional step. */
 export interface CancelSignal {
@@ -7,25 +7,18 @@ export interface CancelSignal {
 
 type NonErrorState<T> = T extends Error ? never : T
 
-/** Wraps rollback failures so callers can warn without losing the original cause. */
-export class TxRollbackError extends JibError {
-  readonly stepName: string
-
-  constructor(stepName: string, cause: unknown) {
-    const detail = cause instanceof Error ? cause.message : String(cause)
-    super('tx_rollback', `${stepName} rollback: ${detail}`, { cause })
-    this.stepName = stepName
-  }
-}
-
-export interface Step<Ctx, State, Err extends Error, RollbackErr extends Error = Error> {
+export interface Step<Ctx, State, Err extends JibError, RollbackErr extends JibError = JibError> {
   readonly name: string
   up(ctx: Ctx, signal: CancelSignal): Promise<NonErrorState<State> | Err>
   down?(ctx: Ctx, state: NonErrorState<State>): Promise<undefined | RollbackErr>
 }
 
 /** Runs transactional steps in order and rolls back completed steps on failure. */
-export async function txRunSteps<Ctx, Err extends Error, RollbackErr extends Error = Error>(
+export async function txRunSteps<
+  Ctx,
+  Err extends JibError,
+  RollbackErr extends JibError = JibError,
+>(
   ctx: Ctx,
   steps: readonly Step<Ctx, unknown, Err, RollbackErr>[],
   signal: CancelSignal,
@@ -35,10 +28,14 @@ export async function txRunSteps<Ctx, Err extends Error, RollbackErr extends Err
   const done: Array<{ step: Step<Ctx, unknown, Err, RollbackErr>; state: unknown }> = []
 
   for (const step of steps) {
-    if (signal.cancelled) return rollback(ctx, done, cancelled(), warn)
+    if (signal.cancelled) {
+      return rollback(ctx, done, cancelled(), warn)
+    }
 
     const state = await step.up(ctx, signal)
-    if (state instanceof Error) return rollback(ctx, done, state as Err, warn)
+    if (state instanceof Error) {
+      return rollback(ctx, done, state as Err, warn)
+    }
 
     done.push({ step, state })
   }
@@ -46,7 +43,7 @@ export async function txRunSteps<Ctx, Err extends Error, RollbackErr extends Err
   return signal.cancelled ? rollback(ctx, done, cancelled(), warn) : undefined
 }
 
-async function rollback<Ctx, Err extends Error, RollbackErr extends Error = Error>(
+async function rollback<Ctx, Err extends JibError, RollbackErr extends JibError = JibError>(
   ctx: Ctx,
   done: ReadonlyArray<{ step: Step<Ctx, unknown, Err, RollbackErr>; state: unknown }>,
   error: Err,
@@ -54,27 +51,30 @@ async function rollback<Ctx, Err extends Error, RollbackErr extends Error = Erro
 ): Promise<Err> {
   for (const { step, state } of [...done].reverse()) {
     const rollbackError = await runRollbackStep(ctx, step, state)
-    if (rollbackError) warn?.(rollbackError.message)
+    if (rollbackError) {
+      warn?.(rollbackError.message)
+    }
   }
 
   return error
 }
 
-async function runRollbackStep<Ctx, Err extends Error, RollbackErr extends Error>(
+async function runRollbackStep<Ctx, Err extends JibError, RollbackErr extends JibError>(
   ctx: Ctx,
   step: Step<Ctx, unknown, Err, RollbackErr>,
   state: unknown,
-): Promise<undefined | TxRollbackError> {
-  if (!step.down) return undefined
+): Promise<undefined | InternalError> {
+  if (!step.down) {
+    return undefined
+  }
   try {
     const result = await step.down(ctx, state)
-    return result instanceof Error ? toTxRollbackError(step.name, result) : undefined
+    if (!(result instanceof Error)) {
+      return undefined
+    }
+    return new InternalError(`${step.name} rollback: ${result.message}`, { cause: result })
   } catch (cause) {
-    return toTxRollbackError(step.name, cause)
+    const message = cause instanceof Error ? cause.message : String(cause)
+    return new InternalError(`${step.name} rollback: ${message}`, { cause })
   }
-}
-
-function toTxRollbackError(stepName: string, cause: unknown): TxRollbackError {
-  if (cause instanceof TxRollbackError) return cause
-  return new TxRollbackError(stepName, cause)
 }

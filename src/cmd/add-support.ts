@@ -1,5 +1,6 @@
 import { CliError, cliIsTextOutput } from '@jib/cli'
 import type { Config } from '@jib/config'
+import type { JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { sourcesBuildChoices, sourcesRunSetup } from '@jib/sources'
 import { tuiIsInteractive, tuiPromptSelectResult, tuiSpinner } from '@jib/tui'
@@ -18,7 +19,7 @@ export async function addChooseInitialSource(
   paths: Paths,
   currentSource?: string,
   deps: AddChooseInitialSourceDeps = {},
-): Promise<{ value?: string; created: boolean } | Error> {
+): Promise<{ value?: string; created: boolean } | JibError> {
   const interactive = deps.isInteractive ?? tuiIsInteractive
   const select = deps.promptSelect ?? tuiPromptSelectResult
   const buildSourceChoices = deps.buildSourceChoices ?? sourcesBuildChoices
@@ -28,17 +29,25 @@ export async function addChooseInitialSource(
   }
 
   const options = buildSourceChoices(cfg)
-  if (options.length === 0) return { created: false }
+  if (options.length === 0) {
+    return { created: false }
+  }
 
   const choice = await select({
     message: 'Source for this app?',
     options: [{ value: 'none', label: 'None', hint: 'Public repo or local path' }, ...options],
   })
-  if (choice instanceof Error) return choice
-  if (choice === 'none') return { created: false }
+  if (choice instanceof Error) {
+    return choice
+  }
+  if (choice === 'none') {
+    return { created: false }
+  }
   if (choice.startsWith('setup:')) {
     const created = await runSourceSetup(cfg, paths, choice.slice('setup:'.length))
-    if (!created) return new CliError('cancelled', 'source setup did not complete; add cancelled')
+    if (!created) {
+      return new CliError('cancelled', 'source setup did not complete; add cancelled')
+    }
     return { value: created, created: true }
   }
   return choice.startsWith('existing:')
@@ -53,12 +62,16 @@ export function addCreateInspectionObserver() {
   return {
     observer: {
       onStateChange: (state: string) => {
-        if (!progress) return
+        if (!progress) {
+          return
+        }
         if (state === 'inputs_ready') {
           active = true
           progress.start('preparing repo')
         }
-        if (state === 'repo_prepared') progress.message('inspecting docker-compose')
+        if (state === 'repo_prepared') {
+          progress.message('inspecting docker-compose')
+        }
         if (state === 'compose_inspected' && active) {
           active = false
           progress.stop('compose inspected')
@@ -67,12 +80,16 @@ export function addCreateInspectionObserver() {
       warn: (message: string) => cliIsTextOutput() && consola.warn(message),
     },
     stop: () => {
-      if (!progress || !active) return
+      if (!progress || !active) {
+        return
+      }
       active = false
       progress.stop('compose inspected')
     },
     fail: () => {
-      if (!progress || !active) return
+      if (!progress || !active) {
+        return
+      }
       active = false
       progress.stop('inspection failed')
     },

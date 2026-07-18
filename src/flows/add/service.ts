@@ -1,5 +1,5 @@
+import { CancelledError } from '@jib/errors'
 import { txRunSteps } from '@jib/tx'
-import { CancelledAddError } from './flow-errors.ts'
 import { type AddRunContext, addBuildSteps } from './steps.ts'
 import type {
   AddFlowObserver,
@@ -37,9 +37,11 @@ export async function addRun(
     ctx,
     addBuildSteps(),
     params.signal ?? { cancelled: false },
-    () => new CancelledAddError(),
+    () => new CancelledError('add cancelled'),
     observer.warn,
   )
-  if (error) return error
+  if (error) {
+    return error
+  }
   return { finalApp: ctx.finalApp, secretsWritten: ctx.secretsWritten }
 }

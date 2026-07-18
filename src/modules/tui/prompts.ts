@@ -1,7 +1,6 @@
 import { createInterface } from 'node:readline'
 import * as clack from '@clack/prompts'
-import { TuiPromptCancelledError, isTuiPemReadError } from './errors.ts'
-import type { TuiNotInteractiveError } from './errors.ts'
+import { CancelledError, InternalError, type ValidationError } from '@jib/errors'
 import { tuiAssertInteractiveResult } from './interactive.ts'
 import { tuiReadPemBlockResult } from './pem.ts'
 
@@ -27,13 +26,26 @@ type ConfirmOpts = { message: string; initialValue?: boolean }
  * clack's cancel symbol into a typed error. Every wrapper in this file
  * delegates here so the interactive/cancel/return shape lives in one place.
  */
-type TuiAskError = TuiNotInteractiveError | TuiPromptCancelledError
-
-async function ask<T>(fn: () => Promise<T | symbol>): Promise<T | TuiAskError> {
+/** Runs one clack prompt and maps cancellation or library failures to shared result errors. */
+async function ask<T>(
+  fn: () => Promise<T | symbol>,
+): Promise<T | ValidationError | CancelledError | InternalError> {
   const interactiveError = tuiAssertInteractiveResult()
-  if (interactiveError) return interactiveError
-  const value = await fn()
-  if (clack.isCancel(value)) return new TuiPromptCancelledError()
+  if (interactiveError) {
+    return interactiveError
+  }
+
+  let value: T | symbol
+  try {
+    value = await fn()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`prompt failed: ${message}`, { cause: error })
+  }
+
+  if (clack.isCancel(value)) {
+    return new CancelledError('cancelled')
+  }
   return value as T
 }
 
@@ -51,7 +63,9 @@ function mapOptions<T extends string>(
   )
 }
 
-export function tuiPromptStringResult(opts: StrOpts): Promise<string | TuiAskError> {
+export function tuiPromptStringResult(
+  opts: StrOpts,
+): Promise<string | ValidationError | CancelledError | InternalError> {
   return ask(() =>
     clack.text({
       message: opts.message,
@@ -62,7 +76,9 @@ export function tuiPromptStringResult(opts: StrOpts): Promise<string | TuiAskErr
   )
 }
 
-export async function tuiPromptStringOptionalResult(opts: StrOpts): Promise<string | TuiAskError> {
+export async function tuiPromptStringOptionalResult(
+  opts: StrOpts,
+): Promise<string | ValidationError | CancelledError | InternalError> {
   const result = await ask<string | undefined>(() =>
     clack.text({
       message: opts.message,
@@ -73,16 +89,24 @@ export async function tuiPromptStringOptionalResult(opts: StrOpts): Promise<stri
   return result instanceof Error ? result : (result ?? '')
 }
 
-export async function tuiPromptIntResult(opts: IntOpts): Promise<number | TuiAskError> {
+export async function tuiPromptIntResult(
+  opts: IntOpts,
+): Promise<number | ValidationError | CancelledError | InternalError> {
   const v = await ask(() =>
     clack.text({
       message: opts.message,
       ...(opts.initialValue !== undefined && { initialValue: String(opts.initialValue) }),
       validate: (s: string) => {
         const n = Number(s)
-        if (!Number.isInteger(n)) return 'must be an integer'
-        if (opts.min !== undefined && n < opts.min) return `must be >= ${opts.min}`
-        if (opts.max !== undefined && n > opts.max) return `must be <= ${opts.max}`
+        if (!Number.isInteger(n)) {
+          return 'must be an integer'
+        }
+        if (opts.min !== undefined && n < opts.min) {
+          return `must be >= ${opts.min}`
+        }
+        if (opts.max !== undefined && n > opts.max) {
+          return `must be <= ${opts.max}`
+        }
         return undefined
       },
     }),
@@ -90,13 +114,15 @@ export async function tuiPromptIntResult(opts: IntOpts): Promise<number | TuiAsk
   return v instanceof Error ? v : Number(v)
 }
 
-export function tuiPromptPasswordResult(opts: { message: string }): Promise<string | TuiAskError> {
+export function tuiPromptPasswordResult(opts: { message: string }): Promise<
+  string | ValidationError | CancelledError | InternalError
+> {
   return ask(() => clack.password({ message: opts.message }))
 }
 
 export function tuiPromptSelectResult<T extends string>(
   opts: SelectOpts<T>,
-): Promise<T | TuiAskError> {
+): Promise<T | ValidationError | CancelledError | InternalError> {
   const options = mapOptions(opts.options) as Parameters<typeof clack.select<T>>[0]['options']
   return ask<T>(() =>
     clack.select<T>({
@@ -109,7 +135,7 @@ export function tuiPromptSelectResult<T extends string>(
 
 export function tuiPromptMultiSelectResult<T extends string>(
   opts: SelectOpts<T>,
-): Promise<T[] | TuiAskError> {
+): Promise<T[] | ValidationError | CancelledError | InternalError> {
   const options = mapOptions(opts.options) as Parameters<typeof clack.multiselect<T>>[0]['options']
   return ask<T[]>(() => clack.multiselect<T>({ message: opts.message, options, required: false }))
 }
@@ -120,33 +146,63 @@ export function tuiPromptMultiSelectResult<T extends string>(
  * readline so pasted multiline text works because clack has no multiline input.
  */
 export async function tuiPromptPemResult(opts: { message: string }): Promise<
-  string | TuiAskError | Awaited<ReturnType<typeof tuiReadPemBlockResult>>
+  string | ValidationError | CancelledError | InternalError
 > {
   const interactiveError = tuiAssertInteractiveResult()
-  if (interactiveError) return interactiveError
+  if (interactiveError) {
+    return interactiveError
+  }
+
   while (true) {
-    clack.log.info(`${opts.message} (paste full PEM block)`)
-    const rl = createInterface({ input: process.stdin })
-    let pem: Awaited<ReturnType<typeof tuiReadPemBlockResult>>
     try {
-      pem = await tuiReadPemBlockResult(rl)
-    } finally {
-      rl.close()
+      clack.log.info(`${opts.message} (paste full PEM block)`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return new InternalError(`rendering prompt: ${message}`, { cause: error })
     }
 
-    if (!(pem instanceof Error)) return pem
-    if (!isTuiPemReadError(pem)) return pem
-    clack.log.warning(pem.message)
+    let pem: Awaited<ReturnType<typeof tuiReadPemBlockResult>>
+    let rl: ReturnType<typeof createInterface> | undefined
+    try {
+      rl = createInterface({ input: process.stdin })
+      pem = await tuiReadPemBlockResult(rl)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return new InternalError(`reading PEM input: ${message}`, { cause: error })
+    } finally {
+      rl?.close()
+    }
+
+    if (typeof pem === 'string') {
+      return pem
+    }
+    if (pem instanceof InternalError) {
+      return pem
+    }
+
+    try {
+      clack.log.warning(pem.message)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return new InternalError(`rendering prompt: ${message}`, { cause: error })
+    }
+
     const retry = await tuiPromptConfirmResult({
       message: 'Try pasting the PEM again?',
       initialValue: true,
     })
-    if (retry instanceof Error) return retry
-    if (!retry) return pem
+    if (retry instanceof Error) {
+      return retry
+    }
+    if (!retry) {
+      return pem
+    }
   }
 }
 
-export function tuiPromptConfirmResult(opts: ConfirmOpts): Promise<boolean | TuiAskError> {
+export function tuiPromptConfirmResult(
+  opts: ConfirmOpts,
+): Promise<boolean | ValidationError | CancelledError | InternalError> {
   return ask(() =>
     clack.confirm({
       message: opts.message,

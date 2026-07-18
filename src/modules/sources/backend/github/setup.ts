@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises'
-import { ConfigError, configLoad } from '@jib/config'
+import { configLoad } from '@jib/config'
 import { pathsEnsureCredsDirResult } from '@jib/paths'
 import {
   tuiLog,
@@ -49,9 +49,15 @@ export async function githubSetup(ctx: SourceSetupContext): Promise<string | nul
       { value: 'skip', label: 'Skip — public repos only or set up later' },
     ],
   })
-  if (choice instanceof Error) return null
-  if (choice === 'key') return githubSetupDeployKey(ctx)
-  if (choice === 'app') return githubSetupApp(ctx)
+  if (choice instanceof Error) {
+    return null
+  }
+  if (choice === 'key') {
+    return githubSetupDeployKey(ctx)
+  }
+  if (choice === 'app') {
+    return githubSetupApp(ctx)
+  }
   return null
 }
 
@@ -69,17 +75,27 @@ export async function githubSetupDeployKey(
     const uiNote = deps.note ?? tuiNote
 
     const name = await promptForString({ message: 'Source name (e.g. my-org-key)' })
-    if (name instanceof Error) return githubSetupFail(uiLog, name)
+    if (name instanceof Error) {
+      return githubSetupFail(uiLog, name)
+    }
     const cfg = await load(ctx.paths.configFile)
-    if (cfg instanceof ConfigError) return githubSetupFail(uiLog, cfg)
+    if (cfg instanceof Error) {
+      return githubSetupFail(uiLog, cfg)
+    }
 
     const nameError = validateSourceName(cfg, name)
-    if (nameError) return githubSetupFail(uiLog, nameError)
+    if (nameError) {
+      return githubSetupFail(uiLog, nameError)
+    }
 
     const pubKey = await generateKey(name, ctx.paths)
-    if (pubKey instanceof Error) return githubSetupFail(uiLog, pubKey)
+    if (pubKey instanceof Error) {
+      return githubSetupFail(uiLog, pubKey)
+    }
     const writeError = await addKeySource(ctx.paths.configFile, name)
-    if (writeError instanceof Error) return githubSetupFail(uiLog, writeError)
+    if (writeError instanceof Error) {
+      return githubSetupFail(uiLog, writeError)
+    }
 
     const keyPaths = githubDeployKeyPaths(ctx.paths, name)
     uiLog.success(`GitHub source "${name}" added to config`)
@@ -115,25 +131,39 @@ export async function githubSetupApp(
     const addAppSource = deps.githubAddAppSource ?? githubAddAppSource
 
     const name = await promptForString({ message: 'Source name (e.g. my-org)' })
-    if (name instanceof Error) return githubSetupFail(uiLog, name)
+    if (name instanceof Error) {
+      return githubSetupFail(uiLog, name)
+    }
     const cfg = await load(ctx.paths.configFile)
-    if (cfg instanceof ConfigError) return githubSetupFail(uiLog, cfg)
+    if (cfg instanceof Error) {
+      return githubSetupFail(uiLog, cfg)
+    }
 
     const nameError = validateSourceName(cfg, name)
-    if (nameError) return githubSetupFail(uiLog, nameError)
+    if (nameError) {
+      return githubSetupFail(uiLog, nameError)
+    }
 
     uiLog.info('create the app at github.com → Settings → Developer settings → GitHub Apps')
     const appId = await promptForInt({ message: 'GitHub App ID', min: 1 })
-    if (appId instanceof Error) return githubSetupFail(uiLog, appId)
+    if (appId instanceof Error) {
+      return githubSetupFail(uiLog, appId)
+    }
     const pem = await promptForPEM({ message: 'Private key PEM' })
-    if (pem instanceof Error) return githubSetupFail(uiLog, pem)
+    if (pem instanceof Error) {
+      return githubSetupFail(uiLog, pem)
+    }
     const pemPath = githubAuthPemPath(ctx.paths, name)
     const ensured = await ensureDir(ctx.paths, 'github-app')
-    if (ensured instanceof Error) return githubSetupFail(uiLog, ensured)
+    if (ensured instanceof Error) {
+      return githubSetupFail(uiLog, ensured)
+    }
     await write(pemPath, pem, { mode: 0o640 })
 
     const writeError = await addAppSource(ctx.paths.configFile, name, appId)
-    if (writeError instanceof Error) return githubSetupFail(uiLog, writeError)
+    if (writeError instanceof Error) {
+      return githubSetupFail(uiLog, writeError)
+    }
 
     uiLog.success(`source "${name}" (GitHub App ${appId}) created`)
     return name

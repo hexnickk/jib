@@ -1,7 +1,7 @@
 import type { Config } from '@jib/config'
+import { InternalError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
-import { DeployExecuteError } from './errors.ts'
 import { runDeploy, runDeployResult } from './run.ts'
 
 const cfg: Config = {
@@ -38,7 +38,7 @@ function createNoopSpinner() {
 }
 
 describe('runDeploy progress', () => {
-  test('returns a typed execute error when deploy throws before returning a promise', async () => {
+  test('returns an internal error when deploy throws before returning a promise', async () => {
     const result = await runDeployResult(cfg, paths, 'demo', undefined, {
       createSpinner: createNoopSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
@@ -47,11 +47,8 @@ describe('runDeploy progress', () => {
       },
     })
 
-    expect(result).toBeInstanceOf(DeployExecuteError)
-    expect(result).toMatchObject({
-      code: 'deploy_execute_failed',
-      message: 'engine setup failed',
-    })
+    expect(result).toBeInstanceOf(InternalError)
+    expect(result).toMatchObject({ code: 'internal', message: 'engine setup failed' })
   })
 
   test('reports spinner start, progress, and stop messages in order', async () => {
@@ -78,6 +75,9 @@ describe('runDeploy progress', () => {
       },
     })
 
+    if (result instanceof Error) {
+      throw result
+    }
     expect(result.sha).toBe('deadbeef12345678')
     expect(events).toEqual([
       'start:[1/2] preparing demo',

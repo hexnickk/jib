@@ -1,5 +1,5 @@
+import { ValidationError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { ValidateConfigError } from './errors.ts'
 import { ConfigSchema } from './schema.ts'
 import { configParseDuration, configValidate, configValidateRepo } from './validate.ts'
 
@@ -72,7 +72,7 @@ describe('configValidate', () => {
   })
 
   test('configValidate returns typed errors for invalid configs', () => {
-    expect(configValidate(base({ poll_interval: 'forever' }))).toBeInstanceOf(ValidateConfigError)
+    expect(configValidate(base({ poll_interval: 'forever' }))).toBeInstanceOf(ValidationError)
   })
 
   test('requires cloudflared enablement when a domain uses tunnel ingress', () => {
@@ -85,7 +85,7 @@ describe('configValidate', () => {
       },
     })
     const error = configValidate(cfg)
-    expect(error).toBeInstanceOf(ValidateConfigError)
+    expect(error).toBeInstanceOf(ValidationError)
     expect(error?.message).toContain('modules.cloudflared')
   })
 

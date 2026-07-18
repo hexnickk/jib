@@ -1,4 +1,4 @@
-import { ValidationError } from '@jib/errors'
+import { type JibError, ValidationError } from '@jib/errors'
 import { pathsDockerHubImage } from '@jib/paths'
 import { addSplitCommaValues } from './guided.ts'
 
@@ -12,9 +12,13 @@ export async function addResolveRepoBackend(
     interactive: () => boolean
     select: typeof import('@jib/tui').tuiPromptSelectResult
   },
-): Promise<RepoBackend | Error | undefined> {
-  if (rawBackend) return addParseRepoBackend(rawBackend)
-  if (repo || !deps.interactive()) return undefined
+): Promise<RepoBackend | JibError | undefined> {
+  if (rawBackend) {
+    return addParseRepoBackend(rawBackend)
+  }
+  if (repo || !deps.interactive()) {
+    return undefined
+  }
   const backend = await deps.select({
     message: 'Source backend',
     options: [
@@ -59,9 +63,15 @@ export function addRepoPrompt(backend: RepoBackend | undefined): {
 
 /** Normalizes a raw repo string according to the chosen backend. */
 export function addNormalizeRepo(repo: string, backend: RepoBackend | undefined): string {
-  if (backend === 'github') return addNormalizeGitHubRepo(repo)
-  if (backend !== 'dockerhub') return repo
-  if (pathsDockerHubImage(repo)) return repo
+  if (backend === 'github') {
+    return addNormalizeGitHubRepo(repo)
+  }
+  if (backend !== 'dockerhub') {
+    return repo
+  }
+  if (pathsDockerHubImage(repo)) {
+    return repo
+  }
   return `docker://${repo}`
 }
 
@@ -73,26 +83,36 @@ export async function addResolvePersistPaths(
     interactive: () => boolean
     promptOptional: typeof import('@jib/tui').tuiPromptStringOptionalResult
   },
-): Promise<string[] | Error> {
-  if (rawPersist.length > 0) return rawPersist.flatMap(addSplitCommaValues)
-  if (!pathsDockerHubImage(repo) || !deps.interactive()) return []
+): Promise<string[] | JibError> {
+  if (rawPersist.length > 0) {
+    return rawPersist.flatMap(addSplitCommaValues)
+  }
+  if (!pathsDockerHubImage(repo) || !deps.interactive()) {
+    return []
+  }
   const raw = await deps.promptOptional({
     message: 'Persistent container path(s) (comma-separated, blank for none)',
     placeholder: '/data',
   })
-  if (raw instanceof Error) return raw
+  if (raw instanceof Error) {
+    return raw
+  }
   return addSplitCommaValues(raw)
 }
 
 function addNormalizeGitHubRepo(repo: string): string {
   const https = normalizeGitHubHttpsRepo(repo)
-  if (https) return https
+  if (https) {
+    return https
+  }
   const ssh = repo.match(/^git@github\.com:([^\s]+?)(?:\.git)?$/)
   return ssh?.[1] ?? repo
 }
 
 function normalizeGitHubHttpsRepo(repo: string): string | null {
-  if (!repo.startsWith('https://github.com/')) return null
+  if (!repo.startsWith('https://github.com/')) {
+    return null
+  }
   const { pathname } = new URL(repo)
   const parts = pathname.split('/').filter(Boolean)
   const owner = parts[0]

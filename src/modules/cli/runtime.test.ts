@@ -2,7 +2,7 @@ import { loggingCreateLogger } from '@jib/logging'
 import { LogLevels } from 'consola'
 import { afterEach, describe, expect, test } from 'vitest'
 import {
-  InvalidInteractiveModeError,
+  CliError,
   cliCreateMissingInputError,
   cliNormalizeError,
   cliReadInteractiveMode,
@@ -19,8 +19,11 @@ const envSnapshot = {
 /** Restores one environment variable to its test-suite starting value. */
 function restoreEnv(name: keyof typeof envSnapshot): void {
   const value = envSnapshot[name]
-  if (value === undefined) Reflect.deleteProperty(process.env, name)
-  else process.env[name] = value
+  if (value === undefined) {
+    Reflect.deleteProperty(process.env, name)
+  } else {
+    process.env[name] = value
+  }
 }
 
 afterEach(() => {
@@ -45,13 +48,17 @@ describe('cli runtime', () => {
       stdoutTty: true,
     })
     expect(runtime).not.toBeInstanceOf(Error)
-    if (runtime instanceof Error) throw runtime
+    if (runtime instanceof Error) {
+      throw runtime
+    }
     expect(runtime.interactive).toBe('always')
     expect(runtime.debug).toBe(true)
 
     const current = cliReadRuntime()
     expect(current).not.toBeInstanceOf(Error)
-    if (current instanceof Error) throw current
+    if (current instanceof Error) {
+      throw current
+    }
     expect(current.debug).toBe(true)
   })
 
@@ -59,7 +66,9 @@ describe('cli runtime', () => {
     process.env.JIB_NON_INTERACTIVE = '1'
     const runtime = cliSetRuntime({ stdinTty: true, stdoutTty: true })
     expect(runtime).not.toBeInstanceOf(Error)
-    if (runtime instanceof Error) throw runtime
+    if (runtime instanceof Error) {
+      throw runtime
+    }
     expect(runtime.interactive).toBe('never')
   })
 
@@ -84,14 +93,12 @@ describe('cli runtime', () => {
   })
 
   test('returns a typed error for an invalid interactive mode', () => {
-    expect(cliReadInteractiveMode('bad')).toBeInstanceOf(InvalidInteractiveModeError)
+    expect(cliReadInteractiveMode('bad')).toBeInstanceOf(CliError)
   })
 
   test('returns a typed error for an invalid interactive env value', () => {
     process.env.JIB_INTERACTIVE = 'bad'
-    expect(cliSetRuntime({ stdinTty: true, stdoutTty: true })).toBeInstanceOf(
-      InvalidInteractiveModeError,
-    )
+    expect(cliSetRuntime({ stdinTty: true, stdoutTty: true })).toBeInstanceOf(CliError)
   })
 })
 

@@ -1,9 +1,5 @@
+import { ValidationError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import {
-  ExecArgsMissingAppError,
-  ExecArgsMissingCommandError,
-  RunArgsMissingAppError,
-} from './errors.ts'
 import { dockerParseExecArgs, dockerParseRunArgs } from './shell.ts'
 
 describe('dockerParseExecArgs', () => {
@@ -20,11 +16,11 @@ describe('dockerParseExecArgs', () => {
   })
 
   test('app only returns a typed error', () => {
-    expect(dockerParseExecArgs(['web'])).toBeInstanceOf(ExecArgsMissingCommandError)
+    expect(dockerParseExecArgs(['web'])).toBeInstanceOf(ValidationError)
   })
 
   test('empty returns a typed error', () => {
-    expect(dockerParseExecArgs([])).toBeInstanceOf(ExecArgsMissingAppError)
+    expect(dockerParseExecArgs([])).toBeInstanceOf(ValidationError)
   })
 
   test('-- with empty before', () => {
@@ -36,7 +32,7 @@ describe('dockerParseExecArgs', () => {
   })
 
   test('missing command after -- returns a typed error', () => {
-    expect(dockerParseExecArgs(['web', '--'])).toBeInstanceOf(ExecArgsMissingCommandError)
+    expect(dockerParseExecArgs(['web', '--'])).toBeInstanceOf(ValidationError)
   })
 })
 
@@ -66,6 +62,6 @@ describe('dockerParseRunArgs', () => {
   })
 
   test('empty argv returns a typed error', () => {
-    expect(dockerParseRunArgs([])).toBeInstanceOf(RunArgsMissingAppError)
+    expect(dockerParseRunArgs([])).toBeInstanceOf(ValidationError)
   })
 })

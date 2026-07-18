@@ -1,18 +1,5 @@
 export { sourcesCollectStatuses, sourcesRunSetup } from './recovery.ts'
 export { sourcesBuildChoices, sourcesPreflightSelection, sourcesSetupRef } from './flow.ts'
-export {
-  SourceDriverNotRegisteredError,
-  SourceLocalCheckoutError,
-  SourceLocalRepoError,
-  SourceMissingAppError,
-  SourceMissingConfigError,
-  SourceProbeError,
-  SourceRemoteResolveError,
-  SourceRemoteSyncError,
-  SourceSetupCancelledError,
-  SourceSetupSelectionRequiredError,
-  SourceWorkdirPrepareError,
-} from './errors.ts'
 export type {
   DriverSourceStatus,
   InspectionCheckout,

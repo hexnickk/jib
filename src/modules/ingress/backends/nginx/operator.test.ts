@@ -1,8 +1,8 @@
 import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { InternalError } from '@jib/errors'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { NginxIngressReloadError } from '../../errors.ts'
 import type { ExecFn, ExecResult } from '../../exec.ts'
 import { ingressCreateNginxOperator } from './operator.ts'
 
@@ -66,7 +66,7 @@ describe('ingressCreateNginxOperator', () => {
         app: 'web',
         domains: [{ host: 'web.example.com', port: 8080, isTunnel: false }],
       }),
-    ).toBeInstanceOf(NginxIngressReloadError)
+    ).toBeInstanceOf(InternalError)
 
     const files = await readdir(ctx.nginxDir).catch(() => [])
     expect(files).toEqual([])

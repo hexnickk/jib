@@ -1,10 +1,10 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { InternalError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { WatcherInstallEnableError } from './errors.ts'
 import { watcherInstallResult } from './install.ts'
 import { watcherUninstallResult } from './uninstall.ts'
 
@@ -32,9 +32,15 @@ afterEach(async () => {
 })
 
 function labelCommand(args: readonly string[]): string {
-  if (args.includes('daemon-reload')) return 'daemon-reload'
-  if (args.includes('enable')) return 'enable'
-  if (args.includes('disable')) return 'disable'
+  if (args.includes('daemon-reload')) {
+    return 'daemon-reload'
+  }
+  if (args.includes('enable')) {
+    return 'enable'
+  }
+  if (args.includes('disable')) {
+    return 'disable'
+  }
   return args.join(' ')
 }
 
@@ -85,7 +91,7 @@ describe('watcher install/uninstall', () => {
       )
 
       expect(calls).toEqual(['daemon-reload', 'enable'])
-      expect(error).toBeInstanceOf(WatcherInstallEnableError)
+      expect(error).toBeInstanceOf(InternalError)
       expect(error?.message).toContain('enable boom')
       expect(await readFile(unitPath, 'utf8')).toContain(`Environment=JIB_ROOT=${root}`)
     } finally {

@@ -1,14 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { $ } from '@/libs/shell'
+import { InternalError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import { type Paths, pathsCredsPath } from '@jib/paths'
-import {
-  CloudflaredInstallCreateDirError,
-  CloudflaredInstallReloadError,
-  CloudflaredInstallWriteComposeError,
-  CloudflaredInstallWriteUnitError,
-} from './errors.ts'
 import {
   CLOUDFLARED_UNIT_PATH,
   cloudflaredComposeYaml,
@@ -33,20 +28,11 @@ interface CloudflaredCommandResultLike {
   stdout: { toString(): string }
 }
 
-/**
- * Writes the compose file + systemd unit under `$JIB_ROOT/cloudflared/`.
- * Returns a typed error on failure so callers can decide whether to throw.
- */
+/** Writes cloudflared's managed files and returns an internal error instead of throwing. */
 export async function cloudflaredInstallResult(
   ctx: CloudflaredContext,
   deps: CloudflaredInstallDeps = {},
-): Promise<
-  | CloudflaredInstallCreateDirError
-  | CloudflaredInstallWriteComposeError
-  | CloudflaredInstallWriteUnitError
-  | CloudflaredInstallReloadError
-  | undefined
-> {
+): Promise<InternalError | undefined> {
   const log = ctx.logger
   const dir = ctx.paths.cloudflaredDir
   const tunnelEnvPath = pathsCredsPath(ctx.paths, 'cloudflare', 'tunnel.env')
@@ -60,7 +46,8 @@ export async function cloudflaredInstallResult(
   try {
     await mkdir(dir, { recursive: true, mode: 0o755 })
   } catch (error) {
-    return new CloudflaredInstallCreateDirError(dir, error)
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`create ${dir}: ${message}`, { cause: error })
   }
 
   const composePath = join(dir, 'docker-compose.yml')
@@ -68,29 +55,39 @@ export async function cloudflaredInstallResult(
   try {
     await writeFile(composePath, renderCompose(vars), { mode: 0o644 })
   } catch (error) {
-    return new CloudflaredInstallWriteComposeError(composePath, error)
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`write ${composePath}: ${message}`, { cause: error })
   }
 
   log.info(`writing ${unitPath}`)
   try {
     await writeFile(unitPath, renderUnit(vars), { mode: 0o644 })
   } catch (error) {
-    return new CloudflaredInstallWriteUnitError(unitPath, error)
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`write ${unitPath}: ${message}`, { cause: error })
   }
 
   log.info('systemctl daemon-reload')
   try {
     const result = await daemonReload()
     const detail = cloudflaredCommandFailure(result)
-    if (detail) return new CloudflaredInstallReloadError(detail)
+    if (detail) {
+      return new InternalError(`systemctl daemon-reload: ${detail}`)
+    }
   } catch (error) {
-    return new CloudflaredInstallReloadError(error)
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`systemctl daemon-reload: ${message}`, { cause: error })
   }
 }
 
+/** Extracts a non-zero command's diagnostic text for an internal result error. */
 function cloudflaredCommandFailure(result: unknown): string | undefined {
-  if (!isCloudflaredCommandResult(result)) return undefined
-  if (result.exitCode === 0) return undefined
+  if (!isCloudflaredCommandResult(result)) {
+    return undefined
+  }
+  if (result.exitCode === 0) {
+    return undefined
+  }
   return (
     result.stderr.toString().trim() ||
     result.stdout.toString().trim() ||

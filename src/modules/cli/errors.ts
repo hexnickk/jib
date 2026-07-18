@@ -32,23 +32,9 @@ export class CliError extends JibError {
   }
 }
 
-export class MissingInputError extends CliError {
-  constructor(message: string, issues: CliIssue[], options: Omit<CliErrorOptions, 'issues'> = {}) {
-    super('missing_input', message, { ...options, issues })
-  }
-}
-
-export class InvalidInteractiveModeError extends CliError {
-  constructor(value: string) {
-    super('invalid_interactive_mode', `invalid --interactive value "${value}"`, {
-      hint: 'expected one of: auto, always, never',
-    })
-  }
-}
-
-/** Creates a typed error for commands that are missing required interactive input. */
-export function cliCreateMissingInputError(message: string, issues: CliIssue[]): MissingInputError {
-  return new MissingInputError(message, issues)
+/** Creates a CLI response error for commands that are missing required interactive input. */
+export function cliCreateMissingInputError(message: string, issues: CliIssue[]): CliError {
+  return new CliError('missing_input', message, { issues })
 }
 
 /** Normalizes thrown or returned failures into the CLI response shape. */

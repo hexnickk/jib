@@ -1,5 +1,5 @@
 import { $ } from '@/libs/shell'
-import { UpdateError } from './errors.ts'
+import { InternalError } from '@jib/errors'
 
 const PACKAGE_NAME = 'deployjib'
 const CLI_BIN = 'jib'
@@ -29,9 +29,9 @@ async function updateRunChecked(
   command: string[],
   label: string,
   options: { sudo?: boolean } = {},
-): Promise<undefined | UpdateError> {
+): Promise<undefined | InternalError> {
   const code = await run(command, options)
-  return code === 0 ? undefined : new UpdateError(`${label} exited with status ${code}`)
+  return code === 0 ? undefined : new InternalError(`${label} exited with status ${code}`)
 }
 
 /** Installs the npm package and performs Linux post-update maintenance. */
@@ -39,19 +39,25 @@ async function updateInstallPackage(
   packageSpec: string,
   platform: NodeJS.Platform,
   run: UpdateCommandRunner,
-): Promise<undefined | UpdateError> {
+): Promise<undefined | InternalError> {
   const installError = await updateRunChecked(
     run,
     ['npm', 'install', '-g', packageSpec],
     'npm install',
   )
-  if (installError) return installError
-  if (platform !== 'linux') return undefined
+  if (installError) {
+    return installError
+  }
+  if (platform !== 'linux') {
+    return undefined
+  }
 
   const migrateError = await updateRunChecked(run, [CLI_BIN, 'migrate'], 'migrate', {
     sudo: true,
   })
-  if (migrateError) return migrateError
+  if (migrateError) {
+    return migrateError
+  }
 
   const watcherActive = await run([
     'sh',
@@ -65,7 +71,9 @@ async function updateInstallPackage(
       'watcher restart',
       { sudo: true },
     )
-    if (restartError) return restartError
+    if (restartError) {
+      return restartError
+    }
   }
 
   return await updateRunChecked(
@@ -77,17 +85,21 @@ async function updateInstallPackage(
 }
 
 /** Converts unexpected subprocess setup failures into update errors. */
-function updateErrorFrom(error: unknown): UpdateError {
-  if (error instanceof UpdateError) return error
+function updateErrorFrom(error: unknown): InternalError {
+  if (error instanceof InternalError) {
+    return error
+  }
   const message = error instanceof Error ? error.message : String(error)
-  return new UpdateError(message, error instanceof Error ? { cause: error } : undefined)
+  return new InternalError(message, { cause: error })
 }
 
 /**
  * Updates jib from npm. Inputs are injectable process dependencies for isolated tests.
  * Output is undefined on success or a typed update error; side effects replace the global npm package and run post-install checks.
  */
-export async function updateRunResult(deps: UpdateRunDeps = {}): Promise<undefined | UpdateError> {
+export async function updateRunResult(
+  deps: UpdateRunDeps = {},
+): Promise<undefined | InternalError> {
   try {
     return await updateInstallPackage(
       deps.packageSpec ?? PACKAGE_NAME,

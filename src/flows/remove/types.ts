@@ -1,5 +1,5 @@
 import type { Config } from '@jib/config'
-import type { RemoveWriteConfigError } from './errors.ts'
+import type { JibError } from '@jib/errors'
 
 export interface RemoveParams {
   appName: string
@@ -18,12 +18,12 @@ export interface RemoveObserver {
 }
 
 export interface RemoveSupport {
-  releaseIngress(appName: string): Promise<undefined | Error>
-  stopApp(cfg: Config, appName: string, quiet: boolean): Promise<undefined | Error>
-  removeCheckout(appName: string, repo: string): Promise<undefined | Error>
-  removeSecrets(appName: string): Promise<undefined | Error>
-  removeState(appName: string): Promise<undefined | Error>
-  removeOverride(appName: string): Promise<undefined | Error>
-  removeManagedCompose(appName: string): Promise<undefined | Error>
-  writeConfig(configFile: string, cfg: Config): Promise<RemoveWriteConfigError | undefined>
+  releaseIngress(appName: string): Promise<JibError | undefined>
+  stopApp(cfg: Config, appName: string, quiet: boolean): Promise<JibError | undefined>
+  removeCheckout(appName: string, repo: string): Promise<JibError | undefined>
+  removeSecrets(appName: string): Promise<JibError | undefined>
+  removeState(appName: string): Promise<JibError | undefined>
+  removeOverride(appName: string): Promise<JibError | undefined>
+  removeManagedCompose(appName: string): Promise<JibError | undefined>
+  writeConfig(configFile: string, cfg: Config): Promise<JibError | undefined>
 }

@@ -1,5 +1,5 @@
+import { ValidationError } from '@jib/errors'
 import { pathsIsDockerHubRepo } from '@jib/paths'
-import { ValidateConfigError } from './errors.ts'
 import type { Config } from './schema.ts'
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
@@ -16,9 +16,15 @@ const EXTERNAL_REPO_PREFIXES = ['file://', 'http://', 'https://', 'ssh://', 'git
  * maliciously-crafted config escape `$JIB_ROOT/repos/` via `repoPath`.
  */
 export function configValidateRepo(repo: string): string | null {
-  if (repo === '' || repo === 'local') return null
-  if (repo.includes('..')) return 'contains ".." path segment'
-  if (repo.startsWith('/')) return null
+  if (repo === '' || repo === 'local') {
+    return null
+  }
+  if (repo.includes('..')) {
+    return 'contains ".." path segment'
+  }
+  if (repo.startsWith('/')) {
+    return null
+  }
   if (repo.startsWith('https://hub.docker.com/')) {
     return pathsIsDockerHubRepo(repo) ? null : 'must point to a Docker Hub repository page'
   }
@@ -27,11 +33,17 @@ export function configValidateRepo(repo: string): string | null {
       ? null
       : 'must include a valid image ref after docker:// or dockerhub://'
   }
-  if (repo.startsWith('git@') && /^git@[^:\s]+:[^\s]+$/.test(repo)) return null
-  for (const prefix of EXTERNAL_REPO_PREFIXES) {
-    if (repo.startsWith(prefix)) return null
+  if (repo.startsWith('git@') && /^git@[^:\s]+:[^\s]+$/.test(repo)) {
+    return null
   }
-  if (GITHUB_SLUG_RE.test(repo)) return null
+  for (const prefix of EXTERNAL_REPO_PREFIXES) {
+    if (repo.startsWith(prefix)) {
+      return null
+    }
+  }
+  if (GITHUB_SLUG_RE.test(repo)) {
+    return null
+  }
   return 'must be "local", "owner/name", docker://image, dockerhub://image, a Docker Hub URL, an absolute path, or a file://, http(s)://, ssh://, git://, or git@host: URL'
 }
 
@@ -43,7 +55,9 @@ export function configValidateRepo(repo: string): string | null {
  * (no `ns`/`us`/`ms`) but covers every value jib's config actually uses.
  */
 export function configParseDuration(s: string): number | null {
-  if (!s) return null
+  if (!s) {
+    return null
+  }
   const units: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000 }
   const re = /(\d+(?:\.\d+)?)([smh])/g
   let total = 0
@@ -51,7 +65,9 @@ export function configParseDuration(s: string): number | null {
   for (const match of s.matchAll(re)) {
     const [, n, unit] = match
     const mult = unit ? units[unit] : undefined
-    if (!mult || n === undefined) return null
+    if (!mult || n === undefined) {
+      return null
+    }
     total += Number.parseFloat(n) * mult
     matched += match[0].length
   }
@@ -59,7 +75,7 @@ export function configParseDuration(s: string): number | null {
 }
 
 /** Runs config-level checks that zod can't express. */
-export function configValidate(cfg: Config): ValidateConfigError | undefined {
+export function configValidate(cfg: Config): ValidationError | undefined {
   const errs: string[] = []
 
   if (configParseDuration(cfg.poll_interval) === null) {
@@ -79,9 +95,13 @@ export function configValidate(cfg: Config): ValidateConfigError | undefined {
 
   let needsCloudflared = false
   for (const [name, app] of Object.entries(cfg.apps)) {
-    if (!APP_NAME_RE.test(name)) errs.push(`app '${name}': name must match [a-z0-9-]+`)
+    if (!APP_NAME_RE.test(name)) {
+      errs.push(`app '${name}': name must match [a-z0-9-]+`)
+    }
     const repoErr = configValidateRepo(app.repo)
-    if (repoErr) errs.push(`app '${name}': repo "${app.repo}" ${repoErr}`)
+    if (repoErr) {
+      errs.push(`app '${name}': repo "${app.repo}" ${repoErr}`)
+    }
     if (app.source && app.repo !== 'local' && !sourceNames.has(app.source)) {
       errs.push(`app '${name}': source "${app.source}" not found in sources`)
     }
@@ -92,7 +112,9 @@ export function configValidate(cfg: Config): ValidateConfigError | undefined {
       if (domain.host !== domain.host.toLowerCase() || !DOMAIN_RE.test(domain.host)) {
         errs.push(`app '${name}': invalid hostname "${domain.host}"`)
       }
-      if (domain.ingress === 'cloudflare-tunnel') needsCloudflared = true
+      if (domain.ingress === 'cloudflare-tunnel') {
+        needsCloudflared = true
+      }
     }
     for (const health of app.health ?? []) {
       if (!health.path.startsWith('/')) {
@@ -105,5 +127,5 @@ export function configValidate(cfg: Config): ValidateConfigError | undefined {
     errs.push('modules.cloudflared: must be enabled when any domain uses cloudflare-tunnel ingress')
   }
 
-  return errs.length > 0 ? new ValidateConfigError(errs.join('\n')) : undefined
+  return errs.length > 0 ? new ValidationError(errs.join('\n')) : undefined
 }

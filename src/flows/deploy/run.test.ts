@@ -1,7 +1,7 @@
 import type { Config } from '@jib/config'
+import { InternalError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
-import { DeployPrepareError } from './errors.ts'
 import { runDeploy, runDeployResult } from './run.ts'
 
 const cfg: Config = {
@@ -54,21 +54,19 @@ describe('runDeploy', () => {
     })
   })
 
-  test('wraps source prep failures as deploy_failed', async () => {
-    await expect(
-      runDeploy(cfg, paths, 'demo', undefined, {
-        createSpinner: createNoopSpinner,
-        sync: async () => {
-          throw new Error('git clone failed')
-        },
-      }),
-    ).rejects.toMatchObject({
-      code: 'deploy_failed',
-      message: 'git clone failed',
+  test('returns an internal error for source preparation failures', async () => {
+    const result = await runDeploy(cfg, paths, 'demo', undefined, {
+      createSpinner: createNoopSpinner,
+      sync: async () => {
+        throw new Error('git clone failed')
+      },
     })
+
+    expect(result).toBeInstanceOf(InternalError)
+    expect(result).toMatchObject({ code: 'internal', message: 'git clone failed' })
   })
 
-  test('returns a typed prepare error instead of throwing for expected sync failures', async () => {
+  test('returns an internal error instead of throwing for expected sync failures', async () => {
     const result = await runDeployResult(cfg, paths, 'demo', undefined, {
       createSpinner: createNoopSpinner,
       sync: async () => {
@@ -76,25 +74,23 @@ describe('runDeploy', () => {
       },
     })
 
-    expect(result).toBeInstanceOf(DeployPrepareError)
-    expect(result).toMatchObject({
-      code: 'deploy_prepare_failed',
-      message: 'git clone failed',
-    })
+    expect(result).toBeInstanceOf(InternalError)
+    expect(result).toMatchObject({ code: 'internal', message: 'git clone failed' })
   })
 
-  test('permission failures hint to repair the managed tree', async () => {
-    await expect(
-      runDeploy(cfg, paths, 'demo', undefined, {
-        createSpinner: createNoopSpinner,
-        sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
-        deployPrepared: async () => {
-          throw new Error("EACCES: permission denied, open '/opt/jib/overrides/demo.yml'")
-        },
-      }),
-    ).rejects.toMatchObject({
-      code: 'deploy_failed',
-      hint: 'repair /opt/jib ownership and permissions, then retry `jib deploy ...`',
+  test('returns permission failures as internal errors', async () => {
+    const result = await runDeploy(cfg, paths, 'demo', undefined, {
+      createSpinner: createNoopSpinner,
+      sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
+      deployPrepared: async () => {
+        throw new Error("EACCES: permission denied, open '/opt/jib/overrides/demo.yml'")
+      },
     })
+
+    expect(result).toBeInstanceOf(InternalError)
+    expect(result).toHaveProperty(
+      'message',
+      "EACCES: permission denied, open '/opt/jib/overrides/demo.yml'",
+    )
   })
 })

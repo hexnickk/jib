@@ -1,11 +1,5 @@
-import { type Config, ConfigError, type GitHubSource, configLoad, configWrite } from '@jib/config'
-import { JibError } from '@jib/errors'
-
-export class GitHubSourceAlreadyExistsError extends JibError {
-  constructor(name: string) {
-    super('github_source_exists', `source "${name}" already exists`)
-  }
-}
+import { type Config, type GitHubSource, configLoad, configWrite } from '@jib/config'
+import { type JibError, ValidationError } from '@jib/errors'
 
 /**
  * Loads config, applies a single mutation, then persists it back to disk so all
@@ -14,9 +8,11 @@ export class GitHubSourceAlreadyExistsError extends JibError {
 async function githubEditConfig(
   path: string,
   edit: (cfg: Config) => void,
-): Promise<undefined | ConfigError | Error> {
+): Promise<undefined | JibError> {
   const cfg = await configLoad(path)
-  if (cfg instanceof ConfigError) return cfg
+  if (cfg instanceof Error) {
+    return cfg
+  }
   edit(cfg)
   return configWrite(path, cfg)
 }
@@ -28,18 +24,17 @@ export function githubGetSource(cfg: Config, name: string): GitHubSource | undef
 }
 
 /** Validates that a source name is free before setup mutates the config. */
-export function githubValidateSourceName(
-  cfg: Config,
-  name: string,
-): GitHubSourceAlreadyExistsError | undefined {
-  return cfg.sources[name] !== undefined ? new GitHubSourceAlreadyExistsError(name) : undefined
+export function githubValidateSourceName(cfg: Config, name: string): ValidationError | undefined {
+  return cfg.sources[name] !== undefined
+    ? new ValidationError(`source "${name}" already exists`)
+    : undefined
 }
 
 /** Writes a deploy-key source entry (idempotent — overwrites on re-setup). */
 export async function githubAddKeySource(
   configFile: string,
   name: string,
-): Promise<undefined | Error> {
+): Promise<undefined | JibError> {
   return githubEditConfig(configFile, (cfg) => {
     cfg.sources[name] = { driver: 'github', type: 'key' }
   })
@@ -50,7 +45,7 @@ export async function githubAddAppSource(
   configFile: string,
   name: string,
   appId: number,
-): Promise<undefined | Error> {
+): Promise<undefined | JibError> {
   return githubEditConfig(configFile, (cfg) => {
     cfg.sources[name] = { driver: 'github', type: 'app', app_id: appId }
   })

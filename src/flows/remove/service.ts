@@ -1,7 +1,5 @@
-import { RemoveMissingAppError, RemoveWriteConfigError } from './errors.ts'
+import { type JibError, NotFoundError } from '@jib/errors'
 import type { RemoveObserver, RemoveParams, RemoveResult, RemoveSupport } from './types.ts'
-
-export { RemoveMissingAppError, RemoveWriteConfigError } from './errors.ts'
 
 export interface RemoveRunContext {
   support: RemoveSupport
@@ -12,14 +10,15 @@ export interface RemoveRunContext {
 export async function removeApp(
   ctx: RemoveRunContext,
   params: RemoveParams,
-): Promise<RemoveResult | RemoveMissingAppError | RemoveWriteConfigError> {
+): Promise<RemoveResult | NotFoundError | JibError> {
   const appCfg = params.cfg.apps[params.appName]
-  if (!appCfg) return new RemoveMissingAppError(params.appName)
+  if (!appCfg) {
+    return new NotFoundError(`app "${params.appName}" not found in config`)
+  }
 
   if (appCfg.domains.length > 0) {
     await runBestEffort(ctx, 'ingress release', () => ctx.support.releaseIngress(params.appName))
   }
-
   await runBestEffort(ctx, 'compose down', () =>
     ctx.support.stopApp(params.cfg, params.appName, params.quiet),
   )
@@ -29,7 +28,9 @@ export async function removeApp(
     ...params.cfg,
     apps: nextApps,
   })
-  if (writeResult instanceof RemoveWriteConfigError) return writeResult
+  if (writeResult instanceof Error) {
+    return writeResult
+  }
 
   await runBestEffort(ctx, 'repo cleanup', () =>
     ctx.support.removeCheckout(params.appName, appCfg.repo),
@@ -47,12 +48,15 @@ export async function removeApp(
 async function runBestEffort(
   ctx: RemoveRunContext,
   label: string,
-  step: () => Promise<undefined | Error>,
+  step: () => Promise<JibError | undefined>,
 ): Promise<void> {
   try {
     const error = await step()
-    if (error instanceof Error) ctx.observer?.warn?.(`${label}: ${error.message}`)
+    if (error instanceof Error) {
+      ctx.observer?.warn?.(`${label}: ${error.message}`)
+    }
   } catch (error) {
-    ctx.observer?.warn?.(`${label}: ${error instanceof Error ? error.message : String(error)}`)
+    const message = error instanceof Error ? error.message : String(error)
+    ctx.observer?.warn?.(`${label}: ${message}`)
   }
 }

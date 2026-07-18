@@ -1,11 +1,6 @@
-import { CloudflaredSaveTunnelTokenError } from '@jib-module/cloudflared'
+import { InternalError } from '@jib/errors'
 import { pathsGetPaths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
-import {
-  CloudflaredSetupPromptError,
-  CloudflaredSetupSaveTokenError,
-  CloudflaredStartError,
-} from './errors.ts'
 import { cloudflaredRunSetup, cloudflaredRunSetupResult } from './setup.ts'
 
 function createLogger() {
@@ -35,8 +30,8 @@ describe('cloudflaredRunSetupResult', () => {
       },
     })
 
-    expect(result).toBeInstanceOf(CloudflaredSetupPromptError)
-    if (result instanceof CloudflaredSetupPromptError) {
+    expect(result).toBeInstanceOf(InternalError)
+    if (result instanceof InternalError) {
       expect(result.message).toContain('confirm tunnel token replacement')
     }
   })
@@ -62,11 +57,11 @@ describe('cloudflaredRunSetupResult', () => {
       hasToken: () => false,
       logger: createLogger(),
       promptPassword: async () => 'eyJhIjoiNzQ',
-      saveToken: async () => new CloudflaredSaveTunnelTokenError('disk full'),
+      saveToken: async () => new InternalError('disk full'),
     })
 
-    expect(result).toBeInstanceOf(CloudflaredSetupSaveTokenError)
-    if (result instanceof CloudflaredSetupSaveTokenError) {
+    expect(result).toBeInstanceOf(InternalError)
+    if (result instanceof InternalError) {
       expect(result.cause).toBeInstanceOf(Error)
       expect(result.message).toContain('disk full')
     }
@@ -79,9 +74,9 @@ describe('cloudflaredRunSetupResult', () => {
       enableService: async () => ({ ok: false, detail: 'permission denied' }),
     })
 
-    expect(result).toBeInstanceOf(CloudflaredStartError)
-    if (result instanceof CloudflaredStartError) {
-      expect(result.detail).toBe('permission denied')
+    expect(result).toBeInstanceOf(InternalError)
+    if (result instanceof InternalError) {
+      expect(result.message).toContain('permission denied')
     }
   })
 })
@@ -122,7 +117,7 @@ describe('cloudflaredRunSetup', () => {
 
     expect(ok).toBe(false)
     expect(logger.messages).toEqual([
-      'warning:tunnel token setup skipped: failed to confirm tunnel token replacement: cancelled',
+      'warning:tunnel token setup skipped: confirm tunnel token replacement: cancelled',
     ])
   })
 
@@ -155,7 +150,7 @@ describe('cloudflaredRunSetup', () => {
     expect(logger.messages).toEqual([
       'info:Get a token at dash.cloudflare.com → Zero Trust → Networks → Connectors,',
       'info:then create a tunnel and copy the install command or token.',
-      'warning:tunnel token setup skipped: failed to read tunnel token input: cancelled',
+      'warning:tunnel token setup skipped: read tunnel token input: cancelled',
     ])
   })
 })

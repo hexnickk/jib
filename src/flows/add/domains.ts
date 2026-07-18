@@ -1,5 +1,6 @@
-import { MissingInputError } from '@jib/cli'
+import { cliCreateMissingInputError } from '@jib/cli'
 import type { ParsedDomain } from '@jib/config'
+import type { JibError } from '@jib/errors'
 import { tuiIsInteractive, tuiPromptSelectResult } from '@jib/tui'
 import { addAssignCliDomainsToServices } from './guided.ts'
 
@@ -7,11 +8,11 @@ import { addAssignCliDomainsToServices } from './guided.ts'
 export async function addCollectDomains(
   domains: ParsedDomain[],
   serviceNames: string[],
-): Promise<ParsedDomain[] | MissingInputError | Error> {
+): Promise<ParsedDomain[] | JibError> {
   if (serviceNames.length <= 1 || !tuiIsInteractive()) {
     const assigned = addAssignCliDomainsToServices(domains, serviceNames)
     if (assigned.issues.length > 0) {
-      return new MissingInputError('missing required input for jib add', assigned.issues)
+      return cliCreateMissingInputError('missing required input for jib add', assigned.issues)
     }
     return assigned.domains
   }
@@ -25,7 +26,9 @@ export async function addCollectDomains(
       message: `Which service should handle ${domain.host}?`,
       options: serviceNames.map((name) => ({ value: name, label: name })),
     })
-    if (service instanceof Error) return service
+    if (service instanceof Error) {
+      return service
+    }
     out.push({
       ...domain,
       service,

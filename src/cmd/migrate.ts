@@ -15,15 +15,24 @@ const cliMigrateCommand = {
 /** Runs pending migrations and returns the migration summary or typed error. */
 async function migrateRunCommand() {
   const linuxError = cliCheckLinuxHost('migrate')
-  if (linuxError) return linuxError
+  if (linuxError) {
+    return linuxError
+  }
   const rootError = cliCheckRootHost('migrate')
-  if (rootError) return rootError
+  if (rootError) {
+    return rootError
+  }
 
   const paths = pathsGetPaths()
   const configExisted = existsSync(paths.configFile)
-  if (cliIsTextOutput()) tuiIntro('jib migrate')
+  if (cliIsTextOutput()) {
+    tuiIntro('jib migrate')
+  }
 
   const result = await runPendingMigrations(paths)
+  if (result instanceof Error) {
+    return result
+  }
   if (cliIsTextOutput()) {
     tuiOutro(
       result.appliedMigrations.length > 0

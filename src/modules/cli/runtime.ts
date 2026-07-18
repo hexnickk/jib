@@ -1,4 +1,4 @@
-import { InvalidInteractiveModeError } from './errors.ts'
+import { CliError } from './errors.ts'
 
 export const cliInteractiveModes = ['auto', 'always', 'never'] as const
 
@@ -15,29 +15,41 @@ let currentCliRuntime: CliRuntime | null = null
 
 /** Parses shell-style truthy env values like 1/true/yes/on. */
 function parseTruthyCliEnv(value: string | undefined): boolean {
-  if (!value) return false
+  if (!value) {
+    return false
+  }
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase())
 }
 
 /** Parses a raw interactive-mode string into a typed mode or a typed error. */
 export function cliReadInteractiveMode(
   value: string | undefined,
-): InteractiveMode | InvalidInteractiveModeError | undefined {
-  if (value === undefined) return undefined
-  if (value === 'auto' || value === 'always' || value === 'never') return value
-  return new InvalidInteractiveModeError(value)
+): InteractiveMode | CliError | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+  if (value === 'auto' || value === 'always' || value === 'never') {
+    return value
+  }
+  return new CliError('invalid_interactive_mode', `invalid --interactive value "${value}"`, {
+    hint: 'expected one of: auto, always, never',
+  })
 }
 
 /** Reads the default interactive mode from env, honoring JIB_NON_INTERACTIVE. */
-function readDefaultCliInteractiveMode(): InteractiveMode | InvalidInteractiveModeError {
-  if (process.env.JIB_NON_INTERACTIVE) return 'never'
+function readDefaultCliInteractiveMode(): InteractiveMode | CliError {
+  if (process.env.JIB_NON_INTERACTIVE) {
+    return 'never'
+  }
   return cliReadInteractiveMode(process.env.JIB_INTERACTIVE) ?? 'auto'
 }
 
 /** Reads the baseline runtime from env defaults and current TTY state. */
-function readDefaultCliRuntime(): CliRuntime | InvalidInteractiveModeError {
+function readDefaultCliRuntime(): CliRuntime | CliError {
   const interactive = readDefaultCliInteractiveMode()
-  if (interactive instanceof Error) return interactive
+  if (interactive instanceof Error) {
+    return interactive
+  }
   return {
     interactive,
     debug: parseTruthyCliEnv(process.env.JIB_DEBUG),
@@ -47,31 +59,36 @@ function readDefaultCliRuntime(): CliRuntime | InvalidInteractiveModeError {
 }
 
 /** Applies explicit overrides on top of the default runtime snapshot. */
-function resolveCliRuntime(runtime: Partial<CliRuntime>): CliRuntime | InvalidInteractiveModeError {
+function resolveCliRuntime(runtime: Partial<CliRuntime>): CliRuntime | CliError {
   const defaults = readDefaultCliRuntime()
-  if (defaults instanceof Error) return defaults
+  if (defaults instanceof Error) {
+    return defaults
+  }
   return { ...defaults, ...runtime }
 }
 
 /** Mirrors the current debug mode into JIB_DEBUG for downstream logging helpers. */
 function syncCliDebugEnv(debug: boolean): void {
-  if (debug) process.env.JIB_DEBUG = '1'
-  else Reflect.deleteProperty(process.env, 'JIB_DEBUG')
+  if (debug) {
+    process.env.JIB_DEBUG = '1'
+  } else {
+    Reflect.deleteProperty(process.env, 'JIB_DEBUG')
+  }
 }
 
 /** Stores a partial runtime and returns the fully materialized runtime. */
-export function cliSetRuntime(
-  runtime: Partial<CliRuntime>,
-): CliRuntime | InvalidInteractiveModeError {
+export function cliSetRuntime(runtime: Partial<CliRuntime>): CliRuntime | CliError {
   const nextRuntime = resolveCliRuntime(runtime)
-  if (nextRuntime instanceof Error) return nextRuntime
+  if (nextRuntime instanceof Error) {
+    return nextRuntime
+  }
   currentCliRuntime = nextRuntime
   syncCliDebugEnv(nextRuntime.debug)
   return currentCliRuntime
 }
 
 /** Reads the current runtime or builds one from env defaults when unset. */
-export function cliReadRuntime(): CliRuntime | InvalidInteractiveModeError {
+export function cliReadRuntime(): CliRuntime | CliError {
   return currentCliRuntime ?? readDefaultCliRuntime()
 }
 
@@ -83,7 +100,9 @@ function readReadyCliRuntime(): CliRuntime | null {
 
 /** Returns whether a resolved runtime allows prompts on its configured stdio streams. */
 export function cliRuntimeCanPrompt(runtime: CliRuntime): boolean {
-  if (runtime.interactive === 'never') return false
+  if (runtime.interactive === 'never') {
+    return false
+  }
   return runtime.stdinTty && runtime.stdoutTty
 }
 

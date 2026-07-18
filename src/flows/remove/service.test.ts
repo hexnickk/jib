@@ -1,11 +1,7 @@
 import type { Config } from '@jib/config'
+import { InternalError, NotFoundError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { RemoveMissingAppError, RemoveWriteConfigError } from './errors.ts'
-import {
-  RemoveMissingAppError as ServiceRemoveMissingAppError,
-  RemoveWriteConfigError as ServiceRemoveWriteConfigError,
-  removeApp,
-} from './service.ts'
+import { removeApp } from './service.ts'
 import type { RemoveSupport } from './types.ts'
 
 const cfg: Config = {
@@ -19,11 +15,6 @@ const cfg: Config = {
 }
 
 describe('removeApp', () => {
-  test('re-exports typed errors from service for compatibility', () => {
-    expect(ServiceRemoveMissingAppError).toBe(RemoveMissingAppError)
-    expect(ServiceRemoveWriteConfigError).toBe(RemoveWriteConfigError)
-  })
-
   test('best-effort steps warn and config removal still lands', async () => {
     const warnings: string[] = []
     const calls: string[] = []
@@ -31,19 +22,19 @@ describe('removeApp', () => {
     const support: RemoveSupport = {
       releaseIngress: async () => {
         calls.push('releaseIngress')
-        return new Error('boom')
+        return new InternalError('boom')
       },
       stopApp: async () => {
         calls.push('stopApp')
-        return new Error('down failed')
+        return new InternalError('down failed')
       },
       removeCheckout: async () => {
         calls.push('removeCheckout')
-        return new Error('cleanup failed')
+        return new InternalError('cleanup failed')
       },
       removeSecrets: async () => {
         calls.push('removeSecrets')
-        return new Error('secret cleanup failed')
+        return new InternalError('secret cleanup failed')
       },
       removeState: async () => {
         calls.push('removeState')
@@ -98,7 +89,9 @@ describe('removeApp', () => {
   test('best-effort steps also downgrade thrown custom-support failures', async () => {
     const warnings: string[] = []
     const demo = cfg.apps.demo
-    if (!demo) throw new Error('expected demo app')
+    if (!demo) {
+      throw new Error('expected demo app')
+    }
     const support: RemoveSupport = {
       releaseIngress: async () => {
         throw new Error('thrown ingress failure')
@@ -156,8 +149,8 @@ describe('removeApp', () => {
       },
     )
 
-    expect(result).toBeInstanceOf(RemoveMissingAppError)
-    expect((result as RemoveMissingAppError).code).toBe('remove_missing_app')
+    expect(result).toBeInstanceOf(NotFoundError)
+    expect((result as NotFoundError).code).toBe('not_found')
   })
 
   test('returns a typed config write error from the primary API', async () => {
@@ -170,7 +163,9 @@ describe('removeApp', () => {
       removeOverride: async () => undefined,
       removeManagedCompose: async () => undefined,
       writeConfig: async (configFile) =>
-        new RemoveWriteConfigError(configFile, { cause: new Error('disk full') }),
+        new InternalError(`failed to write config "${configFile}" during remove`, {
+          cause: new Error('disk full'),
+        }),
     }
 
     const result = await removeApp(
@@ -183,8 +178,8 @@ describe('removeApp', () => {
       },
     )
 
-    expect(result).toBeInstanceOf(RemoveWriteConfigError)
-    expect((result as RemoveWriteConfigError).code).toBe('remove_write_config')
+    expect(result).toBeInstanceOf(InternalError)
+    expect((result as InternalError).code).toBe('internal')
   })
 
   test('returns a typed config write error without throwing', async () => {
@@ -196,7 +191,8 @@ describe('removeApp', () => {
       removeState: async () => undefined,
       removeOverride: async () => undefined,
       removeManagedCompose: async () => undefined,
-      writeConfig: async (configFile) => new RemoveWriteConfigError(configFile),
+      writeConfig: async (configFile) =>
+        new InternalError(`failed to write config "${configFile}" during remove`),
     }
 
     expect(
@@ -209,6 +205,6 @@ describe('removeApp', () => {
           quiet: true,
         },
       ),
-    ).toBeInstanceOf(RemoveWriteConfigError)
+    ).toBeInstanceOf(InternalError)
   })
 })

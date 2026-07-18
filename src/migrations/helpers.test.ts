@@ -1,5 +1,5 @@
+import { InternalError, ValidationError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { AddUserToGroupError, ValidateSudoersError, WriteSudoersError } from './errors.ts'
 import {
   buildSudoersContent,
   migrationEnsureGroupResult,
@@ -22,8 +22,12 @@ describe('migrationEnsureGroupResult', () => {
       run: (args) => {
         const call = args.join(' ')
         calls.push(call)
-        if (call === 'getent group docker') return commandResult(2)
-        if (call === 'groupadd --system docker') return commandResult(0)
+        if (call === 'getent group docker') {
+          return commandResult(2)
+        }
+        if (call === 'groupadd --system docker') {
+          return commandResult(0)
+        }
         return commandResult(1, '', `unexpected ${call}`)
       },
     })
@@ -53,10 +57,18 @@ describe('migrationEnsureUserInGroupResult', () => {
       run: (args) => {
         const call = args.join(' ')
         calls.push(call)
-        if (call === 'getent group docker') return commandResult(2)
-        if (call === 'groupadd --system docker') return commandResult(0)
-        if (call === 'id -nG demo') return commandResult(0, 'wheel jib\n')
-        if (call === 'usermod -aG docker demo') return commandResult(0)
+        if (call === 'getent group docker') {
+          return commandResult(2)
+        }
+        if (call === 'groupadd --system docker') {
+          return commandResult(0)
+        }
+        if (call === 'id -nG demo') {
+          return commandResult(0, 'wheel jib\n')
+        }
+        if (call === 'usermod -aG docker demo') {
+          return commandResult(0)
+        }
         return commandResult(1, '', `unexpected ${call}`)
       },
     })
@@ -76,8 +88,12 @@ describe('migrationEnsureUserInGroupResult', () => {
       run: (args) => {
         const call = args.join(' ')
         calls.push(call)
-        if (call === 'getent group docker') return commandResult(0)
-        if (call === 'id -nG demo') return commandResult(0, 'wheel docker\n')
+        if (call === 'getent group docker') {
+          return commandResult(0)
+        }
+        if (call === 'id -nG demo') {
+          return commandResult(0, 'wheel docker\n')
+        }
         return commandResult(1, '', `unexpected ${call}`)
       },
     })
@@ -90,14 +106,20 @@ describe('migrationEnsureUserInGroupResult', () => {
     const result = await migrationEnsureUserInGroupResult('demo', 'docker', {
       run: (args) => {
         const call = args.join(' ')
-        if (call === 'getent group docker') return commandResult(0)
-        if (call === 'id -nG demo') return commandResult(0, 'wheel jib\n')
-        if (call === 'usermod -aG docker demo') return commandResult(6, '', 'no such user')
+        if (call === 'getent group docker') {
+          return commandResult(0)
+        }
+        if (call === 'id -nG demo') {
+          return commandResult(0, 'wheel jib\n')
+        }
+        if (call === 'usermod -aG docker demo') {
+          return commandResult(6, '', 'no such user')
+        }
         return commandResult(1, '', `unexpected ${call}`)
       },
     })
 
-    expect(result).toBeInstanceOf(AddUserToGroupError)
+    expect(result).toBeInstanceOf(InternalError)
     expect(result?.message).toContain('failed to add user "demo" to group "docker"')
   })
 })
@@ -115,7 +137,7 @@ describe('buildSudoersContent', () => {
       unlink: async () => {},
       writeFile: async () => {},
     })
-    expect(result).toBeInstanceOf(ValidateSudoersError)
+    expect(result).toBeInstanceOf(ValidationError)
   })
 
   test('returns typed write failure when install step fails', async () => {
@@ -128,7 +150,7 @@ describe('buildSudoersContent', () => {
       unlink: async () => {},
       writeFile: async () => {},
     })
-    expect(result).toBeInstanceOf(WriteSudoersError)
+    expect(result).toBeInstanceOf(InternalError)
   })
 
   test('removes installed target when chown fails after rename', async () => {
@@ -144,7 +166,7 @@ describe('buildSudoersContent', () => {
       },
       writeFile: async () => {},
     })
-    expect(result).toBeInstanceOf(WriteSudoersError)
+    expect(result).toBeInstanceOf(InternalError)
     expect(unlinked).toEqual(['/etc/sudoers.d/jib'])
   })
 })

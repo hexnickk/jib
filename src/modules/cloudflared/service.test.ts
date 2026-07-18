@@ -2,10 +2,10 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { configLoad, configWrite } from '@jib/config'
+import { InternalError } from '@jib/errors'
 import { pathsGetPaths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
 import {
-  CloudflaredSaveTunnelTokenError,
   cloudflaredEnableConfig,
   cloudflaredEnableService,
   cloudflaredHasTunnelToken,
@@ -64,7 +64,7 @@ describe('cloudflared service helpers', () => {
 
       const result = await cloudflaredSaveTunnelToken(paths, 'eyJhIjoiNzQ')
 
-      expect(result).toBeInstanceOf(CloudflaredSaveTunnelTokenError)
+      expect(result).toBeInstanceOf(InternalError)
       expect(result).toHaveProperty('cause')
     })
   })
@@ -84,7 +84,9 @@ describe('cloudflared service helpers', () => {
 
       expect(await cloudflaredEnableConfig(paths)).toBeUndefined()
       const config = await configLoad(paths.configFile)
-      if (config instanceof Error) throw config
+      if (config instanceof Error) {
+        throw config
+      }
       expect(config.modules.cloudflared).toBe(true)
     })
   })

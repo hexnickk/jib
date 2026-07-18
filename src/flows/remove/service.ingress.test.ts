@@ -1,4 +1,5 @@
 import type { Config } from '@jib/config'
+import { InternalError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
 import { removeApp } from './service.ts'
 import type { RemoveSupport } from './types.ts'
@@ -24,7 +25,7 @@ describe('runRemove ingress cleanup', () => {
     const support: RemoveSupport = {
       releaseIngress: async () => {
         calls.push('releaseIngress')
-        return new Error('nginx reload failed')
+        return new InternalError('nginx reload failed')
       },
       stopApp: async () => {
         calls.push('stopApp')

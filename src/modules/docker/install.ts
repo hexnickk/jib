@@ -1,11 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { $ } from '@/libs/shell'
-import {
-  DockerInstallCommandError,
-  DockerInstallReadFileError,
-  DockerInstallUnsupportedPlatformError,
-  DockerInstallWriteFileError,
-} from './errors.ts'
+import { InternalError, ValidationError } from '@jib/errors'
 import {
   DOCKER_APT_SOURCE_PATH,
   DOCKER_SAFE_APT_VALUE,
@@ -33,23 +28,19 @@ interface DockerInstallDeps {
   writeFile?: (path: string, data: string, opts: { mode: number }) => Promise<void>
 }
 
-export type DockerInstallResultError =
-  | DockerInstallCommandError
-  | DockerInstallReadFileError
-  | DockerInstallUnsupportedPlatformError
-  | DockerInstallWriteFileError
-
-/** Ensures Docker Engine, the Compose plugin, and docker.service exist and are running. */
+/** Ensures Docker Engine, the Compose plugin, and docker.service are available. */
 export async function dockerEnsureInstalledResult(
   deps: DockerInstallDeps = {},
-): Promise<DockerInstallResultError | undefined> {
+): Promise<InternalError | ValidationError | undefined> {
   if (!(await dockerCommandSucceeds(deps, ['sh', '-c', 'command -v systemctl >/dev/null 2>&1']))) {
-    return new DockerInstallUnsupportedPlatformError('systemd/systemctl is required')
+    return new ValidationError('systemd/systemctl is required')
   }
 
   if (!(await dockerRuntimeReady(deps))) {
     const installError = await dockerInstallFromApt(deps)
-    if (installError) return installError
+    if (installError) {
+      return installError
+    }
   }
 
   const startError = await dockerRunRequired(deps, 'start docker.service', [
@@ -58,13 +49,13 @@ export async function dockerEnsureInstalledResult(
     '--now',
     'docker.service',
   ])
-  if (startError instanceof Error) return startError
+  if (startError instanceof Error) {
+    return startError
+  }
 
   if (!(await dockerRuntimeReady(deps))) {
-    return new DockerInstallCommandError(
-      'verify Docker runtime',
-      ['docker', 'compose', 'version'],
-      'docker compose or docker.service is still unavailable after installation',
+    return new InternalError(
+      'verify Docker runtime: docker compose or docker.service is still unavailable after installation',
     )
   }
 }
@@ -81,42 +72,50 @@ export async function dockerRuntimeReady(deps: DockerInstallDeps = {}): Promise<
 /** Installs Docker Engine from Docker's official apt repository on supported hosts. */
 async function dockerInstallFromApt(
   deps: DockerInstallDeps,
-): Promise<DockerInstallResultError | undefined> {
+): Promise<InternalError | ValidationError | undefined> {
   if (!(await dockerCommandSucceeds(deps, ['sh', '-c', 'command -v apt-get >/dev/null 2>&1']))) {
-    return new DockerInstallUnsupportedPlatformError('apt-get is required for automatic install')
+    return new ValidationError('apt-get is required for automatic install')
   }
 
   const repo = await dockerReadAptRepository(deps)
-  if (repo instanceof Error) return repo
+  if (repo instanceof Error) {
+    return repo
+  }
   const arch = await dockerReadArchitecture(deps)
-  if (arch instanceof Error) return arch
+  if (arch instanceof Error) {
+    return arch
+  }
 
   for (const [step, args] of dockerAptPrepCommands(repo)) {
     const error = await dockerRunRequired(deps, step, args)
-    if (error instanceof Error) return error
+    if (error instanceof Error) {
+      return error
+    }
   }
 
   const sourceError = await dockerWriteAptSource(deps, repo, arch)
-  if (sourceError) return sourceError
+  if (sourceError) {
+    return sourceError
+  }
 
   for (const [step, args] of dockerAptPackageCommands()) {
     const error = await dockerRunRequired(deps, step, args)
-    if (error instanceof Error) return error
+    if (error instanceof Error) {
+      return error
+    }
   }
 }
 
 /** Reads and resolves the host OS into Docker's apt repository coordinates. */
 async function dockerReadAptRepository(
   deps: DockerInstallDeps,
-): Promise<
-  DockerAptRepository | DockerInstallReadFileError | DockerInstallUnsupportedPlatformError
-> {
+): Promise<DockerAptRepository | InternalError | ValidationError> {
   try {
     const raw = await (deps.readOsRelease ?? (() => readFile(OS_RELEASE_PATH, 'utf8')))()
     return dockerSelectAptRepository(dockerParseOsRelease(raw))
   } catch (error) {
-    return new DockerInstallReadFileError(OS_RELEASE_PATH, dockerErrorMessage(error), {
-      cause: error instanceof Error ? error : undefined,
+    return new InternalError(`read ${OS_RELEASE_PATH}: ${dockerErrorMessage(error)}`, {
+      cause: error,
     })
   }
 }
@@ -124,15 +123,17 @@ async function dockerReadAptRepository(
 /** Reads `dpkg --print-architecture` and validates it for an apt source line. */
 async function dockerReadArchitecture(
   deps: DockerInstallDeps,
-): Promise<string | DockerInstallCommandError | DockerInstallUnsupportedPlatformError> {
+): Promise<string | InternalError | ValidationError> {
   const archResult = await dockerRunRequired(deps, 'read dpkg architecture', [
     'dpkg',
     '--print-architecture',
   ])
-  if (archResult instanceof Error) return archResult
+  if (archResult instanceof Error) {
+    return archResult
+  }
   const arch = archResult.stdout.toString().trim()
   if (!DOCKER_SAFE_APT_VALUE.test(arch)) {
-    return new DockerInstallUnsupportedPlatformError(`unsupported dpkg architecture "${arch}"`)
+    return new ValidationError(`unsupported dpkg architecture "${arch}"`)
   }
   return arch
 }
@@ -142,33 +143,31 @@ async function dockerWriteAptSource(
   deps: DockerInstallDeps,
   repo: DockerAptRepository,
   arch: string,
-): Promise<DockerInstallWriteFileError | undefined> {
+): Promise<InternalError | undefined> {
   try {
     await (deps.writeFile ?? writeFile)(DOCKER_APT_SOURCE_PATH, dockerAptSourceLine(repo, arch), {
       mode: 0o644,
     })
   } catch (error) {
-    return new DockerInstallWriteFileError(DOCKER_APT_SOURCE_PATH, dockerErrorMessage(error), {
-      cause: error instanceof Error ? error : undefined,
+    return new InternalError(`write ${DOCKER_APT_SOURCE_PATH}: ${dockerErrorMessage(error)}`, {
+      cause: error,
     })
   }
 }
 
-/** Runs a command where non-zero exit should become a typed install error. */
+/** Runs a command where non-zero exit becomes an internal install failure. */
 async function dockerRunRequired(
   deps: DockerInstallDeps,
   step: string,
   args: readonly string[],
-): Promise<DockerInstallCommandResult | DockerInstallCommandError> {
+): Promise<DockerInstallCommandResult | InternalError> {
   try {
     const result = await dockerRun(deps, args)
     return result.exitCode === 0
       ? result
-      : new DockerInstallCommandError(step, args, dockerCommandDetail(result))
+      : new InternalError(`${step}: ${dockerCommandDetail(result)}`)
   } catch (error) {
-    return new DockerInstallCommandError(step, args, dockerErrorMessage(error), {
-      cause: error instanceof Error ? error : undefined,
-    })
+    return new InternalError(`${step}: ${dockerErrorMessage(error)}`, { cause: error })
   }
 }
 
@@ -189,7 +188,9 @@ function dockerRun(
   deps: DockerInstallDeps,
   args: readonly string[],
 ): Promise<DockerInstallCommandResult> | DockerInstallCommandResult {
-  if (deps.run) return deps.run(args)
+  if (deps.run) {
+    return deps.run(args)
+  }
   const result = $.sync`${args}`
   return { exitCode: result.exitCode ?? 0, stderr: result.stderr, stdout: result.stdout }
 }

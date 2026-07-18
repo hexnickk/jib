@@ -1,10 +1,9 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { CancelledError, type JibError } from '@jib/errors'
 import { pathsGetPaths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
-import type { AddFlowError } from './flow-errors.ts'
-import { CancelledAddError } from './flow-errors.ts'
 import { addFinalApp, addMakeDeps, addMakeParams } from './service.test-support.ts'
 
 describe('add flow state machine', () => {
@@ -51,7 +50,7 @@ describe('add flow state machine', () => {
       },
     })
 
-    expect(result).toBeInstanceOf(CancelledAddError)
+    expect(result).toBeInstanceOf(CancelledError)
     expect(calls).toContain('rollbackRepo')
     expect(calls).toContain('loadConfig')
   })
@@ -61,7 +60,7 @@ describe('add flow state machine', () => {
 
     const result = await flow.run(addMakeParams())
     expect(result).toBeInstanceOf(Error)
-    expect((result as AddFlowError).message).toBe('buildResolvedApp failed')
+    expect((result as JibError).message).toBe('buildResolvedApp failed')
     expect(states).toEqual([
       'inputs_ready',
       'repo_prepared',
@@ -73,7 +72,7 @@ describe('add flow state machine', () => {
     expect(calls.includes('loadConfig')).toBe(false)
   })
 
-  test('docker hub workdir preparation failures return PrepareRepoError', async () => {
+  test('docker hub workdir preparation failures return an internal error', async () => {
     const root = await mkdtemp(join(tmpdir(), 'jib-add-dockerhub-'))
     const { flow } = addMakeDeps()
 
@@ -90,7 +89,7 @@ describe('add flow state machine', () => {
       })
 
       expect(result).toBeInstanceOf(Error)
-      expect((result as AddFlowError).code).toBe('add_prepare_repo')
+      expect((result as JibError).code).toBe('internal')
     } finally {
       await rm(root, { recursive: true, force: true })
     }

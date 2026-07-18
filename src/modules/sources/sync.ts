@@ -1,6 +1,6 @@
+import { InternalError, type JibError } from '@jib/errors'
 import { pathsPathExistsResult } from '@jib/paths'
-import { sourcesEnsureCheckout, sourcesErrorOptions } from './checkout.ts'
-import { SourceLocalCheckoutError, SourceRemoteSyncError } from './errors.ts'
+import { sourcesEnsureCheckout } from './checkout.ts'
 import * as git from './git.ts'
 import type { PreparedSource, ResolvedSource } from './types.ts'
 
@@ -9,24 +9,29 @@ export async function sourcesSyncLocalCheckout(
   appName: string,
   workdir: string,
   ref: string,
-): Promise<PreparedSource | SourceLocalCheckoutError> {
+): Promise<PreparedSource | JibError> {
   try {
-    if ((await pathsPathExistsResult(workdir)) !== true || !(await git.sourcesGitIsRepo(workdir))) {
-      return new SourceLocalCheckoutError(appName, workdir)
+    const exists = await pathsPathExistsResult(workdir)
+    if (exists instanceof Error) {
+      return exists
+    }
+    if (!exists || !(await git.sourcesGitIsRepo(workdir))) {
+      return new InternalError(`failed to sync local repo for app "${appName}" at ${workdir}`)
     }
     const checkoutError = await git.sourcesGitCheckout(workdir, ref)
     if (checkoutError instanceof Error) {
-      return new SourceLocalCheckoutError(appName, workdir, sourcesErrorOptions(checkoutError))
+      return checkoutError
     }
 
     const sha = await git.sourcesGitCurrentSha(workdir)
     if (sha instanceof Error) {
-      return new SourceLocalCheckoutError(appName, workdir, sourcesErrorOptions(sha))
+      return sha
     }
-
     return { workdir, sha }
   } catch (error) {
-    return new SourceLocalCheckoutError(appName, workdir, sourcesErrorOptions(error))
+    return new InternalError(`failed to sync local repo for app "${appName}" at ${workdir}`, {
+      cause: error,
+    })
   }
 }
 
@@ -34,7 +39,7 @@ export async function sourcesSyncLocalCheckout(
 export async function sourcesSyncRemoteCheckout(
   appName: string,
   source: ResolvedSource,
-): Promise<PreparedSource | SourceRemoteSyncError> {
+): Promise<PreparedSource | JibError> {
   try {
     const checkoutError = await sourcesEnsureCheckout(
       source.workdir,
@@ -43,30 +48,33 @@ export async function sourcesSyncRemoteCheckout(
       source.env,
     )
     if (checkoutError instanceof Error) {
-      return new SourceRemoteSyncError(appName, source.ref, sourcesErrorOptions(checkoutError))
+      return checkoutError
     }
   } catch (error) {
-    return new SourceRemoteSyncError(appName, source.ref, sourcesErrorOptions(error))
+    return new InternalError(
+      `failed to sync remote source for app "${appName}" at ref "${source.ref}"`,
+      { cause: error },
+    )
   }
 
   const authError = await source.applyAuth(source.workdir)
   if (authError instanceof Error) {
-    return new SourceRemoteSyncError(appName, source.ref, sourcesErrorOptions(authError))
+    return authError
   }
 
   const fetchError = await git.sourcesGitFetch(source.workdir, source.ref, source.env)
   if (fetchError instanceof Error) {
-    return new SourceRemoteSyncError(appName, source.ref, sourcesErrorOptions(fetchError))
+    return fetchError
   }
 
   const sha = await git.sourcesGitFetchedSha(source.workdir)
   if (sha instanceof Error) {
-    return new SourceRemoteSyncError(appName, source.ref, sourcesErrorOptions(sha))
+    return sha
   }
 
   const checkoutError = await git.sourcesGitCheckout(source.workdir, sha)
   if (checkoutError instanceof Error) {
-    return new SourceRemoteSyncError(appName, source.ref, sourcesErrorOptions(checkoutError))
+    return checkoutError
   }
 
   return { workdir: source.workdir, sha }

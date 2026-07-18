@@ -1,8 +1,8 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { InternalError, ValidationError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { ConfigError, ParseConfigError, ReadConfigError, ValidateConfigError } from './errors.ts'
 import { configLoad } from './load.ts'
 import type { Config } from './schema.ts'
 import { configWrite } from './write.ts'
@@ -35,8 +35,8 @@ describe('configLoad/configWrite', () => {
       }
       expect(await configWrite(path, cfg)).toBeUndefined()
       const loaded = await configLoad(path)
-      expect(loaded).not.toBeInstanceOf(ConfigError)
-      if (loaded instanceof ConfigError) {
+      expect(loaded).not.toBeInstanceOf(Error)
+      if (loaded instanceof Error) {
         throw loaded
       }
       expect(loaded.poll_interval).toBe('2m')
@@ -62,20 +62,20 @@ describe('configLoad/configWrite', () => {
         },
       })
 
-      expect(result).toBeInstanceOf(ValidateConfigError)
+      expect(result).toBeInstanceOf(ValidationError)
     })
   })
 
-  test('configLoad returns ReadConfigError on missing file', async () => {
+  test('configLoad returns an internal error on missing file', async () => {
     const loaded = await configLoad('/no/such/file.yml')
-    expect(loaded).toBeInstanceOf(ReadConfigError)
+    expect(loaded).toBeInstanceOf(InternalError)
   })
 
-  test('configLoad returns ParseConfigError on bad YAML', async () => {
+  test('configLoad returns a validation error on bad YAML', async () => {
     await withTmp(async (dir) => {
       const path = join(dir, 'bad.yml')
       await writeFile(path, 'foo: [bar')
-      expect(await configLoad(path)).toBeInstanceOf(ParseConfigError)
+      expect(await configLoad(path)).toBeInstanceOf(ValidationError)
     })
   })
 })

@@ -1,14 +1,16 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
+import { type Config, configLoad, configWrite } from '@jib/config'
 import { pathsCredsPath, pathsGetPaths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
 import { initInferredOptionalModules, initReconcileOptionalModules } from './reconcile.ts'
 
 async function readConfig(file: string): Promise<Config> {
   const result = await configLoad(file)
-  if (result instanceof ConfigError) throw result
+  if (result instanceof Error) {
+    throw result
+  }
   return result
 }
 
@@ -41,7 +43,9 @@ describe('initReconcileOptionalModules', () => {
       expect(initInferredOptionalModules(cfg, paths)).toEqual({ cloudflared: true })
 
       const next = await initReconcileOptionalModules(cfg, paths)
-      if (next instanceof Error) throw next
+      if (next instanceof Error) {
+        throw next
+      }
       expect(next.modules).toEqual({ cloudflared: true })
     })
   })
@@ -61,7 +65,9 @@ describe('initReconcileOptionalModules', () => {
         },
       })
 
-      if (next instanceof Error) throw next
+      if (next instanceof Error) {
+        throw next
+      }
       expect(next.modules).toEqual({ cloudflared: true })
       expect(writes).toHaveLength(1)
       expect((await readConfig(paths.configFile)).modules).toEqual({})

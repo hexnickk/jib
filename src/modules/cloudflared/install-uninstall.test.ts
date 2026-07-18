@@ -1,16 +1,11 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { InternalError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import {
-  CloudflaredInstallReloadError,
-  CloudflaredInstallWriteUnitError,
-  CloudflaredUninstallDisableError,
-  cloudflaredInstallResult,
-  cloudflaredUninstallResult,
-} from './index.ts'
+import { cloudflaredInstallResult, cloudflaredUninstallResult } from './index.ts'
 
 const serviceName = 'jib-cloudflared.test.service'
 
@@ -125,9 +120,9 @@ describe('cloudflared install/uninstall', () => {
 
       expect(result).toMatchObject({
         message: 'systemctl daemon-reload: reload failed',
-        name: 'CloudflaredInstallReloadError',
+        name: 'InternalError',
       })
-      expect(result).toBeInstanceOf(CloudflaredInstallReloadError)
+      expect(result).toBeInstanceOf(InternalError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -148,7 +143,7 @@ describe('cloudflared install/uninstall', () => {
         },
       )
 
-      expect(result).toBeInstanceOf(CloudflaredInstallWriteUnitError)
+      expect(result).toBeInstanceOf(InternalError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -229,7 +224,7 @@ describe('cloudflared install/uninstall', () => {
         },
       )
 
-      expect(result).toBeInstanceOf(CloudflaredUninstallDisableError)
+      expect(result).toBeInstanceOf(InternalError)
       expect(calls).toEqual(['disable', 'daemon-reload'])
       expect(await stat(unitPath).catch(() => null)).toBeNull()
       expect(
@@ -264,7 +259,7 @@ describe('cloudflared install/uninstall', () => {
         },
       )
 
-      expect(result?.name).toBe('CloudflaredUninstallReloadError')
+      expect(result?.name).toBe('InternalError')
       expect(result?.message).toBe('systemctl daemon-reload: reload failed')
     } finally {
       await rm(root, { recursive: true, force: true })
@@ -286,7 +281,7 @@ describe('cloudflared install/uninstall', () => {
         },
       )
 
-      expect(result).toBeInstanceOf(CloudflaredUninstallDisableError)
+      expect(result).toBeInstanceOf(InternalError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

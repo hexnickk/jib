@@ -1,5 +1,6 @@
+import { InternalError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { UpdateError, updateRunResult } from './index.ts'
+import { updateRunResult } from './index.ts'
 
 describe('updateRunResult', () => {
   test('updates from npm and runs Linux maintenance', async () => {
@@ -66,7 +67,7 @@ describe('updateRunResult', () => {
       runCommand: async (command) => (command[0] === 'npm' ? 1 : 0),
     })
 
-    expect(result).toBeInstanceOf(UpdateError)
+    expect(result).toBeInstanceOf(InternalError)
     expect(result?.message).toContain('npm install exited with status 1')
   })
 })

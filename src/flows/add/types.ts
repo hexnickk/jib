@@ -1,8 +1,8 @@
 import type { App, Config, Domain, HealthCheck, ParsedDomain } from '@jib/config'
 import type { ComposeInspection, ComposeService } from '@jib/docker'
+import type { JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import type { InspectionCheckout } from '@jib/sources'
-import type { AddFlowError } from './flow-errors.ts'
 
 export type EnvEntry = { key: string; value: string }
 
@@ -50,11 +50,14 @@ export interface AddFlowParams {
 }
 
 export type AddFlowResult = { finalApp: App; secretsWritten: number }
-export type AddFlowOutcome = AddFlowResult | AddFlowError
+export type AddFlowOutcome = AddFlowResult | JibError
 
 export interface AddPlanner {
-  inspectCompose(draftApp: App, workdir: string): Promise<ComposeInspection | Error>
-  collectGuidedInputs(inputs: AddInputs, services: ComposeService[]): Promise<GuidedInputs | Error>
+  inspectCompose(draftApp: App, workdir: string): Promise<ComposeInspection | JibError>
+  collectGuidedInputs(
+    inputs: AddInputs,
+    services: ComposeService[],
+  ): Promise<GuidedInputs | JibError>
   buildResolvedApp(
     cfg: Config,
     paths: Paths,
@@ -64,13 +67,13 @@ export interface AddPlanner {
     inputs: AddInputs,
     inspection: ComposeInspection,
     guided: GuidedInputs,
-  ): Promise<App | Error>
+  ): Promise<App | JibError>
   confirmPlan(
     appName: string,
     inspection: ComposeInspection,
     finalApp: App,
     configEntries: ConfigEntry[],
-  ): Promise<undefined | Error>
+  ): Promise<undefined | JibError>
 }
 
 export interface AddFlowObserver {
@@ -83,12 +86,12 @@ export interface AddSupport {
     cfg: Config,
     appName: string,
     target: { repo: string; branch: string; source?: string },
-  ): Promise<InspectionCheckout | Error>
-  removeCheckout(appName: string, repo: string): Promise<undefined | Error>
-  loadConfig(configFile: string): Promise<Config | Error>
-  writeConfig(configFile: string, cfg: Config): Promise<undefined | Error>
-  upsertSecret(appName: string, entry: EnvEntry): Promise<undefined | Error>
-  removeSecret(appName: string, key: string): Promise<undefined | Error>
-  removeManagedCompose(appName: string): Promise<undefined | Error>
-  claimIngress(appName: string, finalApp: App): Promise<undefined | Error>
+  ): Promise<InspectionCheckout | JibError>
+  removeCheckout(appName: string, repo: string): Promise<undefined | JibError>
+  loadConfig(configFile: string): Promise<Config | JibError>
+  writeConfig(configFile: string, cfg: Config): Promise<undefined | JibError>
+  upsertSecret(appName: string, entry: EnvEntry): Promise<undefined | JibError>
+  removeSecret(appName: string, key: string): Promise<undefined | JibError>
+  removeManagedCompose(appName: string): Promise<undefined | JibError>
+  claimIngress(appName: string, finalApp: App): Promise<undefined | JibError>
 }

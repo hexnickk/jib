@@ -1,8 +1,7 @@
+import { InternalError, ValidationError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
 import {
   type DockerInstallCommandResult,
-  DockerInstallReadFileError,
-  DockerInstallUnsupportedPlatformError,
   dockerEnsureInstalledResult,
   dockerParseOsRelease,
   dockerSelectAptRepository,
@@ -61,8 +60,12 @@ describe('docker install helpers', () => {
       run: async (args) => {
         const call = key(args)
         calls.push(call)
-        if (call === 'sh -c command -v systemctl >/dev/null 2>&1') return result()
-        if (call === 'sh -c command -v apt-get >/dev/null 2>&1') return result()
+        if (call === 'sh -c command -v systemctl >/dev/null 2>&1') {
+          return result()
+        }
+        if (call === 'sh -c command -v apt-get >/dev/null 2>&1') {
+          return result()
+        }
         if (call === 'sh -c command -v docker >/dev/null 2>&1') {
           return installed ? result(0, '/usr/bin/docker\n') : result(1)
         }
@@ -72,8 +75,12 @@ describe('docker install helpers', () => {
         if (call === 'systemctl cat docker.service') {
           return installed ? result(0, '[Unit]\n') : result(1)
         }
-        if (call === 'dpkg --print-architecture') return result(0, 'amd64\n')
-        if (call.includes('docker-ce docker-ce-cli containerd.io')) installed = true
+        if (call === 'dpkg --print-architecture') {
+          return result(0, 'amd64\n')
+        }
+        if (call.includes('docker-ce docker-ce-cli containerd.io')) {
+          installed = true
+        }
         return result()
       },
     })
@@ -92,7 +99,7 @@ describe('docker install helpers', () => {
   test('dockerEnsureInstalledResult returns a typed error when systemd is unavailable', async () => {
     const error = await dockerEnsureInstalledResult({ run: async () => result(1, '', 'missing') })
 
-    expect(error).toBeInstanceOf(DockerInstallUnsupportedPlatformError)
+    expect(error).toBeInstanceOf(ValidationError)
     expect(error?.message).toContain('systemd')
   })
 
@@ -103,13 +110,17 @@ describe('docker install helpers', () => {
       },
       run: async (args) => {
         const call = key(args)
-        if (call === 'sh -c command -v systemctl >/dev/null 2>&1') return result()
-        if (call === 'sh -c command -v apt-get >/dev/null 2>&1') return result()
+        if (call === 'sh -c command -v systemctl >/dev/null 2>&1') {
+          return result()
+        }
+        if (call === 'sh -c command -v apt-get >/dev/null 2>&1') {
+          return result()
+        }
         return result(1)
       },
     })
 
-    expect(error).toBeInstanceOf(DockerInstallReadFileError)
+    expect(error).toBeInstanceOf(InternalError)
     expect(error?.message).toContain('read /etc/os-release')
   })
 })

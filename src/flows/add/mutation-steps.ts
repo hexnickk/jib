@@ -1,14 +1,9 @@
+import { InternalError, type JibError } from '@jib/errors'
 import type { Step } from '@jib/tx'
-import {
-  type AddFlowError,
-  ClaimIngressError,
-  ConfigRollbackError,
-  ConfigWriteError,
-  SecretWriteError,
-} from './flow-errors.ts'
 import type { AddRunContext } from './steps.ts'
 
-export const addWriteConfigStep: Step<AddRunContext, { configWritten: true }, AddFlowError> = {
+/** Writes the final app config and rolls it back if a later step fails. */
+export const addWriteConfigStep: Step<AddRunContext, { configWritten: true }, JibError> = {
   name: 'config',
   async up(ctx) {
     const finalCfg = {
@@ -16,7 +11,9 @@ export const addWriteConfigStep: Step<AddRunContext, { configWritten: true }, Ad
       apps: { ...ctx.params.cfg.apps, [ctx.params.appName]: ctx.finalApp },
     }
     const error = await ctx.support.writeConfig(ctx.params.configFile, finalCfg)
-    if (error instanceof Error) return new ConfigWriteError(error)
+    if (error instanceof Error) {
+      return error
+    }
     ctx.observer.onStateChange?.('config_written')
     return { configWritten: true }
   },
@@ -30,15 +27,15 @@ export const addWriteConfigStep: Step<AddRunContext, { configWritten: true }, Ad
     }
     const rollbackApps = { ...loaded.apps }
     delete rollbackApps[ctx.params.appName]
-    const error = await ctx.support.writeConfig(ctx.params.configFile, {
+    return await ctx.support.writeConfig(ctx.params.configFile, {
       ...loaded,
       apps: rollbackApps,
     })
-    if (error instanceof Error) return new ConfigRollbackError(error)
   },
 }
 
-export const addWriteSecretsStep: Step<AddRunContext, { keys: string[] }, AddFlowError> = {
+/** Writes add-flow secrets and removes newly written keys when the flow rolls back. */
+export const addWriteSecretsStep: Step<AddRunContext, { keys: string[] }, JibError> = {
   name: 'secrets',
   async up(ctx) {
     const keys: string[] = []
@@ -51,10 +48,11 @@ export const addWriteSecretsStep: Step<AddRunContext, { keys: string[] }, AddFlo
           continue
         }
         await cleanupWrittenSecrets(ctx, keys)
-        return new SecretWriteError(entry.key, error)
-      } catch (cause) {
+        return error
+      } catch (error) {
         await cleanupWrittenSecrets(ctx, keys)
-        return new SecretWriteError(entry.key, cause)
+        const message = error instanceof Error ? error.message : String(error)
+        return new InternalError(message, { cause: error })
       }
     }
     ctx.secretsWritten = ctx.guided.configEntries.length
@@ -67,31 +65,31 @@ export const addWriteSecretsStep: Step<AddRunContext, { keys: string[] }, AddFlo
   },
 }
 
-export const addClaimIngressStep: Step<AddRunContext, undefined, AddFlowError> = {
+/** Claims ingress after config and secret writes have completed. */
+export const addClaimIngressStep: Step<AddRunContext, undefined, JibError> = {
   name: 'ingress',
   async up(ctx) {
     const error = await ctx.support.claimIngress(ctx.params.appName, ctx.finalApp)
-    if (error instanceof Error) return new ClaimIngressError(error)
+    if (error instanceof Error) {
+      return error
+    }
     ctx.observer.onStateChange?.('routes_claimed')
     return undefined
   },
 }
 
-async function cleanupWrittenSecrets(
-  ctx: AddRunContext,
-  keys: readonly string[],
-): Promise<undefined> {
+/** Removes keys written by this add attempt and logs best-effort cleanup failures. */
+async function cleanupWrittenSecrets(ctx: AddRunContext, keys: readonly string[]): Promise<void> {
   for (const key of keys) {
     try {
       const error = await ctx.support.removeSecret(ctx.params.appName, key)
       if (error instanceof Error) {
         ctx.observer.warn?.(`secret cleanup (${key}): ${error.message}`)
       }
-    } catch (cause) {
+    } catch (error) {
       ctx.observer.warn?.(
-        `secret cleanup (${key}): ${cause instanceof Error ? cause.message : String(cause)}`,
+        `secret cleanup (${key}): ${error instanceof Error ? error.message : String(error)}`,
       )
     }
   }
-  return undefined
 }

@@ -1,6 +1,7 @@
 import { CliError } from '@jib/cli'
-import { type ConfigError, MissingConfigAppError, configLoadAppContext } from '@jib/config'
-import { DockerAppNotFoundError, DockerCommandError, dockerComposeFor } from '@jib/docker'
+import { configLoadAppContext } from '@jib/config'
+import { dockerComposeFor } from '@jib/docker'
+import type { JibError } from '@jib/errors'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
 import { cmdCreateHandler } from './handler.ts'
 
@@ -28,11 +29,7 @@ const cliLogsCommand = {
 async function logsRunCommand(
   args: ArgumentsCamelCase,
 ): Promise<
-  | ConfigError
-  | DockerAppNotFoundError
-  | DockerCommandError
-  | CliError
-  | { app: string; service?: string; followed: boolean; tail?: number }
+  JibError | CliError | { app: string; service?: string; followed: boolean; tail?: number }
 > {
   if (typeof args.app !== 'string') {
     return new CliError('missing_app', 'missing app name — usage: jib logs <app> [service]')
@@ -45,25 +42,20 @@ async function logsRunCommand(
   }
 
   const loaded = await configLoadAppContext(appName)
-  if (loaded instanceof MissingConfigAppError) return new DockerAppNotFoundError(appName)
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const compose = dockerComposeFor(loaded.cfg, loaded.paths, appName)
-  if (compose instanceof DockerAppNotFoundError) return compose
+  if (compose instanceof Error) {
+    return compose
+  }
 
-  try {
-    await compose.logs(service, {
-      follow: args.follow === true,
-      ...(tail !== undefined && { tail }),
-    })
-  } catch (error) {
-    return new DockerCommandError(
-      'logs',
-      appName,
-      error instanceof Error ? error.message : String(error),
-      {
-        cause: error instanceof Error ? error : undefined,
-      },
-    )
+  const logsError = await compose.logs(service, {
+    follow: args.follow === true,
+    ...(tail !== undefined && { tail }),
+  })
+  if (logsError) {
+    return logsError
   }
 
   return {

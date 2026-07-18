@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest'
 
-import { CancelledError, InternalError, JibError, NotFoundError, ValidationError } from './index'
+import {
+  CancelledError,
+  InternalError,
+  JibError,
+  NotFoundError,
+  ValidationError,
+  errorsToJibError,
+} from './index'
 
 describe('errors', () => {
   test('sets names and codes for shared error types', () => {
@@ -23,5 +30,17 @@ describe('errors', () => {
     const error = new InternalError('failed', { cause })
 
     expect(error.cause).toBe(cause)
+  })
+
+  test('normalizes unknown failures without replacing an existing shared error', () => {
+    const existing = new ValidationError('invalid input')
+    const cause = new Error('library failed')
+
+    expect(errorsToJibError(existing)).toBe(existing)
+    expect(errorsToJibError(cause)).toMatchObject({
+      code: 'internal',
+      message: 'library failed',
+      cause,
+    })
   })
 })

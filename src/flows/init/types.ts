@@ -1,4 +1,5 @@
 import type { Config } from '@jib/config'
+import type { JibError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 
@@ -14,7 +15,8 @@ export interface InitContext {
   paths: Paths
 }
 
-export type ModuleHook = (ctx: InitContext) => Promise<undefined | Error>
+/** Result-style lifecycle hook implemented by a first-party module. */
+export type ModuleHook = (ctx: InitContext) => Promise<JibError | undefined>
 
 export interface FirstPartyModule {
   manifest: ModuleManifest

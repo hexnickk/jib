@@ -1,5 +1,5 @@
 import { $ } from '@/libs/shell'
-import { JibError } from '@jib/errors'
+import { InternalError } from '@jib/errors'
 
 interface ShellOutput {
   exitCode: number | null
@@ -11,25 +11,43 @@ export interface GitEnv {
   GIT_SSH_COMMAND?: string
 }
 
-export class SourceGitCommandError extends JibError {
-  constructor(command: string, detail: string) {
-    super('source_git_command', detail ? `${command}: ${detail}` : command)
-  }
+/** Distinguishes zx process output from a Jib error; zx output also extends Error. */
+function isShellOutput(value: ShellOutput | InternalError): value is ShellOutput {
+  return typeof value === 'object' && value !== null && 'exitCode' in value
 }
 
-function commandFailure(out: ShellOutput, label: string): SourceGitCommandError | undefined {
-  if (out.exitCode === 0) return undefined
+/** Maps a non-zero Git process result to an internal error. */
+function commandFailure(
+  out: ShellOutput | InternalError,
+  label: string,
+): InternalError | undefined {
+  if (!isShellOutput(out)) {
+    return out
+  }
+  if (out.exitCode === 0) {
+    return undefined
+  }
   const detail =
     out.stderr.toString().trim() ||
     out.stdout.toString().trim() ||
     `command exited with code ${out.exitCode}`
-  return new SourceGitCommandError(label, detail)
+  return new InternalError(detail ? `${label}: ${detail}` : label)
 }
 
-async function run(args: string[], env: GitEnv = {}, dir?: string): Promise<ShellOutput> {
+/** Runs one Git command without throwing for a non-zero process exit. */
+async function run(
+  args: string[],
+  env: GitEnv = {},
+  dir?: string,
+): Promise<ShellOutput | InternalError> {
   const mergedEnv = { ...process.env, ...env } as Record<string, string>
   const command = dir ? ['git', '-C', dir, ...args] : ['git', ...args]
-  return await $({ env: mergedEnv, quiet: true })`${command}`
+  try {
+    return await $({ env: mergedEnv, quiet: true })`${command}`
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`git ${args[0] ?? 'command'}: ${message}`, { cause: error })
+  }
 }
 
 /** Clones a repo into `dir`, returning a typed git error on failure. */
@@ -37,18 +55,21 @@ export async function sourcesGitClone(
   url: string,
   dir: string,
   opts: { branch?: string; env?: GitEnv } = {},
-): Promise<SourceGitCommandError | undefined> {
+): Promise<InternalError | undefined> {
   const args = ['clone']
-  if (opts.branch) args.push('--branch', opts.branch, '--single-branch')
+  if (opts.branch) {
+    args.push('--branch', opts.branch, '--single-branch')
+  }
   args.push(url, dir)
   const failure = commandFailure(await run(args, opts.env ?? {}), 'git clone')
-  if (failure) return failure
+  if (failure) {
+    return failure
+  }
   await markSafeDirectory(dir)
 }
 
+/** Adds a shared checkout to Git's safe-directory list as a best-effort compatibility step. */
 async function markSafeDirectory(dir: string): Promise<void> {
-  // Shared checkouts live under a common root, so keep the old safe-directory
-  // registration as best-effort compatibility for mixed-ownership hosts.
   await run(['config', '--global', '--add', 'safe.directory', dir])
 }
 
@@ -57,7 +78,7 @@ export async function sourcesGitFetch(
   dir: string,
   ref = '',
   env: GitEnv = {},
-): Promise<SourceGitCommandError | undefined> {
+): Promise<InternalError | undefined> {
   const args = ref ? ['fetch', 'origin', ref] : ['fetch', 'origin']
   return commandFailure(await run(args, env, dir), 'git fetch')
 }
@@ -66,24 +87,34 @@ export async function sourcesGitFetch(
 export async function sourcesGitCheckout(
   dir: string,
   ref: string,
-): Promise<SourceGitCommandError | undefined> {
+): Promise<InternalError | undefined> {
   return commandFailure(await run(['checkout', ref], {}, dir), `git checkout ${ref}`)
 }
 
 /** Returns the current `HEAD` SHA for a local checkout. */
-export async function sourcesGitCurrentSha(dir: string): Promise<string | SourceGitCommandError> {
-  const res = await run(['rev-parse', 'HEAD'], {}, dir)
-  const failure = commandFailure(res, 'git rev-parse')
-  if (failure) return failure
-  return res.stdout.toString().trim()
+export async function sourcesGitCurrentSha(dir: string): Promise<string | InternalError> {
+  const result = await run(['rev-parse', 'HEAD'], {}, dir)
+  const failure = commandFailure(result, 'git rev-parse')
+  if (failure) {
+    return failure
+  }
+  if (!isShellOutput(result)) {
+    return result
+  }
+  return result.stdout.toString().trim()
 }
 
 /** Returns the SHA recorded in `FETCH_HEAD` after a fetch. */
-export async function sourcesGitFetchedSha(dir: string): Promise<string | SourceGitCommandError> {
-  const res = await run(['rev-parse', 'FETCH_HEAD'], {}, dir)
-  const failure = commandFailure(res, 'git rev-parse FETCH_HEAD')
-  if (failure) return failure
-  return res.stdout.toString().trim()
+export async function sourcesGitFetchedSha(dir: string): Promise<string | InternalError> {
+  const result = await run(['rev-parse', 'FETCH_HEAD'], {}, dir)
+  const failure = commandFailure(result, 'git rev-parse FETCH_HEAD')
+  if (failure) {
+    return failure
+  }
+  if (!isShellOutput(result)) {
+    return result
+  }
+  return result.stdout.toString().trim()
 }
 
 /** Resolves the SHA for `ref` without creating a local checkout. */
@@ -91,11 +122,16 @@ export async function sourcesGitLsRemote(
   url: string,
   ref = 'HEAD',
   env: GitEnv = {},
-): Promise<string | SourceGitCommandError> {
-  const res = await run(['ls-remote', url, ref], env)
-  const failure = commandFailure(res, 'git ls-remote')
-  if (failure) return failure
-  const first = res.stdout.toString().trim().split('\n')[0] ?? ''
+): Promise<string | InternalError> {
+  const result = await run(['ls-remote', url, ref], env)
+  const failure = commandFailure(result, 'git ls-remote')
+  if (failure) {
+    return failure
+  }
+  if (!isShellOutput(result)) {
+    return result
+  }
+  const first = result.stdout.toString().trim().split('\n')[0] ?? ''
   return (first.split('\t')[0] ?? '').trim()
 }
 
@@ -103,34 +139,41 @@ export async function sourcesGitLsRemote(
 export async function sourcesGitDefaultBranch(
   url: string,
   env: GitEnv = {},
-): Promise<string | SourceGitCommandError | undefined> {
-  const res = await run(['ls-remote', '--symref', url, 'HEAD'], env)
-  const failure = commandFailure(res, 'git ls-remote --symref')
-  if (failure) return failure
-  for (const line of res.stdout.toString().split('\n')) {
+): Promise<string | InternalError | undefined> {
+  const result = await run(['ls-remote', '--symref', url, 'HEAD'], env)
+  const failure = commandFailure(result, 'git ls-remote --symref')
+  if (failure) {
+    return failure
+  }
+  if (!isShellOutput(result)) {
+    return result
+  }
+  for (const line of result.stdout.toString().split('\n')) {
     const match = /^ref:\s+refs\/heads\/([^\t]+)\tHEAD$/.exec(line.trim())
-    if (match?.[1]) return match[1]
+    if (match?.[1]) {
+      return match[1]
+    }
   }
   return undefined
 }
 
 /** Returns true when `dir` is already a Git worktree. */
 export async function sourcesGitIsRepo(dir: string): Promise<boolean> {
-  const res = await run(['rev-parse', '--git-dir'], {}, dir)
-  return res.exitCode === 0
+  const result = await run(['rev-parse', '--git-dir'], {}, dir)
+  return isShellOutput(result) && result.exitCode === 0
 }
 
 /** Returns true when `origin` is configured for `dir`. */
 export async function sourcesGitHasRemote(dir: string): Promise<boolean> {
-  const res = await run(['remote', 'get-url', 'origin'], {}, dir)
-  return res.exitCode === 0
+  const result = await run(['remote', 'get-url', 'origin'], {}, dir)
+  return isShellOutput(result) && result.exitCode === 0
 }
 
 /** Updates the configured `origin` URL for an existing checkout. */
 export async function sourcesGitSetRemoteUrl(
   dir: string,
   url: string,
-): Promise<SourceGitCommandError | undefined> {
+): Promise<InternalError | undefined> {
   return commandFailure(
     await run(['remote', 'set-url', 'origin', url], {}, dir),
     'git remote set-url',

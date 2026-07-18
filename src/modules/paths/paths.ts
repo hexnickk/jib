@@ -1,6 +1,6 @@
 import { chmod, mkdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { EnsureCredsDirError, PathLookupError } from './errors.ts'
+import { InternalError } from '@jib/errors'
 
 export interface Paths {
   root: string
@@ -94,45 +94,55 @@ export function pathsManagedComposePath(paths: Paths, app: string): string {
 export async function pathsEnsureCredsDirResult(
   paths: Paths,
   kind: string,
-): Promise<EnsureCredsDirError | string> {
+): Promise<InternalError | string> {
   const baseDir = join(paths.secretsDir, '_jib')
   const dir = join(baseDir, kind)
   const baseExists = await pathsPathExistsResult(baseDir)
-  if (baseExists instanceof PathLookupError) {
-    return new EnsureCredsDirError(kind, baseDir, { cause: baseExists })
+  if (baseExists instanceof Error) {
+    return new InternalError(`failed to ensure creds dir "${kind}" at "${baseDir}"`, {
+      cause: baseExists,
+    })
   }
   if (!baseExists) {
     const created = await createCredsDir(kind, baseDir)
-    if (created instanceof EnsureCredsDirError) return created
+    if (created instanceof Error) {
+      return created
+    }
   }
   const dirExists = await pathsPathExistsResult(dir)
-  if (dirExists instanceof PathLookupError) {
-    return new EnsureCredsDirError(kind, dir, { cause: dirExists })
+  if (dirExists instanceof Error) {
+    return new InternalError(`failed to ensure creds dir "${kind}" at "${dir}"`, {
+      cause: dirExists,
+    })
   }
   if (!dirExists) {
     const created = await createCredsDir(kind, dir)
-    if (created instanceof EnsureCredsDirError) return created
+    if (created instanceof Error) {
+      return created
+    }
   }
   return dir
 }
 
 /** Returns true for existing files and directories, or a typed error on stat failures. */
-export async function pathsPathExistsResult(path: string): Promise<boolean | PathLookupError> {
+export async function pathsPathExistsResult(path: string): Promise<boolean | InternalError> {
   try {
     await stat(path)
     return true
   } catch (error) {
-    if (isMissingPathError(error)) return false
-    return new PathLookupError(path, { cause: toError(error) })
+    if (isMissingPathError(error)) {
+      return false
+    }
+    return new InternalError(`failed to inspect path "${path}"`, { cause: error })
   }
 }
 
-async function createCredsDir(kind: string, dir: string): Promise<EnsureCredsDirError | undefined> {
+async function createCredsDir(kind: string, dir: string): Promise<InternalError | undefined> {
   try {
     await mkdir(dir, { recursive: true, mode: 0o770 })
     await chmod(dir, Number.parseInt(CREDS_DIR_MODE, 8))
   } catch (error) {
-    return new EnsureCredsDirError(kind, dir, { cause: toError(error) })
+    return new InternalError(`failed to ensure creds dir "${kind}" at "${dir}"`, { cause: error })
   }
 }
 
@@ -143,9 +153,4 @@ function isMissingPathError(error: unknown): boolean {
     'code' in error &&
     (error.code === 'ENOENT' || error.code === 'ENOTDIR')
   )
-}
-
-function toError(error: unknown): Error {
-  if (error instanceof Error) return error
-  return new Error(String(error))
 }

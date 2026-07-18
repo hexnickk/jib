@@ -2,10 +2,10 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
+import { InternalError } from '@jib/errors'
 import { pathsGetPaths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
 import { stateCollectApps, stateManagedServiceNames, stateNormalizeUnitStatus } from './collect.ts'
-import { StateError } from './errors.ts'
 
 describe('stateManagedServiceNames', () => {
   test('always includes the watcher service', () => {
@@ -58,7 +58,7 @@ describe('stateCollectApps', () => {
         },
       } as Config
       const result = await stateCollectApps(cfg, paths)
-      expect(result).toBeInstanceOf(StateError)
+      expect(result).toBeInstanceOf(InternalError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

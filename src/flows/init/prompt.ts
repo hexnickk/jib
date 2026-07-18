@@ -1,8 +1,9 @@
+import type { JibError } from '@jib/errors'
 import { tuiPromptConfirmResult } from '@jib/tui'
 import type { ModLike } from './registry.ts'
 
 /** Prompts for a single optional module so init can configure them one by one. */
-export function initPromptOptionalModule(mod: ModLike): Promise<boolean | Error> {
+export function initPromptOptionalModule(mod: ModLike): Promise<boolean | JibError> {
   return tuiPromptConfirmResult({
     message:
       `Enable optional module "${mod.manifest.name}"? ${mod.manifest.description ?? ''}`.trim(),

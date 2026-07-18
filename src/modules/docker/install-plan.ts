@@ -1,4 +1,4 @@
-import { DockerInstallUnsupportedPlatformError } from './errors.ts'
+import { ValidationError } from '@jib/errors'
 
 export const DOCKER_KEYRING_PATH = '/etc/apt/keyrings/docker.gpg'
 export const DOCKER_APT_SOURCE_PATH = '/etc/apt/sources.list.d/docker.list'
@@ -14,10 +14,14 @@ export function dockerParseOsRelease(raw: string): Record<string, string> {
   const out: Record<string, string> = {}
   for (const line of raw.split('\n')) {
     const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) continue
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue
+    }
     const match = /^([A-Z0-9_]+)=(.*)$/.exec(trimmed)
     const key = match?.[1]
-    if (key) out[key] = unquoteOsReleaseValue(match?.[2] ?? '')
+    if (key) {
+      out[key] = unquoteOsReleaseValue(match?.[2] ?? '')
+    }
   }
   return out
 }
@@ -25,12 +29,12 @@ export function dockerParseOsRelease(raw: string): Record<string, string> {
 /** Selects the official Docker apt repository for Debian/Ubuntu family hosts. */
 export function dockerSelectAptRepository(
   os: Record<string, string>,
-): DockerAptRepository | DockerInstallUnsupportedPlatformError {
+): DockerAptRepository | ValidationError {
   const id = (os.ID ?? '').toLowerCase()
   const like = (os.ID_LIKE ?? '').toLowerCase().split(/\s+/).filter(Boolean)
   const repoId = id === 'ubuntu' || like.includes('ubuntu') ? 'ubuntu' : debianRepoId(id, like)
   if (!repoId) {
-    return new DockerInstallUnsupportedPlatformError(
+    return new ValidationError(
       `expected Debian/Ubuntu /etc/os-release, got ID=${os.ID ?? '(missing)'}`,
     )
   }
@@ -38,7 +42,7 @@ export function dockerSelectAptRepository(
   const codename =
     repoId === 'ubuntu' ? os.UBUNTU_CODENAME || os.VERSION_CODENAME : os.VERSION_CODENAME
   if (!codename || !DOCKER_SAFE_APT_VALUE.test(codename)) {
-    return new DockerInstallUnsupportedPlatformError(`missing safe VERSION_CODENAME for ${repoId}`)
+    return new ValidationError(`missing safe VERSION_CODENAME for ${repoId}`)
   }
   return { id: repoId, codename }
 }
@@ -96,6 +100,8 @@ function debianRepoId(id: string, like: string[]): 'debian' | undefined {
 }
 
 function unquoteOsReleaseValue(value: string): string {
-  if (!value.startsWith('"') || !value.endsWith('"')) return value
+  if (!value.startsWith('"') || !value.endsWith('"')) {
+    return value
+  }
   return value.slice(1, -1).replaceAll('\\"', '"').replaceAll('\\\\', '\\')
 }

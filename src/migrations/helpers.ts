@@ -1,11 +1,6 @@
 import { chown, rename, unlink, writeFile } from 'node:fs/promises'
 import { $ } from '@/libs/shell'
-import {
-  AddUserToGroupError,
-  ValidateSudoersError,
-  WriteSudoersError,
-  errorMessage,
-} from './errors.ts'
+import { InternalError, ValidationError } from '@jib/errors'
 
 export const GROUP = 'jib'
 export const DOCKER_GROUP = 'docker'
@@ -57,7 +52,7 @@ export async function writeValidatedSudoersResult(
   path: string,
   content: string,
   deps: SudoersDeps = {},
-): Promise<undefined | ValidateSudoersError | WriteSudoersError> {
+): Promise<undefined | ValidationError | InternalError> {
   const tmp = `${path}.tmp-${process.pid}`
   const write = deps.writeFile ?? writeFile
   const check =
@@ -74,7 +69,7 @@ export async function writeValidatedSudoersResult(
   try {
     await write(tmp, content, { mode: 0o440 })
   } catch (error) {
-    return new WriteSudoersError(`failed to write sudoers temp file ${tmp}`, {
+    return new InternalError(`failed to write sudoers temp file ${tmp}`, {
       cause: error instanceof Error ? error : undefined,
     })
   }
@@ -84,7 +79,7 @@ export async function writeValidatedSudoersResult(
     checkResult = check(tmp)
   } catch (error) {
     await remove(tmp).catch(() => {})
-    return new ValidateSudoersError(`failed to validate sudoers file ${path}`, {
+    return new ValidationError(`failed to validate sudoers file ${path}`, {
       cause: error instanceof Error ? error : undefined,
     })
   }
@@ -92,7 +87,7 @@ export async function writeValidatedSudoersResult(
   if (checkResult.exitCode !== 0) {
     await remove(tmp).catch(() => {})
     const stderr = checkResult.stderr.toString().trim()
-    return new ValidateSudoersError(stderr || `visudo rejected ${path}`)
+    return new ValidationError(stderr || `visudo rejected ${path}`)
   }
 
   try {
@@ -102,9 +97,12 @@ export async function writeValidatedSudoersResult(
     return
   } catch (error) {
     await remove(installed ? path : tmp).catch(() => {})
-    return new WriteSudoersError(`failed to install sudoers file ${path}: ${errorMessage(error)}`, {
-      cause: error instanceof Error ? error : undefined,
-    })
+    return new InternalError(
+      `failed to install sudoers file ${path}: ${error instanceof Error ? error.message : String(error)}`,
+      {
+        cause: error instanceof Error ? error : undefined,
+      },
+    )
   }
 }
 
@@ -112,9 +110,8 @@ export async function writeValidatedSudoers(
   path: string,
   content: string,
   deps: SudoersDeps = {},
-): Promise<void> {
-  const result = await writeValidatedSudoersResult(path, content, deps)
-  if (result instanceof Error) throw result
+): Promise<InternalError | ValidationError | undefined> {
+  return writeValidatedSudoersResult(path, content, deps)
 }
 
 /**
@@ -125,16 +122,24 @@ export async function writeValidatedSudoers(
 export async function migrationEnsureGroupResult(
   group: string,
   deps: UserGroupDeps = {},
-): Promise<AddUserToGroupError | undefined> {
+): Promise<InternalError | undefined> {
   const run = deps.run ?? migrationRunCommand
-  const groupResult = await run(['getent', 'group', group])
-  if (groupResult.exitCode === 0) return
+  try {
+    const groupResult = await run(['getent', 'group', group])
+    if (groupResult.exitCode === 0) {
+      return undefined
+    }
 
-  const createResult = await run(['groupadd', '--system', group])
-  if (createResult.exitCode !== 0) {
-    return new AddUserToGroupError(
-      `failed to create group "${group}": ${migrationCommandDetail(createResult)}`,
-    )
+    const createResult = await run(['groupadd', '--system', group])
+    if (createResult.exitCode !== 0) {
+      return new InternalError(
+        `failed to create group "${group}": ${migrationCommandDetail(createResult)}`,
+      )
+    }
+    return undefined
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`ensure group "${group}": ${message}`, { cause: error })
   }
 }
 
@@ -147,24 +152,36 @@ export async function migrationEnsureUserInGroupResult(
   user: string,
   group: string,
   deps: UserGroupDeps = {},
-): Promise<AddUserToGroupError | undefined> {
+): Promise<InternalError | undefined> {
   const run = deps.run ?? migrationRunCommand
   const groupError = await migrationEnsureGroupResult(group, deps)
-  if (groupError) return groupError
-
-  const currentGroups = await run(['id', '-nG', user])
-  if (currentGroups.exitCode !== 0) {
-    return new AddUserToGroupError(
-      `failed to read groups for user "${user}": ${migrationCommandDetail(currentGroups)}`,
-    )
+  if (groupError) {
+    return groupError
   }
-  if (currentGroups.stdout.toString().trim().split(/\s+/).includes(group)) return
 
-  const addResult = await run(['usermod', '-aG', group, user])
-  if (addResult.exitCode !== 0) {
-    return new AddUserToGroupError(
-      `failed to add user "${user}" to group "${group}": ${migrationCommandDetail(addResult)}`,
-    )
+  try {
+    const currentGroups = await run(['id', '-nG', user])
+    if (currentGroups.exitCode !== 0) {
+      return new InternalError(
+        `failed to read groups for user "${user}": ${migrationCommandDetail(currentGroups)}`,
+      )
+    }
+    if (currentGroups.stdout.toString().trim().split(/\s+/).includes(group)) {
+      return undefined
+    }
+
+    const addResult = await run(['usermod', '-aG', group, user])
+    if (addResult.exitCode !== 0) {
+      return new InternalError(
+        `failed to add user "${user}" to group "${group}": ${migrationCommandDetail(addResult)}`,
+      )
+    }
+    return undefined
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`add user "${user}" to group "${group}": ${message}`, {
+      cause: error,
+    })
   }
 }
 

@@ -5,13 +5,16 @@ import type { JibMigration } from './types.ts'
 export const m0006_install_docker: JibMigration = {
   id: '0006_install_docker',
   description: 'Install Docker Engine and Compose plugin, add invoking user to Docker group',
-  up: async () => {
+  async up() {
     const installError = await dockerEnsureInstalledResult()
-    if (installError) throw installError
+    if (installError) {
+      return installError
+    }
 
     const sudoUser = process.env.SUDO_USER
-    if (!sudoUser || sudoUser === 'root') return
-    const groupError = await migrationEnsureUserInGroupResult(sudoUser, DOCKER_GROUP)
-    if (groupError) throw groupError
+    if (!sudoUser || sudoUser === 'root') {
+      return undefined
+    }
+    return await migrationEnsureUserInGroupResult(sudoUser, DOCKER_GROUP)
   },
 }

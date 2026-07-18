@@ -19,6 +19,15 @@ export class InternalError extends JibError {
   }
 }
 
+/** Converts an unknown library failure to a shared error while preserving existing Jib error types. */
+export function errorsToJibError(error: unknown): JibError {
+  if (error instanceof JibError) {
+    return error
+  }
+  const message = error instanceof Error ? error.message : String(error)
+  return new InternalError(message, { cause: error })
+}
+
 /** Represents an expected absence that callers can handle differently from a failed operation. */
 export class NotFoundError extends JibError {
   constructor(message: string, options?: ErrorOptions) {
@@ -37,5 +46,15 @@ export class ValidationError extends JibError {
 export class CancelledError extends JibError {
   constructor(message: string, options?: ErrorOptions) {
     super('cancelled', message, options)
+  }
+}
+
+/** Represents a completed rollback after a failed operation and preserves the original failure. */
+export class RollbackError extends JibError {
+  readonly original: unknown
+
+  constructor(message: string, original: unknown) {
+    super('rollback', message, { cause: original })
+    this.original = original
   }
 }

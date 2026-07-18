@@ -3,11 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import type { DockerExec, ExecResult } from '@jib/docker'
+import { InternalError, NotFoundError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import { pathsGetPaths, pathsRepoPath } from '@jib/paths'
 import { stateCreateStore, stateLoad } from '@jib/state'
 import { describe, expect, test } from 'vitest'
-import { DeployDiskSpaceError, DeployMissingAppError } from './errors.ts'
 import { deployApp, deployUpApp } from './service.ts'
 
 function mkCfg(): Config {
@@ -104,11 +104,15 @@ describe('deployApp', () => {
     )
 
     expect(result instanceof Error).toBe(false)
-    if (result instanceof Error) return
+    if (result instanceof Error) {
+      return
+    }
     expect(result.deployedSHA).toBe('deadbeef')
 
     const state = await stateLoad(store, 'demo')
-    if (state instanceof Error) throw state
+    if (state instanceof Error) {
+      throw state
+    }
     expect(state.deployed_sha).toBe('deadbeef')
     expect(state.deployed_workdir).toBe(workdir)
     expect(calls.some((call) => call.args.includes('build'))).toBe(true)
@@ -132,7 +136,7 @@ describe('deployApp', () => {
       noProgress,
     )
 
-    expect(result).toBeInstanceOf(DeployMissingAppError)
+    expect(result).toBeInstanceOf(NotFoundError)
   })
 
   test('uses the managed env file for compose interpolation', async () => {
@@ -185,7 +189,7 @@ describe('deployApp', () => {
       noProgress,
     )
 
-    expect(result).toBeInstanceOf(DeployDiskSpaceError)
+    expect(result).toBeInstanceOf(InternalError)
   })
 
   test('build failure records the failure in last-deploy state', async () => {
@@ -202,7 +206,9 @@ describe('deployApp', () => {
         diskFree: async () => 10 * 1024 * 1024 * 1024,
         dockerExec: async (args): Promise<ExecResult> => {
           calls.push({ args: [...args] })
-          if (args.includes('build')) return { stdout: '', stderr: 'boom', exitCode: 1 }
+          if (args.includes('build')) {
+            return { stdout: '', stderr: 'boom', exitCode: 1 }
+          }
           return { stdout: '', stderr: '', exitCode: 0 }
         },
       },
@@ -212,7 +218,9 @@ describe('deployApp', () => {
 
     expect(result instanceof Error).toBe(true)
     const state = await stateLoad(store, 'demo')
-    if (state instanceof Error) throw state
+    if (state instanceof Error) {
+      throw state
+    }
     expect(state.last_deploy_status).toBe('failure')
     expect(state.last_deploy_error).toContain('boom')
   })

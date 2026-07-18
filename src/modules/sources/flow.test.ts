@@ -1,4 +1,5 @@
 import type { Config } from '@jib/config'
+import { InternalError } from '@jib/errors'
 import { type Paths, pathsGetPaths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
 import {
@@ -89,7 +90,9 @@ describe('source recovery', () => {
         promptSelect: async () => 'existing:keyy',
         probe: async (_cfg: Config, _paths: Paths, target: SourceTarget) => {
           probed.push(target.source ?? 'none')
-          if (!target.source) return new Error('git clone: Repository not found')
+          if (!target.source) {
+            return new InternalError('git clone: Repository not found')
+          }
           return {
             branch: 'main',
             workdir: '/tmp/demo',
@@ -120,7 +123,9 @@ describe('source recovery', () => {
         isInteractive: () => true,
         promptSelect: async () => 'existing:keyy',
         probe: async (_cfg: Config, _paths: Paths, target: SourceTarget) => {
-          if (!target.source) throw new Error('git clone: Repository not found')
+          if (!target.source) {
+            throw new Error('git clone: Repository not found')
+          }
           return {
             branch: 'main',
             workdir: '/tmp/demo',

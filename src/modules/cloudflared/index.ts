@@ -3,19 +3,6 @@ export const manifest = {
   description: 'Cloudflare Tunnel daemon (optional)',
 } satisfies { name: string; required?: boolean; description?: string }
 
-export {
-  CloudflaredInstallCreateDirError,
-  CloudflaredInstallError,
-  CloudflaredInstallReloadError,
-  CloudflaredInstallWriteComposeError,
-  CloudflaredInstallWriteUnitError,
-  CloudflaredSaveTunnelTokenError,
-  CloudflaredUninstallError,
-  CloudflaredUninstallDisableError,
-  CloudflaredUninstallReloadError,
-  CloudflaredUninstallRemoveComposeError,
-  CloudflaredUninstallRemoveUnitError,
-} from './errors.ts'
 export { cloudflaredInstallResult } from './install.ts'
 export { cloudflaredUninstallResult } from './uninstall.ts'
 export {

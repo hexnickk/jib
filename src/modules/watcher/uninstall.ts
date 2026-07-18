@@ -1,12 +1,8 @@
 import { rm } from 'node:fs/promises'
 import { $ } from '@/libs/shell'
+import { InternalError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
-import {
-  WatcherUninstallDisableError,
-  WatcherUninstallReloadError,
-  WatcherUninstallRemoveUnitError,
-} from './errors.ts'
 import { SERVICE_NAME, UNIT_PATH } from './templates.ts'
 
 interface WatcherContext {
@@ -20,59 +16,60 @@ interface WatcherUninstallDeps {
   run?: (args: readonly string[]) => Promise<unknown>
 }
 
-/**
- * Stops the watcher unit, deletes it, and reloads systemd.
- * Inputs are the runtime context plus optional path/name overrides for isolated tests.
- * Output is undefined on success or a typed uninstall error; side effects run systemctl and remove the unit file.
- */
+/** Stops the watcher unit, deletes it, and returns an internal error on failure. */
 export async function watcherUninstallResult(
   ctx: WatcherContext,
   deps: WatcherUninstallDeps = {},
-): Promise<
-  | WatcherUninstallDisableError
-  | WatcherUninstallReloadError
-  | WatcherUninstallRemoveUnitError
-  | undefined
-> {
+): Promise<InternalError | undefined> {
   const unitPath = deps.unitPath ?? UNIT_PATH
   const serviceName = deps.serviceName ?? SERVICE_NAME
   const run = deps.run ?? ((args: readonly string[]) => $`${args}`)
-  let disableError: WatcherUninstallDisableError | undefined
+  let disableError: InternalError | undefined
 
   ctx.logger.info(`systemctl disable --now ${serviceName}`)
   try {
     const result = await run(['sudo', 'systemctl', 'disable', '--now', serviceName])
     const detail = watcherCommandFailure(result)
-    if (detail) disableError = new WatcherUninstallDisableError(serviceName, detail)
+    if (detail) {
+      disableError = new InternalError(`systemctl disable --now ${serviceName}: ${detail}`)
+    }
   } catch (error) {
-    disableError = new WatcherUninstallDisableError(
-      serviceName,
-      error instanceof Error ? error.message : String(error),
-    )
+    const message = error instanceof Error ? error.message : String(error)
+    disableError = new InternalError(`systemctl disable --now ${serviceName}: ${message}`, {
+      cause: error,
+    })
   }
 
   ctx.logger.info(`removing ${unitPath}`)
   try {
     await rm(unitPath, { force: true })
   } catch (error) {
-    return new WatcherUninstallRemoveUnitError(unitPath, error)
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`remove ${unitPath}: ${message}`, { cause: error })
   }
 
   ctx.logger.info('systemctl daemon-reload')
   try {
     const result = await run(['sudo', 'systemctl', 'daemon-reload'])
     const detail = watcherCommandFailure(result)
-    if (detail) return new WatcherUninstallReloadError(detail)
+    if (detail) {
+      return new InternalError(`systemctl daemon-reload: ${detail}`)
+    }
   } catch (error) {
-    return new WatcherUninstallReloadError(error instanceof Error ? error.message : String(error))
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`systemctl daemon-reload: ${message}`, { cause: error })
   }
 
   return disableError
 }
 
 function watcherCommandFailure(result: unknown): string | undefined {
-  if (!isWatcherCommandResult(result)) return undefined
-  if (result.exitCode === 0) return undefined
+  if (!isWatcherCommandResult(result)) {
+    return undefined
+  }
+  if (result.exitCode === 0) {
+    return undefined
+  }
   return (
     result.stderr.toString().trim() ||
     result.stdout.toString().trim() ||

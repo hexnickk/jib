@@ -1,10 +1,10 @@
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ConfigError, configLoad } from '@jib/config'
+import { configLoad } from '@jib/config'
+import { ValidationError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
 import {
-  GitHubSourceAlreadyExistsError,
   githubAddAppSource,
   githubAddKeySource,
   githubGetSource,
@@ -12,7 +12,9 @@ import {
 } from './config-edit.ts'
 
 function expectLoadedConfig(result: Awaited<ReturnType<typeof configLoad>>) {
-  if (result instanceof ConfigError) throw result
+  if (result instanceof Error) {
+    throw result
+  }
   return result
 }
 
@@ -42,7 +44,7 @@ describe('config-edit', () => {
     const p = await seedConfig({ withProviderRef: true })
     const cfg = expectLoadedConfig(await configLoad(p))
     expect(githubGetSource(cfg, 'gh-key')).toEqual({ driver: 'github', type: 'key' })
-    expect(githubValidateSourceName(cfg, 'gh-key')).toBeInstanceOf(GitHubSourceAlreadyExistsError)
+    expect(githubValidateSourceName(cfg, 'gh-key')).toBeInstanceOf(ValidationError)
   })
 
   test('githubAddKeySource writes a new entry', async () => {

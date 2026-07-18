@@ -1,6 +1,6 @@
 import net from 'node:net'
+import { InternalError } from '@jib/errors'
 import { afterEach, describe, expect, test } from 'vitest'
-import { PortExhaustedError } from './errors.ts'
 import { type PortAllocatorConfig, configAllocatePort } from './port-allocator.ts'
 
 function cfg(...portsPerApp: number[][]): PortAllocatorConfig {
@@ -32,10 +32,10 @@ describe('configAllocatePort', () => {
     expect(port).toBe(20000)
   })
 
-  test('configAllocatePort returns PortExhaustedError when range is fully used', async () => {
+  test('configAllocatePort returns InternalError when range is fully used', async () => {
     const config = cfg([20000, 20001, 20002])
     expect(await configAllocatePort({ config, range: [20000, 20002] })).toBeInstanceOf(
-      PortExhaustedError,
+      InternalError,
     )
   })
 

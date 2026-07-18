@@ -1,11 +1,7 @@
-import {
-  RemoveMissingAppError,
-  RemoveWriteConfigError,
-  removeApp,
-  removeCreateSupport,
-} from '@/flows/remove/index.ts'
+import { removeApp, removeCreateSupport } from '@/flows/remove/index.ts'
 import { cliCanPrompt, cliCreateMissingInputError, cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
+import type { JibError } from '@jib/errors'
 import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { tuiPromptConfirmResult, tuiSpinner } from '@jib/tui'
@@ -26,7 +22,9 @@ const cliRemoveCommand = {
 async function removeRunCommand(args: ArgumentsCamelCase<{ app: string; force?: boolean }>) {
   const appName = String(args.app)
   const loaded = await configLoadAppContext(appName)
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const { cfg, paths } = loaded
   const appCfg = cfg.apps[appName] as NonNullable<(typeof cfg.apps)[string]>
 
@@ -42,8 +40,12 @@ async function removeRunCommand(args: ArgumentsCamelCase<{ app: string; force?: 
       message: `Remove app "${appName}"${ingressSummary}?`,
       initialValue: false,
     })
-    if (ok instanceof Error) return ok
-    if (!ok) return { app: appName, removed: false }
+    if (ok instanceof Error) {
+      return ok
+    }
+    if (!ok) {
+      return { app: appName, removed: false }
+    }
   }
 
   const result = await removeApp(
@@ -54,20 +56,25 @@ async function removeRunCommand(args: ArgumentsCamelCase<{ app: string; force?: 
       }),
       observer: {
         warn: (message) => {
-          if (cliIsTextOutput()) consola.warn(message)
+          if (cliIsTextOutput()) {
+            consola.warn(message)
+          }
         },
       },
     },
     { appName, cfg, configFile: paths.configFile, quiet: !cliIsTextOutput() },
   )
-  if (result instanceof RemoveMissingAppError) return result
-  if (result instanceof RemoveWriteConfigError) return result
-  if (cliIsTextOutput()) consola.success(`removed ${appName}`)
+  if (result instanceof Error) {
+    return result
+  }
+  if (cliIsTextOutput()) {
+    consola.success(`removed ${appName}`)
+  }
   return { app: appName, removed: true }
 }
 
 /** Releases managed ingress while mirroring progress through the CLI spinner. */
-async function removeReleaseIngress(paths: Paths, app: string): Promise<undefined | Error> {
+async function removeReleaseIngress(paths: Paths, app: string): Promise<undefined | JibError> {
   const progress = cliIsTextOutput() ? tuiSpinner() : null
   progress?.start(`releasing ingress for ${app}`)
   const error = await ingressRelease(ingressCreateOperator(paths), app, (update) =>

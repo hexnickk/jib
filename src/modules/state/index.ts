@@ -1,4 +1,3 @@
-export { LockError, StateError } from './errors.ts'
 export type { JibDb } from './db.ts'
 export { stateListMigrations, stateOpenDb, stateRecordMigration } from './db.ts'
 export type { AppStatus, ContainerStatus, ServiceStatus } from './collect.ts'

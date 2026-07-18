@@ -1,4 +1,5 @@
 import type { App, Config, Source } from '@jib/config'
+import type { JibError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import type { GitEnv } from './git.ts'
@@ -32,13 +33,13 @@ export interface ResolvedSource {
   ref: string
   url: string
   workdir: string
-  applyAuth: (workdir: string) => Promise<undefined | Error>
+  applyAuth: (workdir: string) => Promise<JibError | undefined>
 }
 
 export interface ResolvedDriverSource {
   env: GitEnv
   url: string
-  applyAuth: (workdir: string) => Promise<undefined | Error>
+  applyAuth: (workdir: string) => Promise<JibError | undefined>
 }
 
 export interface SourceSetupOption {
@@ -74,7 +75,7 @@ export interface SourceDriver {
   name: string
   setupLabel?: string
   setup?: (ctx: SourceSetupContext) => Promise<string | null>
-  resolve(cfg: Config, app: App, paths: Paths): Promise<ResolvedDriverSource | Error>
+  resolve(cfg: Config, app: App, paths: Paths): Promise<ResolvedDriverSource | JibError>
   supportsRepo(repo: string): boolean
   isAuthFailure(error: unknown): boolean
   describe(source: Source): string
@@ -85,4 +86,5 @@ export interface ProbeSourceDeps {
   lsRemote?: SourceLsRemote
 }
 
-export type SourceLsRemote = (url: string, ref?: string, env?: GitEnv) => Promise<string | Error>
+/** Resolves a Git ref to a SHA without throwing for expected transport failures. */
+export type SourceLsRemote = (url: string, ref?: string, env?: GitEnv) => Promise<string | JibError>

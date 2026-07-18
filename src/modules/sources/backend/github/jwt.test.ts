@@ -1,6 +1,6 @@
 import { createVerify, generateKeyPairSync } from 'node:crypto'
+import { InternalError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { GitHubJwtSignError } from './errors.ts'
 import { githubJwtCreateApp } from './jwt.ts'
 
 /**
@@ -17,7 +17,9 @@ describe('createAppJWT', () => {
 
   test('produces a valid RS256 JWT', () => {
     const signed = githubJwtCreateApp(12345, privateKey)
-    if (signed instanceof Error) throw signed
+    if (signed instanceof Error) {
+      throw signed
+    }
     const { jwt, expiresAt } = signed
     const parts = jwt.split('.')
     expect(parts).toHaveLength(3)
@@ -38,6 +40,6 @@ describe('createAppJWT', () => {
   })
 
   test('returns a typed error for non-RSA PEMs', () => {
-    expect(githubJwtCreateApp(1, 'not a pem')).toBeInstanceOf(GitHubJwtSignError)
+    expect(githubJwtCreateApp(1, 'not a pem')).toBeInstanceOf(InternalError)
   })
 })

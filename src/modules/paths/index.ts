@@ -12,4 +12,3 @@ export {
   pathsDockerHubImage,
   pathsIsDockerHubRepo,
 } from './dockerhub.ts'
-export { EnsureCredsDirError, PathLookupError } from './errors.ts'

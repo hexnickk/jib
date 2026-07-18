@@ -1,12 +1,7 @@
 import { chmod, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { InternalError, type ValidationError } from '@jib/errors'
 import { stringify } from 'yaml'
-import {
-  SerializeConfigError,
-  type ValidateConfigError,
-  WriteConfigError,
-  configErrorMessage,
-} from './errors.ts'
 import type { Config } from './schema.ts'
 import { configValidate } from './validate.ts'
 
@@ -14,17 +9,20 @@ import { configValidate } from './validate.ts'
 export async function configWrite(
   filePath: string,
   config: Config,
-): Promise<undefined | ValidateConfigError | SerializeConfigError | WriteConfigError> {
+): Promise<undefined | ValidationError | InternalError> {
   const validationError = configValidate(config)
-  if (validationError) return validationError
+  if (validationError) {
+    return validationError
+  }
 
   let yaml: string
   try {
     yaml = stringify(config)
   } catch (error) {
-    return new SerializeConfigError(`marshaling config: ${configErrorMessage(error)}`, {
-      cause: error,
-    })
+    return new InternalError(
+      `marshaling config: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    )
   }
 
   const dir = dirname(filePath)
@@ -41,8 +39,9 @@ export async function configWrite(
     return undefined
   } catch (error) {
     await unlink(tmp).catch(() => undefined)
-    return new WriteConfigError(`writing config ${filePath}: ${configErrorMessage(error)}`, {
-      cause: error,
-    })
+    return new InternalError(
+      `writing config ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    )
   }
 }

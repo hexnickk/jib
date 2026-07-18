@@ -1,10 +1,11 @@
-import { CliError, cliIsTextOutput } from '@jib/cli'
+import { cliIsTextOutput } from '@jib/cli'
 import type { Config } from '@jib/config'
-import { type DeployError, type DeployResult, deployApp, deployCreateDeps } from '@jib/deploy'
+import { type DeployResult, deployApp, deployCreateDeps } from '@jib/deploy'
+import { InternalError } from '@jib/errors'
+import type { JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { sourcesSync } from '@jib/sources'
 import { tuiSpinner } from '@jib/tui'
-import { DeployExecuteError, DeployPrepareError, type DeployRunError } from './errors.ts'
 
 interface DeploySpinner {
   message(value: string): void
@@ -27,34 +28,32 @@ interface DeployRunDeps {
   sync?: typeof sourcesSync
 }
 
-/** Runs prepare + deploy and throws a CLI-facing error at the command boundary on failure. */
+/** Runs prepare + deploy and returns its result or a shared typed error. */
 export async function runDeploy(
   cfg: Config,
   paths: Paths,
   app: string,
   ref?: string,
   deps: DeployRunDeps = {},
-): Promise<DeployRunResult> {
-  const result = await runDeployResult(cfg, paths, app, ref, deps)
-  if (result instanceof Error) throw toCliError(result)
-  return result
+): Promise<DeployRunResult | InternalError> {
+  return runDeployResult(cfg, paths, app, ref, deps)
 }
 
-/** Runs prepare + deploy and returns typed workflow errors instead of throwing. */
+/** Runs prepare + deploy and maps dependency failures to internal result errors. */
 export async function runDeployResult(
   cfg: Config,
   paths: Paths,
   app: string,
   ref?: string,
   deps: DeployRunDeps = {},
-): Promise<DeployRunError | DeployRunResult> {
+): Promise<InternalError | DeployRunResult> {
   const showProgress = cliIsTextOutput()
   const createSpin = deps.createSpinner ?? tuiSpinner
   const prepareSpin = showProgress ? createSpin() : null
 
   prepareSpin?.start(`[1/2] preparing ${app}`)
   const ready = await syncDeployApp(cfg, paths, app, ref, deps.sync ?? sourcesSync)
-  if (ready instanceof DeployPrepareError) {
+  if (ready instanceof Error) {
     prepareSpin?.stop(`[1/2] failed to prepare ${app}`)
     return ready
   }
@@ -76,18 +75,18 @@ export async function runDeployResult(
     return deployPromise
   }
 
-  let deployed: DeployError | DeployResult
+  let deployed: JibError | DeployResult
   try {
     deployed = await deployPromise
   } catch (error) {
     deploySpin?.stop(`[2/2] failed to deploy ${app}`)
-    return new DeployExecuteError(toErrorMessage(error), { cause: toErrorCause(error) })
+    return new InternalError(toErrorMessage(error), { cause: error })
   }
   if (deployed instanceof Error) {
     deploySpin?.stop(`[2/2] failed to deploy ${app}`)
-    return deployed instanceof DeployExecuteError
+    return deployed instanceof InternalError
       ? deployed
-      : new DeployExecuteError(deployed.message, { cause: deployed })
+      : new InternalError(deployed.message, { cause: deployed })
   }
 
   deploySpin?.stop(
@@ -102,32 +101,23 @@ export async function runDeployResult(
   }
 }
 
+/** Synchronizes one app checkout and maps source failures to an internal result error. */
 async function syncDeployApp(
   cfg: Config,
   paths: Paths,
   app: string,
   ref: string | undefined,
   sync: typeof sourcesSync,
-): Promise<DeployPrepareError | { workdir: string; sha: string }> {
+): Promise<InternalError | { workdir: string; sha: string }> {
   try {
     const result = await sync(cfg, paths, { app }, ref)
-    return result instanceof Error
-      ? new DeployPrepareError(result.message, { cause: result })
-      : result
+    return result instanceof Error ? new InternalError(result.message, { cause: result }) : result
   } catch (error) {
-    return new DeployPrepareError(toErrorMessage(error), { cause: toErrorCause(error) })
+    return new InternalError(toErrorMessage(error), { cause: error })
   }
 }
 
-function deployFailureHint(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error)
-  if (message.includes('EACCES') && message.includes('/opt/jib/')) {
-    return 'repair /opt/jib ownership and permissions, then retry `jib deploy ...`'
-  }
-  return 'check docker compose output, then retry `jib deploy ...`'
-}
-
-/** Starts the deploy action for one prepared workdir and converts setup throw-paths into typed errors. */
+/** Starts deployment after preparation and maps synchronous setup failures to an internal error. */
 function startDeployPreparedApp(
   createDeps: typeof deployCreateDeps,
   runDeployApp: typeof deployApp,
@@ -136,7 +126,7 @@ function startDeployPreparedApp(
   app: string,
   ready: { workdir: string; sha: string },
   deploySpin: DeploySpinner | null,
-): DeployExecuteError | Promise<DeployError | DeployResult> {
+): InternalError | Promise<JibError | DeployResult> {
   try {
     return runDeployApp(
       createDeps(cfg, paths),
@@ -144,27 +134,11 @@ function startDeployPreparedApp(
       { emit: (step, message) => deploySpin?.message(`${step}: ${message}`) },
     )
   } catch (error) {
-    return new DeployExecuteError(toErrorMessage(error), { cause: toErrorCause(error) })
+    return new InternalError(toErrorMessage(error), { cause: error })
   }
 }
 
-function toCliError(error: DeployRunError): CliError {
-  if (error instanceof DeployPrepareError) {
-    return new CliError('deploy_failed', error.message, {
-      cause: error,
-      hint: 'fix repo access or ref selection, then retry `jib deploy ...`',
-    })
-  }
-  return new CliError('deploy_failed', error.message, {
-    cause: error,
-    hint: deployFailureHint(error),
-  })
-}
-
-function toErrorCause(error: unknown): Error | undefined {
-  return error instanceof Error ? error : undefined
-}
-
+/** Converts an unknown caught value into an error message for a typed internal failure. */
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }

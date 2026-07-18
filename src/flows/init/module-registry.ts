@@ -21,14 +21,8 @@ export const MODULES: readonly FirstPartyModule[] = [
   },
   {
     manifest: ingressManifest,
-    install: async (ctx) => {
-      await ingressInstall(ctx)
-      return undefined
-    },
-    uninstall: async (ctx) => {
-      await ingressUninstall(ctx)
-      return undefined
-    },
+    install: ingressInstall,
+    uninstall: ingressUninstall,
   },
   {
     manifest: cloudflaredManifest,

@@ -1,12 +1,8 @@
 import { writeFile } from 'node:fs/promises'
 import { $ } from '@/libs/shell'
+import { InternalError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
-import {
-  WatcherInstallEnableError,
-  WatcherInstallReloadError,
-  WatcherInstallWriteUnitError,
-} from './errors.ts'
 import { SERVICE_NAME, UNIT_PATH, systemdUnit as watcherSystemdUnit } from './templates.ts'
 
 interface WatcherContext {
@@ -22,17 +18,11 @@ interface WatcherInstallDeps {
   run?: (args: readonly string[]) => Promise<unknown>
 }
 
-/**
- * Writes and enables the watcher systemd unit.
- * Inputs are the runtime context plus optional filesystem/template overrides for isolated tests.
- * Output is undefined on success or a typed install error; side effects write the unit file and run systemctl.
- */
+/** Writes and enables the watcher systemd unit, returning an internal error on failure. */
 export async function watcherInstallResult(
   ctx: WatcherContext,
   deps: WatcherInstallDeps = {},
-): Promise<
-  WatcherInstallWriteUnitError | WatcherInstallReloadError | WatcherInstallEnableError | undefined
-> {
+): Promise<InternalError | undefined> {
   const unitPath = deps.unitPath ?? UNIT_PATH
   const serviceName = deps.serviceName ?? SERVICE_NAME
   const renderUnit = deps.systemdUnit ?? watcherSystemdUnit
@@ -45,31 +35,42 @@ export async function watcherInstallResult(
   try {
     await writeFile(unitPath, renderUnit(vars), { mode: 0o644 })
   } catch (error) {
-    return new WatcherInstallWriteUnitError(unitPath, error)
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`write ${unitPath}: ${message}`, { cause: error })
   }
 
   ctx.logger.info('systemctl daemon-reload')
   try {
     const result = await run(['sudo', 'systemctl', 'daemon-reload'])
     const detail = watcherCommandFailure(result)
-    if (detail) return new WatcherInstallReloadError(detail)
+    if (detail) {
+      return new InternalError(`systemctl daemon-reload: ${detail}`)
+    }
   } catch (error) {
-    return new WatcherInstallReloadError(error)
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`systemctl daemon-reload: ${message}`, { cause: error })
   }
 
   ctx.logger.info(`systemctl enable --now ${serviceName}`)
   try {
     const result = await run(['sudo', 'systemctl', 'enable', '--now', serviceName])
     const detail = watcherCommandFailure(result)
-    if (detail) return new WatcherInstallEnableError(serviceName, detail)
+    if (detail) {
+      return new InternalError(`systemctl enable --now ${serviceName}: ${detail}`)
+    }
   } catch (error) {
-    return new WatcherInstallEnableError(serviceName, error)
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`systemctl enable --now ${serviceName}: ${message}`, { cause: error })
   }
 }
 
 function watcherCommandFailure(result: unknown): string | undefined {
-  if (!isWatcherCommandResult(result)) return undefined
-  if (result.exitCode === 0) return undefined
+  if (!isWatcherCommandResult(result)) {
+    return undefined
+  }
+  if (result.exitCode === 0) {
+    return undefined
+  }
   return (
     result.stderr.toString().trim() ||
     result.stdout.toString().trim() ||

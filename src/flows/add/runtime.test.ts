@@ -1,17 +1,13 @@
 import { CliError, cliNormalizeError } from '@jib/cli'
+import { InternalError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { PrepareRepoError } from './flow-errors.ts'
 import { addNormalizeError } from './index.ts'
 import { addNormalizeDeployError } from './runtime.ts'
 
 describe('add command error normalization', () => {
   test('unexpected add failures keep the retry-safe rollback hint', () => {
     const normalized = cliNormalizeError(
-      addNormalizeError(
-        new PrepareRepoError(new Error('clone failed')),
-        'blog',
-        '/opt/jib/config.yml',
-      ),
+      addNormalizeError(new InternalError('clone failed'), 'blog', '/opt/jib/config.yml'),
     )
 
     expect(normalized.message).toBe('clone failed')

@@ -1,11 +1,6 @@
 import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import {
-  SecretsReadError,
-  SecretsRemoveAppError,
-  SecretsStatError,
-  SecretsWriteError,
-} from './errors.ts'
+import { InternalError, NotFoundError } from '@jib/errors'
 
 export interface SecretsContext {
   secretsDir: string
@@ -31,9 +26,13 @@ function parseEnv(content: string): { lines: string[]; entries: Map<string, numb
   const entries = new Map<string, number>()
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i]?.trim() ?? ''
-    if (!trimmed || trimmed.startsWith('#')) continue
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue
+    }
     const eq = trimmed.indexOf('=')
-    if (eq > 0) entries.set(trimmed.slice(0, eq), i)
+    if (eq > 0) {
+      entries.set(trimmed.slice(0, eq), i)
+    }
   }
   return { lines, entries }
 }
@@ -44,34 +43,36 @@ function isMissingError(error: unknown): boolean {
 }
 
 /** Reads an env file when present and returns a typed error for other read failures. */
-async function readEnvIfPresent(path: string): Promise<string | SecretsReadError | undefined> {
+async function readEnvIfPresent(path: string): Promise<string | InternalError | undefined> {
   try {
     return await readFile(path, 'utf8')
   } catch (error) {
-    if (isMissingError(error)) return undefined
-    return new SecretsReadError(path, { cause: error })
+    if (isMissingError(error)) {
+      return undefined
+    }
+    return new InternalError(`reading secrets ${path}`, { cause: error })
   }
 }
 
 /** Ensures the per-app secrets directory exists with the managed permissions. */
-async function ensureAppDir(path: string): Promise<undefined | SecretsWriteError> {
+async function ensureAppDir(path: string): Promise<undefined | InternalError> {
   try {
     await mkdir(path, { recursive: true, mode: DIR_MODE })
     await chmod(path, DIR_MODE)
     return
   } catch (error) {
-    return new SecretsWriteError(path, { cause: error })
+    return new InternalError(`writing secrets ${path}`, { cause: error })
   }
 }
 
 /** Writes one managed secrets file and reapplies the expected mode. */
-async function writeSecure(path: string, content: string): Promise<undefined | SecretsWriteError> {
+async function writeSecure(path: string, content: string): Promise<undefined | InternalError> {
   try {
     await writeFile(path, content, { mode: FILE_MODE })
     await chmod(path, FILE_MODE)
     return
   } catch (error) {
-    return new SecretsWriteError(path, { cause: error })
+    return new InternalError(`writing secrets ${path}`, { cause: error })
   }
 }
 
@@ -79,14 +80,16 @@ async function writeSecure(path: string, content: string): Promise<undefined | S
 export async function secretsCheckApp(
   ctx: SecretsContext,
   app: string,
-): Promise<AppSecretStatus | SecretsStatError> {
+): Promise<AppSecretStatus | InternalError> {
   const path = join(ctx.secretsDir, app, '.env')
   try {
     await stat(path)
     return { app, exists: true, path }
   } catch (error) {
-    if (isMissingError(error)) return { app, exists: false, path }
-    return new SecretsStatError(path, { cause: error })
+    if (isMissingError(error)) {
+      return { app, exists: false, path }
+    }
+    return new InternalError(`checking secrets ${path}`, { cause: error })
   }
 }
 
@@ -94,11 +97,15 @@ export async function secretsCheckApp(
 export async function secretsReadMasked(
   ctx: SecretsContext,
   app: string,
-): Promise<MaskedSecretEntry[] | SecretsReadError> {
+): Promise<MaskedSecretEntry[] | InternalError | NotFoundError> {
   const path = join(ctx.secretsDir, app, '.env')
   const content = await readEnvIfPresent(path)
-  if (content instanceof SecretsReadError) return content
-  if (content === undefined) return new SecretsReadError(path)
+  if (content instanceof Error) {
+    return content
+  }
+  if (content === undefined) {
+    return new NotFoundError(`secrets ${path} not found`)
+  }
   const { lines, entries } = parseEnv(content)
   return [...entries.entries()].map(([key, idx]) => {
     const line = lines[idx] ?? ''
@@ -115,13 +122,17 @@ export async function secretsUpsert(
   app: string,
   key: string,
   value: string,
-): Promise<undefined | SecretsReadError | SecretsWriteError> {
+): Promise<undefined | InternalError> {
   const appDir = join(ctx.secretsDir, app)
   const ensured = await ensureAppDir(appDir)
-  if (ensured instanceof SecretsWriteError) return ensured
+  if (ensured instanceof Error) {
+    return ensured
+  }
   const path = join(ctx.secretsDir, app, '.env')
   const existing = await readEnvIfPresent(path)
-  if (existing instanceof SecretsReadError) return existing
+  if (existing instanceof Error) {
+    return existing
+  }
   const { lines, entries } = parseEnv(existing ?? '')
   const line = `${key}=${value}`
   const idx = entries.get(key)
@@ -141,17 +152,25 @@ export async function secretsRemove(
   ctx: SecretsContext,
   app: string,
   key: string,
-): Promise<boolean | SecretsReadError | SecretsWriteError> {
+): Promise<boolean | InternalError> {
   const path = join(ctx.secretsDir, app, '.env')
   const content = await readEnvIfPresent(path)
-  if (content instanceof SecretsReadError) return content
-  if (content === undefined) return false
+  if (content instanceof Error) {
+    return content
+  }
+  if (content === undefined) {
+    return false
+  }
   const { lines, entries } = parseEnv(content)
   const idx = entries.get(key)
-  if (idx === undefined) return false
+  if (idx === undefined) {
+    return false
+  }
   lines.splice(idx, 1)
   const written = await writeSecure(path, lines.join('\n'))
-  if (written instanceof SecretsWriteError) return written
+  if (written instanceof Error) {
+    return written
+  }
   return true
 }
 
@@ -159,12 +178,12 @@ export async function secretsRemove(
 export async function secretsRemoveApp(
   ctx: SecretsContext,
   app: string,
-): Promise<undefined | SecretsRemoveAppError> {
+): Promise<undefined | InternalError> {
   const path = join(ctx.secretsDir, app)
   try {
     await rm(path, { recursive: true, force: true })
     return
   } catch (error) {
-    return new SecretsRemoveAppError(path, { cause: error })
+    return new InternalError(`removing secrets ${path}`, { cause: error })
   }
 }

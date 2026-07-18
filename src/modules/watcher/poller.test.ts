@@ -1,12 +1,13 @@
 import type { Config } from '@jib/config'
+import { InternalError } from '@jib/errors'
 import { loggingCreateLogger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
-import { WatcherDeployAppError, WatcherSyncAppError } from './errors.ts'
 import {
   type PollAppDeps,
   watcherParsePollInterval,
   watcherPollApp,
+  watcherRunPollCycle,
   watcherRunPoller,
 } from './poller.ts'
 
@@ -87,10 +88,10 @@ describe('pollApp', () => {
     const error = await watcherPollApp(cfg, paths, 'demo', seen, log, {
       lsRemote: async () => sha,
       syncApp: async () => ({ workdir: '/tmp/prepared-demo', sha }),
-      deployPrepared: async () => new WatcherDeployAppError('demo', new Error('deploy boom')),
+      deployPrepared: async () => new InternalError('deploy boom'),
     })
 
-    expect(error).toBeInstanceOf(WatcherDeployAppError)
+    expect(error).toBeInstanceOf(InternalError)
     expect(seen.has('demo')).toBe(false)
   })
 
@@ -109,7 +110,7 @@ describe('pollApp', () => {
       },
     })
 
-    expect(error).toBeInstanceOf(WatcherDeployAppError)
+    expect(error).toBeInstanceOf(InternalError)
     expect(error?.message).toContain('deploy boom')
     expect(seen.has('demo')).toBe(false)
   })
@@ -128,13 +129,23 @@ describe('pollApp', () => {
       },
     })
 
-    expect(error).toBeInstanceOf(WatcherSyncAppError)
+    expect(error).toBeInstanceOf(InternalError)
     expect(error?.message).toContain('sync boom')
     expect(seen.has('demo')).toBe(false)
   })
 })
 
 describe('runPoller', () => {
+  test('returns a typed config error instead of rejecting the poll cycle', async () => {
+    const result = await watcherRunPollCycle({
+      paths: pathsGetPaths('/tmp/jib-root-test'),
+      log: loggingCreateLogger('test'),
+      getConfig: () => new InternalError('config unavailable'),
+    })
+
+    expect(result).toBeInstanceOf(InternalError)
+  })
+
   test('stops promptly when aborted during sleep', async () => {
     const cfg = mkCfg({ apps: {} as Config['apps'] })
     const paths = pathsGetPaths('/tmp/jib-root-test')

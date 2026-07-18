@@ -1,9 +1,9 @@
 import { runDeploy } from '@/flows/deploy/run.ts'
-import type { CliError } from '@jib/cli'
 import type { Config } from '@jib/config'
+import { InternalError, type RollbackError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { describe, expect, test, vi } from 'vitest'
-import { type AddRolledBackError, addRunSequence } from './sequence.ts'
+import { addRunSequence } from './sequence.ts'
 import type { AddFlowResult } from './types.ts'
 
 const addResult: AddFlowResult = {
@@ -83,7 +83,9 @@ describe('addRunSequence', () => {
       },
       { interrupted: false },
     )
-    if (result instanceof Error) throw result
+    if (result instanceof Error) {
+      throw result
+    }
 
     expect(calls).toEqual(['add', 'deploy'])
     expect(result.deployResult.sha).toBe('abcdef1234')
@@ -98,7 +100,7 @@ describe('addRunSequence', () => {
       },
       async () => {
         calls.push('deploy')
-        return new Error('deploy failed')
+        return new InternalError('deploy failed')
       },
       async () => {
         calls.push('rollback')
@@ -108,8 +110,8 @@ describe('addRunSequence', () => {
     )
     expect(result).toMatchObject({
       message: 'deploy failed',
-      name: 'AddRolledBackError',
-    } satisfies Partial<AddRolledBackError>)
+      name: 'RollbackError',
+    } satisfies Partial<RollbackError>)
 
     expect(calls).toEqual(['add', 'deploy', 'rollback'])
   })
@@ -150,7 +152,9 @@ describe('addRunSequence', () => {
 
       deployment.resolve({ deployedSHA: 'abcdef1234', durationMs: 42 })
       const result = await sequence
-      if (result instanceof Error) throw result
+      if (result instanceof Error) {
+        throw result
+      }
       expect(calls).toEqual(['add', 'deploy'])
       expect(result.deployResult.sha).toBe('abcdef1234')
     } finally {
@@ -183,9 +187,9 @@ describe('addRunSequence', () => {
     )
     expect(result).toMatchObject({
       message: 'add cancelled',
-      name: 'AddRolledBackError',
-      original: { code: 'cancelled', message: 'add cancelled' } satisfies Partial<CliError>,
-    } satisfies Partial<AddRolledBackError>)
+      name: 'RollbackError',
+      original: { code: 'cancelled', message: 'add cancelled' },
+    } satisfies Partial<RollbackError>)
 
     expect(calls).toEqual(['add', 'rollback'])
   })
@@ -220,7 +224,9 @@ describe('addRunSequence', () => {
         },
       },
     )
-    if (result instanceof Error) throw result
+    if (result instanceof Error) {
+      throw result
+    }
 
     expect(calls).toEqual(['add', 'deploy'])
     expect(result.deployResult.sha).toBe('abcdef1234')

@@ -1,5 +1,6 @@
 import type { App, Config } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
+import { InternalError } from '@jib/errors'
 import { pathsGetPaths, pathsManagedComposePath } from '@jib/paths'
 import {
   type AddFlowObserver,
@@ -94,17 +95,23 @@ export function addMakeDeps(
   const support: AddSupport = {
     cloneForInspection: async () => {
       calls.push('prepareRepo')
-      if (failAt === 'prepareRepo') return new Error('prepareRepo failed')
+      if (failAt === 'prepareRepo') {
+        return new InternalError('prepareRepo failed')
+      }
       return { workdir: '/tmp/blog' }
     },
     removeCheckout: async () => {
       calls.push('rollbackRepo')
-      if (failRollbackRepo) return new Error('rollbackRepo failed')
+      if (failRollbackRepo) {
+        return new InternalError('rollbackRepo failed')
+      }
       return undefined
     },
     writeConfig: async (_configFile, cfg) => {
       calls.push('writeConfig')
-      if (failAt === 'writeConfig') return new Error('writeConfig failed')
+      if (failAt === 'writeConfig') {
+        return new InternalError('writeConfig failed')
+      }
       currentConfig = structuredClone(cfg)
       if (injectConcurrentConfigChange && currentConfig.apps.blog) {
         currentConfig.apps.worker = {
@@ -118,14 +125,16 @@ export function addMakeDeps(
     },
     loadConfig: async () => {
       calls.push('loadConfig')
-      if (failLoadConfig) return new Error('loadConfig failed')
+      if (failLoadConfig) {
+        return new InternalError('loadConfig failed')
+      }
       return structuredClone(currentConfig)
     },
     upsertSecret: async (_appName, entry) => {
       calls.push(`upsertSecret:${entry.key}`)
       secretWrites++
       if (failAt === 'writeSecondSecret' && secretWrites === 2) {
-        return new Error('writeSecondSecret failed')
+        return new InternalError('writeSecondSecret failed')
       }
       return undefined
     },
@@ -139,29 +148,39 @@ export function addMakeDeps(
     },
     claimIngress: async () => {
       calls.push('claimRoutes')
-      if (failAt === 'claimRoutes') return new Error('claimRoutes failed')
+      if (failAt === 'claimRoutes') {
+        return new InternalError('claimRoutes failed')
+      }
       return undefined
     },
   }
   const planner: AddPlanner = {
     inspectCompose: async () => {
       calls.push('inspectCompose')
-      if (failAt === 'inspectCompose') return new Error('inspectCompose failed')
+      if (failAt === 'inspectCompose') {
+        return new InternalError('inspectCompose failed')
+      }
       return inspection
     },
     collectGuidedInputs: async () => {
       calls.push('collectGuidedInputs')
-      if (failAt === 'collectGuidedInputs') return new Error('collectGuidedInputs failed')
+      if (failAt === 'collectGuidedInputs') {
+        return new InternalError('collectGuidedInputs failed')
+      }
       return guided
     },
     buildResolvedApp: async () => {
       calls.push('buildResolvedApp')
-      if (failAt === 'buildResolvedApp') return new Error('buildResolvedApp failed')
+      if (failAt === 'buildResolvedApp') {
+        return new InternalError('buildResolvedApp failed')
+      }
       return appOverride
     },
     confirmPlan: async () => {
       calls.push('confirmPlan')
-      if (failAt === 'confirmPlan') return new Error('confirmPlan failed')
+      if (failAt === 'confirmPlan') {
+        return new InternalError('confirmPlan failed')
+      }
       return undefined
     },
   }

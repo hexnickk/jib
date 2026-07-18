@@ -1,40 +1,39 @@
 import { $ } from '@/libs/shell'
-import { GitHubRemoteSetTokenError } from './errors.ts'
+import { InternalError } from '@jib/errors'
 
 /** Canonical SSH clone URL for `owner/repo`. */
 export function githubRemoteSshCloneUrl(repo: string): string {
   return `git@github.com:${repo}.git`
 }
 
-/**
- * HTTPS clone URL, optionally embedding a token via the `x-access-token`
- * username GitHub App installation tokens use. The token is URL-encoded to
- * survive any unusual characters GitHub might ship.
- */
+/** Builds an HTTPS clone URL and embeds an installation token when provided. */
 export function githubRemoteHttpsCloneUrl(repo: string, token?: string): string {
-  if (!token) return `https://github.com/${repo}.git`
+  if (!token) {
+    return `https://github.com/${repo}.git`
+  }
   return `https://x-access-token:${encodeURIComponent(token)}@github.com/${repo}.git`
 }
 
-/**
- * Rewrites a repo's `origin` remote URL in place so subsequent git operations
- * use the supplied installation token. Only touches git config — pure
- * shell-out. Lives in `src/modules/sources/backend/github` because the URL shape is
- * GitHub-specific; watcher/source sync code imports it and applies it to
- * a workdir.
- */
+/** Rewrites a checkout's origin URL to use a GitHub installation token. */
 export async function githubRemoteSetToken(
   repoDir: string,
   repo: string,
   token: string,
-): Promise<GitHubRemoteSetTokenError | undefined> {
+): Promise<InternalError | undefined> {
   const url = githubRemoteHttpsCloneUrl(repo, token)
-  const result = await $`git -C ${repoDir} remote set-url origin ${url}`
-  if (result.exitCode !== 0) {
-    return new GitHubRemoteSetTokenError(
-      result.stderr.trim() ||
-        result.stdout.trim() ||
-        `command exited with code ${result.exitCode ?? 1}`,
-    )
+  try {
+    const result = await $`git -C ${repoDir} remote set-url origin ${url}`
+    if (result.exitCode !== 0) {
+      return new InternalError(
+        `git remote set-url: ${
+          result.stderr.trim() ||
+          result.stdout.trim() ||
+          `command exited with code ${result.exitCode ?? 1}`
+        }`,
+      )
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`git remote set-url: ${message}`, { cause: error })
   }
 }

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { JibError } from '@jib/errors'
+import { InternalError } from '@jib/errors'
 import { type DockerExec, type ExecResult, dockerRealExec } from './exec.ts'
 
 export interface ComposeConfig {
@@ -22,14 +22,20 @@ export interface DockerCompose {
   cfg: ComposeConfig
   projectName(): string
   baseArgs(): string[]
-  build(buildArgs?: Record<string, string>, opts?: { quiet?: boolean }): Promise<void>
-  up(opts?: UpOptions): Promise<void>
-  down(removeVolumes?: boolean, opts?: { quiet?: boolean }): Promise<void>
-  restart(services?: string[], opts?: { quiet?: boolean }): Promise<void>
-  exec(service: string, cmd: string[]): Promise<void>
-  run(service: string, cmd: string[]): Promise<void>
-  logs(service?: string, opts?: { follow?: boolean; tail?: number }): Promise<void>
-  ps(): Promise<ExecResult>
+  build(
+    buildArgs?: Record<string, string>,
+    opts?: { quiet?: boolean },
+  ): Promise<InternalError | undefined>
+  up(opts?: UpOptions): Promise<InternalError | undefined>
+  down(removeVolumes?: boolean, opts?: { quiet?: boolean }): Promise<InternalError | undefined>
+  restart(services?: string[], opts?: { quiet?: boolean }): Promise<InternalError | undefined>
+  exec(service: string, cmd: string[]): Promise<InternalError | undefined>
+  run(service: string, cmd: string[]): Promise<InternalError | undefined>
+  logs(
+    service?: string,
+    opts?: { follow?: boolean; tail?: number },
+  ): Promise<InternalError | undefined>
+  ps(): Promise<ExecResult | InternalError>
 }
 
 /** Creates a plain docker-compose runner object for one app. */
@@ -42,7 +48,9 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
 
   function baseArgs(): string[] {
     const args = ['compose', '-p', projectName()]
-    for (const f of cfg.files) args.push('-f', f)
+    for (const file of cfg.files) {
+      args.push('-f', file)
+    }
     if (cfg.override && existsSync(cfg.override)) {
       args.push('-f', cfg.override)
     }
@@ -53,33 +61,47 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
     return cfg.envFile ? ['--env-file', cfg.envFile] : []
   }
 
-  async function runOrThrow(
+  async function runResult(
     args: string[],
     opts: { env?: Record<string, string>; tty?: boolean; capture?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<InternalError | undefined> {
     const callOpts: Parameters<DockerExec>[1] = { cwd: cfg.dir }
-    if (opts.env) callOpts.env = opts.env
-    if (opts.tty) callOpts.tty = true
-    if (opts.capture) callOpts.capture = true
-    const res = await runner(args, callOpts)
-    if (res.exitCode !== 0) {
-      const detail = res.stderr || res.stdout
-      throw new JibError(
-        'docker',
-        `${args.slice(0, 4).join(' ')} exited ${res.exitCode}: ${detail}`,
-      )
+    if (opts.env) {
+      callOpts.env = opts.env
+    }
+    if (opts.tty) {
+      callOpts.tty = true
+    }
+    if (opts.capture) {
+      callOpts.capture = true
+    }
+    try {
+      const result = await runner(args, callOpts)
+      if (result.exitCode !== 0) {
+        const detail = result.stderr || result.stdout
+        return new InternalError(
+          `${args.slice(0, 4).join(' ')} exited ${result.exitCode}: ${detail}`,
+        )
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return new InternalError(`${args.slice(0, 4).join(' ')} failed: ${message}`, { cause: error })
     }
   }
 
-  async function capture(args: string[]): Promise<ExecResult> {
-    const res = await runner(args, { cwd: cfg.dir, capture: true })
-    if (res.exitCode !== 0) {
-      throw new JibError(
-        'docker',
-        `${args.slice(0, 4).join(' ')} exited ${res.exitCode}: ${res.stderr}`,
-      )
+  async function capture(args: string[]): Promise<ExecResult | InternalError> {
+    try {
+      const result = await runner(args, { cwd: cfg.dir, capture: true })
+      if (result.exitCode !== 0) {
+        return new InternalError(
+          `${args.slice(0, 4).join(' ')} exited ${result.exitCode}: ${result.stderr}`,
+        )
+      }
+      return result
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return new InternalError(`${args.slice(0, 4).join(' ')} failed: ${message}`, { cause: error })
     }
-    return res
   }
 
   return {
@@ -88,7 +110,7 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
     baseArgs,
     async build(buildArgs: Record<string, string> = {}, opts: { quiet?: boolean } = {}) {
       const args = ['docker', ...baseArgs(), ...envArgs(), 'build']
-      await runOrThrow(args, {
+      return runResult(args, {
         ...(Object.keys(buildArgs).length > 0 ? { env: buildArgs } : {}),
         ...(opts.quiet ? { capture: true } : {}),
       })
@@ -104,7 +126,7 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
         '--remove-orphans',
         ...(opts.services ?? []),
       ]
-      await runOrThrow(args, {
+      return runResult(args, {
         ...(opts.buildArgs && Object.keys(opts.buildArgs).length > 0
           ? { env: opts.buildArgs }
           : {}),
@@ -113,29 +135,37 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
     },
     async down(removeVolumes = false, opts: { quiet?: boolean } = {}) {
       const args = ['docker', ...baseArgs(), 'down']
-      if (removeVolumes) args.push('-v')
-      await runOrThrow(args, opts.quiet ? { capture: true } : {})
+      if (removeVolumes) {
+        args.push('-v')
+      }
+      return runResult(args, opts.quiet ? { capture: true } : {})
     },
     async restart(services: string[] = [], opts: { quiet?: boolean } = {}) {
-      await runOrThrow(
+      return runResult(
         ['docker', ...baseArgs(), 'restart', ...services],
         opts.quiet ? { capture: true } : {},
       )
     },
     async exec(service: string, cmd: string[]) {
-      await runOrThrow(['docker', ...baseArgs(), 'exec', service, ...cmd], { tty: true })
+      return runResult(['docker', ...baseArgs(), 'exec', service, ...cmd], { tty: true })
     },
     async run(service: string, cmd: string[]) {
-      await runOrThrow(['docker', ...baseArgs(), ...envArgs(), 'run', '--rm', service, ...cmd], {
+      return runResult(['docker', ...baseArgs(), ...envArgs(), 'run', '--rm', service, ...cmd], {
         tty: true,
       })
     },
     async logs(service?: string, opts: { follow?: boolean; tail?: number } = {}) {
       const args = ['docker', ...baseArgs(), ...envArgs(), 'logs']
-      if (opts.follow) args.push('-f')
-      if (opts.tail && opts.tail > 0) args.push('--tail', String(opts.tail))
-      if (service) args.push(service)
-      await runOrThrow(args)
+      if (opts.follow) {
+        args.push('-f')
+      }
+      if (opts.tail && opts.tail > 0) {
+        args.push('--tail', String(opts.tail))
+      }
+      if (service) {
+        args.push(service)
+      }
+      return runResult(args)
     },
     async ps() {
       return capture(['docker', ...baseArgs(), 'ps', '--format', 'json'])

@@ -1,3 +1,4 @@
+import { InternalError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
 import { dockerCreateCompose } from './compose.ts'
 import type { DockerExec, ExecResult } from './exec.ts'
@@ -14,10 +15,18 @@ function recorder(result: Partial<ExecResult> = {}): { exec: DockerExec; calls: 
   const calls: Call[] = []
   const exec: DockerExec = async (args, opts) => {
     const call: Call = { args }
-    if (opts.cwd !== undefined) call.cwd = opts.cwd
-    if (opts.env !== undefined) call.env = opts.env
-    if (opts.capture !== undefined) call.capture = opts.capture
-    if (opts.tty !== undefined) call.tty = opts.tty
+    if (opts.cwd !== undefined) {
+      call.cwd = opts.cwd
+    }
+    if (opts.env !== undefined) {
+      call.env = opts.env
+    }
+    if (opts.capture !== undefined) {
+      call.capture = opts.capture
+    }
+    if (opts.tty !== undefined) {
+      call.tty = opts.tty
+    }
     calls.push(call)
     return { stdout: '', stderr: '', exitCode: 0, ...result }
   }
@@ -100,9 +109,11 @@ describe('dockerCreateCompose', () => {
     expect(calls[0]?.args.slice(-1)).toEqual(['logs'])
   })
 
-  test('throws JibError on non-zero exit', async () => {
+  test('returns an internal error on non-zero exit', async () => {
     const exec: DockerExec = async () => ({ stdout: '', stderr: 'boom', exitCode: 2 })
     const compose = dockerCreateCompose({ app: 'demo', dir: '.', files: [], exec })
-    await expect(compose.up()).rejects.toThrow(/exited 2/)
+    const result = await compose.up()
+    expect(result).toBeInstanceOf(InternalError)
+    expect(result?.message).toContain('exited 2')
   })
 })

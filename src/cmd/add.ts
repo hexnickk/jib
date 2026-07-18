@@ -1,6 +1,4 @@
 import {
-  AddRolledBackError,
-  CancelledAddError,
   addBuildDraftApp,
   addCreateDefaultSupport,
   addCreatePlanner,
@@ -18,7 +16,8 @@ import {
 } from '@/flows/add/runtime.ts'
 import { runDeploy } from '@/flows/deploy/run.ts'
 import { CliError, cliIsTextOutput } from '@jib/cli'
-import { type App, ConfigError, configLoad, configLoadContext } from '@jib/config'
+import { type App, configLoad, configLoadContext } from '@jib/config'
+import { CancelledError, type JibError, RollbackError, errorsToJibError } from '@jib/errors'
 import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { sourcesPreflightSelection } from '@jib/sources'
@@ -44,27 +43,37 @@ const cliAddCommand = {
 /** Runs the add command flow and returns either a result payload or a typed error. */
 async function addRunCommand(args: ArgumentsCamelCase<AddCommandArgv>) {
   const loaded = await configLoadContext()
-  if (loaded instanceof ConfigError) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   let { cfg, paths } = loaded
   const appName = await addResolveAppName(
     typeof args.app === 'string' ? args.app : undefined,
     cfg.apps,
   )
-  if (appName instanceof Error) return appName
+  if (appName instanceof Error) {
+    return appName
+  }
   const source = await addChooseInitialSource(
     cfg,
     paths,
     typeof args.source === 'string' ? args.source : undefined,
   )
-  if (source instanceof Error) return source
+  if (source instanceof Error) {
+    return source
+  }
   if (source.created) {
     const reloaded = await configLoad(paths.configFile)
-    if (reloaded instanceof ConfigError) return reloaded
+    if (reloaded instanceof Error) {
+      return reloaded
+    }
     cfg = reloaded
   }
 
   const inputs = await addGatherInputs(args)
-  if (inputs instanceof Error) return inputs
+  if (inputs instanceof Error) {
+    return inputs
+  }
   const planner = addCreatePlanner()
   const interrupt = addTrapInterrupt()
   const preflight = await sourcesPreflightSelection(
@@ -80,7 +89,9 @@ async function addRunCommand(args: ArgumentsCamelCase<AddCommandArgv>) {
       promptSelect: tuiPromptSelectResult,
     },
   )
-  if (preflight instanceof Error) return preflight
+  if (preflight instanceof Error) {
+    return preflight
+  }
 
   const flowArgs: { source?: string; branch?: string } = {
     branch: preflight.branch,
@@ -96,7 +107,9 @@ async function addRunCommand(args: ArgumentsCamelCase<AddCommandArgv>) {
     const sequence = await addRunSequence(
       async () => {
         const draftApp = addBuildDraftApp(flowArgs, inputs)
-        if (draftApp instanceof Error) return draftApp
+        if (draftApp instanceof Error) {
+          return draftApp
+        }
         const result = await addRun(
           { support: addSupport, planner, observer: inspection.observer },
           {
@@ -114,8 +127,12 @@ async function addRunCommand(args: ArgumentsCamelCase<AddCommandArgv>) {
             },
           },
         )
-        if (result instanceof CancelledAddError) return result
-        if (result instanceof Error) return addNormalizeError(result, appName, paths.configFile)
+        if (result instanceof CancelledError) {
+          return result
+        }
+        if (result instanceof Error) {
+          return addNormalizeError(result, appName, paths.configFile)
+        }
         return result
       },
       (result) =>
@@ -127,11 +144,11 @@ async function addRunCommand(args: ArgumentsCamelCase<AddCommandArgv>) {
       (result) => addRollbackApp(paths, appName, preflight.cfg, result.finalApp),
       interrupt,
     )
-    if (sequence instanceof CancelledAddError) {
+    if (sequence instanceof CancelledError) {
       inspection.fail()
       return new CliError('cancelled', sequence.message)
     }
-    if (sequence instanceof AddRolledBackError) {
+    if (sequence instanceof RollbackError) {
       const original = interrupt.interrupted
         ? new CliError('cancelled', 'add cancelled')
         : sequence.original
@@ -151,7 +168,11 @@ async function addRunCommand(args: ArgumentsCamelCase<AddCommandArgv>) {
 }
 
 /** Claims ingress for a newly added app while keeping spinner updates local to the command. */
-async function addClaimIngress(paths: Paths, app: string, appCfg: App): Promise<undefined | Error> {
+async function addClaimIngress(
+  paths: Paths,
+  app: string,
+  appCfg: App,
+): Promise<undefined | JibError> {
   const progress = cliIsTextOutput() ? tuiSpinner() : null
   progress?.start(`claiming ingress for ${app}`)
   const error = await ingressClaim(ingressCreateOperator(paths), app, appCfg, (update) =>
@@ -159,7 +180,7 @@ async function addClaimIngress(paths: Paths, app: string, appCfg: App): Promise<
   )
   if (error instanceof Error) {
     progress?.stop('ingress failed')
-    return error
+    return errorsToJibError(error)
   }
   progress?.stop('ingress ready')
   return undefined

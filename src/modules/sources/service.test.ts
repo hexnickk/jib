@@ -2,19 +2,10 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
+import { InternalError, NotFoundError, ValidationError } from '@jib/errors'
 import { pathsGetPaths, pathsPathExistsResult, pathsRepoPath } from '@jib/paths'
 import { afterEach, describe, expect, test } from 'vitest'
 import { $ } from 'zx'
-import {
-  SourceDriverNotRegisteredError,
-  SourceLocalCheckoutError,
-  SourceLocalRepoError,
-  SourceMissingAppError,
-  SourceMissingConfigError,
-  SourceProbeError,
-  SourceRemoteResolveError,
-  SourceRemoteSyncError,
-} from './errors.ts'
 import {
   sourcesCloneForInspection,
   sourcesProbe,
@@ -73,10 +64,14 @@ function configFor(repo: string): Config {
   }
 }
 
-function expectSourceValue<T>(result: T | Error | null | undefined): T {
-  if (result instanceof Error) throw result
-  if (result == null) throw new Error('expected source result')
-  return result
+function expectSourceValue<T>(result: T): Exclude<T, Error | null | undefined> {
+  if (result instanceof Error) {
+    throw result
+  }
+  if (result == null) {
+    throw new Error('expected source result')
+  }
+  return result as Exclude<T, Error | null | undefined>
 }
 
 describe('sources service', () => {
@@ -190,9 +185,9 @@ describe('sources service', () => {
       apps: {},
     }
 
-    expect(await sourcesResolve(cfg, paths, { app: 'demo' })).toBeInstanceOf(SourceMissingAppError)
+    expect(await sourcesResolve(cfg, paths, { app: 'demo' })).toBeInstanceOf(NotFoundError)
     expect(await sourcesResolve(cfg, paths, { app: 'demo', repo: 'local' })).toBeInstanceOf(
-      SourceLocalRepoError,
+      ValidationError,
     )
   })
 
@@ -222,10 +217,10 @@ describe('sources service', () => {
     }
 
     expect(await sourcesResolve(missingSourceCfg, paths, { app: 'demo' })).toBeInstanceOf(
-      SourceMissingConfigError,
+      NotFoundError,
     )
     expect(await sourcesResolve(missingDriverCfg, paths, { app: 'demo' })).toBeInstanceOf(
-      SourceDriverNotRegisteredError,
+      ValidationError,
     )
   })
 
@@ -234,7 +229,7 @@ describe('sources service', () => {
     const paths = pathsGetPaths(root)
     const result = await sourcesSync(configFor('local'), paths, { app: 'demo' })
 
-    expect(result).toBeInstanceOf(SourceLocalCheckoutError)
+    expect(result).toBeInstanceOf(InternalError)
     expect(await sourcesProbe(configFor('local'), paths, { app: 'demo' })).toBeNull()
   })
 
@@ -253,7 +248,7 @@ describe('sources service', () => {
       repo: join(root, 'missing-upstream'),
     })
 
-    expect(result).toBeInstanceOf(SourceRemoteResolveError)
+    expect(result).toBeInstanceOf(InternalError)
   })
 
   test('returns a typed remote sync error when clone fails', async () => {
@@ -264,7 +259,7 @@ describe('sources service', () => {
       app: 'demo',
     })
 
-    expect(result).toBeInstanceOf(SourceRemoteSyncError)
+    expect(result).toBeInstanceOf(InternalError)
     expect(await pathsPathExistsResult(pathsRepoPath(paths, 'demo', missingRepo))).toBe(false)
   })
 
@@ -277,10 +272,10 @@ describe('sources service', () => {
       paths,
       { app: 'demo' },
       {
-        lsRemote: async () => new Error('permission denied'),
+        lsRemote: async () => new InternalError('permission denied'),
       },
     )
 
-    expect(result).toBeInstanceOf(SourceProbeError)
+    expect(result).toBeInstanceOf(InternalError)
   })
 })

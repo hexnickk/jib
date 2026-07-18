@@ -1,8 +1,8 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { InternalError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { LockError } from './errors.ts'
 import { stateAcquireLock } from './lock.ts'
 
 async function withDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
@@ -18,7 +18,9 @@ describe('stateAcquireLock', () => {
   test('acquires and releases', async () => {
     await withDir(async (dir) => {
       const release = await stateAcquireLock(dir, 'app1')
-      if (release instanceof Error) throw release
+      if (release instanceof Error) {
+        throw release
+      }
       await release()
     })
   })
@@ -26,8 +28,10 @@ describe('stateAcquireLock', () => {
   test('non-blocking second acquisition fails', async () => {
     await withDir(async (dir) => {
       const release = await stateAcquireLock(dir, 'app1')
-      if (release instanceof Error) throw release
-      expect(await stateAcquireLock(dir, 'app1', { blocking: false })).toBeInstanceOf(LockError)
+      if (release instanceof Error) {
+        throw release
+      }
+      expect(await stateAcquireLock(dir, 'app1', { blocking: false })).toBeInstanceOf(InternalError)
       await release()
     })
   })
@@ -35,10 +39,12 @@ describe('stateAcquireLock', () => {
   test('blocking acquisition times out', async () => {
     await withDir(async (dir) => {
       const release = await stateAcquireLock(dir, 'app1')
-      if (release instanceof Error) throw release
+      if (release instanceof Error) {
+        throw release
+      }
       expect(
         await stateAcquireLock(dir, 'app1', { blocking: true, timeoutMs: 1000 }),
-      ).toBeInstanceOf(LockError)
+      ).toBeInstanceOf(InternalError)
       await release()
     })
   })
@@ -46,10 +52,14 @@ describe('stateAcquireLock', () => {
   test('second acquisition succeeds after release', async () => {
     await withDir(async (dir) => {
       const r1 = await stateAcquireLock(dir, 'app1')
-      if (r1 instanceof Error) throw r1
+      if (r1 instanceof Error) {
+        throw r1
+      }
       await r1()
       const r2 = await stateAcquireLock(dir, 'app1')
-      if (r2 instanceof Error) throw r2
+      if (r2 instanceof Error) {
+        throw r2
+      }
       await r2()
     })
   })
@@ -59,9 +69,11 @@ describe('stateAcquireLock result errors', () => {
   test('returns typed error when the lock is held', async () => {
     await withDir(async (dir) => {
       const release = await stateAcquireLock(dir, 'app1')
-      if (release instanceof Error) throw release
+      if (release instanceof Error) {
+        throw release
+      }
       const result = await stateAcquireLock(dir, 'app1', { blocking: false })
-      expect(result).toBeInstanceOf(LockError)
+      expect(result).toBeInstanceOf(InternalError)
       await release()
     })
   })
@@ -72,7 +84,7 @@ describe('stateAcquireLock result errors', () => {
     try {
       await writeFile(blockedDir, 'not a directory')
       const result = await stateAcquireLock(blockedDir, 'app1')
-      expect(result).toBeInstanceOf(LockError)
+      expect(result).toBeInstanceOf(InternalError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

@@ -1,11 +1,13 @@
+import { InternalError } from '@jib/errors'
 import { tuiLog } from '@jib/tui'
-import { toInitModuleInstallError } from './errors.ts'
-import type { InitModuleInstallError } from './errors.ts'
 import type { ModLike } from './registry.ts'
 import type { InitContext } from './types.ts'
 
+/** Rolls back installed modules after a later install failure, logging cleanup failures once. */
 async function rollbackInstalls(installed: ModLike[], ctx: InitContext): Promise<void> {
-  if (installed.length === 0) return
+  if (installed.length === 0) {
+    return
+  }
 
   tuiLog.warning(`install failed; rolling back ${installed.length} module(s)…`)
   for (const mod of [...installed].reverse()) {
@@ -27,10 +29,11 @@ async function rollbackInstalls(installed: ModLike[], ctx: InitContext): Promise
   }
 }
 
+/** Installs modules transactionally and returns an internal error after rollback on failure. */
 export async function initRunInstallsTx(
   mods: ModLike[],
   ctx: InitContext,
-): Promise<InitModuleInstallError | undefined> {
+): Promise<InternalError | undefined> {
   const installed: ModLike[] = []
 
   for (const mod of mods) {
@@ -43,13 +46,14 @@ export async function initRunInstallsTx(
       const error = await mod.install(ctx)
       if (error instanceof Error) {
         await rollbackInstalls(installed, ctx)
-        return toInitModuleInstallError(mod.manifest.name, error)
+        return new InternalError(error.message, { cause: error })
       }
       tuiLog.success(mod.manifest.name)
       installed.push(mod)
     } catch (error) {
       await rollbackInstalls(installed, ctx)
-      return toInitModuleInstallError(mod.manifest.name, error)
+      const message = error instanceof Error ? error.message : String(error)
+      return new InternalError(message, { cause: error })
     }
   }
 }

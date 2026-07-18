@@ -1,11 +1,11 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { InternalError } from '@jib/errors'
 import { pathsGetPaths } from '@jib/paths'
 import { stateListMigrations, stateOpenDb } from '@jib/state'
 import type { JibDb } from '@jib/state'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { RunMigrationError } from './errors.ts'
 import { runJibMigrations, runJibMigrationsResult } from './index.ts'
 import type { JibMigration, MigrationContext } from './types.ts'
 
@@ -26,7 +26,14 @@ afterEach(async () => {
 })
 
 function migration(id: string, fn: () => void): JibMigration {
-  return { id, description: `test ${id}`, up: async () => fn() }
+  return {
+    id,
+    description: `test ${id}`,
+    async up() {
+      fn()
+      return undefined
+    },
+  }
 }
 
 describe('runJibMigrations', () => {
@@ -65,7 +72,9 @@ describe('runJibMigrations', () => {
     await runJibMigrations(ctx, [migration('x', () => {}), migration('y', () => {})])
     const rows = stateListMigrations(db)
     expect(rows.map((r) => r.id).sort()).toEqual(['x', 'y'])
-    for (const r of rows) expect(r.at).toBeTruthy()
+    for (const r of rows) {
+      expect(r.at).toBeTruthy()
+    }
   })
 
   test('returns typed failure and does not record failed migration', async () => {
@@ -78,8 +87,10 @@ describe('runJibMigrations', () => {
       migration('c', () => log.push('c')),
     ]
     const result = await runJibMigrationsResult(ctx, migs)
-    expect(result).toBeInstanceOf(RunMigrationError)
-    if (!(result instanceof RunMigrationError)) throw new Error('expected RunMigrationError')
+    expect(result).toBeInstanceOf(InternalError)
+    if (!(result instanceof InternalError)) {
+      throw new Error('expected InternalError')
+    }
     expect(result.message).toContain('migration b failed')
     expect(result.message).toContain('boom')
     expect(log).toEqual(['a'])
@@ -87,12 +98,12 @@ describe('runJibMigrations', () => {
     expect(rows.map((r) => r.id)).toEqual(['a'])
   })
 
-  test('compatibility wrapper still throws typed failure', async () => {
-    const result = runJibMigrations(ctx, [
+  test('result wrapper returns a typed failure', async () => {
+    const result = await runJibMigrations(ctx, [
       migration('broken', () => {
         throw new Error('boom')
       }),
     ])
-    await expect(result).rejects.toBeInstanceOf(RunMigrationError)
+    expect(result).toBeInstanceOf(InternalError)
   })
 })

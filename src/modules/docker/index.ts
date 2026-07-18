@@ -28,31 +28,13 @@ export {
 export { dockerFindUnsafeBindMounts, type UnsafeBindMount } from './volume-safety.ts'
 export { dockerComposeFor } from './compose-for.ts'
 export {
-  DockerAppHasNoServicesError,
-  DockerAppNotFoundError,
-  DockerCommandError,
-  DockerDomainServiceNotFoundError,
-  DockerDomainServiceRequiredError,
-  DockerInstallCommandError,
-  DockerInstallReadFileError,
-  DockerInstallUnsupportedPlatformError,
-  DockerInstallWriteFileError,
-  DockerServiceSelectionRequiredError,
-  ExecArgsMissingAppError,
-  ExecArgsMissingCommandError,
-  RunArgsMissingAppError,
-} from './errors.ts'
-export {
   dockerEnsureInstalledResult,
   dockerRuntimeReady,
   type DockerInstallCommandResult,
-  type DockerInstallResultError,
 } from './install.ts'
 export { dockerParseOsRelease, dockerSelectAptRepository } from './install-plan.ts'
 export {
   type ComposeInspection,
-  type ComposeInspectionCode,
-  ComposeInspectionError,
   dockerDiscoverComposeFiles,
   dockerInspectComposeApp,
   dockerResolveFromCompose,

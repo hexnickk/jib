@@ -2,8 +2,8 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { $ } from '@/libs/shell'
+import { InternalError } from '@jib/errors'
 import type { ProcessPromise } from 'zx'
-import { LockError } from './errors.ts'
 
 export interface LockOptions {
   blocking?: boolean
@@ -22,13 +22,13 @@ export async function stateAcquireLock(
   dir: string,
   app: string,
   opts: LockOptions = {},
-): Promise<LockError | Release> {
+): Promise<InternalError | Release> {
   const blocking = opts.blocking ?? true
   const timeoutMs = opts.timeoutMs ?? 30_000
   try {
     await mkdir(dir, { recursive: true, mode: 0o750 })
   } catch (error) {
-    return new LockError(
+    return new InternalError(
       `creating lock dir ${dir}: ${error instanceof Error ? error.message : String(error)}`,
       { cause: error },
     )
@@ -37,7 +37,13 @@ export async function stateAcquireLock(
 
   const flags = blocking ? ['-x', '-w', Math.ceil(timeoutMs / 1000).toString()] : ['-x', '-n']
   const command = ['flock', ...flags, path, 'sh', '-c', 'echo READY; read _']
-  const proc = $({ stdio: ['pipe', 'pipe', 'pipe'], quiet: true })`${command}`
+  let proc: ProcessPromise
+  try {
+    proc = $({ stdio: ['pipe', 'pipe', 'pipe'], quiet: true })`${command}`
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`start lock process for ${app}: ${message}`, { cause: error })
+  }
   const settled = proc.catch(() => undefined)
 
   const ready = await waitForReady(proc.stdout)
@@ -47,7 +53,7 @@ export async function stateAcquireLock(
     const msg = blocking
       ? `timed out waiting for lock on ${app}`
       : `lock on ${app} is held by another process`
-    return new LockError(msg)
+    return new InternalError(msg)
   }
 
   return async () => {
@@ -60,7 +66,9 @@ async function waitForReady(stdout: ProcessPromise['stdout'] | Readable): Promis
   let buf = ''
   for await (const chunk of stdout) {
     buf += chunk.toString()
-    if (buf.includes('READY')) return true
+    if (buf.includes('READY')) {
+      return true
+    }
   }
   return false
 }

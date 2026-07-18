@@ -1,6 +1,6 @@
+import { ValidationError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
 import { configParseDomain, configParseHealth } from './add-parse.ts'
-import { ParseDomainArgError, ParseHealthArgError } from './errors.ts'
 
 describe('add parse helpers', () => {
   test('parseDomain accepts the supported domain syntax', () => {
@@ -19,11 +19,11 @@ describe('add parse helpers', () => {
 
   test('configParseDomain returns a typed error on malformed input', () => {
     const parsed = configParseDomain('host=example.com,port=not-a-number', 'direct')
-    expect(parsed).toBeInstanceOf(ParseDomainArgError)
+    expect(parsed).toBeInstanceOf(ValidationError)
   })
 
   test('configParseHealth parses path and port and rejects malformed input', () => {
     expect(configParseHealth('/health:8080')).toEqual({ path: '/health', port: 8080 })
-    expect(configParseHealth('health:8080')).toBeInstanceOf(ParseHealthArgError)
+    expect(configParseHealth('health:8080')).toBeInstanceOf(ValidationError)
   })
 })

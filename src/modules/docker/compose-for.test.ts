@@ -2,15 +2,17 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
+import { NotFoundError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { afterEach, describe, expect, test } from 'vitest'
 import { dockerComposeFor } from './compose-for.ts'
-import { DockerAppNotFoundError } from './errors.ts'
 
 const tmpDirs: string[] = []
 
 afterEach(() => {
-  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+  for (const dir of tmpDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 function fixture(): { cfg: Config; paths: Paths } {
@@ -52,7 +54,7 @@ describe('dockerComposeFor', () => {
 
     const result = dockerComposeFor(cfg, paths, 'ghost')
 
-    expect(result).toBeInstanceOf(DockerAppNotFoundError)
+    expect(result).toBeInstanceOf(NotFoundError)
   })
 
   test('builds compose config from app config and existing env file', () => {
@@ -63,8 +65,10 @@ describe('dockerComposeFor', () => {
 
     const result = dockerComposeFor(cfg, paths, 'demo')
 
-    expect(result).not.toBeInstanceOf(DockerAppNotFoundError)
-    if (result instanceof DockerAppNotFoundError) return
+    expect(result).not.toBeInstanceOf(NotFoundError)
+    if (result instanceof NotFoundError) {
+      return
+    }
     expect(result.cfg.files).toEqual([join(paths.reposDir, 'local', 'demo', 'compose.yml')])
     expect(result.cfg.envFile).toBe(join(paths.secretsDir, 'demo', '.env'))
     expect(result.cfg.override).toBe(join(paths.overridesDir, 'demo.yml'))

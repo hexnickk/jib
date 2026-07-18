@@ -1,5 +1,5 @@
+import { ValidationError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { IngressMissingPortError } from './errors.ts'
 import { ingressBuildClaim, ingressClaim } from './service.ts'
 
 describe('ingress service', () => {
@@ -37,7 +37,7 @@ describe('ingress service', () => {
       domains: [{ host: 'web.example.com', ingress: 'direct' }],
     })
 
-    expect(claim).toBeInstanceOf(IngressMissingPortError)
+    expect(claim).toBeInstanceOf(ValidationError)
     expect(claim).toMatchObject({
       message: 'ingress port missing for app "web" domain "web.example.com"',
     })
@@ -57,6 +57,6 @@ describe('ingress service', () => {
       },
     )
 
-    expect(result).toBeInstanceOf(IngressMissingPortError)
+    expect(result).toBeInstanceOf(ValidationError)
   })
 })

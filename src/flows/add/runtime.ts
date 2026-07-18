@@ -1,13 +1,9 @@
 import type { DeployRunResult } from '@/flows/deploy/run.ts'
-import {
-  RemoveMissingAppError,
-  RemoveWriteConfigError,
-  removeApp,
-  removeCreateSupport,
-} from '@/flows/remove/index.ts'
+import { removeApp, removeCreateSupport } from '@/flows/remove/index.ts'
 import { CliError, cliIsTextOutput } from '@jib/cli'
-import { configLoad } from '@jib/config'
 import type { App, Config } from '@jib/config'
+import { configLoad } from '@jib/config'
+import { InternalError, type JibError, NotFoundError } from '@jib/errors'
 import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
@@ -18,6 +14,7 @@ export interface InterruptTrap {
   dispose(): void
 }
 
+/** Renders a completed add-and-deploy result for the command output contract. */
 export function addRenderResult(
   app: string,
   repo: string,
@@ -58,7 +55,8 @@ export function addRenderResult(
   }
 }
 
-export function addNormalizeDeployError(error: unknown, app: string, configFile: string): Error {
+/** Adds rollback guidance to an add/deploy failure at the command boundary. */
+export function addNormalizeDeployError(error: unknown, app: string, configFile: string): CliError {
   const rollbackHint = `rolled back ${app} from ${configFile}; safe to retry: jib add ...`
   const message =
     error instanceof CliError && error.code === 'cancelled'
@@ -75,12 +73,13 @@ export function addNormalizeDeployError(error: unknown, app: string, configFile:
   )
 }
 
+/** Removes an app created by a failed add attempt, treating a missing app as already rolled back. */
 export async function addRollbackApp(
   paths: Paths,
   app: string,
   originalCfg: Config,
   finalApp: App,
-): Promise<undefined | Error> {
+): Promise<JibError | undefined> {
   const cfgResult = await configLoad(paths.configFile)
   const cfg =
     cfgResult instanceof Error
@@ -89,7 +88,9 @@ export async function addRollbackApp(
           apps: { ...originalCfg.apps, [app]: finalApp },
         }
       : cfgResult
-  if (!cfg.apps[app]) return undefined
+  if (!cfg.apps[app]) {
+    return undefined
+  }
   const result = await removeApp(
     {
       support: removeCreateSupport({
@@ -100,11 +101,16 @@ export async function addRollbackApp(
     },
     { appName: app, cfg, configFile: paths.configFile, quiet: !cliIsTextOutput() },
   )
-  if (result instanceof RemoveMissingAppError) return undefined
-  if (result instanceof RemoveWriteConfigError) return result
+  if (result instanceof NotFoundError) {
+    return undefined
+  }
+  if (result instanceof InternalError) {
+    return result
+  }
   return undefined
 }
 
+/** Installs SIGINT and SIGTERM handlers that allow the flow to observe cancellation safely. */
 export function addTrapInterrupt(): InterruptTrap {
   let interrupted = false
   const markInterrupted = () => {

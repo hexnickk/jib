@@ -1,6 +1,6 @@
 import type { App, Config } from '@jib/config'
+import { NotFoundError, ValidationError } from '@jib/errors'
 import { githubDriver } from './backend/github/driver.ts'
-import { SourceDriverNotRegisteredError, SourceMissingConfigError } from './errors.ts'
 import type { SourceDriver } from './types.ts'
 
 const DRIVERS = new Map<string, SourceDriver>([[githubDriver.name, githubDriver]])
@@ -13,18 +13,19 @@ export function sourceDriver(name: string): SourceDriver | undefined {
   return DRIVERS.get(name)
 }
 
+/** Resolves the configured source driver or returns a shared input/absence error. */
 export function resolveSourceDriverResult(
   cfg: Config,
   app: App,
-): SourceDriver | SourceDriverNotRegisteredError | SourceMissingConfigError {
+): SourceDriver | NotFoundError | ValidationError {
   const sourceName = app.source
   const name = sourceName ? cfg.sources[sourceName]?.driver : 'github'
   if (!name) {
-    return new SourceMissingConfigError(sourceName ?? 'unknown')
+    return new NotFoundError(`source "${sourceName ?? 'unknown'}" not found in config`)
   }
   const driver = sourceDriver(name)
   if (!driver) {
-    return new SourceDriverNotRegisteredError(name)
+    return new ValidationError(`source driver "${name}" is not registered`)
   }
   return driver
 }

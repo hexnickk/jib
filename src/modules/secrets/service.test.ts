@@ -1,8 +1,8 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { InternalError, NotFoundError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { SecretsReadError, SecretsStatError, SecretsWriteError } from './errors.ts'
 import { secretsCheckApp, secretsReadMasked, secretsRemove, secretsUpsert } from './service.ts'
 
 async function withSecretsDir<T>(fn: (ctx: { secretsDir: string }) => Promise<T>): Promise<T> {
@@ -21,7 +21,7 @@ describe('secrets service', () => {
     try {
       await writeFile(secretsDir, 'not a dir')
       const result = await secretsUpsert({ secretsDir }, 'web', 'A', '1')
-      expect(result).toBeInstanceOf(SecretsWriteError)
+      expect(result).toBeInstanceOf(InternalError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -33,7 +33,7 @@ describe('secrets service', () => {
     try {
       await writeFile(secretsDir, 'not a dir')
       const result = await secretsCheckApp({ secretsDir }, 'web')
-      expect(result).toBeInstanceOf(SecretsStatError)
+      expect(result).toBeInstanceOf(InternalError)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -42,7 +42,7 @@ describe('secrets service', () => {
   test('secretsReadMasked returns a typed read error when the env file is missing', async () => {
     await withSecretsDir(async (ctx) => {
       const result = await secretsReadMasked(ctx, 'web')
-      expect(result).toBeInstanceOf(SecretsReadError)
+      expect(result).toBeInstanceOf(NotFoundError)
     })
   })
 

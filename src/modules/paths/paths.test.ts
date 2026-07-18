@@ -1,8 +1,8 @@
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { InternalError } from '@jib/errors'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { EnsureCredsDirError, PathLookupError } from './errors.ts'
 import {
   pathsCredsPath,
   pathsEnsureCredsDirResult,
@@ -17,7 +17,9 @@ const tempRoots: string[] = []
 afterEach(async () => {
   while (tempRoots.length > 0) {
     const root = tempRoots.pop()
-    if (root) await rm(root, { recursive: true, force: true })
+    if (root) {
+      await rm(root, { recursive: true, force: true })
+    }
   }
 })
 
@@ -34,8 +36,11 @@ describe('pathsGetPaths', () => {
     Reflect.deleteProperty(process.env, 'JIB_ROOT')
   })
   afterEach(() => {
-    if (prev === undefined) Reflect.deleteProperty(process.env, 'JIB_ROOT')
-    else process.env.JIB_ROOT = prev
+    if (prev === undefined) {
+      Reflect.deleteProperty(process.env, 'JIB_ROOT')
+    } else {
+      process.env.JIB_ROOT = prev
+    }
   })
 
   test('default root is /opt/jib', () => {
@@ -101,7 +106,9 @@ describe('pathsEnsureCredsDirResult', () => {
     const p = pathsGetPaths(root)
 
     const dir = await pathsEnsureCredsDirResult(p, 'github-app')
-    if (dir instanceof Error) throw dir
+    if (dir instanceof Error) {
+      throw dir
+    }
     const info = await stat(dir)
 
     expect(dir).toBe(join(root, 'secrets', '_jib', 'github-app'))
@@ -116,8 +123,8 @@ describe('pathsEnsureCredsDirResult', () => {
 
     const result = await pathsEnsureCredsDirResult(p, 'github-app')
 
-    expect(result).toBeInstanceOf(EnsureCredsDirError)
-    if (result instanceof EnsureCredsDirError) {
+    expect(result).toBeInstanceOf(InternalError)
+    if (result instanceof InternalError) {
       expect(result.cause).toBeInstanceOf(Error)
       expect(result.message).toContain('github-app')
     }
@@ -152,8 +159,8 @@ describe('pathsPathExistsResult', () => {
     try {
       const result = await pathsPathExistsResult(target)
 
-      expect(result).toBeInstanceOf(PathLookupError)
-      if (result instanceof PathLookupError) {
+      expect(result).toBeInstanceOf(InternalError)
+      if (result instanceof InternalError) {
         expect(result.cause).toBeInstanceOf(Error)
       }
     } finally {

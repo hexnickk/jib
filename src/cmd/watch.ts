@@ -19,14 +19,13 @@ const cliWatchCommand = {
 async function watchRunCommand(args: ArgumentsCamelCase<{ once?: boolean }>) {
   const paths = pathsGetPaths()
   const log = loggingCreateLogger('watch')
-  const getConfig = async () => {
-    const config = await configLoad(paths.configFile)
-    if (config instanceof Error) throw config
-    return config
-  }
+  const getConfig = () => configLoad(paths.configFile)
 
   if (args.once) {
-    await watcherRunPollCycle({ paths, getConfig, log })
+    const result = await watcherRunPollCycle({ paths, getConfig, log })
+    if (result instanceof Error) {
+      return result
+    }
     return { ran: true }
   }
 
@@ -34,7 +33,7 @@ async function watchRunCommand(args: ArgumentsCamelCase<{ once?: boolean }>) {
   const shutdown = () => abort.abort()
   process.once('SIGTERM', shutdown)
   process.once('SIGINT', shutdown)
-  await watcherRunPoller({ paths, getConfig, log }, abort.signal)
+  return await watcherRunPoller({ paths, getConfig, log }, abort.signal)
 }
 
 export default cliWatchCommand

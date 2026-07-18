@@ -18,7 +18,9 @@ const cliDeployCommand = {
 async function deployRunCommand(args: ArgumentsCamelCase<{ app: string; ref?: string }>) {
   const appName = String(args.app)
   const loaded = await configLoadAppContext(appName)
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const { cfg, paths } = loaded
   const result = await runDeploy(
     cfg,
@@ -26,6 +28,9 @@ async function deployRunCommand(args: ArgumentsCamelCase<{ app: string; ref?: st
     appName,
     typeof args.ref === 'string' ? args.ref : undefined,
   )
+  if (result instanceof Error) {
+    return result
+  }
   if (cliIsTextOutput()) {
     consola.success(`${appName} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
   }

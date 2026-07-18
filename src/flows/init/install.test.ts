@@ -1,4 +1,5 @@
 import type { Config } from '@jib/config'
+import { InternalError } from '@jib/errors'
 import { loggingCreateLogger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
 import { describe, expect, test, vi } from 'vitest'
@@ -10,7 +11,6 @@ vi.mock('@jib/tui', () => ({
     warning() {},
   },
 }))
-import { InitModuleInstallError } from './errors.ts'
 import { initRunInstallsTx } from './install.ts'
 import type { ModLike } from './registry.ts'
 import type { InitContext } from './types.ts'
@@ -34,8 +34,12 @@ function mod(
   uninstall?: ModLike['uninstall'],
 ): ModLike {
   const result: ModLike = { manifest: { name } }
-  if (install) result.install = install
-  if (uninstall) result.uninstall = uninstall
+  if (install) {
+    result.install = install
+  }
+  if (uninstall) {
+    result.uninstall = uninstall
+  }
   return result
 }
 
@@ -106,7 +110,7 @@ describe('initRunInstallsTx', () => {
 
     const error = await initRunInstallsTx(mods, ctx)
 
-    expect(error).toBeInstanceOf(InitModuleInstallError)
+    expect(error).toBeInstanceOf(InternalError)
     expect(error?.message).toBe('c blew up')
     expect(log).toEqual(['install:a', 'install:b', 'install:c', 'uninstall:b', 'uninstall:a'])
   })
@@ -143,7 +147,7 @@ describe('initRunInstallsTx', () => {
 
     const error = await initRunInstallsTx(mods, ctx)
 
-    expect(error).toBeInstanceOf(InitModuleInstallError)
+    expect(error).toBeInstanceOf(InternalError)
     expect(error?.message).toBe('c blew up')
     expect(log).toEqual(['install:a', 'install:b', 'uninstall:b:fail', 'uninstall:a'])
   })
@@ -170,7 +174,7 @@ describe('initRunInstallsTx', () => {
 
     const error = await initRunInstallsTx(mods, ctx)
 
-    expect(error).toBeInstanceOf(InitModuleInstallError)
+    expect(error).toBeInstanceOf(InternalError)
     expect(error?.message).toBe('c blew up')
     expect(log).toEqual(['install:b', 'uninstall:b'])
   })
@@ -189,7 +193,7 @@ describe('initRunInstallsTx', () => {
 
     const error = await initRunInstallsTx(mods, ctx)
 
-    expect(error).toBeInstanceOf(InitModuleInstallError)
+    expect(error).toBeInstanceOf(InternalError)
     expect(error?.message).toBe('b blew up')
     expect(log).toEqual(['install:a'])
   })
@@ -201,6 +205,6 @@ describe('initRunInstallsTx', () => {
       }),
     ]
 
-    expect(await initRunInstallsTx(mods, ctx)).toBeInstanceOf(InitModuleInstallError)
+    expect(await initRunInstallsTx(mods, ctx)).toBeInstanceOf(InternalError)
   })
 })

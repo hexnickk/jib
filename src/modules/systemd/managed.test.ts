@@ -1,6 +1,7 @@
 import type { Config } from '@jib/config'
+import { InternalError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { SystemdServiceStartError, systemdStartConfiguredManagedServicesResult } from './index.ts'
+import { systemdStartConfiguredManagedServicesResult } from './index.ts'
 
 function configWith(modules: Record<string, boolean>): Config {
   return { config_version: 3, poll_interval: '5m', modules, sources: {}, apps: {} } as Config
@@ -57,7 +58,7 @@ describe('systemdStartConfiguredManagedServicesResult', () => {
       },
     })
 
-    expect(error).toBeInstanceOf(SystemdServiceStartError)
+    expect(error).toBeInstanceOf(InternalError)
     expect(error?.message).toContain('docker missing')
   })
 })

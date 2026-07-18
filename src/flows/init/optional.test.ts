@@ -1,7 +1,8 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type Config, ConfigError, configLoad, configWrite } from '@jib/config'
+import { type Config, configLoad, configWrite } from '@jib/config'
+import { InternalError, JibError } from '@jib/errors'
 import { pathsGetPaths } from '@jib/paths'
 import { describe, expect, test, vi } from 'vitest'
 
@@ -12,17 +13,14 @@ vi.mock('@jib/tui', () => ({
     warning() {},
   },
 }))
-import {
-  InitModuleInstallError,
-  OptionalModuleChoicePersistError,
-  OptionalModuleSetupError,
-} from './errors.ts'
 import { initConfigureOptionalModules, initPersistModuleChoice } from './optional.ts'
 import type { ModLike } from './registry.ts'
 
 async function readConfig(file: string): Promise<Config> {
   const result = await configLoad(file)
-  if (result instanceof ConfigError) throw result
+  if (result instanceof Error) {
+    throw result
+  }
   return result
 }
 
@@ -63,7 +61,7 @@ describe('optional module configuration', () => {
       ).toBeUndefined()
 
       const updated = await initPersistModuleChoice(file, 'cloudflared', true)
-      if (updated instanceof OptionalModuleChoicePersistError) {
+      if (updated instanceof JibError) {
         throw new Error('expected updated config')
       }
       expect(updated.modules.cloudflared).toBe(true)
@@ -78,9 +76,9 @@ describe('optional module configuration', () => {
       },
     })
 
-    expect(error).toBeInstanceOf(OptionalModuleChoicePersistError)
-    if (!(error instanceof OptionalModuleChoicePersistError)) {
-      throw new Error('expected OptionalModuleChoicePersistError')
+    expect(error).toBeInstanceOf(InternalError)
+    if (!(error instanceof InternalError)) {
+      throw new Error('expected InternalError')
     }
     expect(error.message).toBe('config missing')
   })
@@ -134,9 +132,9 @@ describe('optional module configuration', () => {
         resolveModuleSetup: () => async () => false,
       })
 
-      expect(error).toBeInstanceOf(OptionalModuleSetupError)
-      if (!(error instanceof OptionalModuleSetupError)) {
-        throw new Error('expected OptionalModuleSetupError')
+      expect(error).toBeInstanceOf(InternalError)
+      if (!(error instanceof InternalError)) {
+        throw new Error('expected InternalError')
       }
       expect(error.message).toBe('cloudflared setup did not complete')
       expect(calls).toEqual(['install', 'uninstall'])
@@ -156,9 +154,9 @@ describe('optional module configuration', () => {
         resolveModuleSetup: () => async () => false,
       })
 
-      expect(error).toBeInstanceOf(OptionalModuleSetupError)
-      if (!(error instanceof OptionalModuleSetupError)) {
-        throw new Error('expected OptionalModuleSetupError')
+      expect(error).toBeInstanceOf(InternalError)
+      if (!(error instanceof InternalError)) {
+        throw new Error('expected InternalError')
       }
       expect(error.message).toBe('cloudflared setup did not complete')
 
@@ -186,9 +184,9 @@ describe('optional module configuration', () => {
             : undefined,
       })
 
-      expect(error).toBeInstanceOf(OptionalModuleSetupError)
-      if (!(error instanceof OptionalModuleSetupError)) {
-        throw new Error('expected OptionalModuleSetupError')
+      expect(error).toBeInstanceOf(InternalError)
+      if (!(error instanceof InternalError)) {
+        throw new Error('expected InternalError')
       }
       expect(error.message).toBe('stop after saving source')
 
@@ -216,12 +214,11 @@ describe('optional module configuration', () => {
         },
       })
 
-      expect(error).toBeInstanceOf(InitModuleInstallError)
-      if (!(error instanceof InitModuleInstallError)) {
-        throw new Error('expected InitModuleInstallError')
+      expect(error).toBeInstanceOf(InternalError)
+      if (!(error instanceof InternalError)) {
+        throw new Error('expected InternalError')
       }
-      expect(error.message).toBe('install dependency blew up')
-      expect(error.moduleName).toBe('cloudflared')
+      expect(error.message).toContain('install dependency blew up')
     })
   })
 
@@ -235,7 +232,7 @@ describe('optional module configuration', () => {
           promptOptionalModule: async () => true,
           resolveModuleSetup: () => async () => false,
         }),
-      ).toBeInstanceOf(OptionalModuleSetupError)
+      ).toBeInstanceOf(InternalError)
     })
   })
 })
