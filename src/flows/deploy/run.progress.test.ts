@@ -1,8 +1,8 @@
 import type { Config } from '@jib/config'
 import { InternalError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
-import { describe, expect, test } from 'vitest'
-import { runDeploy, runDeployResult } from './run.ts'
+import { describe, expect, test, vi } from 'vitest'
+import { runDeploy } from './run.ts'
 
 const cfg: Config = {
   config_version: 3,
@@ -39,7 +39,7 @@ function createNoopSpinner() {
 
 describe('runDeploy progress', () => {
   test('returns an internal error when deploy throws before returning a promise', async () => {
-    const result = await runDeployResult(cfg, paths, 'demo', undefined, {
+    const result = await runDeploy(cfg, paths, 'demo', undefined, {
       createSpinner: createNoopSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: () => {
@@ -49,6 +49,25 @@ describe('runDeploy progress', () => {
 
     expect(result).toBeInstanceOf(InternalError)
     expect(result).toMatchObject({ code: 'internal', message: 'engine setup failed' })
+  })
+
+  test('stops deployment progress when dependency construction throws', async () => {
+    const failure = new Error('engine setup failed')
+    const stop = vi.fn()
+    const result = await runDeploy(cfg, paths, 'demo', undefined, {
+      createSpinner: () => ({ ...createNoopSpinner(), stop }),
+      sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
+      createDeps: () => {
+        throw failure
+      },
+    })
+
+    expect(result).toBeInstanceOf(InternalError)
+    expect(result).toHaveProperty('cause', failure)
+    expect(stop.mock.calls).toEqual([
+      ['[1/2] repo ready @ 12345678'],
+      ['[2/2] failed to deploy demo'],
+    ])
   })
 
   test('reports spinner start, progress, and stop messages in order', async () => {

@@ -65,39 +65,14 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
     args: string[],
     opts: { env?: Record<string, string>; tty?: boolean; capture?: boolean } = {},
   ): Promise<InternalError | undefined> {
-    const callOpts: Parameters<DockerExec>[1] = { cwd: cfg.dir }
-    if (opts.env) {
-      callOpts.env = opts.env
-    }
-    if (opts.tty) {
-      callOpts.tty = true
-    }
-    if (opts.capture) {
-      callOpts.capture = true
-    }
     try {
-      const result = await runner(args, callOpts)
+      const result = await runner(args, { cwd: cfg.dir, ...opts })
       if (result.exitCode !== 0) {
         const detail = result.stderr || result.stdout
         return new InternalError(
           `${args.slice(0, 4).join(' ')} exited ${result.exitCode}: ${detail}`,
         )
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      return new InternalError(`${args.slice(0, 4).join(' ')} failed: ${message}`, { cause: error })
-    }
-  }
-
-  async function capture(args: string[]): Promise<ExecResult | InternalError> {
-    try {
-      const result = await runner(args, { cwd: cfg.dir, capture: true })
-      if (result.exitCode !== 0) {
-        return new InternalError(
-          `${args.slice(0, 4).join(' ')} exited ${result.exitCode}: ${result.stderr}`,
-        )
-      }
-      return result
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       return new InternalError(`${args.slice(0, 4).join(' ')} failed: ${message}`, { cause: error })
@@ -168,7 +143,21 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
       return runResult(args)
     },
     async ps() {
-      return capture(['docker', ...baseArgs(), 'ps', '--format', 'json'])
+      const args = ['docker', ...baseArgs(), 'ps', '--format', 'json']
+      try {
+        const result = await runner(args, { cwd: cfg.dir, capture: true })
+        if (result.exitCode !== 0) {
+          return new InternalError(
+            `${args.slice(0, 4).join(' ')} exited ${result.exitCode}: ${result.stderr}`,
+          )
+        }
+        return result
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return new InternalError(`${args.slice(0, 4).join(' ')} failed: ${message}`, {
+          cause: error,
+        })
+      }
     },
   }
 }

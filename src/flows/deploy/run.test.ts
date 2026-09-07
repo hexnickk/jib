@@ -1,8 +1,8 @@
 import type { Config } from '@jib/config'
-import { InternalError } from '@jib/errors'
+import { InternalError, NotFoundError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { describe, expect, test } from 'vitest'
-import { runDeploy, runDeployResult } from './run.ts'
+import { runDeploy } from './run.ts'
 
 const cfg: Config = {
   config_version: 3,
@@ -66,17 +66,39 @@ describe('runDeploy', () => {
     expect(result).toMatchObject({ code: 'internal', message: 'git clone failed' })
   })
 
-  test('returns an internal error instead of throwing for expected sync failures', async () => {
-    const result = await runDeployResult(cfg, paths, 'demo', undefined, {
-      createSpinner: createNoopSpinner,
-      sync: async () => {
-        throw new Error('git clone failed')
-      },
-    })
+  test.each([new InternalError('git clone failed'), new NotFoundError('repo not found')])(
+    'wraps returned source failures with their original cause: $message',
+    async (failure) => {
+      const result = await runDeploy(cfg, paths, 'demo', undefined, {
+        createSpinner: createNoopSpinner,
+        sync: async () => failure,
+      })
 
-    expect(result).toBeInstanceOf(InternalError)
-    expect(result).toMatchObject({ code: 'internal', message: 'git clone failed' })
-  })
+      expect(result).toBeInstanceOf(InternalError)
+      expect(result).not.toBe(failure)
+      expect(result).toHaveProperty('message', failure.message)
+      expect(result).toHaveProperty('cause', failure)
+    },
+  )
+
+  test.each([new InternalError('build failed'), new NotFoundError('app not found')])(
+    'preserves internal deploy errors and wraps other returned errors: $message',
+    async (failure) => {
+      const result = await runDeploy(cfg, paths, 'demo', undefined, {
+        createSpinner: createNoopSpinner,
+        sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
+        deployPrepared: async () => failure,
+      })
+
+      expect(result).toBeInstanceOf(InternalError)
+      expect(result).toHaveProperty('message', failure.message)
+      if (failure instanceof InternalError) {
+        expect(result).toBe(failure)
+      } else {
+        expect(result).toHaveProperty('cause', failure)
+      }
+    },
+  )
 
   test('returns permission failures as internal errors', async () => {
     const result = await runDeploy(cfg, paths, 'demo', undefined, {

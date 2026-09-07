@@ -3,45 +3,34 @@ import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { NotFoundError } from '@jib/errors'
 import { type Paths, pathsRepoPath } from '@jib/paths'
-import { type ComposeConfig, type DockerCompose, dockerCreateCompose } from './compose.ts'
+import { type DockerCompose, dockerCreateCompose } from './compose.ts'
+import type { DockerExec } from './exec.ts'
 import { dockerOverridePath } from './override.ts'
 
-/**
- * Build a docker-compose handle for `app` from loaded config + resolved
- * paths. Mirrors the Go `newCompose` helper: resolves the app's workdir,
- * stitches together declared compose files, and points at jib's managed
- * override file.
- *
- * `--env-file` is only set if the managed secrets file exists on disk —
- * docker compose errors out when pointed at a missing file, and most apps
- * don't need secrets.
- */
+/** Resolves one app's Compose files, workdir, override, and optional managed env file. */
 export function dockerComposeFor(
   cfg: Config,
   paths: Paths,
   app: string,
+  options: { workdir?: string; exec?: DockerExec } = {},
 ): DockerCompose | NotFoundError {
   const appCfg = cfg.apps[app]
   if (!appCfg) {
     return new NotFoundError(`app "${app}" not found in config`)
   }
 
-  const dir = pathsRepoPath(paths, app, appCfg.repo)
+  const dir = options.workdir ?? pathsRepoPath(paths, app, appCfg.repo)
   const files = (
     appCfg.compose && appCfg.compose.length > 0 ? appCfg.compose : ['docker-compose.yml']
-  ).map((f) => (f.startsWith('/') ? f : join(dir, f)))
+  ).map((file) => (file.startsWith('/') ? file : join(dir, file)))
+  const envFile = join(paths.secretsDir, app, '.env')
 
-  const envFileCandidate = join(paths.secretsDir, app, '.env')
-  const envFile = existsSync(envFileCandidate) ? envFileCandidate : undefined
-
-  const config: ComposeConfig = {
+  return dockerCreateCompose({
     app,
     dir,
     files,
     override: dockerOverridePath(paths.overridesDir, app),
-  }
-  if (envFile) {
-    config.envFile = envFile
-  }
-  return dockerCreateCompose(config)
+    ...(existsSync(envFile) ? { envFile } : {}),
+    ...(options.exec ? { exec: options.exec } : {}),
+  })
 }

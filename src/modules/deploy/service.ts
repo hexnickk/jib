@@ -1,6 +1,6 @@
-import { type JibError, NotFoundError } from '@jib/errors'
+import { InternalError, type JibError, NotFoundError, errorsToJibError } from '@jib/errors'
+import { stateAcquireLock, stateRecordFailure } from '@jib/state'
 import { deployResolveAppCompose, deployRunFlow } from './flow.ts'
-import { deployAcquireLock, deployRecordFailure, deployReleaseLock } from './support.ts'
 import type { DeployCmd, DeployDeps, DeployResult, ProgressCtx } from './types.ts'
 
 export { MIN_DISK_BYTES } from './types.ts'
@@ -18,22 +18,27 @@ export async function deployApp(
   }
 
   progress.emit('lock', `acquiring lock for ${cmd.app}`)
-  const release = await deployAcquireLock(deps, cmd.app)
+  const release = await stateAcquireLock(deps.paths.locksDir, cmd.app, { blocking: false })
   if (release instanceof Error) {
-    return release
+    return new InternalError(`acquire lock for ${cmd.app}: ${release.message}`, { cause: release })
   }
 
   const result = await deployRunFlow(deps, cmd, appCfg, progress)
   if (result instanceof Error) {
     deps.log.error(`deploy ${cmd.app} failed: ${result.message}`)
-    const recordFailureError = await deployRecordFailure(deps, cmd.app, result.message)
+    const recordFailureError = await stateRecordFailure(deps.store, cmd.app, result.message)
     if (recordFailureError) {
       deps.log.error(`deploy ${cmd.app} failure state update failed: ${recordFailureError.message}`)
     }
   }
 
-  const releaseError = await deployReleaseLock(cmd.app, release)
-  if (releaseError) {
+  try {
+    await release()
+  } catch (error) {
+    const cause = errorsToJibError(error)
+    const releaseError = new InternalError(`release lock for ${cmd.app}: ${cause.message}`, {
+      cause,
+    })
     if (!(result instanceof Error)) {
       return releaseError
     }

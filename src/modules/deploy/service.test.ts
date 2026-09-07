@@ -2,11 +2,11 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '@jib/config'
-import type { DockerExec, ExecResult } from '@jib/docker'
+import { type DockerExec, type ExecResult, dockerComposeFor } from '@jib/docker'
 import { InternalError, NotFoundError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import { pathsGetPaths, pathsRepoPath } from '@jib/paths'
-import { stateCreateStore, stateLoad } from '@jib/state'
+import { stateAcquireLock, stateCreateStore, stateLoad } from '@jib/state'
 import { describe, expect, test } from 'vitest'
 import { deployApp, deployUpApp } from './service.ts'
 
@@ -54,12 +54,17 @@ async function mkImageOnlyWorkdir(): Promise<string> {
 
 interface Call {
   args: string[]
+  cwd?: string
   env?: Record<string, string>
 }
 
 function fakeExec(calls: Call[], exitCode = 0): DockerExec {
   return async (args, opts): Promise<ExecResult> => {
-    calls.push({ args: [...args], ...(opts.env ? { env: opts.env } : {}) })
+    calls.push({
+      args: [...args],
+      ...(opts.cwd ? { cwd: opts.cwd } : {}),
+      ...(opts.env ? { env: opts.env } : {}),
+    })
     return { stdout: '', stderr: '', exitCode }
   }
 }
@@ -192,6 +197,45 @@ describe('deployApp', () => {
     expect(result).toBeInstanceOf(InternalError)
   })
 
+  test.each([
+    new InternalError('disk unavailable'),
+    new Error('disk unavailable'),
+    'disk unavailable',
+  ])('records disk probe failures and releases the lock: %s', async (failure) => {
+    const { paths, store, log } = await mkEnv()
+    const workdir = await mkWorkdir()
+    const result = await deployApp(
+      {
+        config: mkCfg(),
+        paths,
+        store,
+        log,
+        diskFree: async () => {
+          throw failure
+        },
+        dockerExec: fakeExec([]),
+      },
+      { app: 'demo', workdir, sha: 'x', trigger: 'manual' },
+      noProgress,
+    )
+
+    expect(result).toBeInstanceOf(InternalError)
+    if (failure instanceof InternalError) {
+      expect(result).toBe(failure)
+    } else {
+      expect(result).toHaveProperty('cause', failure)
+    }
+    expect(await stateLoad(store, 'demo')).toMatchObject({
+      last_deploy_status: 'failure',
+      last_deploy_error: 'disk unavailable',
+    })
+    const release = await stateAcquireLock(paths.locksDir, 'demo', { blocking: false })
+    if (release instanceof Error) {
+      throw release
+    }
+    await release()
+  })
+
   test('build failure records the failure in last-deploy state', async () => {
     const { paths, store, log } = await mkEnv()
     const calls: Call[] = []
@@ -279,6 +323,53 @@ describe('deployApp', () => {
   })
 })
 describe('deployUpApp', () => {
+  test('uses the direct-command runtime for compose execution', async () => {
+    const { paths, store, log } = await mkEnv()
+    const cfg = mkCfg()
+    const workdir = pathsRepoPath(paths, 'demo', 'local')
+    await mkdir(workdir, { recursive: true })
+    await writeFile(join(workdir, 'docker-compose.yml'), 'services:\n  web:\n    image: nginx\n')
+    await mkdir(join(paths.secretsDir, 'demo'), { recursive: true })
+    await writeFile(join(paths.secretsDir, 'demo', '.env'), 'KEY=value\n')
+    const calls: Call[] = []
+
+    const result = await deployUpApp(
+      {
+        config: cfg,
+        paths,
+        store,
+        log,
+        dockerExec: fakeExec(calls),
+      },
+      'demo',
+    )
+    if (result instanceof Error) {
+      throw result
+    }
+
+    const directCompose = dockerComposeFor(cfg, paths, 'demo')
+    if (directCompose instanceof Error) {
+      throw directCompose
+    }
+    const envFile = directCompose.cfg.envFile
+    if (!envFile) {
+      throw new Error('expected managed env file')
+    }
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.cwd).toBe(directCompose.cfg.dir)
+    expect(calls[0]?.args).toEqual([
+      'docker',
+      ...directCompose.baseArgs(),
+      '--env-file',
+      envFile,
+      'up',
+      '-d',
+      '--force-recreate',
+      '--remove-orphans',
+    ])
+  })
+
   test('refreshes stale override when app has no domains', async () => {
     const { paths, store, log } = await mkEnv()
     const cfg = mkCfg()

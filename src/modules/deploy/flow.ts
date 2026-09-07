@@ -1,17 +1,15 @@
 import type { App } from '@jib/config'
-import { dockerAllHealthy, dockerCheckHealth, dockerHasBuildServices } from '@jib/docker'
-import { InternalError, type JibError, NotFoundError } from '@jib/errors'
-import { pathsRepoPath } from '@jib/paths'
-import type { AppState } from '@jib/state'
 import {
-  deployCoerceError,
-  deployLinkSecrets,
-  deployNewCompose,
-  deployReadDiskFree,
-  deployReadState,
-  deploySyncOverride,
-  deployWriteState,
-} from './support.ts'
+  type DockerCompose,
+  dockerAllHealthy,
+  dockerCheckHealth,
+  dockerComposeFor,
+  dockerHasBuildServices,
+} from '@jib/docker'
+import { InternalError, type JibError, NotFoundError, errorsToJibError } from '@jib/errors'
+import { pathsRepoPath } from '@jib/paths'
+import { type AppState, stateLoad, stateSave } from '@jib/state'
+import { deployLinkSecrets, deployReadDiskFree, deploySyncOverride } from './support.ts'
 import type { DeployCmd, DeployDeps, DeployResult, ProgressCtx } from './types.ts'
 import { MIN_DISK_BYTES } from './types.ts'
 
@@ -33,7 +31,7 @@ export async function deployRunFlow(
     return new InternalError(`insufficient disk space: ${free} bytes free`)
   }
 
-  const prevState = await deployReadState(deps.store, cmd.app)
+  const prevState = await stateLoad(deps.store, cmd.app)
   if (prevState instanceof Error) {
     return prevState
   }
@@ -49,7 +47,13 @@ export async function deployRunFlow(
   }
 
   try {
-    const compose = deployNewCompose(deps, cmd.app, appCfg, cmd.workdir)
+    const compose = dockerComposeFor(deps.config, deps.paths, cmd.app, {
+      workdir: cmd.workdir,
+      ...(deps.dockerExec ? { exec: deps.dockerExec } : {}),
+    })
+    if (compose instanceof Error) {
+      return compose
+    }
     if (dockerHasBuildServices(cmd.workdir, appCfg.compose ?? [])) {
       progress.emit('build', `building ${cmd.app}`)
       const buildError = await compose.build()
@@ -89,13 +93,13 @@ export async function deployRunFlow(
       last_deploy_status: 'success',
       last_deploy_error: '',
     }
-    const saveError = await deployWriteState(deps.store, cmd.app, next)
+    const saveError = await stateSave(deps.store, cmd.app, next)
     if (saveError) {
       return saveError
     }
     return { deployedSHA: cmd.sha, durationMs: Date.now() - start }
   } catch (error) {
-    return deployCoerceError(error)
+    return errorsToJibError(error)
   }
 }
 
@@ -103,7 +107,7 @@ export async function deployRunFlow(
 export async function deployResolveAppCompose(
   deps: DeployDeps,
   appName: string,
-): Promise<JibError | { appCfg: App; compose: ReturnType<typeof deployNewCompose> }> {
+): Promise<JibError | { appCfg: App; compose: DockerCompose }> {
   const appCfg = deps.config.apps[appName]
   if (!appCfg) {
     return new NotFoundError(`app "${appName}" not found in config`)
@@ -117,5 +121,12 @@ export async function deployResolveAppCompose(
   if (secretsError) {
     return secretsError
   }
-  return { appCfg, compose: deployNewCompose(deps, appName, appCfg, workdir) }
+  const compose = dockerComposeFor(deps.config, deps.paths, appName, {
+    workdir,
+    ...(deps.dockerExec ? { exec: deps.dockerExec } : {}),
+  })
+  if (compose instanceof Error) {
+    return compose
+  }
+  return { appCfg, compose }
 }

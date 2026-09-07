@@ -14,20 +14,7 @@ interface Call {
 function recorder(result: Partial<ExecResult> = {}): { exec: DockerExec; calls: Call[] } {
   const calls: Call[] = []
   const exec: DockerExec = async (args, opts) => {
-    const call: Call = { args }
-    if (opts.cwd !== undefined) {
-      call.cwd = opts.cwd
-    }
-    if (opts.env !== undefined) {
-      call.env = opts.env
-    }
-    if (opts.capture !== undefined) {
-      call.capture = opts.capture
-    }
-    if (opts.tty !== undefined) {
-      call.tty = opts.tty
-    }
-    calls.push(call)
+    calls.push({ args, ...opts })
     return { stdout: '', stderr: '', exitCode: 0, ...result }
   }
   return { exec, calls }
@@ -107,6 +94,72 @@ describe('dockerCreateCompose', () => {
     const { compose, calls } = make()
     await compose.logs()
     expect(calls[0]?.args.slice(-1)).toEqual(['logs'])
+  })
+
+  test('captures build/up/down/restart output only when quiet is requested', async () => {
+    const { compose, calls } = make()
+    await compose.build({}, { quiet: true })
+    await compose.up({ quiet: true })
+    await compose.down(false, { quiet: true })
+    await compose.restart([], { quiet: true })
+    await compose.build()
+    await compose.up()
+    await compose.down()
+    await compose.restart()
+
+    expect(calls.slice(0, 4).map((call) => call.capture)).toEqual([true, true, true, true])
+    for (const call of calls.slice(4)) {
+      expect(call).not.toHaveProperty('capture')
+    }
+    expect(calls.every((call) => call.cwd === '/src')).toBe(true)
+  })
+
+  test('ps captures and returns the command result', async () => {
+    const result = { stdout: '{"Name":"web"}', stderr: '', exitCode: 0 }
+    const { exec, calls } = recorder(result)
+    const compose = dockerCreateCompose({ app: 'demo', dir: '/src', files: [], exec })
+
+    expect(await compose.ps()).toEqual(result)
+    expect(calls).toEqual([
+      {
+        args: ['docker', 'compose', '-p', 'jib-demo', 'ps', '--format', 'json'],
+        cwd: '/src',
+        capture: true,
+      },
+    ])
+  })
+
+  test.each(['up', 'ps'] as const)(
+    '%s preserves thrown execution failures as causes',
+    async (command) => {
+      const failure = new Error('docker unavailable')
+      const compose = dockerCreateCompose({
+        app: 'demo',
+        dir: '.',
+        files: [],
+        exec: async () => {
+          throw failure
+        },
+      })
+      const result = await compose[command]()
+      expect(result).toBeInstanceOf(InternalError)
+      expect(result).toHaveProperty(
+        'message',
+        'docker compose -p jib-demo failed: docker unavailable',
+      )
+      expect(result).toHaveProperty('cause', failure)
+    },
+  )
+
+  test.each(['up', 'ps'] as const)('%s retains its non-zero exit diagnostics', async (command) => {
+    const { exec } = recorder({ stdout: 'stdout detail', exitCode: 1 })
+    const compose = dockerCreateCompose({ app: 'demo', dir: '.', files: [], exec })
+    const result = await compose[command]()
+    expect(result).toBeInstanceOf(InternalError)
+    expect(result).toHaveProperty(
+      'message',
+      `docker compose -p jib-demo exited 1: ${command === 'up' ? 'stdout detail' : ''}`,
+    )
   })
 
   test('returns an internal error on non-zero exit', async () => {
