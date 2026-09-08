@@ -1,5 +1,4 @@
 import { cloudflaredReadStatus } from '@jib-module/cloudflared'
-import { cliIsTextOutput } from '@jib/cli'
 import { type App, type Config, type Domain, configAssignPorts } from '@jib/config'
 import { type ComposeInspection, dockerResolveFromCompose } from '@jib/docker'
 import { type JibError, ValidationError } from '@jib/errors'
@@ -72,15 +71,7 @@ export async function addBuildResolvedApp(
   if (parsedApp instanceof Error) {
     return parsedApp
   }
-  const resolved = dockerResolveFromCompose(
-    parsedApp,
-    workdir,
-    cliIsTextOutput() ? { warn: (message) => consola.warn(message) } : {},
-  )
-  if (resolved instanceof Error) {
-    return resolved
-  }
-  return resolved
+  return dockerResolveFromCompose(parsedApp, workdir, { warn: (message) => consola.warn(message) })
 }
 
 /** Ensures tunnel routes have both desired module enablement and a managed token. */

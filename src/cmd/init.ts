@@ -4,7 +4,6 @@ import {
   cliCheckLinuxHost,
   cliCheckRootHost,
   cliCreateMissingInputError,
-  cliIsTextOutput,
 } from '@jib/cli'
 import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
@@ -20,16 +19,6 @@ import {
 } from '@/flows/init/registry.ts'
 import { hasBootstrapState } from '../migrations/service.ts'
 import { cmdCreateHandler } from './handler.ts'
-
-/** Returns a typed error until the machine has completed the bootstrap migration. */
-function initCheckMigration(rootReady: boolean): CliError | undefined {
-  if (rootReady) {
-    return undefined
-  }
-  return new CliError('migrate_required', 'jib is not bootstrapped yet', {
-    hint: 'run `sudo jib migrate` first',
-  })
-}
 
 const cliInitCommand = {
   command: 'init',
@@ -57,13 +46,12 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
   }
 
   const paths = pathsGetPaths()
-  const migrationError = initCheckMigration(hasBootstrapState(paths))
-  if (migrationError) {
-    return migrationError
+  if (!hasBootstrapState(paths)) {
+    return new CliError('migrate_required', 'jib is not bootstrapped yet', {
+      hint: 'run `sudo jib migrate` first',
+    })
   }
-  if (cliIsTextOutput()) {
-    tuiIntro('jib init')
-  }
+  tuiIntro('jib init')
 
   const loaded = await configLoad(paths.configFile)
   if (loaded instanceof Error) {
@@ -81,14 +69,12 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
   const unseen = initUnseenOptionalModules(config)
   if (args.check || unseen.length === 0) {
     const pending = initPendingOptionalModuleNames(config)
-    if (cliIsTextOutput()) {
-      if (pending.length === 0) {
-        tuiNote('No optional modules are waiting for setup.', 'Optional modules')
-        tuiOutro('nothing to do')
-      } else {
-        tuiNote(`Pending optional modules: ${pending.join(', ')}`, 'Optional modules')
-        tuiOutro('run `sudo jib init` to configure them')
-      }
+    if (pending.length === 0) {
+      tuiNote('No optional modules are waiting for setup.', 'Optional modules')
+      tuiOutro('nothing to do')
+    } else {
+      tuiNote(`Pending optional modules: ${pending.join(', ')}`, 'Optional modules')
+      tuiOutro('run `sudo jib init` to configure them')
     }
     return {
       enabledOptionalModules: initInstalledOptionalModules(config).map((mod) => mod.manifest.name),
@@ -96,12 +82,10 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
     }
   }
 
-  if (cliIsTextOutput()) {
-    tuiNote(
-      `Choose which optional pieces you want Jib to manage now.\n${initDescribeModules(unseen).join('\n')}`,
-      'Optional modules',
-    )
-  }
+  tuiNote(
+    `Choose which optional pieces you want Jib to manage now.\n${initDescribeModules(unseen).join('\n')}`,
+    'Optional modules',
+  )
 
   if (!cliCanPrompt()) {
     return cliCreateMissingInputError(
@@ -122,10 +106,8 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
   if (finalConfig instanceof Error) {
     return finalConfig
   }
-  if (cliIsTextOutput()) {
-    tuiOutro('modules configured')
-    tuiNote('Next: run `jib status` to confirm services are healthy.', 'Next steps')
-  }
+  tuiOutro('modules configured')
+  tuiNote('Next: run `jib status` to confirm services are healthy.', 'Next steps')
 
   return {
     enabledOptionalModules: initInstalledOptionalModules(finalConfig).map(

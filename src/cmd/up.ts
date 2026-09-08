@@ -1,4 +1,3 @@
-import { cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
 import { deployCreateDeps, deployUpApp } from '@jib/deploy'
 import { consola } from 'consola'
@@ -22,9 +21,7 @@ async function upRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
   if (result) {
     return result
   }
-  if (cliIsTextOutput()) {
-    consola.success(`started ${appName}`)
-  }
+  consola.success(`started ${appName}`)
   return { app: appName, state: 'started' as const }
 }
 

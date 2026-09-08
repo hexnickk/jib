@@ -1,4 +1,4 @@
-import { CliError, cliIsTextOutput } from '@jib/cli'
+import { CliError } from '@jib/cli'
 import { configLoadContext } from '@jib/config'
 import {
   type SecretsContext,
@@ -71,9 +71,7 @@ async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: st
   if (upsertError instanceof Error) {
     return upsertError
   }
-  if (cliIsTextOutput()) {
-    consola.success(`set ${key} for ${appName}`)
-  }
+  consola.success(`set ${key} for ${appName}`)
   return { app: appName, key, updated: true }
 }
 
@@ -87,9 +85,7 @@ async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
   const { cfg, secrets } = loaded
   const apps = requestedApp ? [requestedApp] : Object.keys(cfg.apps).sort()
   if (apps.length === 0) {
-    if (cliIsTextOutput()) {
-      consola.log('no apps configured')
-    }
+    consola.log('no apps configured')
     return { apps: [] }
   }
 
@@ -120,16 +116,14 @@ async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
     items.push({ app: appName, path: status.path, entries })
   }
 
-  if (cliIsTextOutput()) {
-    for (const item of items) {
-      if (!item.path) {
-        consola.log(`${item.app} no env`)
-        continue
-      }
-      consola.log(`${item.app} ${item.path}`)
-      for (const entry of item.entries) {
-        consola.log(`  ${entry.key}=${entry.masked}`)
-      }
+  for (const item of items) {
+    if (!item.path) {
+      consola.log(`${item.app} no env`)
+      continue
+    }
+    consola.log(`${item.app} ${item.path}`)
+    for (const entry of item.entries) {
+      consola.log(`  ${entry.key}=${entry.masked}`)
     }
   }
 
@@ -159,9 +153,7 @@ async function envDeleteRunCommand(args: ArgumentsCamelCase<{ app: string; key: 
   if (!removed) {
     return new CliError('missing_env_key', `key "${key}" not found in ${appName}`)
   }
-  if (cliIsTextOutput()) {
-    consola.success(`deleted ${key} from ${appName}`)
-  }
+  consola.success(`deleted ${key} from ${appName}`)
   return { app: appName, key, removed: true }
 }
 

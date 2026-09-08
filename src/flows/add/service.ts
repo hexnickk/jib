@@ -1,28 +1,20 @@
 import { CancelledError } from '@jib/errors'
 import { txRunSteps } from '@jib/tx'
-import { type AddRunContext, addBuildSteps } from './steps.ts'
-import type {
-  AddFlowObserver,
-  AddFlowOutcome,
-  AddFlowParams,
-  AddPlanner,
-  AddSupport,
-} from './types.ts'
+import { type AddRunContext, addSteps } from './steps.ts'
+import type { AddFlowObserver, AddFlowOutcome, AddFlowParams, AddSupport } from './types.ts'
 
 export interface RunAddDeps {
   support: AddSupport
-  planner: AddPlanner
   observer?: AddFlowObserver
 }
 
 export async function addRun(
-  { support, planner, observer = {} }: RunAddDeps,
+  { support, observer = {} }: RunAddDeps,
   params: AddFlowParams,
 ): Promise<AddFlowOutcome> {
   const ctx: AddRunContext = {
     params,
     support,
-    planner,
     observer,
     inspection: { composeFiles: [], services: [] },
     workdir: '',
@@ -33,7 +25,7 @@ export async function addRun(
 
   observer.onStateChange?.('inputs_ready')
 
-  const error = await txRunSteps(ctx, addBuildSteps(), {
+  const error = await txRunSteps(ctx, addSteps, {
     signal: params.signal ?? { cancelled: false },
     cancelled: () => new CancelledError('add cancelled'),
     warn: (message) => observer.warn?.(message),

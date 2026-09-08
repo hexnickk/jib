@@ -1,4 +1,4 @@
-import { CliError, cliIsTextOutput } from '@jib/cli'
+import { CliError } from '@jib/cli'
 import { type App, configLoad, configLoadContext } from '@jib/config'
 import { CancelledError, type JibError, RollbackError, errorsToJibError } from '@jib/errors'
 import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
@@ -15,7 +15,6 @@ import { addBuildDraftApp } from './app.ts'
 import { addChooseInitialSource, addCreateInspectionObserver } from './command-support.ts'
 import { addNormalizeError } from './errors.ts'
 import { addGatherInputs, addResolveAppName } from './inputs.ts'
-import { addCreatePlanner } from './planner.ts'
 import {
   addNormalizeDeployError,
   addRenderResult,
@@ -39,7 +38,6 @@ export async function addRunCommand(args: AddCommandArgs) {
     return loaded
   }
   const { cfg, paths, appName, source, inputs } = loaded
-  const planner = addCreatePlanner()
   const interrupt = addTrapInterrupt()
   const preflight = await sourcesPreflightSelection(
     { cfg, paths },
@@ -77,7 +75,7 @@ export async function addRunCommand(args: AddCommandArgs) {
           return draftApp
         }
         const result = await addRun(
-          { support: addSupport, planner, observer: inspection.observer },
+          { support: addSupport, observer: inspection.observer },
           {
             appName,
             args: flowArgs,
@@ -175,15 +173,15 @@ async function addClaimIngress(
   app: string,
   appCfg: App,
 ): Promise<undefined | JibError> {
-  const progress = cliIsTextOutput() ? tuiSpinner() : undefined
-  progress?.start(`claiming ingress for ${app}`)
+  const progress = tuiSpinner()
+  progress.start(`claiming ingress for ${app}`)
   const error = await ingressClaim(ingressCreateOperator(paths), app, appCfg, (update) =>
-    progress?.message(update.message),
+    progress.message(update.message),
   )
   if (error instanceof Error) {
-    progress?.stop('ingress failed')
+    progress.stop('ingress failed')
     return errorsToJibError(error)
   }
-  progress?.stop('ingress ready')
+  progress.stop('ingress ready')
   return undefined
 }

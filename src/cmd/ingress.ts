@@ -1,4 +1,4 @@
-import { CliError, cliIsTextOutput } from '@jib/cli'
+import { CliError } from '@jib/cli'
 import { configLoadContext, configNormalizeByteSize, configWrite } from '@jib/config'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
 import { ingressApplyNginxConfig } from '../modules/ingress/backends/nginx/config.ts'
@@ -53,9 +53,7 @@ async function ingressSetRunCommand(args: ArgumentsCamelCase<IngressSetArgs>) {
     return applyError
   }
 
-  if (cliIsTextOutput()) {
-    process.stdout.write(`ingress max body size set to ${normalized}\n`)
-  }
+  process.stdout.write(`ingress max body size set to ${normalized}\n`)
   return { maxBodySize: normalized }
 }
 

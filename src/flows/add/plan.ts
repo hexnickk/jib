@@ -1,4 +1,4 @@
-import { CliError, cliIsTextOutput } from '@jib/cli'
+import { CliError } from '@jib/cli'
 import type { App } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
 import type { JibError } from '@jib/errors'
@@ -14,9 +14,6 @@ export async function addConfirmPlan(
   finalApp: App,
   configEntries: ConfigEntry[],
 ): Promise<JibError | undefined> {
-  if (!cliIsTextOutput()) {
-    return undefined
-  }
   consola.box(
     addRenderPlanSummary({
       app: appName,

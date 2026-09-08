@@ -1,7 +1,6 @@
 export { addNormalizeError } from './errors.ts'
 export { addBuildDraftApp, addParseApp } from './app.ts'
 export { addGatherInputs, addResolveAppName } from './inputs.ts'
-export { addCreatePlanner, type AddPlannerDeps } from './planner.ts'
 export { addRun, type RunAddDeps } from './service.ts'
 export { addRunSequence } from './sequence.ts'
 export { addCreateDefaultSupport, type AddDefaultSupportOptions } from './support.ts'
@@ -12,7 +11,6 @@ export type {
   AddFlowResult,
   AddFlowState,
   AddInputs,
-  AddPlanner,
   AddSupport,
   ConfigEntry,
   ConfigScope,

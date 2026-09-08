@@ -1,5 +1,5 @@
 import type { App, Config, Domain, HealthCheck, ParsedDomain } from '@jib/config'
-import type { ComposeInspection, ComposeService } from '@jib/docker'
+import type { ComposeInspection } from '@jib/docker'
 import type { JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import type { InspectionCheckout } from '@jib/sources'
@@ -59,24 +59,6 @@ export interface AddResolveInput {
   inputs: AddInputs
   inspection: ComposeInspection
   guided: GuidedInputs
-}
-
-export interface AddPlanner {
-  inspectCompose(draftApp: App, workdir: string): Promise<ComposeInspection | JibError>
-  collectGuidedInputs(
-    inputs: AddInputs,
-    services: ComposeService[],
-  ): Promise<GuidedInputs | JibError>
-  buildResolvedApp(
-    ctx: { cfg: Config; paths: Paths },
-    input: AddResolveInput,
-  ): Promise<App | JibError>
-  confirmPlan(
-    appName: string,
-    inspection: ComposeInspection,
-    finalApp: App,
-    configEntries: ConfigEntry[],
-  ): Promise<undefined | JibError>
 }
 
 export interface AddFlowObserver {

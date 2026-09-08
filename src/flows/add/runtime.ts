@@ -1,4 +1,4 @@
-import { CliError, cliIsTextOutput } from '@jib/cli'
+import { CliError } from '@jib/cli'
 import type { App, Config } from '@jib/config'
 import { configLoad } from '@jib/config'
 import { InternalError, type JibError, NotFoundError } from '@jib/errors'
@@ -22,21 +22,19 @@ export function addRenderResult(
   deploy: DeployRunResult,
 ) {
   const { finalApp, secretsWritten } = result
-  if (secretsWritten > 0 && cliIsTextOutput()) {
+  if (secretsWritten > 0) {
     consola.success(`${secretsWritten} secret(s) set for ${app}`)
   }
-  if (cliIsTextOutput()) {
-    consola.success(`${app} deployed @ ${deploy.sha.slice(0, 8)} (${deploy.durationMs}ms)`)
-    const ingress =
-      finalApp.domains.length > 0
-        ? finalApp.domains
-            .map((domain) => `${domain.host} -> 127.0.0.1:${domain.port}`)
-            .join('\n    ')
-        : 'none'
-    consola.box(
-      `app "${app}" deployed\n  ingress:\n    ${ingress}\n  sha:    ${deploy.sha.slice(0, 8)}`,
-    )
-  }
+  consola.success(`${app} deployed @ ${deploy.sha.slice(0, 8)} (${deploy.durationMs}ms)`)
+  const ingress =
+    finalApp.domains.length > 0
+      ? finalApp.domains
+          .map((domain) => `${domain.host} -> 127.0.0.1:${domain.port}`)
+          .join('\n    ')
+      : 'none'
+  consola.box(
+    `app "${app}" deployed\n  ingress:\n    ${ingress}\n  sha:    ${deploy.sha.slice(0, 8)}`,
+  )
   return {
     app,
     repo,
@@ -99,9 +97,9 @@ export async function addRollbackApp(
         paths,
         releaseIngress: (appName) => ingressRelease(ingressCreateOperator(paths), appName),
       }),
-      observer: { warn: (message) => cliIsTextOutput() && consola.warn(message) },
+      observer: { warn: (message) => consola.warn(message) },
     },
-    { appName: app, cfg, configFile: paths.configFile, quiet: !cliIsTextOutput() },
+    { appName: app, cfg, configFile: paths.configFile, quiet: false },
   )
   if (result instanceof NotFoundError) {
     return undefined

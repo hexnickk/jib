@@ -1,4 +1,4 @@
-import { CliError, cliIsTextOutput } from '@jib/cli'
+import { CliError } from '@jib/cli'
 import type { Config } from '@jib/config'
 import type { JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
@@ -57,14 +57,11 @@ export async function addChooseInitialSource(
 
 /** Creates spinner-backed inspection callbacks for the add flow. */
 export function addCreateInspectionObserver() {
-  const progress = cliIsTextOutput() ? tuiSpinner() : undefined
+  const progress = tuiSpinner()
   let active = false
   return {
     observer: {
       onStateChange: (state: string) => {
-        if (!progress) {
-          return
-        }
         if (state === 'inputs_ready') {
           active = true
           progress.start('preparing repo')
@@ -77,17 +74,17 @@ export function addCreateInspectionObserver() {
           progress.stop('compose inspected')
         }
       },
-      warn: (message: string) => cliIsTextOutput() && consola.warn(message),
+      warn: (message: string) => consola.warn(message),
     },
     stop: () => {
-      if (!progress || !active) {
+      if (!active) {
         return
       }
       active = false
       progress.stop('compose inspected')
     },
     fail: () => {
-      if (!progress || !active) {
+      if (!active) {
         return
       }
       active = false

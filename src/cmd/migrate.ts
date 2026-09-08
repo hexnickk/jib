@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { cliCheckLinuxHost, cliCheckRootHost, cliIsTextOutput } from '@jib/cli'
+import { cliCheckLinuxHost, cliCheckRootHost } from '@jib/cli'
 import { pathsGetPaths } from '@jib/paths'
 import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import type { CommandModule } from 'yargs'
@@ -25,28 +25,24 @@ async function migrateRunCommand() {
 
   const paths = pathsGetPaths()
   const configExisted = existsSync(paths.configFile)
-  if (cliIsTextOutput()) {
-    tuiIntro('jib migrate')
-  }
+  tuiIntro('jib migrate')
 
   const result = await runPendingMigrations(paths)
   if (result instanceof Error) {
     return result
   }
-  if (cliIsTextOutput()) {
-    tuiOutro(
-      result.appliedMigrations.length > 0
-        ? `applied ${result.appliedMigrations.length} migration(s)`
-        : 'nothing to do',
+  tuiOutro(
+    result.appliedMigrations.length > 0
+      ? `applied ${result.appliedMigrations.length} migration(s)`
+      : 'nothing to do',
+  )
+  if (result.sessionReloadGroups.length > 0) {
+    const label = result.sessionReloadGroups.length === 1 ? 'group' : 'groups'
+    const groups = result.sessionReloadGroups.map((group) => `\`${group}\``).join(', ')
+    tuiNote(
+      `You were added to new ${label}: ${groups}. Start a new login session so the memberships are active; until then, keep using \`sudo\`.`,
+      'Next steps',
     )
-    if (result.sessionReloadGroups.length > 0) {
-      const label = result.sessionReloadGroups.length === 1 ? 'group' : 'groups'
-      const groups = result.sessionReloadGroups.map((group) => `\`${group}\``).join(', ')
-      tuiNote(
-        `You were added to new ${label}: ${groups}. Start a new login session so the memberships are active; until then, keep using \`sudo\`.`,
-        'Next steps',
-      )
-    }
   }
 
   return { ...result, configExisted }

@@ -1,19 +1,9 @@
 import { cloudflaredEnableConfig, cloudflaredReadStatus } from '@jib-module/cloudflared'
-import { cliIsTextOutput } from '@jib/cli'
 import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
 import type { CommandModule } from 'yargs'
-import { cloudflaredRunSetup, cloudflaredRunSetupResult } from '@/flows/cloudflared/setup.ts'
+import { cloudflaredRunSetup } from '@/flows/cloudflared/setup.ts'
 import { cmdCreateHandler } from './handler.ts'
-
-/** Writes Cloudflare readiness from the same module and token state used by setup. */
-function writeCloudflaredStatusText(status: ReturnType<typeof cloudflaredReadStatus>): void {
-  process.stdout.write(
-    status.configured ? 'cloudflare tunnel: configured\n' : 'cloudflare tunnel: not configured\n',
-  )
-  process.stdout.write(`  module: ${status.enabled ? 'enabled' : 'disabled'}\n`)
-  process.stdout.write(`  token:  ${status.hasToken ? 'present' : 'missing'}\n`)
-}
 
 const cliCloudflaredCommands = [
   {
@@ -31,23 +21,15 @@ const cliCloudflaredCommands = [
 /** Runs Cloudflare setup and persists module enablement after successful configuration. */
 async function cloudflaredSetupRunCommand() {
   const paths = pathsGetPaths()
-  if (cliIsTextOutput()) {
-    const configured = await cloudflaredRunSetup(paths)
-    if (!configured) {
-      return
-    }
-    const enableError = await cloudflaredEnableConfig(paths)
-    return enableError instanceof Error ? enableError : { configured: true }
-  }
-  const result = await cloudflaredRunSetupResult(paths)
-  if (result instanceof Error || result.status !== 'configured') {
-    return result
+  const configured = await cloudflaredRunSetup(paths)
+  if (!configured) {
+    return
   }
   const enableError = await cloudflaredEnableConfig(paths)
-  return enableError instanceof Error ? enableError : result
+  return enableError instanceof Error ? enableError : { configured: true }
 }
 
-/** Reads Cloudflare Tunnel status and writes the text status view when enabled. */
+/** Reads Cloudflare Tunnel status and writes the text status view. */
 async function cloudflaredStatusRunCommand() {
   const paths = pathsGetPaths()
   const config = await configLoad(paths.configFile)
@@ -55,11 +37,11 @@ async function cloudflaredStatusRunCommand() {
     return config
   }
   const status = cloudflaredReadStatus(config, paths)
-  if (cliIsTextOutput()) {
-    writeCloudflaredStatusText(status)
-    return
-  }
-  return status
+  process.stdout.write(
+    status.configured ? 'cloudflare tunnel: configured\n' : 'cloudflare tunnel: not configured\n',
+  )
+  process.stdout.write(`  module: ${status.enabled ? 'enabled' : 'disabled'}\n`)
+  process.stdout.write(`  token:  ${status.hasToken ? 'present' : 'missing'}\n`)
 }
 
 export default cliCloudflaredCommands

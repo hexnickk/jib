@@ -4,46 +4,23 @@ import type { ArgumentsCamelCase } from 'yargs'
 const ESC = String.fromCharCode(27)
 const ANSI_ESCAPE_RE = new RegExp(`${ESC}(?:[@-Z\\-_]|\\[[0-?]*[ -/]*[@-~])`, 'g')
 
-/** Removes ANSI escape sequences before writing to a non-TTY stream. */
-function stripAnsiText(value: string): string {
-  return value.replaceAll(ANSI_ESCAPE_RE, '')
-}
-
 /** Writes a single line of text, stripping color when the stream is not a TTY. */
 function writeCliText(stream: NodeJS.WriteStream, value: string): void {
-  const text = stream.isTTY ? value : stripAnsiText(value)
+  const text = stream.isTTY ? value : value.replaceAll(ANSI_ESCAPE_RE, '')
   stream.write(text.endsWith('\n') ? text : `${text}\n`)
-}
-
-/** Renders a normalized CLI error in text mode. */
-function writeCliTextError(error: ReturnType<typeof cliNormalizeError>): void {
-  writeCliText(process.stderr, error.message)
-  for (const issue of error.issues ?? []) {
-    writeCliText(process.stderr, `${issue.field}: ${issue.message}`)
-  }
-  if (error.hint) {
-    writeCliText(process.stderr, error.hint)
-  }
 }
 
 /** Renders a CLI error and exits with the normalized exit code. */
 export function cmdExitError(error: unknown): never {
   const normalized = cliNormalizeError(error)
-  writeCliTextError(normalized)
-  process.exit(normalized.exitCode)
-}
-
-/**
- * Completes a yargs handler from a command implementation result.
- * Input is any value returned by a command run function; non-error values are ignored because
- * the text CLI currently renders output inside command implementations. Side effect: exits the
- * process for returned Error instances so yargs does not convert typed failures into raw stacks.
- */
-function cmdHandleResult(result: unknown): void {
-  // Framework boundary: yargs handlers do not propagate returned typed failures to main.ts.
-  if (result instanceof Error) {
-    cmdExitError(result)
+  writeCliText(process.stderr, normalized.message)
+  for (const issue of normalized.issues ?? []) {
+    writeCliText(process.stderr, `${issue.field}: ${issue.message}`)
   }
+  if (normalized.hint) {
+    writeCliText(process.stderr, normalized.hint)
+  }
+  process.exit(normalized.exitCode)
 }
 
 /**
@@ -55,6 +32,10 @@ export function cmdCreateHandler<TArgs>(
   run: (args: ArgumentsCamelCase<TArgs>) => unknown,
 ): (args: ArgumentsCamelCase<TArgs>) => Promise<void> {
   return async (args) => {
-    cmdHandleResult(await run(args))
+    const result = await run(args)
+    // Framework boundary: yargs handlers do not propagate returned typed failures to main.ts.
+    if (result instanceof Error) {
+      cmdExitError(result)
+    }
   }
 }

@@ -1,4 +1,3 @@
-import { cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
 import { deployCreateDeps, deployRestartApp } from '@jib/deploy'
 import { consola } from 'consola'
@@ -25,9 +24,7 @@ async function restartRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
   if (result) {
     return result
   }
-  if (cliIsTextOutput()) {
-    consola.success(`restarted ${appName}`)
-  }
+  consola.success(`restarted ${appName}`)
   return { app: appName, state: 'restarted' as const }
 }
 

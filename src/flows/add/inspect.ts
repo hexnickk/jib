@@ -1,4 +1,4 @@
-import { CliError, cliIsDebugEnabled, cliIsTextOutput } from '@jib/cli'
+import { CliError, cliIsDebugEnabled } from '@jib/cli'
 import type { App } from '@jib/config'
 import {
   type ComposeInspection,
@@ -58,9 +58,7 @@ async function promptComposePaths(
     return handleComposeError(error, workdir, compose)
   }
 
-  if (cliIsTextOutput()) {
-    ;(deps.note ?? tuiNote)(composeNotFoundMessage(workdir, compose), 'Compose file')
-  }
+  ;(deps.note ?? tuiNote)(composeNotFoundMessage(workdir, compose), 'Compose file')
   if (
     (!compose || compose.length === 0) &&
     (deps.canScaffoldCompose ?? addCanScaffoldCompose)(workdir)

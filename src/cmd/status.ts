@@ -1,4 +1,3 @@
-import { cliIsTextOutput } from '@jib/cli'
 import { configLoadContext } from '@jib/config'
 import {
   type AppStatus,
@@ -98,7 +97,7 @@ const cliStatusCommand = {
   handler: cmdCreateHandler(statusRunCommand),
 } satisfies CommandModule
 
-/** Collects status data and writes the text status view when text output is enabled. */
+/** Collects status data and writes the text status view. */
 async function statusRunCommand() {
   const loaded = await configLoadContext()
   if (loaded instanceof Error) {
@@ -115,14 +114,9 @@ async function statusRunCommand() {
     return apps
   }
 
-  if (cliIsTextOutput()) {
-    printServices(services)
-    printSources(sources)
-    printApps(apps)
-    return
-  }
-
-  return { services, sources, apps }
+  printServices(services)
+  printSources(sources)
+  printApps(apps)
 }
 
 export default cliStatusCommand

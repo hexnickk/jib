@@ -1,4 +1,3 @@
-import { cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
 import { deployCreateDeps, deployDownApp } from '@jib/deploy'
 import { consola } from 'consola'
@@ -22,9 +21,7 @@ async function downRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
   if (result) {
     return result
   }
-  if (cliIsTextOutput()) {
-    consola.success(`stopped ${appName}`)
-  }
+  consola.success(`stopped ${appName}`)
   return { app: appName, state: 'stopped' as const }
 }
 

@@ -1,4 +1,3 @@
-import { cliIsTextOutput } from '@jib/cli'
 import type { Config } from '@jib/config'
 import { type DeployResult, deployApp, deployCreateDeps } from '@jib/deploy'
 import { InternalError, type JibError } from '@jib/errors'
@@ -35,11 +34,10 @@ export async function runDeploy(
   deps: DeployRunDeps = {},
 ): Promise<DeployRunResult | InternalError> {
   const { cfg, paths } = ctx
-  const showProgress = cliIsTextOutput()
   const createSpin = deps.createSpinner ?? tuiSpinner
-  const prepareSpin = showProgress ? createSpin() : undefined
+  const prepareSpin = createSpin()
 
-  prepareSpin?.start(`[1/2] preparing ${app}`)
+  prepareSpin.start(`[1/2] preparing ${app}`)
   let ready: PreparedSource | InternalError
   try {
     const result = await (deps.sync ?? sourcesSync)(cfg, paths, { app }, ref)
@@ -49,33 +47,33 @@ export async function runDeploy(
     ready = new InternalError(message, { cause: error })
   }
   if (ready instanceof Error) {
-    prepareSpin?.stop(`[1/2] failed to prepare ${app}`)
+    prepareSpin.stop(`[1/2] failed to prepare ${app}`)
     return ready
   }
-  prepareSpin?.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
+  prepareSpin.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
 
-  const deploySpin = showProgress ? createSpin() : undefined
-  deploySpin?.start(`[2/2] deploying ${app}`)
+  const deploySpin = createSpin()
+  deploySpin.start(`[2/2] deploying ${app}`)
   let deployed: JibError | DeployResult
   try {
     deployed = await (deps.deployPrepared ?? deployApp)(
       (deps.createDeps ?? deployCreateDeps)(cfg, paths),
       { app, workdir: ready.workdir, sha: ready.sha, trigger: 'manual' },
-      { emit: (step, message) => deploySpin?.message(`${step}: ${message}`) },
+      { emit: (step, message) => deploySpin.message(`${step}: ${message}`) },
     )
   } catch (error) {
-    deploySpin?.stop(`[2/2] failed to deploy ${app}`)
+    deploySpin.stop(`[2/2] failed to deploy ${app}`)
     const message = error instanceof Error ? error.message : String(error)
     return new InternalError(message, { cause: error })
   }
   if (deployed instanceof Error) {
-    deploySpin?.stop(`[2/2] failed to deploy ${app}`)
+    deploySpin.stop(`[2/2] failed to deploy ${app}`)
     return deployed instanceof InternalError
       ? deployed
       : new InternalError(deployed.message, { cause: deployed })
   }
 
-  deploySpin?.stop(
+  deploySpin.stop(
     `[2/2] ${app} deployed @ ${deployed.deployedSHA.slice(0, 8)} (${deployed.durationMs}ms)`,
   )
   return {

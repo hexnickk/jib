@@ -1,4 +1,3 @@
-import { cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
 import { consola } from 'consola'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
@@ -30,9 +29,7 @@ async function deployRunCommand(args: ArgumentsCamelCase<{ app: string; ref?: st
   if (result instanceof Error) {
     return result
   }
-  if (cliIsTextOutput()) {
-    consola.success(`${appName} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
-  }
+  consola.success(`${appName} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
   return result
 }
 

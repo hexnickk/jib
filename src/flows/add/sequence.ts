@@ -29,9 +29,8 @@ export async function addRunSequence(
     }
     addResult = added
 
-    const interrupted = addInterruptError(interrupt)
-    if (interrupted) {
-      return addRollbackAfterFailure(addResult, interrupted, rollback)
+    if (interrupt.interrupted) {
+      return addRollbackAfterFailure(addResult, new CancelledError('add cancelled'), rollback)
     }
 
     const deployResult = await deploy(addResult)
@@ -47,13 +46,6 @@ export async function addRunSequence(
     }
     return addRollbackAfterFailure(addResult, error, rollback)
   }
-}
-
-function addInterruptError(interrupt: InterruptState): CancelledError | undefined {
-  if (!interrupt.interrupted) {
-    return undefined
-  }
-  return new CancelledError('add cancelled')
 }
 
 /** Attempts rollback and returns a shared rollback error that retains the original failure. */

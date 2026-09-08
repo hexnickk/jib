@@ -3,12 +3,14 @@ import type { JibError } from '@jib/errors'
 import { pathsManagedComposePath } from '@jib/paths'
 import type { Step } from '@jib/tx'
 import { addPrepareDockerHubWorkdir } from './dockerhub.ts'
+import { addInspectCompose } from './inspect.ts'
 import { addClaimIngressStep, addWriteConfigStep, addWriteSecretsStep } from './mutation-steps.ts'
+import { addConfirmPlan } from './plan.ts'
+import { addBuildResolvedApp, addCollectGuidedInputs } from './resolve.ts'
 import type {
   AddFlowObserver,
   AddFlowParams,
   AddFlowResult,
-  AddPlanner,
   AddSupport,
   GuidedInputs,
 } from './types.ts'
@@ -16,27 +18,12 @@ import type {
 export interface AddRunContext {
   readonly params: AddFlowParams
   readonly support: AddSupport
-  readonly planner: AddPlanner
   readonly observer: AddFlowObserver
   inspection: ComposeInspection
   workdir: string
   guided: GuidedInputs
   finalApp: AddFlowResult['finalApp']
   secretsWritten: number
-}
-
-/** Builds the ordered transactional steps for the add flow. */
-export function addBuildSteps(): readonly Step<AddRunContext, unknown, JibError>[] {
-  return [
-    prepareRepoStep,
-    inspectComposeStep,
-    collectGuidedInputsStep,
-    resolveAppStep,
-    confirmPlanStep,
-    addWriteConfigStep,
-    addWriteSecretsStep,
-    addClaimIngressStep,
-  ]
 }
 
 const prepareRepoStep: Step<AddRunContext, { repo: string }, JibError> = {
@@ -75,7 +62,7 @@ const prepareRepoStep: Step<AddRunContext, { repo: string }, JibError> = {
 const inspectComposeStep: Step<AddRunContext, undefined, JibError> = {
   name: 'compose inspection',
   async up(ctx) {
-    const inspection = await ctx.planner.inspectCompose(ctx.params.draftApp, ctx.workdir)
+    const inspection = await addInspectCompose(ctx.params.draftApp, ctx.workdir)
     if (inspection instanceof Error) {
       return inspection
     }
@@ -88,7 +75,7 @@ const inspectComposeStep: Step<AddRunContext, undefined, JibError> = {
 const collectGuidedInputsStep: Step<AddRunContext, undefined, JibError> = {
   name: 'guided inputs',
   async up(ctx) {
-    const guided = await ctx.planner.collectGuidedInputs(ctx.params.inputs, ctx.inspection.services)
+    const guided = await addCollectGuidedInputs(ctx.params.inputs, ctx.inspection.services)
     if (guided instanceof Error) {
       return guided
     }
@@ -101,7 +88,7 @@ const collectGuidedInputsStep: Step<AddRunContext, undefined, JibError> = {
 const resolveAppStep: Step<AddRunContext, { managedComposeWritten: boolean }, JibError> = {
   name: 'resolved app',
   async up(ctx) {
-    const finalApp = await ctx.planner.buildResolvedApp(
+    const finalApp = await addBuildResolvedApp(
       { cfg: ctx.params.cfg, paths: ctx.params.paths },
       {
         appName: ctx.params.appName,
@@ -135,7 +122,7 @@ const resolveAppStep: Step<AddRunContext, { managedComposeWritten: boolean }, Ji
 const confirmPlanStep: Step<AddRunContext, undefined, JibError> = {
   name: 'plan confirmation',
   async up(ctx) {
-    const result = await ctx.planner.confirmPlan(
+    const result = await addConfirmPlan(
       ctx.params.appName,
       ctx.inspection,
       ctx.finalApp,
@@ -148,3 +135,15 @@ const confirmPlanStep: Step<AddRunContext, undefined, JibError> = {
     return undefined
   },
 }
+
+/** Ordered transactional steps for the add flow. */
+export const addSteps: readonly Step<AddRunContext, unknown, JibError>[] = [
+  prepareRepoStep,
+  inspectComposeStep,
+  collectGuidedInputsStep,
+  resolveAppStep,
+  confirmPlanStep,
+  addWriteConfigStep,
+  addWriteSecretsStep,
+  addClaimIngressStep,
+]
