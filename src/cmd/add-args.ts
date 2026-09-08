@@ -1,19 +1,3 @@
-export interface AddCommandArgv {
-  app?: string
-  source?: string
-  branch?: string
-  repo?: string
-  backend?: string
-  ingress?: string
-  compose?: string
-  persist?: string | string[]
-  domain?: string | string[]
-  env?: string | string[]
-  'build-arg'?: string | string[]
-  'build-env'?: string | string[]
-  health?: string | string[]
-}
-
 export const addCommandOptions = {
   repo: {
     type: 'string',

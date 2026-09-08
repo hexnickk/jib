@@ -4,7 +4,10 @@ import { addMakeDeps, addMakeParams } from './service.test-support.ts'
 
 describe('add flow rollback', () => {
   test('post-config failures roll back repo, secrets, and remove only the failed app', async () => {
-    const { calls, flow, warnings, writtenConfigs } = addMakeDeps('claimRoutes', true)
+    const { calls, flow, warnings, writtenConfigs } = addMakeDeps({
+      failAt: 'claimRoutes',
+      injectConcurrentConfigChange: true,
+    })
 
     const result = await flow.run(addMakeParams())
     expect(result).toBeInstanceOf(Error)
@@ -31,7 +34,7 @@ describe('add flow rollback', () => {
       services: ['web'],
       domains: [{ host: 'blog.example.com', service: 'web', port: 20000, container_port: 80 }],
     } satisfies App
-    const { calls, flow } = addMakeDeps('claimRoutes', false, false, false, managedApp)
+    const { calls, flow } = addMakeDeps({ failAt: 'claimRoutes', appOverride: managedApp })
 
     const result = await flow.run(addMakeParams())
     expect(result).toBeInstanceOf(Error)
@@ -40,7 +43,11 @@ describe('add flow rollback', () => {
   })
 
   test('cleanup keeps going when repo rollback itself fails', async () => {
-    const { calls, flow, warnings, writtenConfigs } = addMakeDeps('claimRoutes', true, false, true)
+    const { calls, flow, warnings, writtenConfigs } = addMakeDeps({
+      failAt: 'claimRoutes',
+      injectConcurrentConfigChange: true,
+      failRollbackRepo: true,
+    })
 
     const result = await flow.run(addMakeParams())
     expect(result).toBeInstanceOf(Error)

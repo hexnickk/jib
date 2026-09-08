@@ -56,24 +56,30 @@ describe('pollApp', () => {
       sha,
     })
     const deployPrepared: NonNullable<PollAppDeps['deployPrepared']> = async (
-      _cfg,
-      _paths,
+      _ctx,
       appName,
       prepared,
-      _log,
     ) => {
       deploys.push({ app: appName, ...prepared })
       return undefined
     }
 
     expect(
-      await watcherPollApp(cfg, paths, 'demo', seen, log, { lsRemote, syncApp, deployPrepared }),
+      await watcherPollApp({ cfg, paths, log }, 'demo', seen, {
+        lsRemote,
+        syncApp,
+        deployPrepared,
+      }),
     ).toBeUndefined()
     expect(deploys).toHaveLength(1)
     expect(deploys[0]).toMatchObject({ app: 'demo', workdir: '/tmp/prepared-demo', sha })
 
     expect(
-      await watcherPollApp(cfg, paths, 'demo', seen, log, { lsRemote, syncApp, deployPrepared }),
+      await watcherPollApp({ cfg, paths, log }, 'demo', seen, {
+        lsRemote,
+        syncApp,
+        deployPrepared,
+      }),
     ).toBeUndefined()
     expect(deploys).toHaveLength(1)
   })
@@ -85,7 +91,7 @@ describe('pollApp', () => {
     const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
 
-    const error = await watcherPollApp(cfg, paths, 'demo', seen, log, {
+    const error = await watcherPollApp({ cfg, paths, log }, 'demo', seen, {
       lsRemote: async () => sha,
       syncApp: async () => ({ workdir: '/tmp/prepared-demo', sha }),
       deployPrepared: async () => new InternalError('deploy boom'),
@@ -102,7 +108,7 @@ describe('pollApp', () => {
     const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
 
-    const error = await watcherPollApp(cfg, paths, 'demo', seen, log, {
+    const error = await watcherPollApp({ cfg, paths, log }, 'demo', seen, {
       lsRemote: async () => sha,
       syncApp: async () => ({ workdir: '/tmp/prepared-demo', sha }),
       deployPrepared: async () => {
@@ -122,7 +128,7 @@ describe('pollApp', () => {
     const log = loggingCreateLogger('test')
     const sha = 'abc123abc123abc123abc123abc123abc123abc1'
 
-    const error = await watcherPollApp(cfg, paths, 'demo', seen, log, {
+    const error = await watcherPollApp({ cfg, paths, log }, 'demo', seen, {
       lsRemote: async () => sha,
       syncApp: async () => {
         throw new Error('sync boom')
@@ -172,7 +178,9 @@ describe('runPoller', () => {
       abort.signal,
     )
 
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0)
+    })
     abort.abort()
     await run
 

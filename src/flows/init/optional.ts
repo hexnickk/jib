@@ -114,10 +114,10 @@ export async function initConfigureOptionalModules(
     if (setup) {
       try {
         const configured = await setup(ctx)
+        if (!configured && mod.install) {
+          await rollbackModuleInstall(mod, ctx)
+        }
         if (!configured) {
-          if (mod.install) {
-            await rollbackModuleInstall(mod, ctx)
-          }
           return new InternalError(`${mod.manifest.name} setup did not complete`)
         }
       } catch (error) {

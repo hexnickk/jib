@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { $ } from '@/libs/shell'
 import { InternalError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import { type Paths, pathsCredsPath } from '@jib/paths'
+import { $ } from '@/libs/shell'
 import {
   CLOUDFLARED_UNIT_PATH,
   cloudflaredComposeYaml,

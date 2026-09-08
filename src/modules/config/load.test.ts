@@ -7,7 +7,7 @@ import { configLoad } from './load.ts'
 import type { Config } from './schema.ts'
 import { configWrite } from './write.ts'
 
-async function withTmp<T>(fn: (dir: string) => Promise<T>): Promise<T> {
+async function withTmp<Value>(fn: (dir: string) => Promise<Value>): Promise<Value> {
   const dir = await mkdtemp(join(tmpdir(), 'jib-cfg-'))
   try {
     return await fn(dir)

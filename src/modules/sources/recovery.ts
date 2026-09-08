@@ -40,7 +40,9 @@ export async function sourcesRunSetup(
   value: string,
 ): Promise<string | null> {
   const driver = sourceDriver(value)
-  if (!driver?.setup) return null
+  if (!driver?.setup) {
+    return null
+  }
   return driver.setup({ config: cfg, logger: loggingCreateLogger('sources'), paths })
 }
 

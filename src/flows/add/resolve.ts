@@ -12,7 +12,7 @@ import { addMergeConfigEntries } from './config-entries.ts'
 import { addCollectDomains } from './domains.ts'
 import { addMergeGuidedServiceAnswers } from './guided.ts'
 import { addPromptForServices } from './service-prompts.ts'
-import type { AddInputs, ConfigEntry } from './types.ts'
+import type { AddInputs, AddResolveInput, ConfigEntry } from './types.ts'
 
 /** Collects the guided domain and config answers that complete the add plan. */
 export async function addCollectGuidedInputs(
@@ -41,15 +41,11 @@ export async function addCollectGuidedInputs(
 
 /** Builds the fully resolved app config once compose inspection and prompts are done. */
 export async function addBuildResolvedApp(
-  cfg: Config,
-  paths: Paths,
-  appName: string,
-  workdir: string,
-  args: { source?: string; branch?: string },
-  inputs: AddInputs,
-  inspection: ComposeInspection,
-  guided: { domains: Domain[]; configEntries: ConfigEntry[] },
+  ctx: { cfg: Config; paths: Paths },
+  input: AddResolveInput,
 ): Promise<App | JibError> {
+  const { cfg, paths } = ctx
+  const { appName, workdir, args, inputs, inspection, guided } = input
   const capabilityError = validateTunnelReadiness(cfg, paths, guided.domains)
   if (capabilityError) {
     return capabilityError

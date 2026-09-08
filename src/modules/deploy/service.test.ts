@@ -89,238 +89,236 @@ const silentLogger = {
   box() {},
 } as unknown as Logger
 
-describe('deployApp', () => {
-  test('happy path emits success + records state', async () => {
-    const { paths, store, log } = await mkEnv()
-    const workdir = await mkWorkdir()
-    const calls: Call[] = []
+test('deployApp > happy path emits success + records state', async () => {
+  const { paths, store, log } = await mkEnv()
+  const workdir = await mkWorkdir()
+  const calls: Call[] = []
 
-    const result = await deployApp(
-      {
-        config: mkCfg(),
-        paths,
-        store,
-        log,
-        diskFree: async () => 10 * 1024 * 1024 * 1024,
-        dockerExec: fakeExec(calls),
+  const result = await deployApp(
+    {
+      config: mkCfg(),
+      paths,
+      store,
+      log,
+      diskFree: async () => 10 * 1024 * 1024 * 1024,
+      dockerExec: fakeExec(calls),
+    },
+    { app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' },
+    noProgress,
+  )
+
+  expect(result instanceof Error).toBe(false)
+  if (result instanceof Error) {
+    return
+  }
+  expect(result.deployedSHA).toBe('deadbeef')
+
+  const state = await stateLoad(store, 'demo')
+  if (state instanceof Error) {
+    throw state
+  }
+  expect(state.deployed_sha).toBe('deadbeef')
+  expect(state.deployed_workdir).toBe(workdir)
+  expect(calls.some((call) => call.args.includes('build'))).toBe(true)
+  expect(calls.some((call) => call.args.includes('up'))).toBe(true)
+})
+
+test('deployApp > missing app returns a typed error', async () => {
+  const { paths, store, log } = await mkEnv()
+  const workdir = await mkWorkdir()
+
+  const result = await deployApp(
+    {
+      config: mkCfg(),
+      paths,
+      store,
+      log,
+      diskFree: async () => 10 * 1024 * 1024 * 1024,
+      dockerExec: fakeExec([]),
+    },
+    { app: 'unknown', workdir, sha: 'deadbeef', trigger: 'manual' },
+    noProgress,
+  )
+
+  expect(result).toBeInstanceOf(NotFoundError)
+})
+
+test('deployApp > uses the managed env file for compose interpolation', async () => {
+  const { paths, store, log } = await mkEnv()
+  const workdir = await mkWorkdir()
+  await mkdir(join(paths.secretsDir, 'demo'), { recursive: true })
+  await writeFile(
+    join(paths.secretsDir, 'demo', '.env'),
+    'VITE_HOST_URL=https://demo.example.com\n',
+  )
+  const calls: Call[] = []
+  const cfg = mkCfg()
+
+  const result = await deployApp(
+    {
+      config: cfg,
+      paths,
+      store,
+      log,
+      diskFree: async () => 10 * 1024 * 1024 * 1024,
+      dockerExec: fakeExec(calls),
+    },
+    { app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' },
+    noProgress,
+  )
+
+  expect(result instanceof Error).toBe(false)
+  const buildCall = calls.find((call) => call.args.includes('build'))
+  const upCall = calls.find((call) => call.args.includes('up'))
+  expect(buildCall?.env).toBeUndefined()
+  expect(upCall?.env).toBeUndefined()
+  expect(buildCall?.args).toContain('--env-file')
+  expect(buildCall?.args).toContain(join(paths.secretsDir, 'demo', '.env'))
+})
+
+test('deployApp > insufficient disk space returns a typed error', async () => {
+  const { paths, store, log } = await mkEnv()
+  const workdir = await mkWorkdir()
+
+  const result = await deployApp(
+    {
+      config: mkCfg(),
+      paths,
+      store,
+      log,
+      diskFree: async () => 1024,
+      dockerExec: fakeExec([]),
+    },
+    { app: 'demo', workdir, sha: 'x', trigger: 'manual' },
+    noProgress,
+  )
+
+  expect(result).toBeInstanceOf(InternalError)
+})
+
+test.each([
+  new InternalError('disk unavailable'),
+  new Error('disk unavailable'),
+  'disk unavailable',
+])('deployApp > records disk probe failures and releases the lock: %s', async (failure) => {
+  const { paths, store, log } = await mkEnv()
+  const workdir = await mkWorkdir()
+  const result = await deployApp(
+    {
+      config: mkCfg(),
+      paths,
+      store,
+      log,
+      diskFree: async () => {
+        throw failure
       },
-      { app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' },
-      noProgress,
-    )
+      dockerExec: fakeExec([]),
+    },
+    { app: 'demo', workdir, sha: 'x', trigger: 'manual' },
+    noProgress,
+  )
 
-    expect(result instanceof Error).toBe(false)
-    if (result instanceof Error) {
-      return
-    }
-    expect(result.deployedSHA).toBe('deadbeef')
-
-    const state = await stateLoad(store, 'demo')
-    if (state instanceof Error) {
-      throw state
-    }
-    expect(state.deployed_sha).toBe('deadbeef')
-    expect(state.deployed_workdir).toBe(workdir)
-    expect(calls.some((call) => call.args.includes('build'))).toBe(true)
-    expect(calls.some((call) => call.args.includes('up'))).toBe(true)
+  expect(result).toBeInstanceOf(InternalError)
+  if (failure instanceof InternalError) {
+    expect(result).toBe(failure)
+  } else {
+    expect(result).toHaveProperty('cause', failure)
+  }
+  expect(await stateLoad(store, 'demo')).toMatchObject({
+    last_deploy_status: 'failure',
+    last_deploy_error: 'disk unavailable',
   })
+  const release = await stateAcquireLock(paths.locksDir, 'demo', { blocking: false })
+  if (release instanceof Error) {
+    throw release
+  }
+  await release()
+})
 
-  test('missing app returns a typed error', async () => {
-    const { paths, store, log } = await mkEnv()
-    const workdir = await mkWorkdir()
+test('deployApp > build failure records the failure in last-deploy state', async () => {
+  const { paths, store, log } = await mkEnv()
+  const calls: Call[] = []
+  const workdir = await mkWorkdir()
 
-    const result = await deployApp(
-      {
-        config: mkCfg(),
-        paths,
-        store,
-        log,
-        diskFree: async () => 10 * 1024 * 1024 * 1024,
-        dockerExec: fakeExec([]),
+  const result = await deployApp(
+    {
+      config: mkCfg(),
+      paths,
+      store,
+      log,
+      diskFree: async () => 10 * 1024 * 1024 * 1024,
+      dockerExec: async (args): Promise<ExecResult> => {
+        calls.push({ args: [...args] })
+        if (args.includes('build')) {
+          return { stdout: '', stderr: 'boom', exitCode: 1 }
+        }
+        return { stdout: '', stderr: '', exitCode: 0 }
       },
-      { app: 'unknown', workdir, sha: 'deadbeef', trigger: 'manual' },
-      noProgress,
-    )
+    },
+    { app: 'demo', workdir, sha: 'x', trigger: 'manual' },
+    noProgress,
+  )
 
-    expect(result).toBeInstanceOf(NotFoundError)
-  })
+  expect(result instanceof Error).toBe(true)
+  const state = await stateLoad(store, 'demo')
+  if (state instanceof Error) {
+    throw state
+  }
+  expect(state.last_deploy_status).toBe('failure')
+  expect(state.last_deploy_error).toContain('boom')
+})
 
-  test('uses the managed env file for compose interpolation', async () => {
-    const { paths, store, log } = await mkEnv()
-    const workdir = await mkWorkdir()
-    await mkdir(join(paths.secretsDir, 'demo'), { recursive: true })
-    await writeFile(
-      join(paths.secretsDir, 'demo', '.env'),
-      'VITE_HOST_URL=https://demo.example.com\n',
-    )
-    const calls: Call[] = []
-    const cfg = mkCfg()
+test('deployApp > zero-domain app deploys without managed ports override', async () => {
+  const { paths, store, log } = await mkEnv()
+  const workdir = await mkWorkdir()
+  const calls: Call[] = []
+  const cfg = mkCfg()
+  cfg.apps.demo = {
+    repo: 'local',
+    branch: 'main',
+    domains: [],
+  }
 
-    const result = await deployApp(
-      {
-        config: cfg,
-        paths,
-        store,
-        log,
-        diskFree: async () => 10 * 1024 * 1024 * 1024,
-        dockerExec: fakeExec(calls),
-      },
-      { app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' },
-      noProgress,
-    )
+  const result = await deployApp(
+    {
+      config: cfg,
+      paths,
+      store,
+      log,
+      diskFree: async () => 10 * 1024 * 1024 * 1024,
+      dockerExec: fakeExec(calls),
+    },
+    { app: 'demo', workdir, sha: 'worker1', trigger: 'manual' },
+    noProgress,
+  )
 
-    expect(result instanceof Error).toBe(false)
-    const buildCall = calls.find((call) => call.args.includes('build'))
-    const upCall = calls.find((call) => call.args.includes('up'))
-    expect(buildCall?.env).toBeUndefined()
-    expect(upCall?.env).toBeUndefined()
-    expect(buildCall?.args).toContain('--env-file')
-    expect(buildCall?.args).toContain(join(paths.secretsDir, 'demo', '.env'))
-  })
+  expect(result instanceof Error).toBe(false)
+  const override = await readFile(join(paths.overridesDir, 'demo.yml'), 'utf8')
+  expect(override).not.toContain('ports:')
+  expect(calls.some((call) => call.args.includes('up'))).toBe(true)
+})
 
-  test('insufficient disk space returns a typed error', async () => {
-    const { paths, store, log } = await mkEnv()
-    const workdir = await mkWorkdir()
+test('deployApp > image-only compose skips the build step', async () => {
+  const { paths, store, log } = await mkEnv()
+  const workdir = await mkImageOnlyWorkdir()
+  const calls: Call[] = []
 
-    const result = await deployApp(
-      {
-        config: mkCfg(),
-        paths,
-        store,
-        log,
-        diskFree: async () => 1024,
-        dockerExec: fakeExec([]),
-      },
-      { app: 'demo', workdir, sha: 'x', trigger: 'manual' },
-      noProgress,
-    )
+  const result = await deployApp(
+    {
+      config: mkCfg(),
+      paths,
+      store,
+      log,
+      diskFree: async () => 10 * 1024 * 1024 * 1024,
+      dockerExec: fakeExec(calls),
+    },
+    { app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' },
+    noProgress,
+  )
 
-    expect(result).toBeInstanceOf(InternalError)
-  })
-
-  test.each([
-    new InternalError('disk unavailable'),
-    new Error('disk unavailable'),
-    'disk unavailable',
-  ])('records disk probe failures and releases the lock: %s', async (failure) => {
-    const { paths, store, log } = await mkEnv()
-    const workdir = await mkWorkdir()
-    const result = await deployApp(
-      {
-        config: mkCfg(),
-        paths,
-        store,
-        log,
-        diskFree: async () => {
-          throw failure
-        },
-        dockerExec: fakeExec([]),
-      },
-      { app: 'demo', workdir, sha: 'x', trigger: 'manual' },
-      noProgress,
-    )
-
-    expect(result).toBeInstanceOf(InternalError)
-    if (failure instanceof InternalError) {
-      expect(result).toBe(failure)
-    } else {
-      expect(result).toHaveProperty('cause', failure)
-    }
-    expect(await stateLoad(store, 'demo')).toMatchObject({
-      last_deploy_status: 'failure',
-      last_deploy_error: 'disk unavailable',
-    })
-    const release = await stateAcquireLock(paths.locksDir, 'demo', { blocking: false })
-    if (release instanceof Error) {
-      throw release
-    }
-    await release()
-  })
-
-  test('build failure records the failure in last-deploy state', async () => {
-    const { paths, store, log } = await mkEnv()
-    const calls: Call[] = []
-    const workdir = await mkWorkdir()
-
-    const result = await deployApp(
-      {
-        config: mkCfg(),
-        paths,
-        store,
-        log,
-        diskFree: async () => 10 * 1024 * 1024 * 1024,
-        dockerExec: async (args): Promise<ExecResult> => {
-          calls.push({ args: [...args] })
-          if (args.includes('build')) {
-            return { stdout: '', stderr: 'boom', exitCode: 1 }
-          }
-          return { stdout: '', stderr: '', exitCode: 0 }
-        },
-      },
-      { app: 'demo', workdir, sha: 'x', trigger: 'manual' },
-      noProgress,
-    )
-
-    expect(result instanceof Error).toBe(true)
-    const state = await stateLoad(store, 'demo')
-    if (state instanceof Error) {
-      throw state
-    }
-    expect(state.last_deploy_status).toBe('failure')
-    expect(state.last_deploy_error).toContain('boom')
-  })
-
-  test('zero-domain app deploys without managed ports override', async () => {
-    const { paths, store, log } = await mkEnv()
-    const workdir = await mkWorkdir()
-    const calls: Call[] = []
-    const cfg = mkCfg()
-    cfg.apps.demo = {
-      repo: 'local',
-      branch: 'main',
-      domains: [],
-    }
-
-    const result = await deployApp(
-      {
-        config: cfg,
-        paths,
-        store,
-        log,
-        diskFree: async () => 10 * 1024 * 1024 * 1024,
-        dockerExec: fakeExec(calls),
-      },
-      { app: 'demo', workdir, sha: 'worker1', trigger: 'manual' },
-      noProgress,
-    )
-
-    expect(result instanceof Error).toBe(false)
-    const override = await readFile(join(paths.overridesDir, 'demo.yml'), 'utf8')
-    expect(override).not.toContain('ports:')
-    expect(calls.some((call) => call.args.includes('up'))).toBe(true)
-  })
-
-  test('image-only compose skips the build step', async () => {
-    const { paths, store, log } = await mkEnv()
-    const workdir = await mkImageOnlyWorkdir()
-    const calls: Call[] = []
-
-    const result = await deployApp(
-      {
-        config: mkCfg(),
-        paths,
-        store,
-        log,
-        diskFree: async () => 10 * 1024 * 1024 * 1024,
-        dockerExec: fakeExec(calls),
-      },
-      { app: 'demo', workdir, sha: 'deadbeef', trigger: 'manual' },
-      noProgress,
-    )
-
-    expect(result instanceof Error).toBe(false)
-    expect(calls.some((call) => call.args.includes('build'))).toBe(false)
-    expect(calls.some((call) => call.args.includes('up'))).toBe(true)
-  })
+  expect(result instanceof Error).toBe(false)
+  expect(calls.some((call) => call.args.includes('build'))).toBe(false)
+  expect(calls.some((call) => call.args.includes('up'))).toBe(true)
 })
 describe('deployUpApp', () => {
   test('uses the direct-command runtime for compose execution', async () => {

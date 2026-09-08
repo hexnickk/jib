@@ -27,46 +27,46 @@ describe('module registry', () => {
   })
 
   test('initRequiredModules returns the core install set', () => {
-    const names = initRequiredModules().map((m) => m.manifest.name)
+    const names = initRequiredModules().map((module) => module.manifest.name)
     expect(names).toEqual(REQUIRED_NAMES)
   })
 
   test('initOptionalModules returns the opt-in module set', () => {
-    const names = initOptionalModules().map((m) => m.manifest.name)
+    const names = initOptionalModules().map((module) => module.manifest.name)
     expect(names).toEqual(OPTIONAL_NAMES)
   })
 
   test('initResolveModules looks up by name', () => {
     const mods = initResolveModules(['ingress', 'cloudflared'])
-    expect(mods.map((m) => m.manifest.name)).toEqual(['ingress', 'cloudflared'])
+    expect(mods.map((module) => module.manifest.name)).toEqual(['ingress', 'cloudflared'])
   })
 
   test('initResolveModules ignores unknown names', () => {
     const mods = initResolveModules(['ingress', 'nonexistent'])
-    expect(mods.map((m) => m.manifest.name)).toEqual(['ingress'])
+    expect(mods.map((module) => module.manifest.name)).toEqual(['ingress'])
   })
 
   test('initInstalledOptionalModules returns modules with true', () => {
     const config = configWith({ cloudflared: true })
-    const names = initInstalledOptionalModules(config).map((m) => m.manifest.name)
+    const names = initInstalledOptionalModules(config).map((module) => module.manifest.name)
     expect(names).toEqual(['cloudflared'])
   })
 
   test('initUnseenOptionalModules returns modules not in config.modules', () => {
     const config = configWith({ cloudflared: true })
-    const names = initUnseenOptionalModules(config).map((m) => m.manifest.name)
+    const names = initUnseenOptionalModules(config).map((module) => module.manifest.name)
     expect(names).toEqual([])
   })
 
   test('initUnseenOptionalModules returns all when modules is empty', () => {
     const config = configWith({})
-    const names = initUnseenOptionalModules(config).map((m) => m.manifest.name)
+    const names = initUnseenOptionalModules(config).map((module) => module.manifest.name)
     expect(names).toEqual(OPTIONAL_NAMES)
   })
 
   test('initUnseenOptionalModules returns none when all are decided', () => {
     const config = configWith({ cloudflared: true })
-    const names = initUnseenOptionalModules(config).map((m) => m.manifest.name)
+    const names = initUnseenOptionalModules(config).map((module) => module.manifest.name)
     expect(names).toEqual([])
   })
 

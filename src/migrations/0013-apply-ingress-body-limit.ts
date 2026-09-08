@@ -11,9 +11,8 @@ export const m0013_apply_ingress_body_limit: JibMigration = {
       return init
     }
     try {
-      const { ingressApplyNginxConfig } = await import(
-        '../modules/ingress/backends/nginx/config.ts'
-      )
+      const { ingressApplyNginxConfig } =
+        await import('../modules/ingress/backends/nginx/config.ts')
       return await ingressApplyNginxConfig(init.paths, init.config)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

@@ -8,9 +8,9 @@ import { cloudflaredSaveTunnelToken } from './service.ts'
 import { cloudflaredReadStatus } from './status.ts'
 
 /** Creates isolated Cloudflare paths and removes them after each status scenario. */
-async function withPaths<T>(
-  run: (paths: ReturnType<typeof pathsGetPaths>) => Promise<T>,
-): Promise<T> {
+async function withPaths<Value>(
+  run: (paths: ReturnType<typeof pathsGetPaths>) => Promise<Value>,
+): Promise<Value> {
   const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-status-'))
   try {
     return await run(pathsGetPaths(root))
@@ -76,7 +76,9 @@ describe('cloudflaredReadStatus', () => {
       ).toBeUndefined()
 
       const reloaded = await configLoad(paths.configFile)
-      if (reloaded instanceof Error) throw reloaded
+      if (reloaded instanceof Error) {
+        throw reloaded
+      }
       expect(cloudflaredReadStatus(reloaded, paths).configured).toBe(true)
     })
   })

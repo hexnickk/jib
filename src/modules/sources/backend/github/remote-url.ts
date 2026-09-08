@@ -1,5 +1,5 @@
-import { $ } from '@/libs/shell'
 import { InternalError } from '@jib/errors'
+import { $ } from '@/libs/shell'
 
 /** Canonical SSH clone URL for `owner/repo`. */
 export function githubRemoteSshCloneUrl(repo: string): string {

@@ -101,7 +101,9 @@ function createCliParser(rawArgs: string[], runtime: CliRuntime): Argv {
         stdinTty: runtime.stdinTty,
         stdoutTty: runtime.stdoutTty,
       })
-      if (nextRuntime instanceof Error) cmdExitError(nextRuntime)
+      if (nextRuntime instanceof Error) {
+        cmdExitError(nextRuntime)
+      }
     }, true)
     .help()
     .version(pkg.version)
@@ -113,14 +115,18 @@ function createCliParser(rawArgs: string[], runtime: CliRuntime): Argv {
       parser.showHelp('log')
     },
   )
-  for (const command of cliCommands) parser.command(command as CommandModule)
+  for (const command of cliCommands) {
+    parser.command(command as CommandModule)
+  }
   return parser
 }
 
 configureSharedFileUmask()
 
 const runtime = cliReadRuntime()
-if (runtime instanceof Error) cmdExitError(runtime)
+if (runtime instanceof Error) {
+  cmdExitError(runtime)
+}
 
 const rawArgs = hideBin(process.argv)
 

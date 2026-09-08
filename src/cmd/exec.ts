@@ -29,7 +29,9 @@ const cliExecCommand = {
 /** Runs docker exec passthrough parsing and returns a shell result or typed error. */
 async function execRunCommand() {
   const parsed = dockerParseExecArgs(readExecTail())
-  if (parsed instanceof Error) return parsed
+  if (parsed instanceof Error) {
+    return parsed
+  }
   return await dockerHandleShell(parsed, 'exec')
 }
 

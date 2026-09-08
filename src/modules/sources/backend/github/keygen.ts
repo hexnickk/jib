@@ -1,7 +1,7 @@
 import { chmod, readFile, stat } from 'node:fs/promises'
-import { $ } from '@/libs/shell'
 import { InternalError, ValidationError } from '@jib/errors'
 import { type Paths, pathsCredsPath, pathsEnsureCredsDirResult } from '@jib/paths'
+import { $ } from '@/libs/shell'
 
 /** Disk layout for a deploy-key source. */
 export interface DeployKeyPaths {

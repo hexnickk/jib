@@ -61,31 +61,13 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
     return cfg.envFile ? ['--env-file', cfg.envFile] : []
   }
 
-  async function runResult(
-    args: string[],
-    opts: { env?: Record<string, string>; tty?: boolean; capture?: boolean } = {},
-  ): Promise<InternalError | undefined> {
-    try {
-      const result = await runner(args, { cwd: cfg.dir, ...opts })
-      if (result.exitCode !== 0) {
-        const detail = result.stderr || result.stdout
-        return new InternalError(
-          `${args.slice(0, 4).join(' ')} exited ${result.exitCode}: ${detail}`,
-        )
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      return new InternalError(`${args.slice(0, 4).join(' ')} failed: ${message}`, { cause: error })
-    }
-  }
-
   return {
     cfg,
     projectName,
     baseArgs,
     async build(buildArgs: Record<string, string> = {}, opts: { quiet?: boolean } = {}) {
       const args = ['docker', ...baseArgs(), ...envArgs(), 'build']
-      return runResult(args, {
+      return runResult(cfg, runner, args, {
         ...(Object.keys(buildArgs).length > 0 ? { env: buildArgs } : {}),
         ...(opts.quiet ? { capture: true } : {}),
       })
@@ -101,7 +83,7 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
         '--remove-orphans',
         ...(opts.services ?? []),
       ]
-      return runResult(args, {
+      return runResult(cfg, runner, args, {
         ...(opts.buildArgs && Object.keys(opts.buildArgs).length > 0
           ? { env: opts.buildArgs }
           : {}),
@@ -113,21 +95,28 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
       if (removeVolumes) {
         args.push('-v')
       }
-      return runResult(args, opts.quiet ? { capture: true } : {})
+      return runResult(cfg, runner, args, opts.quiet ? { capture: true } : {})
     },
     async restart(services: string[] = [], opts: { quiet?: boolean } = {}) {
       return runResult(
+        cfg,
+        runner,
         ['docker', ...baseArgs(), 'restart', ...services],
         opts.quiet ? { capture: true } : {},
       )
     },
     async exec(service: string, cmd: string[]) {
-      return runResult(['docker', ...baseArgs(), 'exec', service, ...cmd], { tty: true })
-    },
-    async run(service: string, cmd: string[]) {
-      return runResult(['docker', ...baseArgs(), ...envArgs(), 'run', '--rm', service, ...cmd], {
+      return runResult(cfg, runner, ['docker', ...baseArgs(), 'exec', service, ...cmd], {
         tty: true,
       })
+    },
+    async run(service: string, cmd: string[]) {
+      return runResult(
+        cfg,
+        runner,
+        ['docker', ...baseArgs(), ...envArgs(), 'run', '--rm', service, ...cmd],
+        { tty: true },
+      )
     },
     async logs(service?: string, opts: { follow?: boolean; tail?: number } = {}) {
       const args = ['docker', ...baseArgs(), ...envArgs(), 'logs']
@@ -140,24 +129,49 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
       if (service) {
         args.push(service)
       }
-      return runResult(args)
+      return runResult(cfg, runner, args)
     },
     async ps() {
-      const args = ['docker', ...baseArgs(), 'ps', '--format', 'json']
-      try {
-        const result = await runner(args, { cwd: cfg.dir, capture: true })
-        if (result.exitCode !== 0) {
-          return new InternalError(
-            `${args.slice(0, 4).join(' ')} exited ${result.exitCode}: ${result.stderr}`,
-          )
-        }
-        return result
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        return new InternalError(`${args.slice(0, 4).join(' ')} failed: ${message}`, {
-          cause: error,
-        })
-      }
+      return captureResult(cfg, runner, ['docker', ...baseArgs(), 'ps', '--format', 'json'])
     },
+  }
+}
+
+/** Executes a Compose mutation or streaming command, retaining its exit diagnostics. */
+async function runResult(
+  cfg: ComposeConfig,
+  runner: DockerExec,
+  args: string[],
+  opts: { env?: Record<string, string>; tty?: boolean; capture?: boolean } = {},
+): Promise<InternalError | undefined> {
+  try {
+    const result = await runner(args, { cwd: cfg.dir, ...opts })
+    if (result.exitCode !== 0) {
+      const detail = result.stderr || result.stdout
+      return new InternalError(`${args.slice(0, 4).join(' ')} exited ${result.exitCode}: ${detail}`)
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`${args.slice(0, 4).join(' ')} failed: ${message}`, { cause: error })
+  }
+}
+
+/** Captures Compose status output, preserving its stderr-only failure diagnostics. */
+async function captureResult(
+  cfg: ComposeConfig,
+  runner: DockerExec,
+  args: string[],
+): Promise<ExecResult | InternalError> {
+  try {
+    const result = await runner(args, { cwd: cfg.dir, capture: true })
+    if (result.exitCode !== 0) {
+      return new InternalError(
+        `${args.slice(0, 4).join(' ')} exited ${result.exitCode}: ${result.stderr}`,
+      )
+    }
+    return result
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`${args.slice(0, 4).join(' ')} failed: ${message}`, { cause: error })
   }
 }

@@ -1,4 +1,3 @@
-import { removeApp, removeCreateSupport } from '@/flows/remove/index.ts'
 import { cliCanPrompt, cliCreateMissingInputError, cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
 import type { JibError } from '@jib/errors'
@@ -7,6 +6,7 @@ import type { Paths } from '@jib/paths'
 import { tuiPromptConfirmResult, tuiSpinner } from '@jib/tui'
 import { consola } from 'consola'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
+import { removeApp, removeCreateSupport } from '@/flows/remove/index.ts'
 import { cmdCreateHandler } from './handler.ts'
 
 const cliRemoveCommand = {
@@ -35,7 +35,9 @@ async function removeRunCommand(args: ArgumentsCamelCase<{ app: string; force?: 
       ])
     }
     const ingressSummary =
-      appCfg.domains.length > 0 ? ` (${appCfg.domains.map((d) => d.host).join(', ')})` : ''
+      appCfg.domains.length > 0
+        ? ` (${appCfg.domains.map((domain) => domain.host).join(', ')})`
+        : ''
     const ok = await tuiPromptConfirmResult({
       message: `Remove app "${appName}"${ingressSummary}?`,
       initialValue: false,

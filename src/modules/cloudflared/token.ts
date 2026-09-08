@@ -9,14 +9,22 @@
  */
 export function cloudflaredExtractTunnelToken(raw: string): string {
   const trimmed = raw.trim()
-  if (!trimmed) return ''
+  if (!trimmed) {
+    return ''
+  }
 
   const install = /(?:sudo\s+)?cloudflared\s+service\s+install\s+(.+)$/i.exec(trimmed)
-  if (install?.[1]) return install[1].trim()
+  if (install?.[1]) {
+    return install[1].trim()
+  }
 
   const run = /cloudflared\s+tunnel\s+run\s+--token\s+(.+)$/i.exec(trimmed)
-  if (run?.[1]) return run[1].trim()
+  if (run?.[1]) {
+    return run[1].trim()
+  }
 
-  if (/^\s*(?:sudo\s+)?cloudflared\s/i.test(trimmed)) return ''
+  if (/^\s*(?:sudo\s+)?cloudflared\s/i.test(trimmed)) {
+    return ''
+  }
   return trimmed
 }

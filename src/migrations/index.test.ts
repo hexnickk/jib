@@ -71,9 +71,9 @@ describe('runJibMigrations', () => {
   test('records migration IDs in jib_migrations table', async () => {
     await runJibMigrations(ctx, [migration('x', () => {}), migration('y', () => {})])
     const rows = stateListMigrations(db)
-    expect(rows.map((r) => r.id).sort()).toEqual(['x', 'y'])
-    for (const r of rows) {
-      expect(r.at).toBeTruthy()
+    expect(rows.map((row) => row.id).sort()).toEqual(['x', 'y'])
+    for (const row of rows) {
+      expect(row.at).toBeTruthy()
     }
   })
 
@@ -95,7 +95,7 @@ describe('runJibMigrations', () => {
     expect(result.message).toContain('boom')
     expect(log).toEqual(['a'])
     const rows = stateListMigrations(db)
-    expect(rows.map((r) => r.id)).toEqual(['a'])
+    expect(rows.map((row) => row.id)).toEqual(['a'])
   })
 
   test('result wrapper returns a typed failure', async () => {

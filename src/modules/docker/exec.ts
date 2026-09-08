@@ -43,7 +43,7 @@ export async function dockerSpawnInherit(
 
 /** Executes Docker and maps process-launch failures to a non-zero result instead of throwing. */
 export const dockerRealExec: DockerExec = async (args, opts) => {
-  const env = { ...process.env, ...(opts.env ?? {}) } as Record<string, string>
+  const env = { ...process.env, ...opts.env } as Record<string, string>
   if (opts.tty) {
     return await dockerSpawnInherit(args, opts.cwd, env)
   }

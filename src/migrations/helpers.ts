@@ -1,6 +1,6 @@
 import { chown, rename, unlink, writeFile } from 'node:fs/promises'
-import { $ } from '@/libs/shell'
 import { InternalError, ValidationError } from '@jib/errors'
+import { $ } from '@/libs/shell'
 
 export const GROUP = 'jib'
 export const DOCKER_GROUP = 'docker'

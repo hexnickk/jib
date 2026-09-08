@@ -103,43 +103,47 @@ export async function addPromptForServices(
       }
     }
 
-    let addManual = false
-    if (tuiIsInteractive()) {
-      const confirm = await tuiPromptConfirmResult({
-        message: `Add more .env variables for "${service.name}"?`,
-        initialValue: false,
-      })
-      if (confirm instanceof Error) {
-        return confirm
-      }
-      addManual = confirm
+    const manual = await promptAdditionalConfig(service.name)
+    if (manual instanceof Error) {
+      return manual
     }
-    if (addManual) {
-      const manual = await tuiPromptLinesResult({
-        title: `Additional .env variables for "${service.name}"`,
-        lines: MANUAL_CONFIG_LINES,
-        promptLabel: 'var',
-        validateLine: addValidateEnvEntry,
-      })
-      if (manual instanceof Error) {
-        return manual
+    for (const raw of manual) {
+      const base = addParseEnvEntry(raw)
+      if (base instanceof Error) {
+        return base
       }
-      for (const raw of manual) {
-        const base = addParseEnvEntry(raw)
-        if (base instanceof Error) {
-          return base
-        }
-        const existing = provided.get(base.key)
-        const entry = { ...base, scope: existing?.scope ?? 'runtime' }
-        configEntries.push(entry)
-        provided.set(base.key, mergeEntry(existing, entry))
-      }
+      const existing = provided.get(base.key)
+      const entry = { ...base, scope: existing?.scope ?? 'runtime' }
+      configEntries.push(entry)
+      provided.set(base.key, mergeEntry(existing, entry))
     }
 
     answers.push({ service: service.name, expose, domainHosts: nextDomainHosts, configEntries })
   }
 
   return answers
+}
+
+async function promptAdditionalConfig(service: string): Promise<string[] | JibError> {
+  if (!tuiIsInteractive()) {
+    return []
+  }
+  const confirm = await tuiPromptConfirmResult({
+    message: `Add more .env variables for "${service}"?`,
+    initialValue: false,
+  })
+  if (confirm instanceof Error) {
+    return confirm
+  }
+  if (!confirm) {
+    return []
+  }
+  return tuiPromptLinesResult({
+    title: `Additional .env variables for "${service}"`,
+    lines: MANUAL_CONFIG_LINES,
+    promptLabel: 'var',
+    validateLine: addValidateEnvEntry,
+  })
 }
 
 function mergeEntry(existing: ConfigEntry | undefined, next: ConfigEntry): ConfigEntry {

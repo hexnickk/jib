@@ -1,6 +1,6 @@
-import { $ } from '@/libs/shell'
 import { type Config, configLoad } from '@jib/config'
 import { InternalError, type JibError, errorsToJibError } from '@jib/errors'
+import { $ } from '@/libs/shell'
 
 const WATCHER_SERVICE = 'jib-watcher.service'
 const CLOUDFLARED_SERVICE = 'jib-cloudflared.service'
@@ -17,7 +17,7 @@ interface SystemdManagedServicesDeps {
 }
 
 /** Starts all configured Jib-managed systemd units after dependencies are installed. */
-export async function systemdStartConfiguredManagedServicesResult(
+export async function systemdStartManagedServicesResult(
   configFile: string,
   deps: SystemdManagedServicesDeps = {},
 ): Promise<JibError | undefined> {

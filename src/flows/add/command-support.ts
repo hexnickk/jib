@@ -57,7 +57,7 @@ export async function addChooseInitialSource(
 
 /** Creates spinner-backed inspection callbacks for the add flow. */
 export function addCreateInspectionObserver() {
-  const progress = cliIsTextOutput() ? tuiSpinner() : null
+  const progress = cliIsTextOutput() ? tuiSpinner() : undefined
   let active = false
   return {
     observer: {

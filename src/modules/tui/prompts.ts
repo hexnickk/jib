@@ -14,10 +14,10 @@ export {
 
 type StrOpts = { message: string; placeholder?: string; initialValue?: string }
 type IntOpts = { message: string; initialValue?: number; min?: number; max?: number }
-type SelectOpts<T extends string> = {
+type SelectOpts<Value extends string> = {
   message: string
-  options: { value: T; label: string; hint?: string }[]
-  initialValue?: T
+  options: { value: Value; label: string; hint?: string }[]
+  initialValue?: Value
 }
 type ConfirmOpts = { message: string; initialValue?: boolean }
 
@@ -27,15 +27,15 @@ type ConfirmOpts = { message: string; initialValue?: boolean }
  * delegates here so the interactive/cancel/return shape lives in one place.
  */
 /** Runs one clack prompt and maps cancellation or library failures to shared result errors. */
-async function ask<T>(
-  fn: () => Promise<T | symbol>,
-): Promise<T | ValidationError | CancelledError | InternalError> {
+async function ask<Value>(
+  fn: () => Promise<Value | symbol>,
+): Promise<Value | ValidationError | CancelledError | InternalError> {
   const interactiveError = tuiAssertInteractiveResult()
   if (interactiveError) {
     return interactiveError
   }
 
-  let value: T | symbol
+  let value: Value | symbol
   try {
     value = await fn()
   } catch (error) {
@@ -46,20 +46,23 @@ async function ask<T>(
   if (clack.isCancel(value)) {
     return new CancelledError('cancelled')
   }
-  return value as T
+  return value as Value
 }
 
 /**
  * Drop `hint: undefined` so clack (compiled under `exactOptionalPropertyTypes`)
  * accepts the literal. Centralized so every select/multiselect call stays typed.
  */
-function mapOptions<T extends string>(
-  options: SelectOpts<T>['options'],
-): { value: T; label: string }[] {
-  return options.map((o) =>
-    o.hint !== undefined
-      ? ({ value: o.value, label: o.label, hint: o.hint } as { value: T; label: string })
-      : { value: o.value, label: o.label },
+function mapOptions<Value extends string>(
+  options: SelectOpts<Value>['options'],
+): { value: Value; label: string }[] {
+  return options.map((option) =>
+    option.hint !== undefined
+      ? ({ value: option.value, label: option.label, hint: option.hint } as {
+          value: Value
+          label: string
+        })
+      : { value: option.value, label: option.label },
   )
 }
 
@@ -71,7 +74,7 @@ export function tuiPromptStringResult(
       message: opts.message,
       ...(opts.placeholder !== undefined && { placeholder: opts.placeholder }),
       ...(opts.initialValue !== undefined && { initialValue: opts.initialValue }),
-      validate: (v: string) => (v.length === 0 ? 'value required' : undefined),
+      validate: (value: string) => (value.length === 0 ? 'value required' : undefined),
     }),
   )
 }
@@ -92,40 +95,40 @@ export async function tuiPromptStringOptionalResult(
 export async function tuiPromptIntResult(
   opts: IntOpts,
 ): Promise<number | ValidationError | CancelledError | InternalError> {
-  const v = await ask(() =>
+  const value = await ask(() =>
     clack.text({
       message: opts.message,
       ...(opts.initialValue !== undefined && { initialValue: String(opts.initialValue) }),
-      validate: (s: string) => {
-        const n = Number(s)
-        if (!Number.isInteger(n)) {
+      validate: (input: string) => {
+        const number = Number(input)
+        if (!Number.isInteger(number)) {
           return 'must be an integer'
         }
-        if (opts.min !== undefined && n < opts.min) {
+        if (opts.min !== undefined && number < opts.min) {
           return `must be >= ${opts.min}`
         }
-        if (opts.max !== undefined && n > opts.max) {
+        if (opts.max !== undefined && number > opts.max) {
           return `must be <= ${opts.max}`
         }
         return undefined
       },
     }),
   )
-  return v instanceof Error ? v : Number(v)
+  return value instanceof Error ? value : Number(value)
 }
 
-export function tuiPromptPasswordResult(opts: { message: string }): Promise<
-  string | ValidationError | CancelledError | InternalError
-> {
+export function tuiPromptPasswordResult(opts: {
+  message: string
+}): Promise<string | ValidationError | CancelledError | InternalError> {
   return ask(() => clack.password({ message: opts.message }))
 }
 
-export function tuiPromptSelectResult<T extends string>(
-  opts: SelectOpts<T>,
-): Promise<T | ValidationError | CancelledError | InternalError> {
-  const options = mapOptions(opts.options) as Parameters<typeof clack.select<T>>[0]['options']
-  return ask<T>(() =>
-    clack.select<T>({
+export function tuiPromptSelectResult<Value extends string>(
+  opts: SelectOpts<Value>,
+): Promise<Value | ValidationError | CancelledError | InternalError> {
+  const options = mapOptions(opts.options) as Parameters<typeof clack.select<Value>>[0]['options']
+  return ask<Value>(() =>
+    clack.select<Value>({
       message: opts.message,
       options,
       ...(opts.initialValue !== undefined && { initialValue: opts.initialValue }),
@@ -133,11 +136,15 @@ export function tuiPromptSelectResult<T extends string>(
   )
 }
 
-export function tuiPromptMultiSelectResult<T extends string>(
-  opts: SelectOpts<T>,
-): Promise<T[] | ValidationError | CancelledError | InternalError> {
-  const options = mapOptions(opts.options) as Parameters<typeof clack.multiselect<T>>[0]['options']
-  return ask<T[]>(() => clack.multiselect<T>({ message: opts.message, options, required: false }))
+export function tuiPromptMultiSelectResult<Value extends string>(
+  opts: SelectOpts<Value>,
+): Promise<Value[] | ValidationError | CancelledError | InternalError> {
+  const options = mapOptions(opts.options) as Parameters<
+    typeof clack.multiselect<Value>
+  >[0]['options']
+  return ask<Value[]>(() =>
+    clack.multiselect<Value>({ message: opts.message, options, required: false }),
+  )
 }
 
 /**
@@ -145,9 +152,9 @@ export function tuiPromptMultiSelectResult<T extends string>(
  * `-----END ... KEY-----`, then returns the full block. Uses raw
  * readline so pasted multiline text works because clack has no multiline input.
  */
-export async function tuiPromptPemResult(opts: { message: string }): Promise<
-  string | ValidationError | CancelledError | InternalError
-> {
+export async function tuiPromptPemResult(opts: {
+  message: string
+}): Promise<string | ValidationError | CancelledError | InternalError> {
   const interactiveError = tuiAssertInteractiveResult()
   if (interactiveError) {
     return interactiveError

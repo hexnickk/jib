@@ -1,5 +1,5 @@
-import { $ } from '@/libs/shell'
 import { InternalError } from '@jib/errors'
+import { $ } from '@/libs/shell'
 
 const PACKAGE_NAME = 'deployjib'
 const CLI_BIN = 'jib'

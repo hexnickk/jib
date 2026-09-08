@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
-import { $ } from '@/libs/shell'
 import { configLoad, configWrite } from '@jib/config'
 import { InternalError, type JibError } from '@jib/errors'
 import { type Paths, pathsCredsPath, pathsEnsureCredsDirResult } from '@jib/paths'
+import { $ } from '@/libs/shell'
 import { CLOUDFLARED_SERVICE_NAME } from './templates.ts'
 import { cloudflaredExtractTunnelToken } from './token.ts'
 

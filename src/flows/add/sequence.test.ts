@@ -1,8 +1,8 @@
-import { runDeploy } from '@/flows/deploy/run.ts'
 import type { Config } from '@jib/config'
 import { InternalError, type RollbackError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
-import { describe, expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vitest'
+import { runDeploy } from '@/flows/deploy/run.ts'
 import { addRunSequence } from './sequence.ts'
 import type { AddFlowResult } from './types.ts'
 
@@ -51,184 +51,182 @@ function createNoopSpinner() {
 }
 
 /** Creates a caller-controlled promise for testing asynchronous lifecycle ordering. */
-function createDeferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((finish) => {
+function createDeferred<Value>(): { promise: Promise<Value>; resolve(value: Value): void } {
+  let resolve!: (value: Value) => void
+  const promise = new Promise<Value>((finish) => {
     resolve = finish
   })
   return { promise, resolve }
 }
 
-describe('addRunSequence', () => {
-  test('runs add then deploy without rollback on success', async () => {
-    const calls: string[] = []
-    const result = await addRunSequence(
-      async () => {
-        calls.push('add')
-        return addResult
-      },
-      async () => {
-        calls.push('deploy')
-        return {
-          app: 'blog',
-          durationMs: 42,
-          preparedSha: '1234567890',
-          sha: 'abcdef1234',
-          workdir: '/tmp/blog',
-        }
-      },
-      async () => {
-        calls.push('rollback')
-        return undefined
-      },
-      { interrupted: false },
-    )
-    if (result instanceof Error) {
-      throw result
-    }
-
-    expect(calls).toEqual(['add', 'deploy'])
-    expect(result.deployResult.sha).toBe('abcdef1234')
-  })
-
-  test('rolls back when deploy fails', async () => {
-    const calls: string[] = []
-    const result = await addRunSequence(
-      async () => {
-        calls.push('add')
-        return addResult
-      },
-      async () => {
-        calls.push('deploy')
-        return new InternalError('deploy failed')
-      },
-      async () => {
-        calls.push('rollback')
-        return undefined
-      },
-      { interrupted: false },
-    )
-    expect(result).toMatchObject({
-      message: 'deploy failed',
-      name: 'RollbackError',
-    } satisfies Partial<RollbackError>)
-
-    expect(calls).toEqual(['add', 'deploy', 'rollback'])
-  })
-
-  test('does not roll back add while deployment is still active', async () => {
-    vi.useFakeTimers()
-    const deployment = createDeferred<{ deployedSHA: string; durationMs: number }>()
-    const deploymentStarted = createDeferred<void>()
-    const calls: string[] = []
-
-    try {
-      const sequence = addRunSequence(
-        async () => {
-          calls.push('add')
-          return addResult
-        },
-        async () => {
-          calls.push('deploy')
-          return await runDeploy(deployConfig, deployPaths, 'blog', undefined, {
-            createSpinner: createNoopSpinner,
-            sync: async () => ({ sha: '1234567890', workdir: '/tmp/blog' }),
-            deployPrepared: async () => {
-              deploymentStarted.resolve()
-              return await deployment.promise
-            },
-          })
-        },
-        async () => {
-          calls.push('rollback')
-          return undefined
-        },
-        { interrupted: false },
-      )
-
-      await deploymentStarted.promise
-      await vi.advanceTimersByTimeAsync(10 * 60_000)
-      expect(calls).toEqual(['add', 'deploy'])
-
-      deployment.resolve({ deployedSHA: 'abcdef1234', durationMs: 42 })
-      const result = await sequence
-      if (result instanceof Error) {
-        throw result
+test('addRunSequence > runs add then deploy without rollback on success', async () => {
+  const calls: string[] = []
+  const result = await addRunSequence(
+    async () => {
+      calls.push('add')
+      return addResult
+    },
+    async () => {
+      calls.push('deploy')
+      return {
+        app: 'blog',
+        durationMs: 42,
+        preparedSha: '1234567890',
+        sha: 'abcdef1234',
+        workdir: '/tmp/blog',
       }
-      expect(calls).toEqual(['add', 'deploy'])
-      expect(result.deployResult.sha).toBe('abcdef1234')
-    } finally {
-      vi.useRealTimers()
-    }
-  })
+    },
+    async () => {
+      calls.push('rollback')
+      return undefined
+    },
+    { interrupted: false },
+  )
+  if (result instanceof Error) {
+    throw result
+  }
 
-  test('rolls back if interrupted after add completes', async () => {
-    const calls: string[] = []
-    const result = await addRunSequence(
+  expect(calls).toEqual(['add', 'deploy'])
+  expect(result.deployResult.sha).toBe('abcdef1234')
+})
+
+test('addRunSequence > rolls back when deploy fails', async () => {
+  const calls: string[] = []
+  const result = await addRunSequence(
+    async () => {
+      calls.push('add')
+      return addResult
+    },
+    async () => {
+      calls.push('deploy')
+      return new InternalError('deploy failed')
+    },
+    async () => {
+      calls.push('rollback')
+      return undefined
+    },
+    { interrupted: false },
+  )
+  expect(result).toMatchObject({
+    message: 'deploy failed',
+    name: 'RollbackError',
+  } satisfies Partial<RollbackError>)
+
+  expect(calls).toEqual(['add', 'deploy', 'rollback'])
+})
+
+test('addRunSequence > does not roll back add while deployment is still active', async () => {
+  vi.useFakeTimers()
+  const deployment = createDeferred<{ deployedSHA: string; durationMs: number }>()
+  const deploymentStarted = createDeferred<void>()
+  const calls: string[] = []
+
+  try {
+    const sequence = addRunSequence(
       async () => {
         calls.push('add')
         return addResult
       },
       async () => {
         calls.push('deploy')
-        return {
-          app: 'blog',
-          durationMs: 42,
-          preparedSha: '1234567890',
-          sha: 'abcdef1234',
-          workdir: '/tmp/blog',
-        }
+        return await runDeploy({ cfg: deployConfig, paths: deployPaths }, 'blog', undefined, {
+          createSpinner: createNoopSpinner,
+          sync: async () => ({ sha: '1234567890', workdir: '/tmp/blog' }),
+          deployPrepared: async () => {
+            deploymentStarted.resolve()
+            return await deployment.promise
+          },
+        })
       },
       async () => {
         calls.push('rollback')
         return undefined
       },
-      { interrupted: true },
+      { interrupted: false },
     )
-    expect(result).toMatchObject({
-      message: 'add cancelled',
-      name: 'RollbackError',
-      original: { code: 'cancelled', message: 'add cancelled' },
-    } satisfies Partial<RollbackError>)
 
-    expect(calls).toEqual(['add', 'rollback'])
-  })
+    await deploymentStarted.promise
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(calls).toEqual(['add', 'deploy'])
 
-  test('does not roll back after a successful deploy even if interrupted late', async () => {
-    const calls: string[] = []
-    let interrupted = false
-
-    const result = await addRunSequence(
-      async () => {
-        calls.push('add')
-        return addResult
-      },
-      async () => {
-        calls.push('deploy')
-        interrupted = true
-        return {
-          app: 'blog',
-          durationMs: 42,
-          preparedSha: '1234567890',
-          sha: 'abcdef1234',
-          workdir: '/tmp/blog',
-        }
-      },
-      async () => {
-        calls.push('rollback')
-        return undefined
-      },
-      {
-        get interrupted() {
-          return interrupted
-        },
-      },
-    )
+    deployment.resolve({ deployedSHA: 'abcdef1234', durationMs: 42 })
+    const result = await sequence
     if (result instanceof Error) {
       throw result
     }
-
     expect(calls).toEqual(['add', 'deploy'])
     expect(result.deployResult.sha).toBe('abcdef1234')
-  })
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('addRunSequence > rolls back if interrupted after add completes', async () => {
+  const calls: string[] = []
+  const result = await addRunSequence(
+    async () => {
+      calls.push('add')
+      return addResult
+    },
+    async () => {
+      calls.push('deploy')
+      return {
+        app: 'blog',
+        durationMs: 42,
+        preparedSha: '1234567890',
+        sha: 'abcdef1234',
+        workdir: '/tmp/blog',
+      }
+    },
+    async () => {
+      calls.push('rollback')
+      return undefined
+    },
+    { interrupted: true },
+  )
+  expect(result).toMatchObject({
+    message: 'add cancelled',
+    name: 'RollbackError',
+    original: { code: 'cancelled', message: 'add cancelled' },
+  } satisfies Partial<RollbackError>)
+
+  expect(calls).toEqual(['add', 'rollback'])
+})
+
+test('addRunSequence > does not roll back after a successful deploy even if interrupted late', async () => {
+  const calls: string[] = []
+  let interrupted = false
+
+  const result = await addRunSequence(
+    async () => {
+      calls.push('add')
+      return addResult
+    },
+    async () => {
+      calls.push('deploy')
+      interrupted = true
+      return {
+        app: 'blog',
+        durationMs: 42,
+        preparedSha: '1234567890',
+        sha: 'abcdef1234',
+        workdir: '/tmp/blog',
+      }
+    },
+    async () => {
+      calls.push('rollback')
+      return undefined
+    },
+    {
+      get interrupted() {
+        return interrupted
+      },
+    },
+  )
+  if (result instanceof Error) {
+    throw result
+  }
+
+  expect(calls).toEqual(['add', 'deploy'])
+  expect(result.deployResult.sha).toBe('abcdef1234')
 })

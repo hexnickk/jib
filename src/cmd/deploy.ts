@@ -1,8 +1,8 @@
-import { runDeploy } from '@/flows/deploy/run.ts'
 import { cliIsTextOutput } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
 import { consola } from 'consola'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
+import { runDeploy } from '@/flows/deploy/run.ts'
 import { cmdCreateHandler } from './handler.ts'
 
 const cliDeployCommand = {
@@ -23,8 +23,7 @@ async function deployRunCommand(args: ArgumentsCamelCase<{ app: string; ref?: st
   }
   const { cfg, paths } = loaded
   const result = await runDeploy(
-    cfg,
-    paths,
+    { cfg, paths },
     appName,
     typeof args.ref === 'string' ? args.ref : undefined,
   )

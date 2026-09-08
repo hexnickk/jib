@@ -102,14 +102,15 @@ const resolveAppStep: Step<AddRunContext, { managedComposeWritten: boolean }, Ji
   name: 'resolved app',
   async up(ctx) {
     const finalApp = await ctx.planner.buildResolvedApp(
-      ctx.params.cfg,
-      ctx.params.paths,
-      ctx.params.appName,
-      ctx.workdir,
-      ctx.params.args,
-      ctx.params.inputs,
-      ctx.inspection,
-      ctx.guided,
+      { cfg: ctx.params.cfg, paths: ctx.params.paths },
+      {
+        appName: ctx.params.appName,
+        workdir: ctx.workdir,
+        args: ctx.params.args,
+        inputs: ctx.params.inputs,
+        inspection: ctx.inspection,
+        guided: ctx.guided,
+      },
     )
     if (finalApp instanceof Error) {
       return finalApp

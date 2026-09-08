@@ -43,7 +43,9 @@ describe('addPromptForServices', () => {
     )
 
     expect(result).not.toBeInstanceOf(Error)
-    if (result instanceof Error) throw result
+    if (result instanceof Error) {
+      throw result
+    }
     expect(optionalPrompts).toEqual([
       'Value for TELEGRAM_BOT_TOKEN (optional, leave blank to skip)',
     ])

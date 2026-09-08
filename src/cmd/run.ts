@@ -29,7 +29,9 @@ const cliRunCommand = {
 /** Runs docker run passthrough parsing and returns a shell result or typed error. */
 async function runRunCommand() {
   const parsed = dockerParseRunArgs(readRunTail())
-  if (parsed instanceof Error) return parsed
+  if (parsed instanceof Error) {
+    return parsed
+  }
   return await dockerHandleShell(parsed, 'run')
 }
 

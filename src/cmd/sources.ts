@@ -17,9 +17,13 @@ const cliSourcesCommands = [
 async function sourcesSetupRunCommand() {
   const paths = pathsGetPaths()
   const config = await configLoad(paths.configFile)
-  if (config instanceof Error) return config
+  if (config instanceof Error) {
+    return config
+  }
   const source = await sourcesSetupRef(config, paths, { promptSelect: tuiPromptSelectResult })
-  if (source instanceof Error) return source
+  if (source instanceof Error) {
+    return source
+  }
   return { ok: source !== null, ...(source ? { source } : {}) }
 }
 

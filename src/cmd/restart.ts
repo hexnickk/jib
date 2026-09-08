@@ -15,13 +15,19 @@ const cliRestartCommand = {
 async function restartRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
   const appName = String(args.app)
   const loaded = await configLoadAppContext(appName)
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const result = await deployRestartApp(
     deployCreateDeps(loaded.cfg, loaded.paths, 'restart'),
     appName,
   )
-  if (result) return result
-  if (cliIsTextOutput()) consola.success(`restarted ${appName}`)
+  if (result) {
+    return result
+  }
+  if (cliIsTextOutput()) {
+    consola.success(`restarted ${appName}`)
+  }
   return { app: appName, state: 'restarted' as const }
 }
 

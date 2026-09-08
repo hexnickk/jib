@@ -1,5 +1,5 @@
-import { $ } from '@/libs/shell'
 import { InternalError } from '@jib/errors'
+import { $ } from '@/libs/shell'
 import { GROUP, migrationEnsureGroupResult, migrationEnsureUserInGroupResult } from './helpers.ts'
 import type { JibMigration } from './types.ts'
 

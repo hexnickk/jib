@@ -1,8 +1,8 @@
-import { $ } from '@/libs/shell'
 import type { Config } from '@jib/config'
 import type { InternalError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { type SourceStatus, sourcesCollectStatuses } from '@jib/sources'
+import { $ } from '@/libs/shell'
 import { stateCreateStore, stateLoad } from './store.ts'
 
 export interface ServiceStatus {
@@ -84,7 +84,7 @@ export async function stateCollectApps(
       lastDeploy: state.last_deploy,
       lastDeployStatus: state.last_deploy_status,
       containers,
-      domains: app.domains.map((d) => ({ host: d.host, port: d.port })),
+      domains: app.domains.map((domain) => ({ host: domain.host, port: domain.port })),
     })
   }
   return results

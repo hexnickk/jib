@@ -21,7 +21,9 @@ function writeCliTextError(error: ReturnType<typeof cliNormalizeError>): void {
   for (const issue of error.issues ?? []) {
     writeCliText(process.stderr, `${issue.field}: ${issue.message}`)
   }
-  if (error.hint) writeCliText(process.stderr, error.hint)
+  if (error.hint) {
+    writeCliText(process.stderr, error.hint)
+  }
 }
 
 /** Renders a CLI error and exits with the normalized exit code. */
@@ -39,7 +41,9 @@ export function cmdExitError(error: unknown): never {
  */
 function cmdHandleResult(result: unknown): void {
   // Framework boundary: yargs handlers do not propagate returned typed failures to main.ts.
-  if (result instanceof Error) cmdExitError(result)
+  if (result instanceof Error) {
+    cmdExitError(result)
+  }
 }
 
 /**
@@ -48,7 +52,7 @@ function cmdHandleResult(result: unknown): void {
  * async yargs handler that exits for returned Errors and otherwise ignores successful payloads.
  */
 export function cmdCreateHandler<TArgs>(
-  run: (args: ArgumentsCamelCase<TArgs>) => Promise<unknown> | unknown,
+  run: (args: ArgumentsCamelCase<TArgs>) => unknown,
 ): (args: ArgumentsCamelCase<TArgs>) => Promise<void> {
   return async (args) => {
     cmdHandleResult(await run(args))

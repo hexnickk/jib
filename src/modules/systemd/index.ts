@@ -1,4 +1,1 @@
-export {
-  systemdStartConfiguredManagedServicesResult,
-  systemdStartManagedUnitResult,
-} from './managed.ts'
+export { systemdStartManagedServicesResult, systemdStartManagedUnitResult } from './managed.ts'

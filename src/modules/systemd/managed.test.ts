@@ -1,7 +1,7 @@
 import type { Config } from '@jib/config'
 import { InternalError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
-import { systemdStartConfiguredManagedServicesResult } from './index.ts'
+import { systemdStartManagedServicesResult } from './index.ts'
 
 function configWith(modules: Record<string, boolean>): Config {
   return { config_version: 3, poll_interval: '5m', modules, sources: {}, apps: {} } as Config
@@ -11,10 +11,10 @@ function result(exitCode = 0, stdout = '', stderr = '') {
   return { exitCode, stdout: Buffer.from(stdout), stderr: Buffer.from(stderr) }
 }
 
-describe('systemdStartConfiguredManagedServicesResult', () => {
+describe('systemdStartManagedServicesResult', () => {
   test('starts watcher and configured cloudflared service', async () => {
     const calls: string[] = []
-    const error = await systemdStartConfiguredManagedServicesResult('/config.yml', {
+    const error = await systemdStartManagedServicesResult('/config.yml', {
       loadConfig: async () => configWith({ cloudflared: true }),
       run: async (args) => {
         calls.push(args.join(' '))
@@ -33,7 +33,7 @@ describe('systemdStartConfiguredManagedServicesResult', () => {
 
   test('does not start cloudflared when the optional module is disabled', async () => {
     const calls: string[] = []
-    const error = await systemdStartConfiguredManagedServicesResult('/config.yml', {
+    const error = await systemdStartManagedServicesResult('/config.yml', {
       loadConfig: async () => configWith({ cloudflared: false }),
       run: async (args) => {
         calls.push(args.join(' '))
@@ -49,7 +49,7 @@ describe('systemdStartConfiguredManagedServicesResult', () => {
   })
 
   test('returns a typed start error', async () => {
-    const error = await systemdStartConfiguredManagedServicesResult('/config.yml', {
+    const error = await systemdStartManagedServicesResult('/config.yml', {
       loadConfig: async () => configWith({}),
       run: async (args) => {
         return args.join(' ') === 'systemctl enable --now jib-watcher.service'

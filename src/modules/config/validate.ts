@@ -54,24 +54,24 @@ export function configValidateRepo(repo: string): string | null {
  * any unknown unit all return `null`. Narrower than Go's `time.ParseDuration`
  * (no `ns`/`us`/`ms`) but covers every value jib's config actually uses.
  */
-export function configParseDuration(s: string): number | null {
-  if (!s) {
+export function configParseDuration(raw: string): number | null {
+  if (!raw) {
     return null
   }
   const units: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000 }
   const re = /(\d+(?:\.\d+)?)([smh])/g
   let total = 0
   let matched = 0
-  for (const match of s.matchAll(re)) {
-    const [, n, unit] = match
+  for (const match of raw.matchAll(re)) {
+    const [, amount, unit] = match
     const mult = unit ? units[unit] : undefined
-    if (!mult || n === undefined) {
+    if (!mult || amount === undefined) {
       return null
     }
-    total += Number.parseFloat(n) * mult
+    total += Number.parseFloat(amount) * mult
     matched += match[0].length
   }
-  return matched === s.length && matched > 0 ? total : null
+  return matched === raw.length && matched > 0 ? total : null
 }
 
 /** Runs config-level checks that zod can't express. */

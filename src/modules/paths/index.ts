@@ -8,7 +8,4 @@ export {
   pathsEnsureCredsDirResult,
   pathsPathExistsResult,
 } from './paths.ts'
-export {
-  pathsDockerHubImage,
-  pathsIsDockerHubRepo,
-} from './dockerhub.ts'
+export { pathsDockerHubImage, pathsIsDockerHubRepo } from './dockerhub.ts'

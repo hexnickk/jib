@@ -44,18 +44,18 @@ describe('pathsGetPaths', () => {
   })
 
   test('default root is /opt/jib', () => {
-    const p = pathsGetPaths()
-    expect(p.root).toBe('/opt/jib')
-    expect(p.configFile).toBe('/opt/jib/config.yml')
-    expect(p.stateDir).toBe('/opt/jib/state')
-    expect(p.locksDir).toBe('/opt/jib/locks')
-    expect(p.secretsDir).toBe('/opt/jib/secrets')
-    expect(p.overridesDir).toBe('/opt/jib/overrides')
-    expect(p.composeDir).toBe('/opt/jib/compose')
-    expect(p.reposDir).toBe('/opt/jib/repos')
-    expect(p.repoRoot).toBe('/opt/jib/src')
-    expect(p.nginxDir).toBe('/opt/jib/nginx')
-    expect(p.cloudflaredDir).toBe('/opt/jib/cloudflared')
+    const paths = pathsGetPaths()
+    expect(paths.root).toBe('/opt/jib')
+    expect(paths.configFile).toBe('/opt/jib/config.yml')
+    expect(paths.stateDir).toBe('/opt/jib/state')
+    expect(paths.locksDir).toBe('/opt/jib/locks')
+    expect(paths.secretsDir).toBe('/opt/jib/secrets')
+    expect(paths.overridesDir).toBe('/opt/jib/overrides')
+    expect(paths.composeDir).toBe('/opt/jib/compose')
+    expect(paths.reposDir).toBe('/opt/jib/repos')
+    expect(paths.repoRoot).toBe('/opt/jib/src')
+    expect(paths.nginxDir).toBe('/opt/jib/nginx')
+    expect(paths.cloudflaredDir).toBe('/opt/jib/cloudflared')
   })
 
   test('$JIB_ROOT overrides default', () => {
@@ -71,23 +71,23 @@ describe('pathsGetPaths', () => {
 })
 
 describe('pathsRepoPath', () => {
-  const p = pathsGetPaths('/opt/jib')
+  const paths = pathsGetPaths('/opt/jib')
 
   test('local repo', () => {
-    expect(pathsRepoPath(p, 'myapp', 'local')).toBe('/opt/jib/repos/local/myapp')
+    expect(pathsRepoPath(paths, 'myapp', 'local')).toBe('/opt/jib/repos/local/myapp')
   })
   test('empty repo treated as local', () => {
-    expect(pathsRepoPath(p, 'myapp', '')).toBe('/opt/jib/repos/local/myapp')
+    expect(pathsRepoPath(paths, 'myapp', '')).toBe('/opt/jib/repos/local/myapp')
   })
   test('github repo', () => {
-    expect(pathsRepoPath(p, 'myapp', 'hexnickk/jib')).toBe('/opt/jib/repos/github/hexnickk/jib')
+    expect(pathsRepoPath(paths, 'myapp', 'hexnickk/jib')).toBe('/opt/jib/repos/github/hexnickk/jib')
   })
 })
 
 describe('pathsCredsPath', () => {
   test('groups by kind and name', () => {
-    const p = pathsGetPaths('/opt/jib')
-    expect(pathsCredsPath(p, 'github-app', 'prod.pem')).toBe(
+    const paths = pathsGetPaths('/opt/jib')
+    expect(pathsCredsPath(paths, 'github-app', 'prod.pem')).toBe(
       '/opt/jib/secrets/_jib/github-app/prod.pem',
     )
   })
@@ -95,17 +95,17 @@ describe('pathsCredsPath', () => {
 
 describe('pathsManagedComposePath', () => {
   test('uses a predictable jib-managed location', () => {
-    const p = pathsGetPaths('/opt/jib')
-    expect(pathsManagedComposePath(p, 'demo')).toBe('/opt/jib/compose/demo.yml')
+    const paths = pathsGetPaths('/opt/jib')
+    expect(pathsManagedComposePath(paths, 'demo')).toBe('/opt/jib/compose/demo.yml')
   })
 })
 
 describe('pathsEnsureCredsDirResult', () => {
   test('creates group-writable setgid credential directories', async () => {
     const root = await createTempRoot()
-    const p = pathsGetPaths(root)
+    const paths = pathsGetPaths(root)
 
-    const dir = await pathsEnsureCredsDirResult(p, 'github-app')
+    const dir = await pathsEnsureCredsDirResult(paths, 'github-app')
     if (dir instanceof Error) {
       throw dir
     }
@@ -117,11 +117,11 @@ describe('pathsEnsureCredsDirResult', () => {
 
   test('returns typed errors when directory creation fails', async () => {
     const root = await createTempRoot()
-    const p = pathsGetPaths(root)
+    const paths = pathsGetPaths(root)
 
-    await writeFile(p.secretsDir, 'blocked')
+    await writeFile(paths.secretsDir, 'blocked')
 
-    const result = await pathsEnsureCredsDirResult(p, 'github-app')
+    const result = await pathsEnsureCredsDirResult(paths, 'github-app')
 
     expect(result).toBeInstanceOf(InternalError)
     if (result instanceof InternalError) {

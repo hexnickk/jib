@@ -20,13 +20,13 @@ function expectLoadedConfig(result: Awaited<ReturnType<typeof configLoad>>) {
 
 async function seedConfig(opts: { withProviderRef?: boolean } = {}): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'jib-gh-'))
-  const p = join(dir, 'config.yml')
+  const configFile = join(dir, 'config.yml')
   const sourceRef = opts.withProviderRef ? '    source: gh-key\n' : ''
   const sourceSection = opts.withProviderRef
     ? 'sources:\n  gh-key:\n    driver: github\n    type: key\n'
     : ''
   await writeFile(
-    p,
+    configFile,
     `config_version: 3
 ${sourceSection}apps:
   demo:
@@ -36,28 +36,28 @@ ${sourceRef}    domains:
         port: 3000
 `,
   )
-  return p
+  return configFile
 }
 
 describe('config-edit', () => {
   test('round-trips a key source', async () => {
-    const p = await seedConfig({ withProviderRef: true })
-    const cfg = expectLoadedConfig(await configLoad(p))
+    const configFile = await seedConfig({ withProviderRef: true })
+    const cfg = expectLoadedConfig(await configLoad(configFile))
     expect(githubGetSource(cfg, 'gh-key')).toEqual({ driver: 'github', type: 'key' })
     expect(githubValidateSourceName(cfg, 'gh-key')).toBeInstanceOf(ValidationError)
   })
 
   test('githubAddKeySource writes a new entry', async () => {
-    const p = await seedConfig()
-    expect(await githubAddKeySource(p, 'fresh')).toBeUndefined()
-    const cfg = expectLoadedConfig(await configLoad(p))
+    const configFile = await seedConfig()
+    expect(await githubAddKeySource(configFile, 'fresh')).toBeUndefined()
+    const cfg = expectLoadedConfig(await configLoad(configFile))
     expect(githubGetSource(cfg, 'fresh')).toEqual({ driver: 'github', type: 'key' })
   })
 
   test('round-trips an app source', async () => {
-    const p = await seedConfig()
-    expect(await githubAddAppSource(p, 'gh-app', 42)).toBeUndefined()
-    const cfg = expectLoadedConfig(await configLoad(p))
+    const configFile = await seedConfig()
+    expect(await githubAddAppSource(configFile, 'gh-app', 42)).toBeUndefined()
+    const cfg = expectLoadedConfig(await configLoad(configFile))
     expect(githubGetSource(cfg, 'gh-app')).toEqual({
       driver: 'github',
       type: 'app',

@@ -1,9 +1,8 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Readable } from 'node:stream'
-import { $ } from '@/libs/shell'
 import { InternalError } from '@jib/errors'
 import type { ProcessPromise } from 'zx'
+import { $ } from '@/libs/shell'
 
 export interface LockOptions {
   blocking?: boolean
@@ -62,7 +61,7 @@ export async function stateAcquireLock(
   }
 }
 
-async function waitForReady(stdout: ProcessPromise['stdout'] | Readable): Promise<boolean> {
+async function waitForReady(stdout: ProcessPromise['stdout']): Promise<boolean> {
   let buf = ''
   for await (const chunk of stdout) {
     buf += chunk.toString()

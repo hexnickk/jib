@@ -39,7 +39,7 @@ function createNoopSpinner() {
 
 describe('runDeploy progress', () => {
   test('returns an internal error when deploy throws before returning a promise', async () => {
-    const result = await runDeploy(cfg, paths, 'demo', undefined, {
+    const result = await runDeploy({ cfg, paths }, 'demo', undefined, {
       createSpinner: createNoopSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: () => {
@@ -54,7 +54,7 @@ describe('runDeploy progress', () => {
   test('stops deployment progress when dependency construction throws', async () => {
     const failure = new Error('engine setup failed')
     const stop = vi.fn()
-    const result = await runDeploy(cfg, paths, 'demo', undefined, {
+    const result = await runDeploy({ cfg, paths }, 'demo', undefined, {
       createSpinner: () => ({ ...createNoopSpinner(), stop }),
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       createDeps: () => {
@@ -84,7 +84,7 @@ describe('runDeploy progress', () => {
       },
     })
 
-    const result = await runDeploy(cfg, paths, 'demo', undefined, {
+    const result = await runDeploy({ cfg, paths }, 'demo', undefined, {
       createSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: async (_deps, _target, progress) => {

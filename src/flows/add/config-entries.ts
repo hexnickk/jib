@@ -44,7 +44,9 @@ export function addMergeConfigEntries(entries: ConfigEntry[]): ConfigEntry[] | V
 
 /** Unions two scopes into the smallest scope that covers both. */
 export function addUnionScopes(left: ConfigScope, right: ConfigScope): ConfigScope {
-  if (left === right) return left
+  if (left === right) {
+    return left
+  }
   return addIncludesRuntime(left) || addIncludesRuntime(right)
     ? addIncludesBuild(left) || addIncludesBuild(right)
       ? 'both'
@@ -54,7 +56,9 @@ export function addUnionScopes(left: ConfigScope, right: ConfigScope): ConfigSco
 
 /** Infers the narrowest scope that covers the observed runtime/build usage. */
 export function addInferScope(runtimeRef: boolean, buildRef: boolean): ConfigScope {
-  if (runtimeRef && buildRef) return 'both'
+  if (runtimeRef && buildRef) {
+    return 'both'
+  }
   return buildRef ? 'build' : 'runtime'
 }
 

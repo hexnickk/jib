@@ -39,15 +39,23 @@ async function ingressSetRunCommand(args: ArgumentsCamelCase<IngressSetArgs>) {
   }
 
   const loaded = await configLoadContext()
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const { cfg, paths } = loaded
-  const nextCfg = { ...cfg, ingress: { ...(cfg.ingress ?? {}), max_body_size: normalized } }
+  const nextCfg = { ...cfg, ingress: { ...cfg.ingress, max_body_size: normalized } }
   const writeError = await configWrite(paths.configFile, nextCfg)
-  if (writeError instanceof Error) return writeError
+  if (writeError instanceof Error) {
+    return writeError
+  }
   const applyError = await ingressApplyNginxConfig(paths, nextCfg)
-  if (applyError instanceof Error) return applyError
+  if (applyError instanceof Error) {
+    return applyError
+  }
 
-  if (cliIsTextOutput()) process.stdout.write(`ingress max body size set to ${normalized}\n`)
+  if (cliIsTextOutput()) {
+    process.stdout.write(`ingress max body size set to ${normalized}\n`)
+  }
   return { maxBodySize: normalized }
 }
 

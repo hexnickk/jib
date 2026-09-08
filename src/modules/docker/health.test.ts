@@ -9,7 +9,9 @@ function mockFetch(sequence: Array<{ status: number } | { throw: Error }>): {
   const fn = (async () => {
     const entry = sequence[state.calls] ?? sequence[sequence.length - 1]
     state.calls++
-    if (entry && 'throw' in entry) throw entry.throw
+    if (entry && 'throw' in entry) {
+      throw entry.throw
+    }
     return new Response(null, { status: entry?.status ?? 500 })
   }) as unknown as typeof fetch
   return {

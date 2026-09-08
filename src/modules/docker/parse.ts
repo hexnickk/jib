@@ -46,16 +46,24 @@ export function dockerParseComposeServices(
   const files = composeFiles.length > 0 ? composeFiles : ['docker-compose.yml']
   const merged = new Map<string, RawService>()
 
-  for (const f of files) {
-    const data = readFileSync(isAbsolute(f) ? f : join(repoDir, f), 'utf8')
+  for (const file of files) {
+    const data = readFileSync(isAbsolute(file) ? file : join(repoDir, file), 'utf8')
     const cf = (parseYaml(data) ?? {}) as RawComposeFile
     for (const [name, svc] of Object.entries(cf.services ?? {})) {
       const existing = merged.get(name) ?? {}
       const next: RawService = { ...existing }
-      if (svc.ports) next.ports = svc.ports
-      if (svc.expose) next.expose = svc.expose
-      if (svc.environment !== undefined) next.environment = svc.environment
-      if (svc.build !== undefined) next.build = svc.build
+      if (svc.ports) {
+        next.ports = svc.ports
+      }
+      if (svc.expose) {
+        next.expose = svc.expose
+      }
+      if (svc.environment !== undefined) {
+        next.environment = svc.environment
+      }
+      if (svc.build !== undefined) {
+        next.build = svc.build
+      }
       merged.set(name, next)
     }
   }
@@ -76,10 +84,12 @@ export function dockerParseComposeServices(
 /** Reports whether any compose service declares a `build:` stanza. */
 export function dockerHasBuildServices(repoDir: string, composeFiles: string[] = []): boolean {
   const files = composeFiles.length > 0 ? composeFiles : ['docker-compose.yml']
-  for (const f of files) {
-    const data = readFileSync(isAbsolute(f) ? f : join(repoDir, f), 'utf8')
+  for (const file of files) {
+    const data = readFileSync(isAbsolute(file) ? file : join(repoDir, file), 'utf8')
     const cf = (parseYaml(data) ?? {}) as RawComposeFile
-    if (Object.values(cf.services ?? {}).some((service) => service.build !== undefined)) return true
+    if (Object.values(cf.services ?? {}).some((service) => service.build !== undefined)) {
+      return true
+    }
   }
   return false
 }
@@ -94,13 +104,17 @@ export function dockerHasBuildServices(repoDir: string, composeFiles: string[] =
  */
 export function dockerInferContainerPort(service: ComposeService): number | undefined {
   if (service.ports.length > 0) {
-    const p = parseContainerSide(service.ports[0])
-    if (p) return p
+    const port = parseContainerSide(service.ports[0])
+    if (port) {
+      return port
+    }
   }
   if (service.expose.length > 0) {
-    const e = service.expose[0]
-    const n = typeof e === 'number' ? e : Number.parseInt(String(e), 10)
-    if (Number.isFinite(n) && n > 0) return Math.floor(n)
+    const exposed = service.expose[0]
+    const portNumber = typeof exposed === 'number' ? exposed : Number.parseInt(String(exposed), 10)
+    if (Number.isFinite(portNumber) && portNumber > 0) {
+      return Math.floor(portNumber)
+    }
   }
   return undefined
 }
@@ -111,22 +125,26 @@ export function dockerHasPublishedPorts(service: ComposeService): boolean {
 }
 
 /** Extract the *container* side of a single `ports:` entry. */
-function parseContainerSide(p: unknown): number | undefined {
-  if (typeof p === 'number') return Math.floor(p)
-  if (typeof p === 'string') {
-    const stripped = p.split('/')[0] ?? p
+function parseContainerSide(port: unknown): number | undefined {
+  if (typeof port === 'number') {
+    return Math.floor(port)
+  }
+  if (typeof port === 'string') {
+    const stripped = port.split('/')[0] ?? port
     const parts = stripped.split(':')
     // "80" -> container 80; "8080:80" -> 80; "127.0.0.1:8080:80" -> 80
     const tail = parts[parts.length - 1] ?? ''
-    const n = Number.parseInt(tail, 10)
-    return Number.isFinite(n) && n > 0 ? n : undefined
+    const portNumber = Number.parseInt(tail, 10)
+    return Number.isFinite(portNumber) && portNumber > 0 ? portNumber : undefined
   }
-  if (p && typeof p === 'object' && 'target' in p) {
-    const v = (p as { target: unknown }).target
-    if (typeof v === 'number') return Math.floor(v)
-    if (typeof v === 'string') {
-      const n = Number.parseInt(v, 10)
-      return Number.isFinite(n) && n > 0 ? n : undefined
+  if (port && typeof port === 'object' && 'target' in port) {
+    const target = (port as { target: unknown }).target
+    if (typeof target === 'number') {
+      return Math.floor(target)
+    }
+    if (typeof target === 'string') {
+      const portNumber = Number.parseInt(target, 10)
+      return Number.isFinite(portNumber) && portNumber > 0 ? portNumber : undefined
     }
   }
   return undefined
@@ -137,32 +155,44 @@ function parseEnvRefs(environment: unknown): string[] {
   const refs = new Set<string>()
   if (Array.isArray(environment)) {
     for (const entry of environment) {
-      if (typeof entry !== 'string') continue
+      if (typeof entry !== 'string') {
+        continue
+      }
       const eq = entry.indexOf('=')
       if (eq < 0) {
-        if (entry) refs.add(entry)
+        if (entry) {
+          refs.add(entry)
+        }
         continue
       }
       const key = entry.slice(0, eq)
       const value = entry.slice(eq + 1)
-      if (key && (value.length === 0 || value.includes('${'))) refs.add(key)
+      if (key && (value.length === 0 || value.includes('${'))) {
+        refs.add(key)
+      }
     }
     return [...refs]
   }
-  if (!environment || typeof environment !== 'object') return []
+  if (!environment || typeof environment !== 'object') {
+    return []
+  }
   for (const [key, value] of Object.entries(environment as Record<string, unknown>)) {
     if (value === null || value === undefined) {
       refs.add(key)
       continue
     }
-    if (typeof value === 'string' && value.includes('${')) refs.add(key)
+    if (typeof value === 'string' && value.includes('${')) {
+      refs.add(key)
+    }
   }
   return [...refs]
 }
 
 /** Extracts build args that still need operator-provided values at build time. */
 function parseBuildArgRefs(build: unknown): string[] {
-  if (!build || typeof build !== 'object' || Array.isArray(build) || !('args' in build)) return []
+  if (!build || typeof build !== 'object' || Array.isArray(build) || !('args' in build)) {
+    return []
+  }
   return parseArgRefs((build as RawBuildConfig).args)
 }
 
@@ -171,25 +201,35 @@ function parseArgRefs(args: unknown): string[] {
   const refs = new Set<string>()
   if (Array.isArray(args)) {
     for (const entry of args) {
-      if (typeof entry !== 'string') continue
+      if (typeof entry !== 'string') {
+        continue
+      }
       const eq = entry.indexOf('=')
       if (eq < 0) {
-        if (entry) refs.add(entry)
+        if (entry) {
+          refs.add(entry)
+        }
         continue
       }
       const key = entry.slice(0, eq)
       const value = entry.slice(eq + 1)
-      if (key && (value.length === 0 || value.includes('${'))) refs.add(key)
+      if (key && (value.length === 0 || value.includes('${'))) {
+        refs.add(key)
+      }
     }
     return [...refs]
   }
-  if (!args || typeof args !== 'object') return []
+  if (!args || typeof args !== 'object') {
+    return []
+  }
   for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
     if (value === null || value === undefined) {
       refs.add(key)
       continue
     }
-    if (typeof value === 'string' && value.includes('${')) refs.add(key)
+    if (typeof value === 'string' && value.includes('${')) {
+      refs.add(key)
+    }
   }
   return [...refs]
 }

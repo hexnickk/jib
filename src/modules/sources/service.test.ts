@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { Config } from '@jib/config'
 import { InternalError, NotFoundError, ValidationError } from '@jib/errors'
 import { pathsGetPaths, pathsPathExistsResult, pathsRepoPath } from '@jib/paths'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, expect, test } from 'vitest'
 import { $ } from 'zx'
 import {
   sourcesCloneForInspection,
@@ -64,218 +64,210 @@ function configFor(repo: string): Config {
   }
 }
 
-function expectSourceValue<T>(result: T): Exclude<T, Error | null | undefined> {
+function expectSourceValue<Value>(result: Value): Exclude<Value, Error | null | undefined> {
   if (result instanceof Error) {
     throw result
   }
   if (result == null) {
     throw new Error('expected source result')
   }
-  return result as Exclude<T, Error | null | undefined>
+  return result as Exclude<Value, Error | null | undefined>
 }
 
-describe('sources service', () => {
-  test('probe returns the remote sha without requiring a checkout', async () => {
-    const upstream = await makeUpstream('jib-probe')
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
-    const result = expectSourceValue(
-      await sourcesProbe(configFor(upstream), paths, { app: 'demo' }),
-    )
+test('sources service > probe returns the remote sha without requiring a checkout', async () => {
+  const upstream = await makeUpstream('jib-probe')
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
+  const result = expectSourceValue(await sourcesProbe(configFor(upstream), paths, { app: 'demo' }))
 
-    expect(result.sha).toMatch(/^[0-9a-f]{40}$/)
-    expect(result.workdir).toBe(pathsRepoPath(paths, 'demo', upstream))
+  expect(result.sha).toMatch(/^[0-9a-f]{40}$/)
+  expect(result.workdir).toBe(pathsRepoPath(paths, 'demo', upstream))
+})
+
+test('sources service > sourcesCloneForInspection and sourcesSync share the checkout lifecycle', async () => {
+  const upstream = await makeUpstream('jib-roundtrip')
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
+  const workdir = pathsRepoPath(paths, 'demo', upstream)
+
+  const checkout = expectSourceValue(
+    await sourcesCloneForInspection(configFor(upstream), paths, { app: 'demo' }),
+  )
+  expect(checkout.workdir).toBe(workdir)
+
+  const prepared = expectSourceValue(
+    await sourcesSync(configFor(upstream), paths, { app: 'demo' }, 'main'),
+  )
+  expect(prepared.workdir).toBe(workdir)
+  expect(await pathsPathExistsResult(workdir)).toBe(true)
+
+  await sourcesRemoveCheckout(paths, 'demo', upstream)
+  expect(await pathsPathExistsResult(workdir)).toBe(false)
+})
+
+test('sources service > probe and sourcesSync follow the remote default branch for a new app', async () => {
+  const upstream = await makeUpstreamOnBranch('jib-master', 'master')
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
+  const cfg: Config = {
+    config_version: 3,
+    poll_interval: '5m',
+    modules: {},
+    sources: {},
+    apps: {},
+  }
+
+  const probed = expectSourceValue(await sourcesProbe(cfg, paths, { app: 'demo', repo: upstream }))
+  const prepared = expectSourceValue(await sourcesSync(cfg, paths, { app: 'demo', repo: upstream }))
+
+  expect(probed.branch).toBe('master')
+  expect(prepared.sha).toMatch(/^[0-9a-f]{40}$/)
+})
+
+test('sources service > sourcesSync accepts a tag ref', async () => {
+  const upstream = await makeUpstream('jib-tag')
+  await writeFile(join(upstream, 'RELEASE'), 'v2\n')
+  await $`git -C ${upstream} add RELEASE`.quiet()
+  await $`git -C ${upstream} commit -m release`.quiet()
+  await $`git -C ${upstream} tag v2`.quiet()
+
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
+  const prepared = expectSourceValue(
+    await sourcesSync(configFor(upstream), paths, { app: 'demo' }, 'v2'),
+  )
+
+  expect(prepared.sha).toMatch(/^[0-9a-f]{40}$/)
+})
+
+test('sources service > docker hub repo resolves to a stable local workdir without git', async () => {
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
+  const cfg: Config = {
+    config_version: 3,
+    poll_interval: '5m',
+    modules: {},
+    sources: {},
+    apps: {},
+  }
+
+  const probed = await sourcesProbe(cfg, paths, {
+    app: 'demo',
+    repo: 'https://hub.docker.com/r/n8nio/n8n',
   })
-
-  test('sourcesCloneForInspection and sourcesSync share the checkout lifecycle', async () => {
-    const upstream = await makeUpstream('jib-roundtrip')
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
-    const workdir = pathsRepoPath(paths, 'demo', upstream)
-
-    const checkout = expectSourceValue(
-      await sourcesCloneForInspection(configFor(upstream), paths, { app: 'demo' }),
-    )
-    expect(checkout.workdir).toBe(workdir)
-
-    const prepared = expectSourceValue(
-      await sourcesSync(configFor(upstream), paths, { app: 'demo' }, 'main'),
-    )
-    expect(prepared.workdir).toBe(workdir)
-    expect(await pathsPathExistsResult(workdir)).toBe(true)
-
-    await sourcesRemoveCheckout(paths, 'demo', upstream)
-    expect(await pathsPathExistsResult(workdir)).toBe(false)
-  })
-
-  test('probe and sourcesSync follow the remote default branch for a new app', async () => {
-    const upstream = await makeUpstreamOnBranch('jib-master', 'master')
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
-    const cfg: Config = {
-      config_version: 3,
-      poll_interval: '5m',
-      modules: {},
-      sources: {},
-      apps: {},
-    }
-
-    const probed = expectSourceValue(
-      await sourcesProbe(cfg, paths, { app: 'demo', repo: upstream }),
-    )
-    const prepared = expectSourceValue(
-      await sourcesSync(cfg, paths, { app: 'demo', repo: upstream }),
-    )
-
-    expect(probed.branch).toBe('master')
-    expect(prepared.sha).toMatch(/^[0-9a-f]{40}$/)
-  })
-
-  test('sourcesSync accepts a tag ref', async () => {
-    const upstream = await makeUpstream('jib-tag')
-    await writeFile(join(upstream, 'RELEASE'), 'v2\n')
-    await $`git -C ${upstream} add RELEASE`.quiet()
-    await $`git -C ${upstream} commit -m release`.quiet()
-    await $`git -C ${upstream} tag v2`.quiet()
-
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
-    const prepared = expectSourceValue(
-      await sourcesSync(configFor(upstream), paths, { app: 'demo' }, 'v2'),
-    )
-
-    expect(prepared.sha).toMatch(/^[0-9a-f]{40}$/)
-  })
-
-  test('docker hub repo resolves to a stable local workdir without git', async () => {
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
-    const cfg: Config = {
-      config_version: 3,
-      poll_interval: '5m',
-      modules: {},
-      sources: {},
-      apps: {},
-    }
-
-    const probed = await sourcesProbe(cfg, paths, {
+  const prepared = expectSourceValue(
+    await sourcesSync(cfg, paths, {
       app: 'demo',
       repo: 'https://hub.docker.com/r/n8nio/n8n',
-    })
-    const prepared = expectSourceValue(
-      await sourcesSync(cfg, paths, {
-        app: 'demo',
-        repo: 'https://hub.docker.com/r/n8nio/n8n',
-      }),
-    )
+    }),
+  )
 
-    expect(probed).toBeNull()
-    expect(prepared.workdir).toBe(pathsRepoPath(paths, 'demo', 'local'))
-    expect(prepared.sha).toBe('n8nio/n8n')
-  })
+  expect(probed).toBeNull()
+  expect(prepared.workdir).toBe(pathsRepoPath(paths, 'demo', 'local'))
+  expect(prepared.sha).toBe('n8nio/n8n')
+})
 
-  test('returns typed result errors for missing app and local repo resolution failures', async () => {
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
-    const cfg: Config = {
-      config_version: 3,
-      poll_interval: '5m',
-      modules: {},
-      sources: {},
-      apps: {},
-    }
+test('sources service > returns typed result errors for missing app and local repo resolution failures', async () => {
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
+  const cfg: Config = {
+    config_version: 3,
+    poll_interval: '5m',
+    modules: {},
+    sources: {},
+    apps: {},
+  }
 
-    expect(await sourcesResolve(cfg, paths, { app: 'demo' })).toBeInstanceOf(NotFoundError)
-    expect(await sourcesResolve(cfg, paths, { app: 'demo', repo: 'local' })).toBeInstanceOf(
-      ValidationError,
-    )
-  })
+  expect(await sourcesResolve(cfg, paths, { app: 'demo' })).toBeInstanceOf(NotFoundError)
+  expect(await sourcesResolve(cfg, paths, { app: 'demo', repo: 'local' })).toBeInstanceOf(
+    ValidationError,
+  )
+})
 
-  test('returns typed result errors for missing source config and driver registration', async () => {
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
+test('sources service > returns typed result errors for missing source config and driver registration', async () => {
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
 
-    const missingSourceCfg: Config = {
-      config_version: 3,
-      poll_interval: '5m',
-      modules: {},
-      sources: {},
-      apps: {
-        demo: {
-          repo: 'acme/private',
-          branch: 'main',
-          domains: [],
-          source: 'missing',
-        },
+  const missingSourceCfg: Config = {
+    config_version: 3,
+    poll_interval: '5m',
+    modules: {},
+    sources: {},
+    apps: {
+      demo: {
+        repo: 'acme/private',
+        branch: 'main',
+        domains: [],
+        source: 'missing',
       },
-    }
-    const missingDriverCfg: Config = {
-      ...missingSourceCfg,
-      sources: {
-        missing: { driver: 'gitlab' as unknown as 'github', type: 'app', app_id: 1 },
-      },
-    }
+    },
+  }
+  const missingDriverCfg: Config = {
+    ...missingSourceCfg,
+    sources: {
+      missing: { driver: 'gitlab' as unknown as 'github', type: 'app', app_id: 1 },
+    },
+  }
 
-    expect(await sourcesResolve(missingSourceCfg, paths, { app: 'demo' })).toBeInstanceOf(
-      NotFoundError,
-    )
-    expect(await sourcesResolve(missingDriverCfg, paths, { app: 'demo' })).toBeInstanceOf(
-      ValidationError,
-    )
+  expect(await sourcesResolve(missingSourceCfg, paths, { app: 'demo' })).toBeInstanceOf(
+    NotFoundError,
+  )
+  expect(await sourcesResolve(missingDriverCfg, paths, { app: 'demo' })).toBeInstanceOf(
+    ValidationError,
+  )
+})
+
+test('sources service > returns a typed local checkout error for a missing local repo workdir', async () => {
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
+  const result = await sourcesSync(configFor('local'), paths, { app: 'demo' })
+
+  expect(result).toBeInstanceOf(InternalError)
+  expect(await sourcesProbe(configFor('local'), paths, { app: 'demo' })).toBeNull()
+})
+
+test('sources service > returns a typed remote resolve error when default branch lookup fails', async () => {
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
+  const cfg: Config = {
+    config_version: 3,
+    poll_interval: '5m',
+    modules: {},
+    sources: {},
+    apps: {},
+  }
+  const result = await sourcesResolve(cfg, paths, {
+    app: 'demo',
+    repo: join(root, 'missing-upstream'),
   })
 
-  test('returns a typed local checkout error for a missing local repo workdir', async () => {
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
-    const result = await sourcesSync(configFor('local'), paths, { app: 'demo' })
+  expect(result).toBeInstanceOf(InternalError)
+})
 
-    expect(result).toBeInstanceOf(InternalError)
-    expect(await sourcesProbe(configFor('local'), paths, { app: 'demo' })).toBeNull()
+test('sources service > returns a typed remote sync error when clone fails', async () => {
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
+  const missingRepo = join(root, 'missing-upstream')
+  const result = await sourcesSync(configFor(join(root, 'missing-upstream')), paths, {
+    app: 'demo',
   })
 
-  test('returns a typed remote resolve error when default branch lookup fails', async () => {
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
-    const cfg: Config = {
-      config_version: 3,
-      poll_interval: '5m',
-      modules: {},
-      sources: {},
-      apps: {},
-    }
-    const result = await sourcesResolve(cfg, paths, {
-      app: 'demo',
-      repo: join(root, 'missing-upstream'),
-    })
+  expect(result).toBeInstanceOf(InternalError)
+  expect(await pathsPathExistsResult(pathsRepoPath(paths, 'demo', missingRepo))).toBe(false)
+})
 
-    expect(result).toBeInstanceOf(InternalError)
-  })
+test('sources service > returns a typed probe error when lsRemote returns an error result', async () => {
+  const upstream = await makeUpstream('jib-probe-fail')
+  const root = await makeTempRoot('jib-root-')
+  const paths = pathsGetPaths(root)
+  const result = await sourcesProbe(
+    configFor(upstream),
+    paths,
+    { app: 'demo' },
+    {
+      lsRemote: async () => new InternalError('permission denied'),
+    },
+  )
 
-  test('returns a typed remote sync error when clone fails', async () => {
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
-    const missingRepo = join(root, 'missing-upstream')
-    const result = await sourcesSync(configFor(join(root, 'missing-upstream')), paths, {
-      app: 'demo',
-    })
-
-    expect(result).toBeInstanceOf(InternalError)
-    expect(await pathsPathExistsResult(pathsRepoPath(paths, 'demo', missingRepo))).toBe(false)
-  })
-
-  test('returns a typed probe error when lsRemote returns an error result', async () => {
-    const upstream = await makeUpstream('jib-probe-fail')
-    const root = await makeTempRoot('jib-root-')
-    const paths = pathsGetPaths(root)
-    const result = await sourcesProbe(
-      configFor(upstream),
-      paths,
-      { app: 'demo' },
-      {
-        lsRemote: async () => new InternalError('permission denied'),
-      },
-    )
-
-    expect(result).toBeInstanceOf(InternalError)
-  })
+  expect(result).toBeInstanceOf(InternalError)
 })

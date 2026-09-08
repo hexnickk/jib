@@ -4,10 +4,10 @@ import { join } from 'node:path'
 import { pathsGetPaths } from '@jib/paths'
 import { stateOpenDb } from '@jib/state'
 import { describe, expect, test } from 'vitest'
-import { moveBuildArgsToEnv } from './0014_move_build_args_to_env.ts'
+import { moveBuildArgsToEnv } from './0014-move-build-args-to-env.ts'
 
 /** Creates an isolated migration context root and cleans it after the callback. */
-async function withRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
+async function withRoot<Value>(fn: (root: string) => Promise<Value>): Promise<Value> {
   const root = await mkdtemp(join(tmpdir(), 'jib-m0014-'))
   try {
     return await fn(root)

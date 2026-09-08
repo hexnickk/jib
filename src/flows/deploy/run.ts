@@ -29,12 +29,12 @@ interface DeployRunDeps {
 
 /** Runs prepare + deploy and returns its result or a shared typed error. */
 export async function runDeploy(
-  cfg: Config,
-  paths: Paths,
+  ctx: { cfg: Config; paths: Paths },
   app: string,
   ref?: string,
   deps: DeployRunDeps = {},
 ): Promise<DeployRunResult | InternalError> {
+  const { cfg, paths } = ctx
   const showProgress = cliIsTextOutput()
   const createSpin = deps.createSpinner ?? tuiSpinner
   const prepareSpin = showProgress ? createSpin() : undefined

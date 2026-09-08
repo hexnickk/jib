@@ -10,9 +10,13 @@ export const DEFAULT_INGRESS_MAX_BODY_SIZE = '10m'
  */
 export function configNormalizeByteSize(value: string): string | undefined {
   const match = value.trim().match(BYTE_SIZE_RE)
-  if (!match) return undefined
+  if (!match) {
+    return undefined
+  }
   const amount = match[1]
-  if (amount === undefined) return undefined
+  if (amount === undefined) {
+    return undefined
+  }
   const unit = match[2]?.toLowerCase() ?? ''
   return `${amount}${unit}`
 }

@@ -37,7 +37,9 @@ describe('addCreatePlanner', () => {
     })
 
     const inspection = await planner.inspectCompose(draftApp, workdir)
-    if (inspection instanceof Error) throw inspection
+    if (inspection instanceof Error) {
+      throw inspection
+    }
 
     expect(inspection.composeFiles).toEqual([GENERATED_COMPOSE_FILE])
     expect(inspection.services.map((service) => service.name)).toEqual(['app'])
@@ -55,26 +57,29 @@ describe('addCreatePlanner', () => {
 
     const planner = addCreatePlanner()
     const app = await planner.buildResolvedApp(
-      cfg,
-      paths,
-      'demo',
-      workdir,
-      {},
+      { cfg, paths },
       {
-        repo: 'owner/demo',
-        persistPaths: [],
-        ingressDefault: 'direct',
-        parsedDomains: [],
-        configEntries: [],
-        healthChecks: [],
+        appName: 'demo',
+        workdir,
+        args: {},
+        inputs: {
+          repo: 'owner/demo',
+          persistPaths: [],
+          ingressDefault: 'direct',
+          parsedDomains: [],
+          configEntries: [],
+          healthChecks: [],
+        },
+        inspection: {
+          composeFiles: [GENERATED_COMPOSE_FILE],
+          services: [{ name: 'app', ports: [], expose: [], envRefs: [], buildArgRefs: [] }],
+        },
+        guided: { domains: [], configEntries: [] },
       },
-      {
-        composeFiles: [GENERATED_COMPOSE_FILE],
-        services: [{ name: 'app', ports: [], expose: [], envRefs: [], buildArgRefs: [] }],
-      },
-      { domains: [], configEntries: [] },
     )
-    if (app instanceof Error) throw app
+    if (app instanceof Error) {
+      throw app
+    }
 
     expect(app.compose).toEqual([pathsManagedComposePath(paths, 'demo')])
   })
@@ -92,7 +97,9 @@ describe('addCreatePlanner', () => {
     })
 
     const inspection = await planner.inspectCompose(draftApp, workdir)
-    if (inspection instanceof Error) throw inspection
+    if (inspection instanceof Error) {
+      throw inspection
+    }
 
     expect(inspection.composeFiles).toEqual(['compose.yml'])
     expect(inspection.services.map((service) => service.name)).toEqual(['web'])

@@ -1,7 +1,7 @@
 import { join } from 'node:path'
-import { $ } from '@/libs/shell'
 import { InternalError } from '@jib/errors'
 import { pathsPathExistsResult } from '@jib/paths'
+import { $ } from '@/libs/shell'
 import type { JibMigration } from './types.ts'
 
 /**
@@ -9,9 +9,9 @@ import type { JibMigration } from './types.ts'
  * group write permissions. This runs under `sudo jib migrate`, so it can safely
  * restore ownership and modes for future non-root CLI writes.
  */
-export async function repairManagedSecretsTree(paths: { secretsDir: string }): Promise<
-  InternalError | undefined
-> {
+export async function repairManagedSecretsTree(paths: {
+  secretsDir: string
+}): Promise<InternalError | undefined> {
   const root = join(paths.secretsDir, '_jib')
   const exists = await pathsPathExistsResult(root)
   if (exists instanceof Error) {
@@ -34,7 +34,7 @@ export async function repairManagedSecretsTree(paths: { secretsDir: string }): P
   )
 }
 
-export const m0011_repair_managed_secret_permissions: JibMigration = {
+export const m0011_repair_secret_permissions: JibMigration = {
   id: '0011_repair_managed_secret_permissions',
   description: 'Repair jib-managed secret tree permissions',
   async up(ctx) {

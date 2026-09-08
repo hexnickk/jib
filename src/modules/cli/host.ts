@@ -4,7 +4,9 @@ import { cliCanPrompt } from './runtime.ts'
 
 /** Returns an error when a command must run on Linux. */
 export function cliCheckLinuxHost(commandName: string): CliError | undefined {
-  if (process.platform === 'linux') return undefined
+  if (process.platform === 'linux') {
+    return undefined
+  }
   return new CliError(
     'unsupported_platform',
     `jib ${commandName} only runs on Linux target hosts`,
@@ -16,7 +18,9 @@ export function cliCheckLinuxHost(commandName: string): CliError | undefined {
 
 /** Re-execs under sudo when prompting is allowed, or returns an error when it is not. */
 export function cliCheckRootHost(commandName: string): CliError | undefined {
-  if (process.getuid?.() === 0) return undefined
+  if (process.getuid?.() === 0) {
+    return undefined
+  }
   if (!cliCanPrompt()) {
     return new CliError(
       'root_required',

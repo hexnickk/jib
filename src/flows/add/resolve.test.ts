@@ -16,8 +16,11 @@ const debugEnv = process.env.JIB_DEBUG
 /** Restores CLI runtime state changed by non-interactive guided-input tests. */
 function restoreRuntime(): void {
   cliSetRuntime({ interactive: 'auto', debug: false, stdinTty: true, stdoutTty: true })
-  if (debugEnv === undefined) Reflect.deleteProperty(process.env, 'JIB_DEBUG')
-  else process.env.JIB_DEBUG = debugEnv
+  if (debugEnv === undefined) {
+    Reflect.deleteProperty(process.env, 'JIB_DEBUG')
+  } else {
+    process.env.JIB_DEBUG = debugEnv
+  }
 }
 
 afterEach(restoreRuntime)
@@ -53,7 +56,9 @@ describe('addCollectGuidedInputs', () => {
     ])
 
     expect(result).not.toBeInstanceOf(Error)
-    if (result instanceof Error) throw result
+    if (result instanceof Error) {
+      throw result
+    }
     expect(result.configEntries).toEqual([])
   })
 
@@ -72,19 +77,20 @@ describe('addCollectGuidedInputs', () => {
       await writeFile(join(workdir, 'compose.yml'), 'services:\n  web:\n    image: nginx\n')
       const build = () =>
         addBuildResolvedApp(
-          config,
-          paths,
-          'demo',
-          workdir,
-          {},
-          { ...inputs(), composeRaw: ['compose.yml'] },
+          { cfg: config, paths },
           {
-            composeFiles: ['compose.yml'],
-            services: [service()],
-          },
-          {
-            domains: [{ host: 'demo.example.com', service: 'web', ingress: 'cloudflare-tunnel' }],
-            configEntries: [],
+            appName: 'demo',
+            workdir,
+            args: {},
+            inputs: { ...inputs(), composeRaw: ['compose.yml'] },
+            inspection: {
+              composeFiles: ['compose.yml'],
+              services: [service()],
+            },
+            guided: {
+              domains: [{ host: 'demo.example.com', service: 'web', ingress: 'cloudflare-tunnel' }],
+              configEntries: [],
+            },
           },
         )
 
@@ -94,7 +100,9 @@ describe('addCollectGuidedInputs', () => {
 
       expect(await cloudflaredSaveTunnelToken(paths, 'eyJhIjoiNzQ')).toBe(true)
       const app = await build()
-      if (app instanceof Error) throw app
+      if (app instanceof Error) {
+        throw app
+      }
       expect(app.domains[0]?.ingress).toBe('cloudflare-tunnel')
     } finally {
       await rm(root, { recursive: true, force: true })
@@ -113,7 +121,9 @@ describe('addCollectGuidedInputs', () => {
     const result = await addCollectGuidedInputs(inputs([envEntry]), [service()])
 
     expect(result).not.toBeInstanceOf(Error)
-    if (result instanceof Error) throw result
+    if (result instanceof Error) {
+      throw result
+    }
     expect(result.configEntries).toEqual([envEntry])
   })
 })

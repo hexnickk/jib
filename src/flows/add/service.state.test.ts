@@ -56,7 +56,7 @@ describe('add flow state machine', () => {
   })
 
   test('failure before config write rolls back prepared repo without partial cleanup noise', async () => {
-    const { calls, flow, states } = addMakeDeps('buildResolvedApp')
+    const { calls, flow, states } = addMakeDeps({ failAt: 'buildResolvedApp' })
 
     const result = await flow.run(addMakeParams())
     expect(result).toBeInstanceOf(Error)

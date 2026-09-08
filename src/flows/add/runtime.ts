@@ -1,5 +1,3 @@
-import type { DeployRunResult } from '@/flows/deploy/run.ts'
-import { removeApp, removeCreateSupport } from '@/flows/remove/index.ts'
 import { CliError, cliIsTextOutput } from '@jib/cli'
 import type { App, Config } from '@jib/config'
 import { configLoad } from '@jib/config'
@@ -7,6 +5,8 @@ import { InternalError, type JibError, NotFoundError } from '@jib/errors'
 import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
+import type { DeployRunResult } from '@/flows/deploy/run.ts'
+import { removeApp, removeCreateSupport } from '@/flows/remove/index.ts'
 import type { AddFlowResult } from './types.ts'
 
 export interface InterruptTrap {
@@ -29,7 +29,9 @@ export function addRenderResult(
     consola.success(`${app} deployed @ ${deploy.sha.slice(0, 8)} (${deploy.durationMs}ms)`)
     const ingress =
       finalApp.domains.length > 0
-        ? finalApp.domains.map((d) => `${d.host} -> 127.0.0.1:${d.port}`).join('\n    ')
+        ? finalApp.domains
+            .map((domain) => `${domain.host} -> 127.0.0.1:${domain.port}`)
+            .join('\n    ')
         : 'none'
     consola.box(
       `app "${app}" deployed\n  ingress:\n    ${ingress}\n  sha:    ${deploy.sha.slice(0, 8)}`,
@@ -41,12 +43,12 @@ export function addRenderResult(
     composeFiles: finalApp.compose ?? [],
     durationMs: deploy.durationMs,
     preparedSha: deploy.preparedSha,
-    routes: finalApp.domains.map((d) => ({
-      containerPort: d.container_port ?? null,
-      host: d.host,
-      ingress: d.ingress ?? 'direct',
-      port: d.port ?? null,
-      service: d.service ?? null,
+    routes: finalApp.domains.map((domain) => ({
+      containerPort: domain.container_port ?? null,
+      host: domain.host,
+      ingress: domain.ingress ?? 'direct',
+      port: domain.port ?? null,
+      service: domain.service ?? null,
     })),
     secretsWritten,
     services: finalApp.services ?? [],

@@ -2,7 +2,7 @@ import type { Config } from '@jib/config'
 import { InternalError } from '@jib/errors'
 import { loggingCreateLogger } from '@jib/logging'
 import { pathsGetPaths } from '@jib/paths'
-import { describe, expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 vi.mock('@jib/tui', () => ({
   tuiLog: {
@@ -43,168 +43,166 @@ function mod(
   return result
 }
 
-describe('initRunInstallsTx', () => {
-  test('happy path: every module installs in order', async () => {
-    const log: string[] = []
-    const mods = [
-      mod('a', async () => {
+test('initRunInstallsTx > happy path: every module installs in order', async () => {
+  const log: string[] = []
+  const mods = [
+    mod('a', async () => {
+      log.push('install:a')
+      return undefined
+    }),
+    mod('b', async () => {
+      log.push('install:b')
+      return undefined
+    }),
+    mod('c', async () => {
+      log.push('install:c')
+      return undefined
+    }),
+  ]
+
+  expect(await initRunInstallsTx(mods, ctx)).toBeUndefined()
+
+  expect(log).toEqual(['install:a', 'install:b', 'install:c'])
+})
+
+test('initRunInstallsTx > failure mid-sequence: previously installed modules roll back in reverse', async () => {
+  const log: string[] = []
+  const mods = [
+    mod(
+      'a',
+      async () => {
         log.push('install:a')
         return undefined
-      }),
-      mod('b', async () => {
+      },
+      async () => {
+        log.push('uninstall:a')
+        return undefined
+      },
+    ),
+    mod(
+      'b',
+      async () => {
         log.push('install:b')
         return undefined
-      }),
-      mod('c', async () => {
+      },
+      async () => {
+        log.push('uninstall:b')
+        return undefined
+      },
+    ),
+    mod(
+      'c',
+      async () => {
         log.push('install:c')
-        return undefined
-      }),
-    ]
-
-    expect(await initRunInstallsTx(mods, ctx)).toBeUndefined()
-
-    expect(log).toEqual(['install:a', 'install:b', 'install:c'])
-  })
-
-  test('failure mid-sequence: previously installed modules roll back in reverse', async () => {
-    const log: string[] = []
-    const mods = [
-      mod(
-        'a',
-        async () => {
-          log.push('install:a')
-          return undefined
-        },
-        async () => {
-          log.push('uninstall:a')
-          return undefined
-        },
-      ),
-      mod(
-        'b',
-        async () => {
-          log.push('install:b')
-          return undefined
-        },
-        async () => {
-          log.push('uninstall:b')
-          return undefined
-        },
-      ),
-      mod(
-        'c',
-        async () => {
-          log.push('install:c')
-          throw new Error('c blew up')
-        },
-        async () => {
-          log.push('uninstall:c')
-          return undefined
-        },
-      ),
-      mod('d', async () => {
-        log.push('install:d')
-        return undefined
-      }),
-    ]
-
-    const error = await initRunInstallsTx(mods, ctx)
-
-    expect(error).toBeInstanceOf(InternalError)
-    expect(error?.message).toBe('c blew up')
-    expect(log).toEqual(['install:a', 'install:b', 'install:c', 'uninstall:b', 'uninstall:a'])
-  })
-
-  test('failing uninstall in the rollback chain does not abort the rest', async () => {
-    const log: string[] = []
-    const mods = [
-      mod(
-        'a',
-        async () => {
-          log.push('install:a')
-          return undefined
-        },
-        async () => {
-          log.push('uninstall:a')
-          return undefined
-        },
-      ),
-      mod(
-        'b',
-        async () => {
-          log.push('install:b')
-          return undefined
-        },
-        async () => {
-          log.push('uninstall:b:fail')
-          throw new Error('b cannot be uninstalled')
-        },
-      ),
-      mod('c', async () => {
         throw new Error('c blew up')
-      }),
-    ]
+      },
+      async () => {
+        log.push('uninstall:c')
+        return undefined
+      },
+    ),
+    mod('d', async () => {
+      log.push('install:d')
+      return undefined
+    }),
+  ]
 
-    const error = await initRunInstallsTx(mods, ctx)
+  const error = await initRunInstallsTx(mods, ctx)
 
-    expect(error).toBeInstanceOf(InternalError)
-    expect(error?.message).toBe('c blew up')
-    expect(log).toEqual(['install:a', 'install:b', 'uninstall:b:fail', 'uninstall:a'])
-  })
+  expect(error).toBeInstanceOf(InternalError)
+  expect(error?.message).toBe('c blew up')
+  expect(log).toEqual(['install:a', 'install:b', 'install:c', 'uninstall:b', 'uninstall:a'])
+})
 
-  test('module with no install() is skipped and not added to the installed set', async () => {
-    const log: string[] = []
-    const mods = [
-      mod('noop'),
-      mod(
-        'b',
-        async () => {
-          log.push('install:b')
-          return undefined
-        },
-        async () => {
-          log.push('uninstall:b')
-          return undefined
-        },
-      ),
-      mod('c', async () => {
-        throw new Error('c blew up')
-      }),
-    ]
-
-    const error = await initRunInstallsTx(mods, ctx)
-
-    expect(error).toBeInstanceOf(InternalError)
-    expect(error?.message).toBe('c blew up')
-    expect(log).toEqual(['install:b', 'uninstall:b'])
-  })
-
-  test('module with no uninstall() is left in place with a warning', async () => {
-    const log: string[] = []
-    const mods = [
-      mod('a', async () => {
+test('initRunInstallsTx > failing uninstall in the rollback chain does not abort the rest', async () => {
+  const log: string[] = []
+  const mods = [
+    mod(
+      'a',
+      async () => {
         log.push('install:a')
         return undefined
-      }),
-      mod('b', async () => {
-        throw new Error('b blew up')
-      }),
-    ]
+      },
+      async () => {
+        log.push('uninstall:a')
+        return undefined
+      },
+    ),
+    mod(
+      'b',
+      async () => {
+        log.push('install:b')
+        return undefined
+      },
+      async () => {
+        log.push('uninstall:b:fail')
+        throw new Error('b cannot be uninstalled')
+      },
+    ),
+    mod('c', async () => {
+      throw new Error('c blew up')
+    }),
+  ]
 
-    const error = await initRunInstallsTx(mods, ctx)
+  const error = await initRunInstallsTx(mods, ctx)
 
-    expect(error).toBeInstanceOf(InternalError)
-    expect(error?.message).toBe('b blew up')
-    expect(log).toEqual(['install:a'])
-  })
+  expect(error).toBeInstanceOf(InternalError)
+  expect(error?.message).toBe('c blew up')
+  expect(log).toEqual(['install:a', 'install:b', 'uninstall:b:fail', 'uninstall:a'])
+})
 
-  test('returns the typed install error for failing installs', async () => {
-    const mods = [
-      mod('broken', async () => {
-        throw new Error('broken install')
-      }),
-    ]
+test('initRunInstallsTx > module with no install() is skipped and not added to the installed set', async () => {
+  const log: string[] = []
+  const mods = [
+    mod('noop'),
+    mod(
+      'b',
+      async () => {
+        log.push('install:b')
+        return undefined
+      },
+      async () => {
+        log.push('uninstall:b')
+        return undefined
+      },
+    ),
+    mod('c', async () => {
+      throw new Error('c blew up')
+    }),
+  ]
 
-    expect(await initRunInstallsTx(mods, ctx)).toBeInstanceOf(InternalError)
-  })
+  const error = await initRunInstallsTx(mods, ctx)
+
+  expect(error).toBeInstanceOf(InternalError)
+  expect(error?.message).toBe('c blew up')
+  expect(log).toEqual(['install:b', 'uninstall:b'])
+})
+
+test('initRunInstallsTx > module with no uninstall() is left in place with a warning', async () => {
+  const log: string[] = []
+  const mods = [
+    mod('a', async () => {
+      log.push('install:a')
+      return undefined
+    }),
+    mod('b', async () => {
+      throw new Error('b blew up')
+    }),
+  ]
+
+  const error = await initRunInstallsTx(mods, ctx)
+
+  expect(error).toBeInstanceOf(InternalError)
+  expect(error?.message).toBe('b blew up')
+  expect(log).toEqual(['install:a'])
+})
+
+test('initRunInstallsTx > returns the typed install error for failing installs', async () => {
+  const mods = [
+    mod('broken', async () => {
+      throw new Error('broken install')
+    }),
+  ]
+
+  expect(await initRunInstallsTx(mods, ctx)).toBeInstanceOf(InternalError)
 })

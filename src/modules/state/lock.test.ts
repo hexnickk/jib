@@ -5,7 +5,7 @@ import { InternalError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
 import { stateAcquireLock } from './lock.ts'
 
-async function withDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
+async function withDir<Value>(fn: (dir: string) => Promise<Value>): Promise<Value> {
   const dir = await mkdtemp(join(tmpdir(), 'jib-lock-'))
   try {
     return await fn(dir)

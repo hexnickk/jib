@@ -14,7 +14,9 @@ async function readConfig(file: string): Promise<Config> {
   return result
 }
 
-async function withTmpConfig<T>(fn: (cfg: Config, root: string) => Promise<T>): Promise<T> {
+async function withTmpConfig<Value>(
+  fn: (cfg: Config, root: string) => Promise<Value>,
+): Promise<Value> {
   const root = await mkdtemp(join(tmpdir(), 'jib-init-reconcile-'))
   const config = {
     config_version: 3,
@@ -75,7 +77,7 @@ describe('initReconcileOptionalModules', () => {
   })
 
   test('preserves explicit module decisions', async () => {
-    await withTmpConfig(async (_, root) => {
+    await withTmpConfig(async (_config, root) => {
       const paths = pathsGetPaths(root)
       const tokenPath = pathsCredsPath(paths, 'cloudflare', 'tunnel.env')
       await mkdir(join(root, 'secrets', '_jib', 'cloudflare'), { recursive: true })

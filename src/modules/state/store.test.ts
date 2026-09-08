@@ -6,9 +6,9 @@ import { describe, expect, test } from 'vitest'
 import { stateEmpty } from './schema.ts'
 import { stateCreateStore, stateLoad, stateRecordFailure, stateRemove, stateSave } from './store.ts'
 
-async function withStore<T>(
-  fn: (store: ReturnType<typeof stateCreateStore>, dir: string) => Promise<T>,
-): Promise<T> {
+async function withStore<Value>(
+  fn: (store: ReturnType<typeof stateCreateStore>, dir: string) => Promise<Value>,
+): Promise<Value> {
   const dir = await mkdtemp(join(tmpdir(), 'jib-state-'))
   try {
     return await fn(stateCreateStore(dir), dir)
@@ -19,8 +19,8 @@ async function withStore<T>(
 
 describe('state store', () => {
   test('load on missing file returns empty', async () => {
-    await withStore(async (s) => {
-      const st = await stateLoad(s, 'ghost')
+    await withStore(async (store) => {
+      const st = await stateLoad(store, 'ghost')
       if (st instanceof Error) {
         throw st
       }
@@ -30,12 +30,12 @@ describe('state store', () => {
   })
 
   test('round-trip save + load', async () => {
-    await withStore(async (s) => {
+    await withStore(async (store) => {
       const st = stateEmpty('web')
       st.deployed_sha = 'abc123'
       st.last_deploy_status = 'success'
-      expect(await stateSave(s, 'web', st)).toBeUndefined()
-      const loaded = await stateLoad(s, 'web')
+      expect(await stateSave(store, 'web', st)).toBeUndefined()
+      const loaded = await stateLoad(store, 'web')
       if (loaded instanceof Error) {
         throw loaded
       }
@@ -46,10 +46,10 @@ describe('state store', () => {
   })
 
   test('recordFailure writes last-deploy summary', async () => {
-    await withStore(async (s) => {
-      expect(await stateSave(s, 'web', stateEmpty('web'))).toBeUndefined()
-      expect(await stateRecordFailure(s, 'web', 'boom')).toBeUndefined()
-      const st = await stateLoad(s, 'web')
+    await withStore(async (store) => {
+      expect(await stateSave(store, 'web', stateEmpty('web'))).toBeUndefined()
+      expect(await stateRecordFailure(store, 'web', 'boom')).toBeUndefined()
+      const st = await stateLoad(store, 'web')
       if (st instanceof Error) {
         throw st
       }
@@ -60,10 +60,10 @@ describe('state store', () => {
   })
 
   test('remove deletes the app state file', async () => {
-    await withStore(async (s) => {
-      expect(await stateSave(s, 'web', stateEmpty('web'))).toBeUndefined()
-      expect(await stateRemove(s, 'web')).toBeUndefined()
-      const st = await stateLoad(s, 'web')
+    await withStore(async (store) => {
+      expect(await stateSave(store, 'web', stateEmpty('web'))).toBeUndefined()
+      expect(await stateRemove(store, 'web')).toBeUndefined()
+      const st = await stateLoad(store, 'web')
       if (st instanceof Error) {
         throw st
       }
@@ -73,9 +73,9 @@ describe('state store', () => {
   })
 
   test('load rejects corrupt JSON', async () => {
-    await withStore(async (s, dir) => {
+    await withStore(async (store, dir) => {
       await writeFile(join(dir, 'web.json'), '{not json')
-      expect(await stateLoad(s, 'web')).toBeInstanceOf(InternalError)
+      expect(await stateLoad(store, 'web')).toBeInstanceOf(InternalError)
     })
   })
 })

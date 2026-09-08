@@ -14,7 +14,9 @@ import { cmdCreateHandler } from './handler.ts'
 /** Loads the shared env command context from the managed config. */
 async function loadEnvContext() {
   const loaded = await configLoadContext()
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const { cfg, paths } = loaded
   const secrets: SecretsContext = { secretsDir: paths.secretsDir }
   return { cfg, paths, secrets }
@@ -51,10 +53,14 @@ async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: st
   const appName = String(args.app)
   const pair = String(args.pair)
   const loaded = await loadEnvContext()
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const { cfg, secrets } = loaded
   const appCfg = cfg.apps[appName]
-  if (!appCfg) return new CliError('missing_app', `app "${appName}" not found in config`)
+  if (!appCfg) {
+    return new CliError('missing_app', `app "${appName}" not found in config`)
+  }
   const separator = pair.indexOf('=')
   if (separator < 1) {
     return new CliError('invalid_env_pair', `invalid format "${pair}" — expected KEY=VALUE`)
@@ -62,8 +68,12 @@ async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: st
   const key = pair.slice(0, separator)
   const value = pair.slice(separator + 1)
   const upsertError = await secretsUpsert(secrets, appName, key, value)
-  if (upsertError instanceof Error) return upsertError
-  if (cliIsTextOutput()) consola.success(`set ${key} for ${appName}`)
+  if (upsertError instanceof Error) {
+    return upsertError
+  }
+  if (cliIsTextOutput()) {
+    consola.success(`set ${key} for ${appName}`)
+  }
   return { app: appName, key, updated: true }
 }
 
@@ -71,11 +81,15 @@ async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: st
 async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
   const requestedApp = typeof args.app === 'string' ? args.app : undefined
   const loaded = await loadEnvContext()
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const { cfg, secrets } = loaded
   const apps = requestedApp ? [requestedApp] : Object.keys(cfg.apps).sort()
   if (apps.length === 0) {
-    if (cliIsTextOutput()) consola.log('no apps configured')
+    if (cliIsTextOutput()) {
+      consola.log('no apps configured')
+    }
     return { apps: [] }
   }
 
@@ -87,16 +101,22 @@ async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
   let missingApp = false
   for (const appName of apps) {
     const appCfg = cfg.apps[appName]
-    if (!appCfg) return new CliError('missing_app', `app "${appName}" not found in config`)
+    if (!appCfg) {
+      return new CliError('missing_app', `app "${appName}" not found in config`)
+    }
     const status = await secretsCheckApp(secrets, appName)
-    if (status instanceof Error) return status
+    if (status instanceof Error) {
+      return status
+    }
     if (!status.exists) {
       items.push({ app: appName, path: null, entries: [] })
       missingApp = true
       continue
     }
     const entries = await secretsReadMasked(secrets, appName)
-    if (entries instanceof Error) return entries
+    if (entries instanceof Error) {
+      return entries
+    }
     items.push({ app: appName, path: status.path, entries })
   }
 
@@ -107,7 +127,9 @@ async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
         continue
       }
       consola.log(`${item.app} ${item.path}`)
-      for (const entry of item.entries) consola.log(`  ${entry.key}=${entry.masked}`)
+      for (const entry of item.entries) {
+        consola.log(`  ${entry.key}=${entry.masked}`)
+      }
     }
   }
 
@@ -122,14 +144,24 @@ async function envDeleteRunCommand(args: ArgumentsCamelCase<{ app: string; key: 
   const appName = String(args.app)
   const key = String(args.key)
   const loaded = await loadEnvContext()
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const { cfg, secrets } = loaded
   const appCfg = cfg.apps[appName]
-  if (!appCfg) return new CliError('missing_app', `app "${appName}" not found in config`)
+  if (!appCfg) {
+    return new CliError('missing_app', `app "${appName}" not found in config`)
+  }
   const removed = await secretsRemove(secrets, appName, key)
-  if (removed instanceof Error) return removed
-  if (!removed) return new CliError('missing_env_key', `key "${key}" not found in ${appName}`)
-  if (cliIsTextOutput()) consola.success(`deleted ${key} from ${appName}`)
+  if (removed instanceof Error) {
+    return removed
+  }
+  if (!removed) {
+    return new CliError('missing_env_key', `key "${key}" not found in ${appName}`)
+  }
+  if (cliIsTextOutput()) {
+    consola.success(`deleted ${key} from ${appName}`)
+  }
   return { app: appName, key, removed: true }
 }
 

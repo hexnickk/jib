@@ -7,4 +7,4 @@ import { $ as zx$ } from 'zx'
 zx$.quiet = true
 zx$.nothrow = true
 
-export const $ = zx$
+export { zx$ as $ }

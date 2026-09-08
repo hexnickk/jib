@@ -39,7 +39,7 @@ function createNoopSpinner() {
 
 describe('runDeploy', () => {
   test('returns prepared and deployed shas on success', async () => {
-    const result = await runDeploy(cfg, paths, 'demo', undefined, {
+    const result = await runDeploy({ cfg, paths }, 'demo', undefined, {
       createSpinner: createNoopSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: async () => ({ deployedSHA: 'deadbeef12345678', durationMs: 42 }),
@@ -55,7 +55,7 @@ describe('runDeploy', () => {
   })
 
   test('returns an internal error for source preparation failures', async () => {
-    const result = await runDeploy(cfg, paths, 'demo', undefined, {
+    const result = await runDeploy({ cfg, paths }, 'demo', undefined, {
       createSpinner: createNoopSpinner,
       sync: async () => {
         throw new Error('git clone failed')
@@ -69,7 +69,7 @@ describe('runDeploy', () => {
   test.each([new InternalError('git clone failed'), new NotFoundError('repo not found')])(
     'wraps returned source failures with their original cause: $message',
     async (failure) => {
-      const result = await runDeploy(cfg, paths, 'demo', undefined, {
+      const result = await runDeploy({ cfg, paths }, 'demo', undefined, {
         createSpinner: createNoopSpinner,
         sync: async () => failure,
       })
@@ -84,7 +84,7 @@ describe('runDeploy', () => {
   test.each([new InternalError('build failed'), new NotFoundError('app not found')])(
     'preserves internal deploy errors and wraps other returned errors: $message',
     async (failure) => {
-      const result = await runDeploy(cfg, paths, 'demo', undefined, {
+      const result = await runDeploy({ cfg, paths }, 'demo', undefined, {
         createSpinner: createNoopSpinner,
         sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
         deployPrepared: async () => failure,
@@ -101,7 +101,7 @@ describe('runDeploy', () => {
   )
 
   test('returns permission failures as internal errors', async () => {
-    const result = await runDeploy(cfg, paths, 'demo', undefined, {
+    const result = await runDeploy({ cfg, paths }, 'demo', undefined, {
       createSpinner: createNoopSpinner,
       sync: async () => ({ sha: '12345678deadbeef', workdir: '/tmp/demo' }),
       deployPrepared: async () => {

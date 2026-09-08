@@ -23,18 +23,18 @@ describe('createAppJWT', () => {
     const { jwt, expiresAt } = signed
     const parts = jwt.split('.')
     expect(parts).toHaveLength(3)
-    const [h, p, s] = parts as [string, string, string]
+    const [encodedHeader, encodedPayload, encodedSignature] = parts as [string, string, string]
 
-    const header = JSON.parse(Buffer.from(h, 'base64url').toString())
+    const header = JSON.parse(Buffer.from(encodedHeader, 'base64url').toString())
     expect(header).toEqual({ alg: 'RS256', typ: 'JWT' })
-    const payload = JSON.parse(Buffer.from(p, 'base64url').toString())
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString())
     expect(payload.iss).toBe('12345')
     expect(payload.exp).toBeGreaterThan(payload.iat)
 
     const verifier = createVerify('RSA-SHA256')
-    verifier.update(`${h}.${p}`)
+    verifier.update(`${encodedHeader}.${encodedPayload}`)
     verifier.end()
-    const ok = verifier.verify(publicKey, Buffer.from(s, 'base64url'))
+    const ok = verifier.verify(publicKey, Buffer.from(encodedSignature, 'base64url'))
     expect(ok).toBe(true)
     expect(expiresAt.getTime()).toBeGreaterThan(Date.now())
   })

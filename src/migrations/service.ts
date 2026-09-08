@@ -1,11 +1,11 @@
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { $ } from '@/libs/shell'
 import { InternalError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { stateOpenDb } from '@jib/state'
 import type { JibDb } from '@jib/state'
+import { $ } from '@/libs/shell'
 import { DOCKER_GROUP, GROUP } from './helpers.ts'
 import { migrations, runJibMigrationsResult } from './index.ts'
 

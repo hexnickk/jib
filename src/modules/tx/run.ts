@@ -5,7 +5,7 @@ export interface CancelSignal {
   readonly cancelled: boolean
 }
 
-type NonErrorState<T> = T extends Error ? never : T
+type NonErrorState<Value> = Value extends Error ? never : Value
 
 export interface Step<Ctx, State, Err extends JibError, RollbackErr extends JibError = JibError> {
   readonly name: string
@@ -21,10 +21,13 @@ export async function txRunSteps<
 >(
   ctx: Ctx,
   steps: readonly Step<Ctx, unknown, Err, RollbackErr>[],
-  signal: CancelSignal,
-  cancelled: () => Err,
-  warn?: (message: string) => void,
+  options: {
+    signal: CancelSignal
+    cancelled: () => Err
+    warn?: (message: string) => void
+  },
 ): Promise<undefined | Err> {
+  const { signal, cancelled, warn } = options
   const done: Array<{ step: Step<Ctx, unknown, Err, RollbackErr>; state: unknown }> = []
 
   for (const step of steps) {

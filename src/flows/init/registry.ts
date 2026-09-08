@@ -14,13 +14,13 @@ export { initOptionalModules, initRequiredModules, initResolveModules }
 
 /** Optional modules where config.modules[name] === true. */
 export function initInstalledOptionalModules(config: Config): ModLike[] {
-  return initOptionalModules().filter((m) => config.modules?.[m.manifest.name] === true)
+  return initOptionalModules().filter((module) => config.modules?.[module.manifest.name] === true)
 }
 
 /** Optional modules the user has never been asked about. */
 export function initUnseenOptionalModules(config: Config): ModLike[] {
   const mods = config.modules ?? {}
-  return initOptionalModules().filter((m) => !(m.manifest.name in mods))
+  return initOptionalModules().filter((module) => !(module.manifest.name in mods))
 }
 
 /** Returns the names of optional modules that still need an explicit choice. */

@@ -21,13 +21,17 @@ describe('github installation lookup', () => {
   test('listInstallations uses the GitHub app endpoint and returns parsed installations', async () => {
     let seenAuth = ''
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
-      seenAuth = String((init?.headers as Record<string, string>).Authorization)
-      expect(String(url)).toBe('https://api.github.com/app/installations')
+      seenAuth = new Headers(init?.headers).get('Authorization') ?? ''
+      expect(url instanceof Request ? url.url : String(url)).toBe(
+        'https://api.github.com/app/installations',
+      )
       return new Response(JSON.stringify([{ id: 7, account: { login: 'Acme' } }]), { status: 200 })
     }) as unknown as typeof fetch
 
     const items = await githubInstallationList(12345, privateKey)
-    if (items instanceof Error) throw items
+    if (items instanceof Error) {
+      throw items
+    }
 
     expect(seenAuth.startsWith('Bearer ')).toBe(true)
     expect(items).toEqual([{ id: 7, account: { login: 'Acme' } }])
@@ -40,7 +44,9 @@ describe('github installation lookup', () => {
       })) as unknown as typeof fetch
 
     const installationId = await githubInstallationFindForOrg(12345, privateKey, 'acme')
-    if (installationId instanceof Error) throw installationId
+    if (installationId instanceof Error) {
+      throw installationId
+    }
 
     expect(installationId).toBe(42)
   })

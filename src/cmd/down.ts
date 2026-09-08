@@ -15,10 +15,16 @@ const cliDownCommand = {
 async function downRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
   const appName = String(args.app)
   const loaded = await configLoadAppContext(appName)
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const result = await deployDownApp(deployCreateDeps(loaded.cfg, loaded.paths, 'down'), appName)
-  if (result) return result
-  if (cliIsTextOutput()) consola.success(`stopped ${appName}`)
+  if (result) {
+    return result
+  }
+  if (cliIsTextOutput()) {
+    consola.success(`stopped ${appName}`)
+  }
   return { app: appName, state: 'stopped' as const }
 }
 

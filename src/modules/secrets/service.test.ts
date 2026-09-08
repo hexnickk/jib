@@ -5,7 +5,9 @@ import { InternalError, NotFoundError } from '@jib/errors'
 import { describe, expect, test } from 'vitest'
 import { secretsCheckApp, secretsReadMasked, secretsRemove, secretsUpsert } from './service.ts'
 
-async function withSecretsDir<T>(fn: (ctx: { secretsDir: string }) => Promise<T>): Promise<T> {
+async function withSecretsDir<Value>(
+  fn: (ctx: { secretsDir: string }) => Promise<Value>,
+): Promise<Value> {
   const secretsDir = await mkdtemp(join(tmpdir(), 'jib-secrets-service-'))
   try {
     return await fn({ secretsDir })

@@ -4,7 +4,7 @@ import { DEFAULT_INGRESS_MAX_BODY_SIZE, configNormalizeByteSize } from './byte-s
 /** Accepts either a string or an array of strings; normalizes to `string[]`. */
 export const StringOrSlice = z
   .union([z.string(), z.array(z.string())])
-  .transform((v) => (typeof v === 'string' ? [v] : v))
+  .transform((value) => (typeof value === 'string' ? [value] : value))
 
 export const GitHubSourceSchema = z.object({
   driver: z.literal('github'),

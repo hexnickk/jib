@@ -42,10 +42,13 @@ describe('github keygen helpers', () => {
     const paths = pathsGetPaths(root)
     mockZxDollar((parts, ...values) => {
       const command = parts.join(' ')
-      if (!command.includes('ssh-keygen -t ed25519 -f')) return fakeShell()
+      if (!command.includes('ssh-keygen -t ed25519 -f')) {
+        return fakeShell()
+      }
       const privateKey = values[0]
-      if (typeof privateKey !== 'string')
+      if (typeof privateKey !== 'string') {
         throw new Error('private key path missing in test shell stub')
+      }
       const publicKey = `${privateKey}.pub`
       writeFileSync(privateKey, 'PRIVATE KEY\n')
       writeFileSync(publicKey, 'ssh-ed25519 AAAA test\n')

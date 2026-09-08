@@ -5,8 +5,8 @@ import { type PortAllocatorConfig, configAllocatePort } from './port-allocator.t
 
 function cfg(...portsPerApp: number[][]): PortAllocatorConfig {
   const apps: PortAllocatorConfig['apps'] = {}
-  portsPerApp.forEach((ports, i) => {
-    apps[`app${i}`] = { domains: ports.map((port) => ({ port })) }
+  portsPerApp.forEach((ports, appIndex) => {
+    apps[`app${appIndex}`] = { domains: ports.map((port) => ({ port })) }
   })
   return { apps }
 }

@@ -15,10 +15,16 @@ const cliUpCommand = {
 async function upRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
   const appName = String(args.app)
   const loaded = await configLoadAppContext(appName)
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const result = await deployUpApp(deployCreateDeps(loaded.cfg, loaded.paths, 'up'), appName)
-  if (result) return result
-  if (cliIsTextOutput()) consola.success(`started ${appName}`)
+  if (result) {
+    return result
+  }
+  if (cliIsTextOutput()) {
+    consola.success(`started ${appName}`)
+  }
   return { app: appName, state: 'started' as const }
 }
 

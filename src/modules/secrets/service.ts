@@ -24,14 +24,14 @@ const DIR_MODE = 0o750
 function parseEnv(content: string): { lines: string[]; entries: Map<string, number> } {
   const lines = content.split('\n')
   const entries = new Map<string, number>()
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i]?.trim() ?? ''
+  for (let index = 0; index < lines.length; index++) {
+    const trimmed = lines[index]?.trim() ?? ''
     if (!trimmed || trimmed.startsWith('#')) {
       continue
     }
     const eq = trimmed.indexOf('=')
     if (eq > 0) {
-      entries.set(trimmed.slice(0, eq), i)
+      entries.set(trimmed.slice(0, eq), index)
     }
   }
   return { lines, entries }

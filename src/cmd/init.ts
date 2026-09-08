@@ -1,11 +1,3 @@
-import { initConfigureOptionalModules } from '@/flows/init/optional.ts'
-import { initReconcileOptionalModules } from '@/flows/init/reconcile.ts'
-import {
-  initDescribeModules,
-  initInstalledOptionalModules,
-  initPendingOptionalModuleNames,
-  initUnseenOptionalModules,
-} from '@/flows/init/registry.ts'
 import {
   CliError,
   cliCanPrompt,
@@ -18,12 +10,22 @@ import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
 import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
+import { initConfigureOptionalModules } from '@/flows/init/optional.ts'
+import { initReconcileOptionalModules } from '@/flows/init/reconcile.ts'
+import {
+  initDescribeModules,
+  initInstalledOptionalModules,
+  initPendingOptionalModuleNames,
+  initUnseenOptionalModules,
+} from '@/flows/init/registry.ts'
 import { hasBootstrapState } from '../migrations/service.ts'
 import { cmdCreateHandler } from './handler.ts'
 
 /** Returns a typed error until the machine has completed the bootstrap migration. */
 function initCheckMigration(rootReady: boolean): CliError | undefined {
-  if (rootReady) return undefined
+  if (rootReady) {
+    return undefined
+  }
   return new CliError('migrate_required', 'jib is not bootstrapped yet', {
     hint: 'run `sudo jib migrate` first',
   })
@@ -44,25 +46,40 @@ const cliInitCommand = {
 /** Runs optional module setup and returns a setup summary or typed error. */
 async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
   const linuxError = cliCheckLinuxHost('init')
-  if (linuxError) return linuxError
+  if (linuxError) {
+    return linuxError
+  }
   if (!args.check) {
     const rootError = cliCheckRootHost('init')
-    if (rootError) return rootError
+    if (rootError) {
+      return rootError
+    }
   }
 
   const paths = pathsGetPaths()
   const migrationError = initCheckMigration(hasBootstrapState(paths))
-  if (migrationError) return migrationError
-  if (cliIsTextOutput()) tuiIntro('jib init')
+  if (migrationError) {
+    return migrationError
+  }
+  if (cliIsTextOutput()) {
+    tuiIntro('jib init')
+  }
 
-  if (args.check) {
-    let config = await configLoad(paths.configFile)
-    if (config instanceof Error) return config
-    const reconciled = await initReconcileOptionalModules(config, paths, {
-      writeConfig: async () => undefined,
-    })
-    if (reconciled instanceof Error) return reconciled
-    config = reconciled
+  const loaded = await configLoad(paths.configFile)
+  if (loaded instanceof Error) {
+    return loaded
+  }
+  const config = await initReconcileOptionalModules(
+    loaded,
+    paths,
+    args.check ? { writeConfig: async () => undefined } : {},
+  )
+  if (config instanceof Error) {
+    return config
+  }
+
+  const unseen = initUnseenOptionalModules(config)
+  if (args.check || unseen.length === 0) {
     const pending = initPendingOptionalModuleNames(config)
     if (cliIsTextOutput()) {
       if (pending.length === 0) {
@@ -76,24 +93,6 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
     return {
       enabledOptionalModules: initInstalledOptionalModules(config).map((mod) => mod.manifest.name),
       optionalModulesPending: pending,
-    }
-  }
-
-  let config = await configLoad(paths.configFile)
-  if (config instanceof Error) return config
-  const reconciled = await initReconcileOptionalModules(config, paths)
-  if (reconciled instanceof Error) return reconciled
-  config = reconciled
-  const unseen = initUnseenOptionalModules(config)
-
-  if (unseen.length === 0) {
-    if (cliIsTextOutput()) {
-      tuiNote('No optional modules are waiting for setup.', 'Optional modules')
-      tuiOutro('nothing to do')
-    }
-    return {
-      enabledOptionalModules: initInstalledOptionalModules(config).map((mod) => mod.manifest.name),
-      optionalModulesPending: [],
     }
   }
 
@@ -116,9 +115,13 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
   }
 
   const configureError = await initConfigureOptionalModules(config, paths, unseen)
-  if (configureError instanceof Error) return configureError
+  if (configureError instanceof Error) {
+    return configureError
+  }
   const finalConfig = await configLoad(paths.configFile)
-  if (finalConfig instanceof Error) return finalConfig
+  if (finalConfig instanceof Error) {
+    return finalConfig
+  }
   if (cliIsTextOutput()) {
     tuiOutro('modules configured')
     tuiNote('Next: run `jib status` to confirm services are healthy.', 'Next steps')

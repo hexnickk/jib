@@ -1,8 +1,8 @@
 import { rm } from 'node:fs/promises'
-import { $ } from '@/libs/shell'
 import { InternalError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
+import { $ } from '@/libs/shell'
 import { SERVICE_NAME, UNIT_PATH } from './templates.ts'
 
 interface WatcherContext {

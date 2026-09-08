@@ -13,13 +13,21 @@ import { cmdCreateHandler } from './handler.ts'
 
 /** Renders a human-readable relative time for the status screen. */
 function timeAgo(iso: string): string {
-  if (!iso) return ''
+  if (!iso) {
+    return ''
+  }
   const ms = Date.now() - new Date(iso).getTime()
-  if (ms < 60_000) return 'just now'
+  if (ms < 60_000) {
+    return 'just now'
+  }
   const mins = Math.floor(ms / 60_000)
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 60) {
+    return `${mins}m ago`
+  }
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
+  if (hours < 24) {
+    return `${hours}h ago`
+  }
   return `${Math.floor(hours / 24)}d ago`
 }
 
@@ -62,7 +70,9 @@ function printApps(apps: AppStatus[]): void {
   printLine()
   printLine('apps')
   apps.forEach((app, index) => {
-    if (index > 0) printLine()
+    if (index > 0) {
+      printLine()
+    }
     const sha = app.sha ? app.sha.slice(0, 7) : 'never deployed'
     const ago = timeAgo(app.lastDeploy)
     const deployState = app.lastDeployStatus || 'unknown'
@@ -75,8 +85,9 @@ function printApps(apps: AppStatus[]): void {
       )
     }
     if (app.domains.length > 0) {
-      for (const domain of app.domains)
+      for (const domain of app.domains) {
         printLine(`    ingress:  ${domain.host} -> :${domain.port ?? '?'}`)
+      }
     }
   })
 }
@@ -90,7 +101,9 @@ const cliStatusCommand = {
 /** Collects status data and writes the text status view when text output is enabled. */
 async function statusRunCommand() {
   const loaded = await configLoadContext()
-  if (loaded instanceof Error) return loaded
+  if (loaded instanceof Error) {
+    return loaded
+  }
   const { cfg, paths } = loaded
   const hasCloudflared = cfg.modules?.cloudflared === true
   const [services, sources, apps] = await Promise.all([
@@ -98,7 +111,9 @@ async function statusRunCommand() {
     stateCollectSources(cfg, paths),
     stateCollectApps(cfg, paths),
   ])
-  if (apps instanceof Error) return apps
+  if (apps instanceof Error) {
+    return apps
+  }
 
   if (cliIsTextOutput()) {
     printServices(services)

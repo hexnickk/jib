@@ -13,7 +13,9 @@ export function deployBuildOverrideServices(
   const single = parsed.length === 1 ? parsed[0]?.name : undefined
   for (const domain of domains) {
     const target = domain.service ?? single
-    if (!target || domain.port === undefined || domain.container_port === undefined) continue
+    if (!target || domain.port === undefined || domain.container_port === undefined) {
+      continue
+    }
     const ports = byService.get(target) ?? []
     ports.push({ host: domain.port, container: domain.container_port })
     byService.set(target, ports)

@@ -40,13 +40,13 @@ const LOG_OPTS = { driver: 'json-file', options: { 'max-size': '50m', 'max-file'
  */
 export function dockerBuildOverride(app: string, services: OverrideService[]): OverrideFile {
   const out: OverrideFile['services'] = {}
-  for (const s of services) {
-    out[s.name] = {
+  for (const service of services) {
+    out[service.name] = {
       labels: JIB_LABELS(app),
       restart: 'unless-stopped',
       logging: LOG_OPTS,
-      ...(s.ports && s.ports.length > 0
-        ? { ports: s.ports.map((p) => `${p.host}:${p.container}`) }
+      ...(service.ports && service.ports.length > 0
+        ? { ports: service.ports.map((port) => `${port.host}:${port.container}`) }
         : {}),
     }
   }
@@ -65,11 +65,11 @@ export function dockerOverridePath(overrideDir: string, app: string): string {
  */
 export function dockerRenderOverrideYAML(app: string, services: OverrideService[]): string {
   const doc = new Document(dockerBuildOverride(app, services))
-  for (const s of services) {
-    if (!s.ports || s.ports.length === 0) {
+  for (const service of services) {
+    if (!service.ports || service.ports.length === 0) {
       continue
     }
-    const seq = doc.getIn(['services', s.name, 'ports'], true)
+    const seq = doc.getIn(['services', service.name, 'ports'], true)
     if (seq instanceof YAMLSeq) {
       seq.tag = '!override'
       for (const item of seq.items) {

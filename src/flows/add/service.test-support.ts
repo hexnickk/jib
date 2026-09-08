@@ -70,7 +70,7 @@ export function addMakeParams(): AddFlowParams {
   }
 }
 
-export function addMakeDeps(
+interface AddTestOptions {
   failAt?:
     | 'prepareRepo'
     | 'inspectCompose'
@@ -79,12 +79,15 @@ export function addMakeDeps(
     | 'confirmPlan'
     | 'writeConfig'
     | 'writeSecondSecret'
-    | 'claimRoutes',
-  injectConcurrentConfigChange = false,
-  failLoadConfig = false,
-  failRollbackRepo = false,
-  appOverride: App = addFinalApp,
-) {
+    | 'claimRoutes'
+  injectConcurrentConfigChange?: boolean
+  failLoadConfig?: boolean
+  failRollbackRepo?: boolean
+  appOverride?: App
+}
+
+export function addMakeDeps(options: AddTestOptions = {}) {
+  const { failAt, injectConcurrentConfigChange, failLoadConfig, failRollbackRepo } = options
   const calls: string[] = []
   const states: AddFlowState[] = []
   const warnings: string[] = []
@@ -154,7 +157,35 @@ export function addMakeDeps(
       return undefined
     },
   }
-  const planner: AddPlanner = {
+  const planner = makePlanner(options, calls)
+  const observer: AddFlowObserver = {
+    onStateChange: (state) => {
+      states.push(state)
+    },
+    warn: (message) => {
+      warnings.push(message)
+    },
+  }
+
+  const flow = {
+    run(params: AddFlowParams) {
+      return addRun({ support, planner, observer }, params)
+    },
+  }
+
+  return {
+    flow,
+    calls,
+    states,
+    warnings,
+    writtenConfigs,
+    managedCompose: pathsManagedComposePath(paths, 'blog'),
+  }
+}
+
+function makePlanner(options: AddTestOptions, calls: string[]): AddPlanner {
+  const { failAt, appOverride = addFinalApp } = options
+  return {
     inspectCompose: async () => {
       calls.push('inspectCompose')
       if (failAt === 'inspectCompose') {
@@ -183,28 +214,5 @@ export function addMakeDeps(
       }
       return undefined
     },
-  }
-  const observer: AddFlowObserver = {
-    onStateChange: (state) => {
-      states.push(state)
-    },
-    warn: (message) => {
-      warnings.push(message)
-    },
-  }
-
-  const flow = {
-    run(params: AddFlowParams) {
-      return addRun({ support, planner, observer }, params)
-    },
-  }
-
-  return {
-    flow,
-    calls,
-    states,
-    warnings,
-    writtenConfigs,
-    managedCompose: pathsManagedComposePath(paths, 'blog'),
   }
 }

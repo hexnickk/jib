@@ -104,14 +104,12 @@ export async function sourcesSetupRef(
 
 /** Probes a chosen source and offers interactive recovery for authentication failures. */
 export async function sourcesPreflightSelection(
-  appName: string,
-  cfg: Config,
-  paths: Paths,
-  repo: string,
-  currentSource?: string,
-  currentBranch?: string,
+  ctx: { cfg: Config; paths: Paths },
+  selection: SourceTarget & { repo: string },
   deps: SourceRecoveryDeps = {},
 ): Promise<{ cfg: Config; source?: string; branch: string } | JibError> {
+  const { cfg, paths } = ctx
+  const { app: appName, repo, source: currentSource, branch: currentBranch } = selection
   let resolvedCfg = cfg
   let source = currentSource
   const runProbe = deps.probe ?? sourcesProbe
@@ -130,11 +128,9 @@ export async function sourcesPreflightSelection(
     }
 
     const nextSource = await sourcesMaybeRecover(
-      resolvedCfg,
-      paths,
-      repo,
+      { cfg: resolvedCfg, paths },
+      { repo, source },
       probeResult,
-      source,
       deps,
     )
     if (nextSource instanceof Error) {
@@ -155,13 +151,13 @@ export async function sourcesPreflightSelection(
 
 /** Attempts interactive source recovery and returns a replacement source or no recovery. */
 export async function sourcesMaybeRecover(
-  cfg: Config,
-  paths: Paths,
-  repo: string,
+  ctx: { cfg: Config; paths: Paths },
+  selection: Pick<SourceTarget, 'source'> & { repo: string },
   error: unknown,
-  currentSource?: string,
   deps: SourceRecoveryDeps = {},
 ): Promise<string | JibError | null> {
+  const { cfg, paths } = ctx
+  const { repo, source: currentSource } = selection
   const interactive = deps.isInteractive?.() ?? false
   if (!interactive || !sourcesRepoSupportsRecovery(repo) || !sourcesIsAuthFailure(repo, error)) {
     return null

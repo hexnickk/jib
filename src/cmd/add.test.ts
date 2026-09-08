@@ -5,7 +5,7 @@ import type { CliError } from '@jib/cli'
 import type { Config } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
 import { afterEach, describe, expect, test } from 'vitest'
-import { addChooseInitialSource } from './add-support.ts'
+import { addChooseInitialSource } from '@/flows/add/command-support.ts'
 
 const cfg = {
   config_version: 3,
@@ -16,11 +16,11 @@ const cfg = {
 } as Config
 
 const tempDirs: string[] = []
-const selectSetup = async <T extends string>(_opts: {
+const selectSetup = async <Value extends string>(_opts: {
   message: string
-  options: { value: T; label: string; hint?: string }[]
-  initialValue?: T
-}): Promise<T> => 'setup:github' as T
+  options: { value: Value; label: string; hint?: string }[]
+  initialValue?: Value
+}): Promise<Value> => 'setup:github' as Value
 
 /** Creates an isolated temp workspace for add command tests. */
 function createAddTestPaths() {
@@ -30,7 +30,9 @@ function createAddTestPaths() {
 }
 
 afterEach(() => {
-  for (const dir of tempDirs.splice(0)) rmSync(dir, { force: true, recursive: true })
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { force: true, recursive: true })
+  }
 })
 
 describe('addChooseInitialSource', () => {

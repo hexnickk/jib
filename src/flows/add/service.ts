@@ -33,13 +33,11 @@ export async function addRun(
 
   observer.onStateChange?.('inputs_ready')
 
-  const error = await txRunSteps(
-    ctx,
-    addBuildSteps(),
-    params.signal ?? { cancelled: false },
-    () => new CancelledError('add cancelled'),
-    observer.warn,
-  )
+  const error = await txRunSteps(ctx, addBuildSteps(), {
+    signal: params.signal ?? { cancelled: false },
+    cancelled: () => new CancelledError('add cancelled'),
+    warn: (message) => observer.warn?.(message),
+  })
   if (error) {
     return error
   }

@@ -13,7 +13,7 @@ import {
   cloudflaredTunnelTokenPath,
 } from './index.ts'
 
-async function withTmpPaths<T>(fn: (root: string) => Promise<T>): Promise<T> {
+async function withTmpPaths<Value>(fn: (root: string) => Promise<Value>): Promise<Value> {
   const root = await mkdtemp(join(tmpdir(), 'jib-cloudflared-'))
   try {
     return await fn(root)

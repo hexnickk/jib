@@ -15,14 +15,19 @@ export interface PollAppDeps {
   syncApp?: typeof sourcesSync
   deployPrepared?: typeof deployPreparedApp
 }
+interface PollAppContext {
+  cfg: Config
+  paths: Paths
+  log: Logger
+}
+
 export async function watcherPollApp(
-  cfg: Config,
-  paths: Paths,
+  ctx: PollAppContext,
   appName: string,
   lastSeen: Map<string, string>,
-  log: Logger,
   deps: PollAppDeps = {},
 ): Promise<InternalError | undefined> {
+  const { cfg, paths, log } = ctx
   const app = cfg.apps[appName]
   if (!app || !app.repo || app.repo === 'local') {
     return
@@ -43,16 +48,14 @@ export async function watcherPollApp(
     return prepared
   }
   log.info(`${appName}: new sha ${prepared.sha.slice(0, 7)} (was ${prev.slice(0, 7) || 'none'})`)
-  const deployError = await deployPreparedAppResult(
-    cfg,
-    paths,
-    appName,
-    prepared,
-    log,
-    deps.deployPrepared ?? deployPreparedApp,
-  )
-  if (deployError) {
-    return deployError
+  try {
+    const result = await (deps.deployPrepared ?? deployPreparedApp)(ctx, appName, prepared)
+    if (result instanceof Error) {
+      return new InternalError(`deploy ${appName}: ${result.message}`, { cause: result })
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new InternalError(`deploy ${appName}: ${message}`, { cause: error })
   }
   lastSeen.set(appName, prepared.sha)
 }
@@ -97,32 +100,12 @@ async function syncPollApp(
   }
 }
 
-async function deployPreparedAppResult(
-  cfg: Config,
-  paths: Paths,
-  appName: string,
-  prepared: { workdir: string; sha: string },
-  log: Logger,
-  deployPrepared: typeof deployPreparedApp,
-): Promise<InternalError | undefined> {
-  try {
-    const result = await deployPrepared(cfg, paths, appName, prepared, log)
-    return result instanceof Error
-      ? new InternalError(`deploy ${appName}: ${result.message}`, { cause: result })
-      : undefined
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    return new InternalError(`deploy ${appName}: ${message}`, { cause: error })
-  }
-}
-
 async function deployPreparedApp(
-  cfg: Config,
-  paths: Paths,
+  ctx: PollAppContext,
   appName: string,
   prepared: { workdir: string; sha: string },
-  log: Logger,
 ): Promise<InternalError | undefined> {
+  const { cfg, paths, log } = ctx
   const result = await deployApp(
     {
       config: cfg,
@@ -155,7 +138,7 @@ export async function watcherRunPollCycle(
     return cfg
   }
   for (const name of Object.keys(cfg.apps)) {
-    const error = await watcherPollApp(cfg, deps.paths, name, lastSeen, deps.log)
+    const error = await watcherPollApp({ cfg, paths: deps.paths, log: deps.log }, name, lastSeen)
     if (error) {
       deps.log.warn(`${name}: poll error: ${error.message}`)
     }

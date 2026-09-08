@@ -1,9 +1,9 @@
-import { cloudflaredRunSetup, cloudflaredRunSetupResult } from '@/flows/cloudflared/setup.ts'
 import { cloudflaredEnableConfig, cloudflaredReadStatus } from '@jib-module/cloudflared'
 import { cliIsTextOutput } from '@jib/cli'
 import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
 import type { CommandModule } from 'yargs'
+import { cloudflaredRunSetup, cloudflaredRunSetupResult } from '@/flows/cloudflared/setup.ts'
 import { cmdCreateHandler } from './handler.ts'
 
 /** Writes Cloudflare readiness from the same module and token state used by setup. */
@@ -33,12 +33,16 @@ async function cloudflaredSetupRunCommand() {
   const paths = pathsGetPaths()
   if (cliIsTextOutput()) {
     const configured = await cloudflaredRunSetup(paths)
-    if (!configured) return
+    if (!configured) {
+      return
+    }
     const enableError = await cloudflaredEnableConfig(paths)
     return enableError instanceof Error ? enableError : { configured: true }
   }
   const result = await cloudflaredRunSetupResult(paths)
-  if (result instanceof Error || result.status !== 'configured') return result
+  if (result instanceof Error || result.status !== 'configured') {
+    return result
+  }
   const enableError = await cloudflaredEnableConfig(paths)
   return enableError instanceof Error ? enableError : result
 }
@@ -47,7 +51,9 @@ async function cloudflaredSetupRunCommand() {
 async function cloudflaredStatusRunCommand() {
   const paths = pathsGetPaths()
   const config = await configLoad(paths.configFile)
-  if (config instanceof Error) return config
+  if (config instanceof Error) {
+    return config
+  }
   const status = cloudflaredReadStatus(config, paths)
   if (cliIsTextOutput()) {
     writeCloudflaredStatusText(status)

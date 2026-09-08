@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
-import { $ } from '@/libs/shell'
 import { InternalError, ValidationError } from '@jib/errors'
+import { $ } from '@/libs/shell'
 import {
   DOCKER_APT_SOURCE_PATH,
   DOCKER_SAFE_APT_VALUE,

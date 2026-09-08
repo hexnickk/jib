@@ -23,8 +23,8 @@ export function dockerFindUnsafeBindMounts(
   const files = composeFiles.length > 0 ? composeFiles : ['docker-compose.yml']
   const merged = new Map<string, RawService>()
 
-  for (const f of files) {
-    const data = readFileSync(isAbsolute(f) ? f : join(repoDir, f), 'utf8')
+  for (const file of files) {
+    const data = readFileSync(isAbsolute(file) ? file : join(repoDir, file), 'utf8')
     const cf = (parseYaml(data) ?? {}) as RawComposeFile
     for (const [name, svc] of Object.entries(cf.services ?? {})) {
       const existing = merged.get(name) ?? {}
@@ -36,7 +36,9 @@ export function dockerFindUnsafeBindMounts(
   for (const [service, svc] of merged) {
     for (const volume of svc.volumes ?? []) {
       const source = bindMountSource(volume)
-      if (source) out.push({ service, source })
+      if (source) {
+        out.push({ service, source })
+      }
     }
   }
   return out
@@ -46,15 +48,21 @@ export function dockerFindUnsafeBindMounts(
 function bindMountSource(volume: unknown): string | null {
   if (typeof volume === 'string') {
     const source = volume.split(':')[0] ?? ''
-    if (!source || !sourceLooksLikeHostPath(source)) return null
+    if (!source || !sourceLooksLikeHostPath(source)) {
+      return null
+    }
     return source
   }
-  if (!volume || typeof volume !== 'object') return null
+  if (!volume || typeof volume !== 'object') {
+    return null
+  }
   const raw = volume as { type?: unknown; source?: unknown }
   if (raw.type === 'bind' && typeof raw.source === 'string' && raw.source.length > 0) {
     return raw.source
   }
-  if (typeof raw.source === 'string' && sourceLooksLikeHostPath(raw.source)) return raw.source
+  if (typeof raw.source === 'string' && sourceLooksLikeHostPath(raw.source)) {
+    return raw.source
+  }
   return null
 }
 

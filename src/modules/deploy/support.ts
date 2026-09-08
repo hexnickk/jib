@@ -1,9 +1,9 @@
 import { stat, symlink, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
-import { $ } from '@/libs/shell'
 import type { App } from '@jib/config'
 import { dockerParseComposeServices, dockerWriteOverride } from '@jib/docker'
 import { InternalError, type JibError, errorsToJibError } from '@jib/errors'
+import { $ } from '@/libs/shell'
 import { deployBuildOverrideServices } from './override.ts'
 import type { DeployDeps } from './types.ts'
 

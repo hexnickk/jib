@@ -3,11 +3,10 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@jib/*": ["src/modules/*/index.ts", "src/modules/*"],
-      "@jib-module/*": ["src/modules/*/index.ts", "src/modules/*"]
+      "@/*": ["./src/*"],
+      "@jib/*": ["./src/modules/*/index.ts", "./src/modules/*"],
+      "@jib-module/*": ["./src/modules/*/index.ts", "./src/modules/*"]
     },
     "lib": ["ESNext"],
     "types": ["node", "vitest/globals"],

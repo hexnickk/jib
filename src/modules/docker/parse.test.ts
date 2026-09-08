@@ -108,35 +108,35 @@ describe('dockerParseComposeServices', () => {
 
 describe('dockerInferContainerPort / dockerHasPublishedPorts', () => {
   test('ports: ["8080:80"] -> container 80, published=true', () => {
-    const s = svc({ ports: ['8080:80'] })
-    expect(dockerInferContainerPort(s)).toBe(80)
-    expect(dockerHasPublishedPorts(s)).toBe(true)
+    const service = svc({ ports: ['8080:80'] })
+    expect(dockerInferContainerPort(service)).toBe(80)
+    expect(dockerHasPublishedPorts(service)).toBe(true)
   })
   test('ports: ["80"] (no host) -> container 80, published=true', () => {
-    const s = svc({ ports: ['80'] })
-    expect(dockerInferContainerPort(s)).toBe(80)
-    expect(dockerHasPublishedPorts(s)).toBe(true)
+    const service = svc({ ports: ['80'] })
+    expect(dockerInferContainerPort(service)).toBe(80)
+    expect(dockerHasPublishedPorts(service)).toBe(true)
   })
   test('expose: ["3000"] -> container 3000, published=false', () => {
-    const s = svc({ expose: ['3000'] })
-    expect(dockerInferContainerPort(s)).toBe(3000)
-    expect(dockerHasPublishedPorts(s)).toBe(false)
+    const service = svc({ expose: ['3000'] })
+    expect(dockerInferContainerPort(service)).toBe(3000)
+    expect(dockerHasPublishedPorts(service)).toBe(false)
   })
   test('both ports and expose -> ports wins', () => {
-    const s = svc({ ports: ['8080:80'], expose: ['3000'] })
-    expect(dockerInferContainerPort(s)).toBe(80)
+    const service = svc({ ports: ['8080:80'], expose: ['3000'] })
+    expect(dockerInferContainerPort(service)).toBe(80)
   })
   test('neither -> undefined, false', () => {
-    const s = svc({})
-    expect(dockerInferContainerPort(s)).toBeUndefined()
-    expect(dockerHasPublishedPorts(s)).toBe(false)
+    const service = svc({})
+    expect(dockerInferContainerPort(service)).toBeUndefined()
+    expect(dockerHasPublishedPorts(service)).toBe(false)
   })
   test('long-form {target: 80} object', () => {
-    const s = svc({ ports: [{ target: 80, published: 8080 }] })
-    expect(dockerInferContainerPort(s)).toBe(80)
+    const service = svc({ ports: [{ target: 80, published: 8080 }] })
+    expect(dockerInferContainerPort(service)).toBe(80)
   })
   test('127.0.0.1:8080:80 -> container 80', () => {
-    const s = svc({ ports: ['127.0.0.1:8080:80'] })
-    expect(dockerInferContainerPort(s)).toBe(80)
+    const service = svc({ ports: ['127.0.0.1:8080:80'] })
+    expect(dockerInferContainerPort(service)).toBe(80)
   })
 })

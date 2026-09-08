@@ -32,7 +32,9 @@ export function addSplitCommaValues(raw?: string | null): string[] {
 export function addParseEnvEntry(raw: string): EnvEntry | ValidationError {
   const line = raw.trim()
   const eq = line.indexOf('=')
-  if (eq < 1) return new ValidationError(`invalid env entry "${raw}" - expected KEY=VALUE`)
+  if (eq < 1) {
+    return new ValidationError(`invalid env entry "${raw}" - expected KEY=VALUE`)
+  }
   return { key: line.slice(0, eq), value: line.slice(eq + 1) }
 }
 
@@ -60,7 +62,9 @@ export function addAssignCliDomainsToServices(
   domains: ParsedDomain[],
   serviceNames: string[],
 ): { domains: ParsedDomain[]; issues: CliIssue[] } {
-  if (domains.length === 0) return { domains: [], issues: [] }
+  if (domains.length === 0) {
+    return { domains: [], issues: [] }
+  }
   if (serviceNames.length <= 1) {
     const fallback = serviceNames[0]
     return {
@@ -73,7 +77,9 @@ export function addAssignCliDomainsToServices(
 
   const issues: CliIssue[] = []
   const nextDomains = domains.map((domain, index) => {
-    if (domain.service) return domain
+    if (domain.service) {
+      return domain
+    }
     issues.push({
       field: `domain[${index}].service`,
       message: `compose has multiple services (${serviceNames.join(', ')}); rerun with --domain host=${domain.host},service=<${serviceNames.join('|')}>`,
@@ -86,7 +92,9 @@ export function addAssignCliDomainsToServices(
 /** Infers the config scopes referenced by one summarized compose service. */
 export function addDetectedConfigScopes(service: AddServiceSummary): Map<string, ConfigScope> {
   const out = new Map<string, ConfigScope>()
-  for (const key of service.envRefs ?? []) out.set(key, addInferScope(true, out.has(key)))
+  for (const key of service.envRefs ?? []) {
+    out.set(key, addInferScope(true, out.has(key)))
+  }
   for (const key of service.buildArgRefs ?? []) {
     const prior = out.get(key)
     out.set(key, addInferScope(prior === 'runtime' || prior === 'both', true))
@@ -109,9 +117,13 @@ export function addMergeGuidedServiceAnswers(
   )
 
   for (const answer of answers) {
-    if (!knownServices.has(answer.service)) continue
+    if (!knownServices.has(answer.service)) {
+      continue
+    }
     configEntries.push(...(answer.configEntries ?? []))
-    if (!answer.expose || servicesWithDomains.has(answer.service)) continue
+    if (!answer.expose || servicesWithDomains.has(answer.service)) {
+      continue
+    }
     for (const host of answer.domainHosts ?? []) {
       domains.push({
         host,
@@ -125,7 +137,9 @@ export function addMergeGuidedServiceAnswers(
   }
 
   const merged = addMergeConfigEntries(configEntries)
-  if (merged instanceof Error) return merged
+  if (merged instanceof Error) {
+    return merged
+  }
   return { domains, configEntries: merged }
 }
 

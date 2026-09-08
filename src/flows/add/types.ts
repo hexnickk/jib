@@ -52,6 +52,15 @@ export interface AddFlowParams {
 export type AddFlowResult = { finalApp: App; secretsWritten: number }
 export type AddFlowOutcome = AddFlowResult | JibError
 
+export interface AddResolveInput {
+  appName: string
+  workdir: string
+  args: { source?: string; branch?: string }
+  inputs: AddInputs
+  inspection: ComposeInspection
+  guided: GuidedInputs
+}
+
 export interface AddPlanner {
   inspectCompose(draftApp: App, workdir: string): Promise<ComposeInspection | JibError>
   collectGuidedInputs(
@@ -59,14 +68,8 @@ export interface AddPlanner {
     services: ComposeService[],
   ): Promise<GuidedInputs | JibError>
   buildResolvedApp(
-    cfg: Config,
-    paths: Paths,
-    appName: string,
-    workdir: string,
-    args: { source?: string; branch?: string },
-    inputs: AddInputs,
-    inspection: ComposeInspection,
-    guided: GuidedInputs,
+    ctx: { cfg: Config; paths: Paths },
+    input: AddResolveInput,
   ): Promise<App | JibError>
   confirmPlan(
     appName: string,
