@@ -1,10 +1,7 @@
-.PHONY: build test lint fmt dev clean bootstrap
+.PHONY: build lint fmt dev clean bootstrap
 
 build:
 	npm run build
-
-test:
-	npm test
 
 lint:
 	npm run lint

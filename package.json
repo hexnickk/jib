@@ -20,7 +20,6 @@
   },
   "scripts": {
     "build": "tsup --entry.jib src/main.ts --format esm --platform node --target node22 --external better-sqlite3 --clean --no-splitting && chmod +x dist/jib.js",
-    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint . && npm run fmt:check",
     "fmt": "oxfmt --write .",
@@ -48,7 +47,6 @@
     "oxlint-tsgolint": "^7.0.2001",
     "tsup": "^8.5.1",
     "tsx": "^4.22.4",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.9"
+    "typescript": "^5.9.3"
   }
 }

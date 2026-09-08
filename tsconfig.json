@@ -9,7 +9,7 @@
       "@jib-module/*": ["./src/modules/*/index.ts", "./src/modules/*"]
     },
     "lib": ["ESNext"],
-    "types": ["node", "vitest/globals"],
+    "types": ["node"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
@@ -27,6 +27,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

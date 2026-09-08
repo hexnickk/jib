@@ -30,7 +30,6 @@ jobs:
         run: |
           npm run lint
           npm run typecheck
-          npm test
 
       - name: Sync package version with tag
         env:

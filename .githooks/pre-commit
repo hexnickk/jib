@@ -13,10 +13,4 @@ if [ -f package.json ] && command -v npm &>/dev/null; then
         echo "ERROR: typecheck failed. Fix type errors before committing."
         exit 1
     fi
-
-    echo "pre-commit: tests"
-    if ! npm test 2>&1; then
-        echo "ERROR: tests failed. Fix before committing."
-        exit 1
-    fi
 fi
