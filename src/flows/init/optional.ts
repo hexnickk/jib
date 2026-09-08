@@ -2,26 +2,19 @@ import { type Config, configLoad, configWrite } from '@jib/config'
 import { InternalError, type JibError } from '@jib/errors'
 import { loggingCreateLogger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
+import { tuiPromptConfirmResult } from '@jib/tui'
 import { initRunInstallsTx } from './install.ts'
-import { initPromptOptionalModule } from './prompt.ts'
-import type { ModLike } from './registry.ts'
-import { initResolveModuleSetup } from './setup-registry.ts'
-import type { InitContext } from './types.ts'
+import type { FirstPartyModule, InitContext } from './types.ts'
 
 interface OptionalModuleDeps {
   loadConfig?: (configFile: string) => Promise<Config | JibError>
-  promptOptionalModule?: typeof initPromptOptionalModule
-  resolveModuleSetup?: typeof initResolveModuleSetup
+  promptOptionalModule?: (mod: FirstPartyModule) => Promise<boolean | JibError>
   runInstallsTx?: typeof initRunInstallsTx
   writeConfig?: (configFile: string, config: Config) => Promise<undefined | JibError>
 }
 
-function initCtx(config: Config, paths: Paths): InitContext {
-  return { config, logger: loggingCreateLogger('init'), paths }
-}
-
 /** Rolls back one module after setup failure and logs cleanup failures at the owning init boundary. */
-async function rollbackModuleInstall(mod: ModLike, ctx: InitContext): Promise<void> {
+async function rollbackModuleInstall(mod: FirstPartyModule, ctx: InitContext): Promise<void> {
   if (!mod.uninstall) {
     return
   }
@@ -66,16 +59,21 @@ export async function initPersistModuleChoice(
 export async function initConfigureOptionalModules(
   config: Config,
   paths: Paths,
-  candidates: readonly ModLike[],
+  candidates: readonly FirstPartyModule[],
   deps: OptionalModuleDeps = {},
 ): Promise<JibError | undefined> {
-  const ask = deps.promptOptionalModule ?? initPromptOptionalModule
-  const setupFor = deps.resolveModuleSetup ?? initResolveModuleSetup
+  const ask = deps.promptOptionalModule
   const installTx = deps.runInstallsTx ?? initRunInstallsTx
 
   let current = config
   for (const mod of candidates) {
-    const enabled = await ask(mod)
+    const enabled = await (ask
+      ? ask(mod)
+      : tuiPromptConfirmResult({
+          message:
+            `Enable optional module "${mod.manifest.name}"? ${mod.manifest.description ?? ''}`.trim(),
+          initialValue: false,
+        }))
     if (enabled instanceof Error) {
       return enabled
     }
@@ -93,8 +91,8 @@ export async function initConfigureOptionalModules(
       continue
     }
 
-    const ctx = initCtx(current, paths)
-    const setup = setupFor(mod.manifest.name)
+    const ctx: InitContext = { config: current, logger: loggingCreateLogger('init'), paths }
+    const setup = mod.setup
 
     if (mod.install) {
       let installError: JibError | undefined

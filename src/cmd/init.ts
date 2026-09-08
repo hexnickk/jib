@@ -11,12 +11,7 @@ import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
 import { initConfigureOptionalModules } from '@/flows/init/optional.ts'
 import { initReconcileOptionalModules } from '@/flows/init/reconcile.ts'
-import {
-  initDescribeModules,
-  initInstalledOptionalModules,
-  initPendingOptionalModuleNames,
-  initUnseenOptionalModules,
-} from '@/flows/init/registry.ts'
+import { initInstalledOptionalModules, initUnseenOptionalModules } from '@/flows/init/registry.ts'
 import { hasBootstrapState } from '../migrations/service.ts'
 import { cmdCreateHandler } from './handler.ts'
 
@@ -68,7 +63,7 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
 
   const unseen = initUnseenOptionalModules(config)
   if (args.check || unseen.length === 0) {
-    const pending = initPendingOptionalModuleNames(config)
+    const pending = unseen.map((mod) => mod.manifest.name)
     if (pending.length === 0) {
       tuiNote('No optional modules are waiting for setup.', 'Optional modules')
       tuiOutro('nothing to do')
@@ -83,7 +78,9 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
   }
 
   tuiNote(
-    `Choose which optional pieces you want Jib to manage now.\n${initDescribeModules(unseen).join('\n')}`,
+    `Choose which optional pieces you want Jib to manage now.\n${unseen
+      .map((mod) => `${mod.manifest.name}: ${mod.manifest.description ?? mod.manifest.name}`)
+      .join('\n')}`,
     'Optional modules',
   )
 

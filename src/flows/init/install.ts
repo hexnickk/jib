@@ -1,10 +1,9 @@
 import { InternalError } from '@jib/errors'
 import { tuiLog } from '@jib/tui'
-import type { ModLike } from './registry.ts'
-import type { InitContext } from './types.ts'
+import type { FirstPartyModule, InitContext } from './types.ts'
 
 /** Rolls back installed modules after a later install failure, logging cleanup failures once. */
-async function rollbackInstalls(installed: ModLike[], ctx: InitContext): Promise<void> {
+async function rollbackInstalls(installed: FirstPartyModule[], ctx: InitContext): Promise<void> {
   if (installed.length === 0) {
     return
   }
@@ -31,10 +30,10 @@ async function rollbackInstalls(installed: ModLike[], ctx: InitContext): Promise
 
 /** Installs modules transactionally and returns an internal error after rollback on failure. */
 export async function initRunInstallsTx(
-  mods: ModLike[],
+  mods: FirstPartyModule[],
   ctx: InitContext,
 ): Promise<InternalError | undefined> {
-  const installed: ModLike[] = []
+  const installed: FirstPartyModule[] = []
 
   for (const mod of mods) {
     if (!mod.install) {

@@ -1,36 +1,47 @@
-import type { Config } from '@jib/config'
 import {
-  type FirstPartyModule,
-  initAllModules,
-  initOptionalModules,
-  initRequiredModules,
-  initResolveModules,
-} from './module-registry.ts'
+  cloudflaredInstallResult,
+  manifest as cloudflaredManifest,
+  cloudflaredUninstallResult,
+} from '@jib-module/cloudflared'
+import {
+  watcherInstallResult,
+  manifest as watcherManifest,
+  watcherUninstallResult,
+} from '@jib-module/watcher'
+import type { Config } from '@jib/config'
+import { ingressInstall, manifest as ingressManifest, ingressUninstall } from '@jib/ingress'
+import { cloudflaredRunSetup } from '../cloudflared/setup.ts'
+import type { FirstPartyModule } from './types.ts'
 
-export type ModLike = FirstPartyModule
-
-export const INIT_ALL_MODULES: readonly ModLike[] = initAllModules()
-export { initOptionalModules, initRequiredModules, initResolveModules }
+/** Bundled modules and their install, setup, and uninstall hooks. */
+const MODULES: readonly FirstPartyModule[] = [
+  {
+    manifest: watcherManifest,
+    install: watcherInstallResult,
+    uninstall: watcherUninstallResult,
+  },
+  {
+    manifest: ingressManifest,
+    install: ingressInstall,
+    uninstall: ingressUninstall,
+  },
+  {
+    manifest: cloudflaredManifest,
+    install: cloudflaredInstallResult,
+    setup: ({ paths }) => cloudflaredRunSetup(paths),
+    uninstall: cloudflaredUninstallResult,
+  },
+]
 
 /** Optional modules where config.modules[name] === true. */
-export function initInstalledOptionalModules(config: Config): ModLike[] {
-  return initOptionalModules().filter((module) => config.modules?.[module.manifest.name] === true)
+export function initInstalledOptionalModules(config: Config): FirstPartyModule[] {
+  return MODULES.filter(
+    (mod) => !mod.manifest.required && config.modules?.[mod.manifest.name] === true,
+  )
 }
 
 /** Optional modules the user has never been asked about. */
-export function initUnseenOptionalModules(config: Config): ModLike[] {
-  const mods = config.modules ?? {}
-  return initOptionalModules().filter((module) => !(module.manifest.name in mods))
-}
-
-/** Returns the names of optional modules that still need an explicit choice. */
-export function initPendingOptionalModuleNames(config: Config): string[] {
-  return initUnseenOptionalModules(config).map((mod) => mod.manifest.name)
-}
-
-/** Formats optional module names and descriptions for the init intro note. */
-export function initDescribeModules(modules: ModLike[]): string[] {
-  return modules.map(
-    (mod) => `${mod.manifest.name}: ${mod.manifest.description ?? mod.manifest.name}`,
-  )
+export function initUnseenOptionalModules(config: Config): FirstPartyModule[] {
+  const modules = config.modules ?? {}
+  return MODULES.filter((mod) => !mod.manifest.required && !(mod.manifest.name in modules))
 }

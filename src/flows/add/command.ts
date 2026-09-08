@@ -15,6 +15,7 @@ import { addBuildDraftApp } from './app.ts'
 import { addChooseInitialSource, addCreateInspectionObserver } from './command-support.ts'
 import { addNormalizeError } from './errors.ts'
 import { addGatherInputs, addResolveAppName } from './inputs.ts'
+import { addRun } from './run.ts'
 import {
   addNormalizeDeployError,
   addRenderResult,
@@ -22,7 +23,6 @@ import {
   addTrapInterrupt,
 } from './runtime.ts'
 import { addRunSequence } from './sequence.ts'
-import { addRun } from './service.ts'
 import { addCreateDefaultSupport } from './support.ts'
 
 export type AddCommandArgs = Parameters<typeof addGatherInputs>[0] & {

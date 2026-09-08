@@ -21,5 +21,6 @@ export type ModuleHook = (ctx: InitContext) => Promise<JibError | undefined>
 export interface FirstPartyModule {
   manifest: ModuleManifest
   install?: ModuleHook
+  setup?: (ctx: InitContext) => Promise<boolean>
   uninstall?: ModuleHook
 }
