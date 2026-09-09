@@ -23,7 +23,7 @@ export async function addCollectGuidedInputs(
   if (domains instanceof Error) {
     return domains
   }
-  const answers = await addPromptForServices(domains, composeServices, inputs.configEntries)
+  const answers = await addPromptForServices(domains, composeServices)
   if (answers instanceof Error) {
     return answers
   }

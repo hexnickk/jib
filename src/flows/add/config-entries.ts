@@ -11,14 +11,6 @@ export function addIncludesBuild(scope: ConfigScope): boolean {
   return scope === 'build' || scope === 'both'
 }
 
-/** Returns true when `scope` satisfies every requirement in `required`. */
-export function addScopeCovers(scope: ConfigScope, required: ConfigScope): boolean {
-  return (
-    (!addIncludesRuntime(required) || addIncludesRuntime(scope)) &&
-    (!addIncludesBuild(required) || addIncludesBuild(scope))
-  )
-}
-
 /** Merges config entries by key, upgrading compatible scopes and rejecting conflicts. */
 export function addMergeConfigEntries(entries: ConfigEntry[]): ConfigEntry[] | ValidationError {
   const merged = new Map<string, ConfigEntry>()

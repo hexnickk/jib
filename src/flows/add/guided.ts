@@ -161,18 +161,15 @@ export function addRenderPlanSummary(input: {
     const exposure = hosts.length > 0 ? hosts.join(', ') : 'internal only'
     lines.push(`  ${service.name}: ${exposure}`)
   }
-  const runtimeKeys = input.configEntries
-    .filter((entry) => entry.scope === 'runtime' || entry.scope === 'both')
-    .map((entry) => entry.key)
-  const buildKeys = input.configEntries
-    .filter((entry) => entry.scope === 'build' || entry.scope === 'both')
-    .map((entry) => entry.key)
-  lines.push(
-    `runtime vars (${input.envFile}): ${runtimeKeys.length > 0 ? runtimeKeys.join(', ') : 'none'}`,
-  )
-  lines.push(
-    `build vars (${input.envFile}): ${buildKeys.length > 0 ? buildKeys.join(', ') : 'none'}`,
-  )
+  for (const scope of ['runtime', 'build'] as const) {
+    const variables = input.configEntries
+      .filter((entry) => entry.scope === scope || entry.scope === 'both')
+      .map((entry) => `  ${entry.key}`)
+    lines.push(
+      `${scope} vars (${input.envFile}):`,
+      ...(variables.length > 0 ? variables : ['  none']),
+    )
+  }
   return lines.join('\n')
 }
 

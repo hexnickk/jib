@@ -14,7 +14,7 @@ export async function addConfirmPlan(
   finalApp: App,
   configEntries: ConfigEntry[],
 ): Promise<JibError | undefined> {
-  consola.box(
+  consola.log(
     addRenderPlanSummary({
       app: appName,
       composeFiles: inspection.composeFiles,
