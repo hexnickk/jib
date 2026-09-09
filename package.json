@@ -2,6 +2,10 @@
   "name": "deployjib",
   "version": "0.0.0",
   "private": false,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "type": "module",
   "repository": {
     "type": "git",
@@ -41,10 +45,12 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.20.0",
     "@types/yargs": "^17.0.35",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
     "drizzle-kit": "^0.31.10",
     "oxfmt": "^0.67.0",
     "oxlint": "^1.82.0",
     "oxlint-tsgolint": "^7.0.2001",
+    "semantic-release": "^25.0.9",
     "tsup": "^8.5.1",
     "tsx": "^4.22.4",
     "typescript": "^5.9.3"
