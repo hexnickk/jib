@@ -13,7 +13,7 @@ const cliSourcesCommands = [
   },
 ] satisfies CommandModule[]
 
-/** Runs source reference setup and returns the selected source payload or typed error. */
+/** Runs interactive source reference setup. */
 async function sourcesSetupRunCommand() {
   const paths = pathsGetPaths()
   const config = await configLoad(paths.configFile)
@@ -24,7 +24,6 @@ async function sourcesSetupRunCommand() {
   if (source instanceof Error) {
     return source
   }
-  return { ok: source !== null, ...(source ? { source } : {}) }
 }
 
 export default cliSourcesCommands

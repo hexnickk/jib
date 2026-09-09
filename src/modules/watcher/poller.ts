@@ -3,17 +3,11 @@ import { deployApp } from '@jib/deploy'
 import { InternalError, type JibError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
-import { type ProbeSourceDeps, sourcesProbe, sourcesSync } from '@jib/sources'
+import { sourcesProbe, sourcesSync } from '@jib/sources'
 import { stateCreateStore } from '@jib/state'
 /** Parses `poll_interval`, defaulting to 5 minutes only for invalid raw strings. */
 export function watcherParsePollInterval(raw: string): number {
   return configParseDuration(raw) ?? 5 * 60_000
-}
-/** Checks one app and deploys when the remote SHA changes. */
-export interface PollAppDeps {
-  lsRemote?: ProbeSourceDeps['lsRemote']
-  syncApp?: typeof sourcesSync
-  deployPrepared?: typeof deployPreparedApp
 }
 interface PollAppContext {
   cfg: Config
@@ -21,18 +15,18 @@ interface PollAppContext {
   log: Logger
 }
 
+/** Checks one app and deploys when the remote SHA changes. */
 export async function watcherPollApp(
   ctx: PollAppContext,
   appName: string,
   lastSeen: Map<string, string>,
-  deps: PollAppDeps = {},
 ): Promise<InternalError | undefined> {
   const { cfg, paths, log } = ctx
   const app = cfg.apps[appName]
   if (!app || !app.repo || app.repo === 'local') {
     return
   }
-  const source = await probePollApp(cfg, paths, appName, deps)
+  const source = await probePollApp(cfg, paths, appName)
   if (source instanceof Error) {
     return source
   }
@@ -43,13 +37,13 @@ export async function watcherPollApp(
   if (source.sha === prev) {
     return
   }
-  const prepared = await syncPollApp(cfg, paths, appName, deps)
+  const prepared = await syncPollApp(cfg, paths, appName)
   if (prepared instanceof Error) {
     return prepared
   }
   log.info(`${appName}: new sha ${prepared.sha.slice(0, 7)} (was ${prev.slice(0, 7) || 'none'})`)
   try {
-    const result = await (deps.deployPrepared ?? deployPreparedApp)(ctx, appName, prepared)
+    const result = await deployPreparedApp(ctx, appName, prepared)
     if (result instanceof Error) {
       return new InternalError(`deploy ${appName}: ${result.message}`, { cause: result })
     }
@@ -64,15 +58,9 @@ async function probePollApp(
   cfg: Config,
   paths: Paths,
   appName: string,
-  deps: PollAppDeps,
 ): Promise<InternalError | { branch: string; workdir: string; sha: string } | null> {
   try {
-    const result = await sourcesProbe(
-      cfg,
-      paths,
-      { app: appName },
-      deps.lsRemote ? { lsRemote: deps.lsRemote } : {},
-    )
+    const result = await sourcesProbe(cfg, paths, { app: appName })
     return result instanceof Error
       ? new InternalError(`probe ${appName}: ${result.message}`, { cause: result })
       : result
@@ -86,11 +74,9 @@ async function syncPollApp(
   cfg: Config,
   paths: Paths,
   appName: string,
-  deps: PollAppDeps,
 ): Promise<InternalError | { workdir: string; sha: string }> {
-  const sync = deps.syncApp ?? sourcesSync
   try {
-    const result = await sync(cfg, paths, { app: appName })
+    const result = await sourcesSync(cfg, paths, { app: appName })
     return result instanceof Error
       ? new InternalError(`sync ${appName}: ${result.message}`, { cause: result })
       : result
@@ -125,7 +111,6 @@ export interface PollerDeps {
   paths: Paths
   getConfig: () => Promise<Config | JibError> | Config | JibError
   log: Logger
-  sleep?: (ms: number, signal: AbortSignal) => Promise<void>
 }
 
 /** Runs one polling cycle and returns the updated SHA state or a config-read error. */
@@ -151,7 +136,6 @@ export async function watcherRunPoller(
   deps: PollerDeps,
   abort: AbortSignal,
 ): Promise<JibError | undefined> {
-  const sleep = deps.sleep ?? sleepUntilNextPoll
   const lastSeen = new Map<string, string>()
   while (!abort.aborted) {
     const cfg = await watcherGetConfig(deps)
@@ -171,7 +155,7 @@ export async function watcherRunPoller(
     if (cycle instanceof Error) {
       return cycle
     }
-    await sleep(watcherParsePollInterval(cfg.poll_interval), abort)
+    await sleepUntilNextPoll(watcherParsePollInterval(cfg.poll_interval), abort)
   }
 }
 

@@ -54,7 +54,6 @@ async function ingressSetRunCommand(args: ArgumentsCamelCase<IngressSetArgs>) {
   }
 
   process.stdout.write(`ingress max body size set to ${normalized}\n`)
-  return { maxBodySize: normalized }
 }
 
 export default cliIngressCommands

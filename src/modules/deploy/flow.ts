@@ -23,7 +23,7 @@ export async function deployRunFlow(
   const start = Date.now()
 
   progress.emit('disk', 'checking disk space')
-  const free = await deployReadDiskFree(deps, cmd.workdir)
+  const free = await deployReadDiskFree(cmd.workdir)
   if (free instanceof Error) {
     return free
   }
@@ -49,7 +49,6 @@ export async function deployRunFlow(
   try {
     const compose = dockerComposeFor(deps.config, deps.paths, cmd.app, {
       workdir: cmd.workdir,
-      ...(deps.dockerExec ? { exec: deps.dockerExec } : {}),
     })
     if (compose instanceof Error) {
       return compose
@@ -78,7 +77,7 @@ export async function deployRunFlow(
 
     if (appCfg.health && appCfg.health.length > 0) {
       progress.emit('health', 'running health checks')
-      const results = await dockerCheckHealth(appCfg.health, deps.healthOpts ?? {})
+      const results = await dockerCheckHealth(appCfg.health)
       if (!dockerAllHealthy(results)) {
         return new InternalError(`health check failed: ${JSON.stringify(results)}`)
       }
@@ -121,10 +120,7 @@ export async function deployResolveAppCompose(
   if (secretsError) {
     return secretsError
   }
-  const compose = dockerComposeFor(deps.config, deps.paths, appName, {
-    workdir,
-    ...(deps.dockerExec ? { exec: deps.dockerExec } : {}),
-  })
+  const compose = dockerComposeFor(deps.config, deps.paths, appName, { workdir })
   if (compose instanceof Error) {
     return compose
   }

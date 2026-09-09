@@ -1,7 +1,6 @@
 import { CliError } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
 import { dockerComposeFor } from '@jib/docker'
-import type { JibError } from '@jib/errors'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
 import { cmdCreateHandler } from './handler.ts'
 
@@ -26,11 +25,7 @@ const cliLogsCommand = {
 } satisfies CommandModule
 
 /** Streams docker compose logs for one app, optionally narrowed to a service. */
-async function logsRunCommand(
-  args: ArgumentsCamelCase,
-): Promise<
-  JibError | CliError | { app: string; service?: string; followed: boolean; tail?: number }
-> {
+async function logsRunCommand(args: ArgumentsCamelCase) {
   if (typeof args.app !== 'string') {
     return new CliError('missing_app', 'missing app name — usage: jib logs <app> [service]')
   }
@@ -50,20 +45,10 @@ async function logsRunCommand(
     return compose
   }
 
-  const logsError = await compose.logs(service, {
+  return await compose.logs(service, {
     follow: args.follow === true,
     ...(tail !== undefined && { tail }),
   })
-  if (logsError) {
-    return logsError
-  }
-
-  return {
-    app: appName,
-    ...(service !== undefined && { service }),
-    followed: args.follow === true,
-    ...(tail !== undefined && { tail }),
-  }
 }
 
 export default cliLogsCommand

@@ -81,10 +81,3 @@ export interface SourceDriver {
   describe(source: Source): string
   describeStatus(sourceName: string, source: Source, paths: Paths): Promise<DriverSourceStatus>
 }
-
-export interface ProbeSourceDeps {
-  lsRemote?: SourceLsRemote
-}
-
-/** Resolves a Git ref to a SHA without throwing for expected transport failures. */
-export type SourceLsRemote = (url: string, ref?: string, env?: GitEnv) => Promise<string | JibError>

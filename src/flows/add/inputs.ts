@@ -9,12 +9,7 @@ import {
   configValidateRepo,
 } from '@jib/config'
 import { type JibError, ValidationError } from '@jib/errors'
-import {
-  tuiIsInteractive,
-  tuiPromptSelectResult,
-  tuiPromptStringOptionalResult,
-  tuiPromptStringResult,
-} from '@jib/tui'
+import { tuiIsInteractive, tuiPromptStringResult } from '@jib/tui'
 import { addMergeConfigEntries } from './config-entries.ts'
 import { addParseEnvEntry, addSplitCommaValues } from './guided.ts'
 import {
@@ -24,13 +19,6 @@ import {
   addResolveRepoBackend,
 } from './repo.ts'
 import type { AddInputs, ConfigEntry, ConfigScope } from './types.ts'
-
-interface GatherAddInputsDeps {
-  isInteractive?: typeof tuiIsInteractive
-  promptSelect?: typeof tuiPromptSelectResult
-  promptString?: typeof tuiPromptStringResult
-  promptStringOptional?: typeof tuiPromptStringOptionalResult
-}
 
 const APP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
 
@@ -63,37 +51,30 @@ export async function addResolveAppName(
 }
 
 /** Collects and validates the add-flow inputs from argv and optional prompts. */
-export async function addGatherInputs(
-  args: {
-    repo?: string
-    ingress?: string
-    compose?: string
-    domain?: string | string[]
-    env?: string | string[]
-    'build-arg'?: string | string[]
-    'build-env'?: string | string[]
-    health?: string | string[]
-    persist?: string | string[]
-    backend?: string
-  },
-  deps: GatherAddInputsDeps = {},
-): Promise<AddInputs | JibError> {
-  const interactive = deps.isInteractive ?? tuiIsInteractive
-  const select = deps.promptSelect ?? tuiPromptSelectResult
-  const prompt = deps.promptString ?? tuiPromptStringResult
-  const promptOptional = deps.promptStringOptional ?? tuiPromptStringOptionalResult
-  const backend = await addResolveRepoBackend(args.backend, args.repo, { interactive, select })
+export async function addGatherInputs(args: {
+  repo?: string
+  ingress?: string
+  compose?: string
+  domain?: string | string[]
+  env?: string | string[]
+  'build-arg'?: string | string[]
+  'build-env'?: string | string[]
+  health?: string | string[]
+  persist?: string | string[]
+  backend?: string
+}): Promise<AddInputs | JibError> {
+  const backend = await addResolveRepoBackend(args.backend, args.repo)
   if (backend instanceof Error) {
     return backend
   }
   let repo = args.repo
   if (!repo) {
-    if (!interactive()) {
+    if (!tuiIsInteractive()) {
       return cliCreateMissingInputError('missing required input for jib add', [
         { field: 'repo', message: 'provide --repo or rerun with interactive prompts enabled' },
       ])
     }
-    const prompted = await prompt(addRepoPrompt(backend))
+    const prompted = await tuiPromptStringResult(addRepoPrompt(backend))
     if (prompted instanceof Error) {
       return prompted
     }
@@ -106,10 +87,7 @@ export async function addGatherInputs(
   }
   const ingressDefault = args.ingress ?? 'direct'
   const composeRaw = args.compose ? addSplitCommaValues(args.compose) : undefined
-  const persistPaths = await addResolvePersistPaths(repo, configToArray(args.persist), {
-    interactive,
-    promptOptional,
-  })
+  const persistPaths = await addResolvePersistPaths(repo, configToArray(args.persist))
   if (persistPaths instanceof Error) {
     return persistPaths
   }

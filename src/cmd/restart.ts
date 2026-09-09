@@ -10,7 +10,7 @@ const cliRestartCommand = {
   handler: cmdCreateHandler(restartRunCommand),
 } satisfies CommandModule<Record<string, unknown>, { app: string }>
 
-/** Runs the restart command and returns a restart payload or typed error. */
+/** Restarts the app containers and reports success. */
 async function restartRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
   const appName = String(args.app)
   const loaded = await configLoadAppContext(appName)
@@ -25,7 +25,6 @@ async function restartRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
     return result
   }
   consola.success(`restarted ${appName}`)
-  return { app: appName, state: 'restarted' as const }
 }
 
 export default cliRestartCommand

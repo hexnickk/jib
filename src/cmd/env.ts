@@ -48,7 +48,7 @@ const cliEnvCommands = [
   },
 ] satisfies CommandModule<Record<string, unknown>, unknown>[]
 
-/** Sets an env key-value pair and returns the mutation payload or typed error. */
+/** Sets an env key-value pair and reports success. */
 async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: string }>) {
   const appName = String(args.app)
   const pair = String(args.pair)
@@ -72,10 +72,9 @@ async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: st
     return upsertError
   }
   consola.success(`set ${key} for ${appName}`)
-  return { app: appName, key, updated: true }
 }
 
-/** Lists env variables for one app or all apps and returns masked entries or typed error. */
+/** Prints masked env variables for one app or all apps. */
 async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
   const requestedApp = typeof args.app === 'string' ? args.app : undefined
   const loaded = await loadEnvContext()
@@ -86,7 +85,7 @@ async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
   const apps = requestedApp ? [requestedApp] : Object.keys(cfg.apps).sort()
   if (apps.length === 0) {
     consola.log('no apps configured')
-    return { apps: [] }
+    return
   }
 
   const items: {
@@ -130,10 +129,9 @@ async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
   if (missingApp && requestedApp) {
     return new CliError('missing_env', `app "${requestedApp}" has no env configured`)
   }
-  return { apps: items }
 }
 
-/** Deletes an env key and returns the mutation payload or typed error. */
+/** Deletes an env key and reports success. */
 async function envDeleteRunCommand(args: ArgumentsCamelCase<{ app: string; key: string }>) {
   const appName = String(args.app)
   const key = String(args.key)
@@ -154,7 +152,6 @@ async function envDeleteRunCommand(args: ArgumentsCamelCase<{ app: string; key: 
     return new CliError('missing_env_key', `key "${key}" not found in ${appName}`)
   }
   consola.success(`deleted ${key} from ${appName}`)
-  return { app: appName, key, removed: true }
 }
 
 export default cliEnvCommands

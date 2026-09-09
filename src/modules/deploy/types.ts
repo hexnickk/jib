@@ -1,5 +1,4 @@
 import type { Config } from '@jib/config'
-import type { CheckHealthOptions, DockerExec } from '@jib/docker'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import type { StateStore } from '@jib/state'
@@ -11,9 +10,6 @@ export interface DeployDeps {
   paths: Paths
   store: StateStore
   log: Logger
-  diskFree?: (path: string) => Promise<number>
-  dockerExec?: DockerExec
-  healthOpts?: CheckHealthOptions
 }
 
 export interface ProgressCtx {

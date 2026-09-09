@@ -15,12 +15,7 @@ export interface InterruptTrap {
 }
 
 /** Renders a completed add-and-deploy result for the command output contract. */
-export function addRenderResult(
-  app: string,
-  repo: string,
-  result: AddFlowResult,
-  deploy: DeployRunResult,
-) {
+export function addRenderResult(app: string, result: AddFlowResult, deploy: DeployRunResult) {
   const { finalApp, secretsWritten } = result
   if (secretsWritten > 0) {
     consola.success(`${secretsWritten} secret(s) set for ${app}`)
@@ -35,24 +30,6 @@ export function addRenderResult(
   consola.box(
     `app "${app}" deployed\n  ingress:\n    ${ingress}\n  sha:    ${deploy.sha.slice(0, 8)}`,
   )
-  return {
-    app,
-    repo,
-    composeFiles: finalApp.compose ?? [],
-    durationMs: deploy.durationMs,
-    preparedSha: deploy.preparedSha,
-    routes: finalApp.domains.map((domain) => ({
-      containerPort: domain.container_port ?? null,
-      host: domain.host,
-      ingress: domain.ingress ?? 'direct',
-      port: domain.port ?? null,
-      service: domain.service ?? null,
-    })),
-    secretsWritten,
-    services: finalApp.services ?? [],
-    sha: deploy.sha,
-    workdir: deploy.workdir,
-  }
 }
 
 /** Adds rollback guidance to an add/deploy failure at the command boundary. */

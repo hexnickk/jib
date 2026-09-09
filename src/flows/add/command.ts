@@ -31,7 +31,7 @@ export type AddCommandArgs = Parameters<typeof addGatherInputs>[0] & {
   branch?: string
 }
 
-/** Runs the add command flow and returns either a result payload or a typed error. */
+/** Runs app registration and deployment, returning a typed error on failure. */
 export async function addRunCommand(args: AddCommandArgs) {
   const loaded = await prepareCommandInputs(args)
   if (loaded instanceof Error) {
@@ -124,7 +124,7 @@ export async function addRunCommand(args: AddCommandArgs) {
     }
     const { addResult, deployResult } = sequence
     inspection.stop()
-    return addRenderResult(appName, inputs.repo, addResult, deployResult)
+    addRenderResult(appName, addResult, deployResult)
   } finally {
     interrupt.dispose()
   }

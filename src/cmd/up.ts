@@ -10,7 +10,7 @@ const cliUpCommand = {
   handler: cmdCreateHandler(upRunCommand),
 } satisfies CommandModule<Record<string, unknown>, { app: string }>
 
-/** Runs the up command and returns a start payload or typed error. */
+/** Starts the app containers and reports success. */
 async function upRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
   const appName = String(args.app)
   const loaded = await configLoadAppContext(appName)
@@ -22,7 +22,6 @@ async function upRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
     return result
   }
   consola.success(`started ${appName}`)
-  return { app: appName, state: 'started' as const }
 }
 
 export default cliUpCommand

@@ -11,20 +11,10 @@ import { tuiIsInteractive, tuiNote, tuiPromptConfirmResult, tuiPromptStringResul
 import { consola } from 'consola'
 import { addCanScaffoldCompose, addScaffoldComposeFromDockerfile } from './compose-scaffold.ts'
 
-export interface AddInspectComposeDeps {
-  canScaffoldCompose?: (workdir: string) => boolean
-  isInteractive?: () => boolean
-  note?: typeof tuiNote
-  promptConfirm?: typeof tuiPromptConfirmResult
-  promptString?: typeof tuiPromptStringResult
-  scaffoldComposeFromDockerfile?: (workdir: string) => string | JibError | undefined
-}
-
 /** Inspects compose files, prompting for missing compose input when interactive. */
 export async function addInspectCompose(
   draftApp: App,
   workdir: string,
-  deps: AddInspectComposeDeps = {},
 ): Promise<ComposeInspection | JibError> {
   let compose = draftApp.compose
   for (;;) {
@@ -36,12 +26,9 @@ export async function addInspectCompose(
       }
       return inspection
     }
-    const nextCompose = await promptComposePaths(inspection, workdir, compose, deps)
+    const nextCompose = await promptComposePaths(inspection, workdir, compose)
     if (nextCompose instanceof Error) {
       return nextCompose
-    }
-    if (!nextCompose) {
-      return inspection
     }
     compose = nextCompose
   }
@@ -52,38 +39,42 @@ async function promptComposePaths(
   error: JibError,
   workdir: string,
   compose: string[] | undefined,
-  deps: AddInspectComposeDeps,
-): Promise<string[] | JibError | undefined> {
-  if (!(error instanceof ValidationError) || !(deps.isInteractive ?? tuiIsInteractive)()) {
+): Promise<string[] | JibError> {
+  if (!(error instanceof ValidationError) || !tuiIsInteractive()) {
     return handleComposeError(error, workdir, compose)
   }
 
-  ;(deps.note ?? tuiNote)(composeNotFoundMessage(workdir, compose), 'Compose file')
-  if (
-    (!compose || compose.length === 0) &&
-    (deps.canScaffoldCompose ?? addCanScaffoldCompose)(workdir)
-  ) {
-    const confirm = await (deps.promptConfirm ?? tuiPromptConfirmResult)({
+  tuiNote(composeNotFoundMessage(workdir, compose), 'Compose file')
+  if ((!compose || compose.length === 0) && addCanScaffoldCompose(workdir)) {
+    const confirm = await tuiPromptConfirmResult({
       message: 'Generate a minimal docker-compose.generated.yml from the repo Dockerfile?',
       initialValue: true,
     })
     if (confirm instanceof Error) {
       return confirm
     }
-    if (!confirm) {
-      return await promptComposeInput(compose, deps)
-    }
-    const generated = (deps.scaffoldComposeFromDockerfile ?? addScaffoldComposeFromDockerfile)(
-      workdir,
-    )
-    if (generated instanceof Error) {
-      return generated
-    }
-    if (generated) {
-      return [generated]
+    if (confirm) {
+      const generated = addScaffoldComposeFromDockerfile(workdir)
+      if (generated instanceof Error) {
+        return generated
+      }
+      if (generated) {
+        return [generated]
+      }
     }
   }
-  return await promptComposeInput(compose, deps)
+  const input = await tuiPromptStringResult({
+    message: 'Compose file(s) relative to the repo (comma-separated)',
+    placeholder: 'docker-compose.yml',
+    ...(compose ? { initialValue: compose.join(',') } : {}),
+  })
+  if (input instanceof Error) {
+    return input
+  }
+  return input
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
 }
 
 /** Converts a compose inspection failure to the command-facing error shape. */
@@ -143,23 +134,4 @@ function inspectComposeOnce(
     )
   }
   return inspection
-}
-
-/** Prompts for comma-separated compose paths and removes empty entries. */
-async function promptComposeInput(
-  compose: string[] | undefined,
-  deps: AddInspectComposeDeps,
-): Promise<string[] | JibError> {
-  const input = await (deps.promptString ?? tuiPromptStringResult)({
-    message: 'Compose file(s) relative to the repo (comma-separated)',
-    placeholder: 'docker-compose.yml',
-    ...(compose ? { initialValue: compose.join(',') } : {}),
-  })
-  if (input instanceof Error) {
-    return input
-  }
-  return input
-    .split(',')
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0)
 }

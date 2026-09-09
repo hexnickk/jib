@@ -6,34 +6,22 @@ import { sourcesBuildChoices, sourcesRunSetup } from '@jib/sources'
 import { tuiIsInteractive, tuiPromptSelectResult, tuiSpinner } from '@jib/tui'
 import { consola } from 'consola'
 
-export interface AddChooseInitialSourceDeps {
-  buildSourceChoices?: typeof sourcesBuildChoices
-  isInteractive?: typeof tuiIsInteractive
-  promptSelect?: typeof tuiPromptSelectResult
-  runSourceSetup?: typeof sourcesRunSetup
-}
-
 /** Chooses the initial source, prompting only when the caller did not provide one. */
 export async function addChooseInitialSource(
   cfg: Config,
   paths: Paths,
   currentSource?: string,
-  deps: AddChooseInitialSourceDeps = {},
 ): Promise<{ value?: string; created: boolean } | JibError> {
-  const interactive = deps.isInteractive ?? tuiIsInteractive
-  const select = deps.promptSelect ?? tuiPromptSelectResult
-  const buildSourceChoices = deps.buildSourceChoices ?? sourcesBuildChoices
-  const runSourceSetup = deps.runSourceSetup ?? sourcesRunSetup
-  if (currentSource || !interactive()) {
+  if (currentSource || !tuiIsInteractive()) {
     return currentSource ? { value: currentSource, created: false } : { created: false }
   }
 
-  const options = buildSourceChoices(cfg)
+  const options = sourcesBuildChoices(cfg)
   if (options.length === 0) {
     return { created: false }
   }
 
-  const choice = await select({
+  const choice = await tuiPromptSelectResult({
     message: 'Source for this app?',
     options: [{ value: 'none', label: 'None', hint: 'Public repo or local path' }, ...options],
   })
@@ -44,7 +32,7 @@ export async function addChooseInitialSource(
     return { created: false }
   }
   if (choice.startsWith('setup:')) {
-    const created = await runSourceSetup(cfg, paths, choice.slice('setup:'.length))
+    const created = await sourcesRunSetup(cfg, paths, choice.slice('setup:'.length))
     if (!created) {
       return new CliError('cancelled', 'source setup did not complete; add cancelled')
     }

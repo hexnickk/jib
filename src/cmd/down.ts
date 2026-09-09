@@ -10,7 +10,7 @@ const cliDownCommand = {
   handler: cmdCreateHandler(downRunCommand),
 } satisfies CommandModule<Record<string, unknown>, { app: string }>
 
-/** Runs the down command and returns a stop payload or typed error. */
+/** Stops the app containers and reports success. */
 async function downRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
   const appName = String(args.app)
   const loaded = await configLoadAppContext(appName)
@@ -22,7 +22,6 @@ async function downRunCommand(args: ArgumentsCamelCase<{ app: string }>) {
     return result
   }
   consola.success(`stopped ${appName}`)
-  return { app: appName, state: 'stopped' as const }
 }
 
 export default cliDownCommand

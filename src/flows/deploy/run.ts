@@ -5,12 +5,6 @@ import type { Paths } from '@jib/paths'
 import { type PreparedSource, sourcesSync } from '@jib/sources'
 import { tuiSpinner } from '@jib/tui'
 
-interface DeploySpinner {
-  message(value: string): void
-  start(value: string): void
-  stop(value: string): void
-}
-
 export interface DeployRunResult {
   app: string
   durationMs: number
@@ -19,28 +13,19 @@ export interface DeployRunResult {
   workdir: string
 }
 
-interface DeployRunDeps {
-  createDeps?: typeof deployCreateDeps
-  createSpinner?: () => DeploySpinner
-  deployPrepared?: typeof deployApp
-  sync?: typeof sourcesSync
-}
-
 /** Runs prepare + deploy and returns its result or a shared typed error. */
 export async function runDeploy(
   ctx: { cfg: Config; paths: Paths },
   app: string,
   ref?: string,
-  deps: DeployRunDeps = {},
 ): Promise<DeployRunResult | InternalError> {
   const { cfg, paths } = ctx
-  const createSpin = deps.createSpinner ?? tuiSpinner
-  const prepareSpin = createSpin()
+  const prepareSpin = tuiSpinner()
 
   prepareSpin.start(`[1/2] preparing ${app}`)
   let ready: PreparedSource | InternalError
   try {
-    const result = await (deps.sync ?? sourcesSync)(cfg, paths, { app }, ref)
+    const result = await sourcesSync(cfg, paths, { app }, ref)
     ready = result instanceof Error ? new InternalError(result.message, { cause: result }) : result
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -52,12 +37,12 @@ export async function runDeploy(
   }
   prepareSpin.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
 
-  const deploySpin = createSpin()
+  const deploySpin = tuiSpinner()
   deploySpin.start(`[2/2] deploying ${app}`)
   let deployed: JibError | DeployResult
   try {
-    deployed = await (deps.deployPrepared ?? deployApp)(
-      (deps.createDeps ?? deployCreateDeps)(cfg, paths),
+    deployed = await deployApp(
+      deployCreateDeps(cfg, paths),
       { app, workdir: ready.workdir, sha: ready.sha, trigger: 'manual' },
       { emit: (step, message) => deploySpin.message(`${step}: ${message}`) },
     )

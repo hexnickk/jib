@@ -11,7 +11,7 @@ import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
 import { initConfigureOptionalModules } from '@/flows/init/optional.ts'
 import { initReconcileOptionalModules } from '@/flows/init/reconcile.ts'
-import { initInstalledOptionalModules, initUnseenOptionalModules } from '@/flows/init/registry.ts'
+import { initUnseenOptionalModules } from '@/flows/init/registry.ts'
 import { hasBootstrapState } from '../migrations/service.ts'
 import { cmdCreateHandler } from './handler.ts'
 
@@ -27,7 +27,7 @@ const cliInitCommand = {
   handler: cmdCreateHandler(initRunCommand),
 } satisfies CommandModule<Record<string, unknown>, { check?: boolean }>
 
-/** Runs optional module setup and returns a setup summary or typed error. */
+/** Runs optional module setup and displays its outcome. */
 async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
   const linuxError = cliCheckLinuxHost('init')
   if (linuxError) {
@@ -71,10 +71,7 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
       tuiNote(`Pending optional modules: ${pending.join(', ')}`, 'Optional modules')
       tuiOutro('run `sudo jib init` to configure them')
     }
-    return {
-      enabledOptionalModules: initInstalledOptionalModules(config).map((mod) => mod.manifest.name),
-      optionalModulesPending: pending,
-    }
+    return
   }
 
   tuiNote(
@@ -105,13 +102,6 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
   }
   tuiOutro('modules configured')
   tuiNote('Next: run `jib status` to confirm services are healthy.', 'Next steps')
-
-  return {
-    enabledOptionalModules: initInstalledOptionalModules(finalConfig).map(
-      (mod) => mod.manifest.name,
-    ),
-    optionalModulesPending: initUnseenOptionalModules(finalConfig).map((mod) => mod.manifest.name),
-  }
 }
 
 export default cliInitCommand

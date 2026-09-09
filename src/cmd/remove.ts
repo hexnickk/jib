@@ -18,7 +18,7 @@ const cliRemoveCommand = {
   handler: cmdCreateHandler(removeRunCommand),
 } satisfies CommandModule<Record<string, unknown>, { app: string; force?: boolean }>
 
-/** Runs the remove command and returns its removal payload or typed error. */
+/** Confirms app removal and reports its outcome. */
 async function removeRunCommand(args: ArgumentsCamelCase<{ app: string; force?: boolean }>) {
   const appName = String(args.app)
   const loaded = await configLoadAppContext(appName)
@@ -46,7 +46,7 @@ async function removeRunCommand(args: ArgumentsCamelCase<{ app: string; force?: 
       return ok
     }
     if (!ok) {
-      return { app: appName, removed: false }
+      return
     }
   }
 
@@ -64,7 +64,6 @@ async function removeRunCommand(args: ArgumentsCamelCase<{ app: string; force?: 
     return result
   }
   consola.success(`removed ${appName}`)
-  return { app: appName, removed: true }
 }
 
 /** Releases managed ingress while mirroring progress through the CLI spinner. */

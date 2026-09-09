@@ -50,15 +50,9 @@ export async function deployLinkSecrets(
   }
 }
 
-/** Reads free disk space for the target workdir, using the injected override when present. */
-export async function deployReadDiskFree(
-  deps: DeployDeps,
-  path: string,
-): Promise<JibError | number> {
+/** Reads free disk space for the target workdir. */
+export async function deployReadDiskFree(path: string): Promise<JibError | number> {
   try {
-    if (deps.diskFree) {
-      return await deps.diskFree(path)
-    }
     const result = await $`df -B1 --output=avail ${path}`
     if (result.exitCode !== 0) {
       return Number.POSITIVE_INFINITY

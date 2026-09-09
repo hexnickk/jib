@@ -33,13 +33,6 @@ const MODULES: readonly FirstPartyModule[] = [
   },
 ]
 
-/** Optional modules where config.modules[name] === true. */
-export function initInstalledOptionalModules(config: Config): FirstPartyModule[] {
-  return MODULES.filter(
-    (mod) => !mod.manifest.required && config.modules?.[mod.manifest.name] === true,
-  )
-}
-
 /** Optional modules the user has never been asked about. */
 export function initUnseenOptionalModules(config: Config): FirstPartyModule[] {
   const modules = config.modules ?? {}

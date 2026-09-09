@@ -8,7 +8,6 @@ import { sourcesSyncLocalCheckout, sourcesSyncRemoteCheckout } from './sync.ts'
 import type {
   InspectionCheckout,
   PreparedSource,
-  ProbeSourceDeps,
   ResolvedSource,
   SourceProbe,
   SourceTarget,
@@ -134,7 +133,6 @@ export async function sourcesProbe(
   cfg: Config,
   paths: Paths,
   target: SourceTarget,
-  deps: ProbeSourceDeps = {},
 ): Promise<SourceProbe | JibError | null> {
   const app = resolveTargetApp(cfg, target)
   if (app instanceof Error) {
@@ -148,10 +146,8 @@ export async function sourcesProbe(
   if (source instanceof Error) {
     return source
   }
-  const lsRemote = deps.lsRemote ?? git.sourcesGitLsRemote
-
   try {
-    const sha = await lsRemote(source.url, source.ref, source.env)
+    const sha = await git.sourcesGitLsRemote(source.url, source.ref, source.env)
     if (sha instanceof Error) {
       return sha
     }

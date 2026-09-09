@@ -13,7 +13,7 @@ const cliDeployCommand = {
   handler: cmdCreateHandler(deployRunCommand),
 } satisfies CommandModule<Record<string, unknown>, { app: string; ref?: string }>
 
-/** Runs the deploy command and returns its deployment payload or typed error. */
+/** Deploys an app and displays its deployed revision. */
 async function deployRunCommand(args: ArgumentsCamelCase<{ app: string; ref?: string }>) {
   const appName = String(args.app)
   const loaded = await configLoadAppContext(appName)
@@ -30,7 +30,6 @@ async function deployRunCommand(args: ArgumentsCamelCase<{ app: string; ref?: st
     return result
   }
   consola.success(`${appName} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`)
-  return result
 }
 
 export default cliDeployCommand

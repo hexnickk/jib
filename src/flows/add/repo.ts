@@ -1,5 +1,6 @@
 import { type JibError, ValidationError } from '@jib/errors'
 import { pathsDockerHubImage } from '@jib/paths'
+import { tuiIsInteractive, tuiPromptSelectResult, tuiPromptStringOptionalResult } from '@jib/tui'
 import { addSplitCommaValues } from './guided.ts'
 
 type RepoBackend = 'github' | 'dockerhub' | 'other'
@@ -8,18 +9,19 @@ type RepoBackend = 'github' | 'dockerhub' | 'other'
 export async function addResolveRepoBackend(
   rawBackend: string | undefined,
   repo: string | undefined,
-  deps: {
-    interactive: () => boolean
-    select: typeof import('@jib/tui').tuiPromptSelectResult
-  },
 ): Promise<RepoBackend | JibError | undefined> {
   if (rawBackend) {
-    return addParseRepoBackend(rawBackend)
+    if (rawBackend === 'github' || rawBackend === 'dockerhub' || rawBackend === 'other') {
+      return rawBackend
+    }
+    return new ValidationError(
+      `invalid --backend "${rawBackend}" (expected github|dockerhub|other)`,
+    )
   }
-  if (repo || !deps.interactive()) {
+  if (repo || !tuiIsInteractive()) {
     return undefined
   }
-  const backend = await deps.select({
+  const backend = await tuiPromptSelectResult({
     message: 'Source backend',
     options: [
       { value: 'github', label: 'GitHub', hint: 'owner/repo or GitHub URL' },
@@ -28,14 +30,6 @@ export async function addResolveRepoBackend(
     ],
   })
   return backend instanceof Error ? backend : (backend as RepoBackend)
-}
-
-/** Parses the explicit `--backend` flag into a known backend value. */
-export function addParseRepoBackend(rawBackend: string): RepoBackend | ValidationError {
-  if (rawBackend === 'github' || rawBackend === 'dockerhub' || rawBackend === 'other') {
-    return rawBackend
-  }
-  return new ValidationError(`invalid --backend "${rawBackend}" (expected github|dockerhub|other)`)
 }
 
 /** Builds the repo prompt copy for the selected backend. */
@@ -64,7 +58,17 @@ export function addRepoPrompt(backend: RepoBackend | undefined): {
 /** Normalizes a raw repo string according to the chosen backend. */
 export function addNormalizeRepo(repo: string, backend: RepoBackend | undefined): string {
   if (backend === 'github') {
-    return addNormalizeGitHubRepo(repo)
+    if (repo.startsWith('https://github.com/')) {
+      const { pathname } = new URL(repo)
+      const parts = pathname.split('/').filter(Boolean)
+      const owner = parts[0]
+      const name = parts[1]?.replace(/\.git$/, '')
+      if (owner && name) {
+        return `${owner}/${name}`
+      }
+    }
+    const ssh = repo.match(/^git@github\.com:([^\s]+?)(?:\.git)?$/)
+    return ssh?.[1] ?? repo
   }
   if (backend !== 'dockerhub') {
     return repo
@@ -79,18 +83,14 @@ export function addNormalizeRepo(repo: string, backend: RepoBackend | undefined)
 export async function addResolvePersistPaths(
   repo: string,
   rawPersist: string[],
-  deps: {
-    interactive: () => boolean
-    promptOptional: typeof import('@jib/tui').tuiPromptStringOptionalResult
-  },
 ): Promise<string[] | JibError> {
   if (rawPersist.length > 0) {
     return rawPersist.flatMap(addSplitCommaValues)
   }
-  if (!pathsDockerHubImage(repo) || !deps.interactive()) {
+  if (!pathsDockerHubImage(repo) || !tuiIsInteractive()) {
     return []
   }
-  const raw = await deps.promptOptional({
+  const raw = await tuiPromptStringOptionalResult({
     message: 'Persistent container path(s) (comma-separated, blank for none)',
     placeholder: '/data',
   })
@@ -98,24 +98,4 @@ export async function addResolvePersistPaths(
     return raw
   }
   return addSplitCommaValues(raw)
-}
-
-function addNormalizeGitHubRepo(repo: string): string {
-  const https = normalizeGitHubHttpsRepo(repo)
-  if (https) {
-    return https
-  }
-  const ssh = repo.match(/^git@github\.com:([^\s]+?)(?:\.git)?$/)
-  return ssh?.[1] ?? repo
-}
-
-function normalizeGitHubHttpsRepo(repo: string): string | null {
-  if (!repo.startsWith('https://github.com/')) {
-    return null
-  }
-  const { pathname } = new URL(repo)
-  const parts = pathname.split('/').filter(Boolean)
-  const owner = parts[0]
-  const name = parts[1]?.replace(/\.git$/, '')
-  return owner && name ? `${owner}/${name}` : null
 }

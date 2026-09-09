@@ -26,7 +26,7 @@ async function watchRunCommand(args: ArgumentsCamelCase<{ once?: boolean }>) {
     if (result instanceof Error) {
       return result
     }
-    return { ran: true }
+    return
   }
 
   const abort = new AbortController()
