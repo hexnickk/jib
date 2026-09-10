@@ -6,7 +6,7 @@ import type { Paths } from '@jib/paths'
 import { tuiPromptConfirmResult, tuiSpinner } from '@jib/tui'
 import { consola } from 'consola'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
-import { removeApp, removeCreateSupport } from '@/flows/remove/index.ts'
+import { removeApp } from '@/flows/remove/index.ts'
 import { cmdCreateHandler } from './handler.ts'
 
 const cliRemoveCommand = {
@@ -52,11 +52,9 @@ async function removeRunCommand(args: ArgumentsCamelCase<{ app: string; force?: 
 
   const result = await removeApp(
     {
-      support: removeCreateSupport({
-        paths,
-        releaseIngress: (nextAppName) => removeReleaseIngress(paths, nextAppName),
-      }),
-      observer: { warn: (message) => consola.warn(message) },
+      paths,
+      releaseIngress: (nextAppName) => removeReleaseIngress(paths, nextAppName),
+      warn: (message) => consola.warn(message),
     },
     { appName, cfg, configFile: paths.configFile, quiet: false },
   )

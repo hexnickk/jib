@@ -1,15 +1,8 @@
 import { CliError } from '@jib/cli'
-import { type App, configLoad, configLoadContext } from '@jib/config'
-import { CancelledError, type JibError, RollbackError, errorsToJibError } from '@jib/errors'
-import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
-import type { Paths } from '@jib/paths'
+import { configLoad, configLoadContext } from '@jib/config'
+import { CancelledError, RollbackError } from '@jib/errors'
 import { sourcesPreflightSelection } from '@jib/sources'
-import {
-  tuiIsInteractive,
-  tuiPromptConfirmResult,
-  tuiPromptSelectResult,
-  tuiSpinner,
-} from '@jib/tui'
+import { tuiIsInteractive, tuiPromptConfirmResult, tuiPromptSelectResult } from '@jib/tui'
 import { runDeploy } from '../deploy/run.ts'
 import { addBuildDraftApp } from './app.ts'
 import { addChooseInitialSource, addCreateInspectionObserver } from './command-support.ts'
@@ -23,7 +16,6 @@ import {
   addTrapInterrupt,
 } from './runtime.ts'
 import { addRunSequence } from './sequence.ts'
-import { addCreateDefaultSupport } from './support.ts'
 
 export type AddCommandArgs = Parameters<typeof addGatherInputs>[0] & {
   app?: string
@@ -62,10 +54,6 @@ export async function addRunCommand(args: AddCommandArgs) {
     ...(preflight.source ? { source: preflight.source } : {}),
   }
   const inspection = addCreateInspectionObserver()
-  const addSupport = addCreateDefaultSupport({
-    paths,
-    claimIngress: (nextAppName, finalApp) => addClaimIngress(paths, nextAppName, finalApp),
-  })
 
   try {
     const sequence = await addRunSequence(
@@ -75,7 +63,6 @@ export async function addRunCommand(args: AddCommandArgs) {
           return draftApp
         }
         const result = await addRun(
-          { support: addSupport, observer: inspection.observer },
           {
             appName,
             args: flowArgs,
@@ -90,6 +77,7 @@ export async function addRunCommand(args: AddCommandArgs) {
               },
             },
           },
+          inspection.observer,
         )
         if (result instanceof Error && !(result instanceof CancelledError)) {
           return addNormalizeError(result, appName, paths.configFile)
@@ -165,23 +153,4 @@ async function prepareCommandInputs(args: AddCommandArgs) {
     return inputs
   }
   return { cfg, paths, appName, source, inputs }
-}
-
-/** Claims ingress for a newly added app while keeping spinner updates local to the command. */
-async function addClaimIngress(
-  paths: Paths,
-  app: string,
-  appCfg: App,
-): Promise<undefined | JibError> {
-  const progress = tuiSpinner()
-  progress.start(`claiming ingress for ${app}`)
-  const error = await ingressClaim(ingressCreateOperator(paths), app, appCfg, (update) =>
-    progress.message(update.message),
-  )
-  if (error instanceof Error) {
-    progress.stop('ingress failed')
-    return errorsToJibError(error)
-  }
-  progress.stop('ingress ready')
-  return undefined
 }

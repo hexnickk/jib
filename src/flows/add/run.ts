@@ -1,56 +1,48 @@
+import { rm } from 'node:fs/promises'
+import { type App, configLoad, configWrite } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
-import { CancelledError, InternalError, type JibError } from '@jib/errors'
+import { CancelledError, InternalError, type JibError, errorsToJibError } from '@jib/errors'
+import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
 import { pathsManagedComposePath } from '@jib/paths'
+import { secretsRemove, secretsUpsert } from '@jib/secrets'
+import { sourcesCloneForInspection, sourcesRemoveCheckout } from '@jib/sources'
+import { tuiSpinner } from '@jib/tui'
 import { type Step, txRunSteps } from '@jib/tx'
 import { addPrepareDockerHubWorkdir } from './dockerhub.ts'
 import { addInspectCompose } from './inspect.ts'
 import { addConfirmPlan } from './plan.ts'
 import { addBuildResolvedApp, addCollectGuidedInputs } from './resolve.ts'
-import type {
-  AddFlowObserver,
-  AddFlowOutcome,
-  AddFlowParams,
-  AddFlowResult,
-  AddSupport,
-  GuidedInputs,
-} from './types.ts'
-
-export interface RunAddDeps {
-  support: AddSupport
-  observer?: AddFlowObserver
-}
+import type { AddFlowObserver, AddFlowParams, AddFlowResult, GuidedInputs } from './types.ts'
 
 interface AddRunContext {
   readonly params: AddFlowParams
-  readonly support: AddSupport
   readonly observer: AddFlowObserver
   inspection: ComposeInspection
   workdir: string
   guided: GuidedInputs
-  finalApp: AddFlowResult['finalApp']
+  finalApp: App
   secretsWritten: number
 }
 
 /** Registers an app transactionally, rolling back completed steps on failure or cancellation. */
 export async function addRun(
-  { support, observer = {} }: RunAddDeps,
-  params: AddFlowParams,
-): Promise<AddFlowOutcome> {
-  const ctx: AddRunContext = {
-    params,
-    support,
+  ctx: AddFlowParams,
+  observer: AddFlowObserver = {},
+): Promise<AddFlowResult | JibError> {
+  const state: AddRunContext = {
+    params: ctx,
     observer,
     inspection: { composeFiles: [], services: [] },
     workdir: '',
     guided: { domains: [], configEntries: [] },
-    finalApp: params.draftApp,
+    finalApp: ctx.draftApp,
     secretsWritten: 0,
   }
 
   observer.onStateChange?.('inputs_ready')
 
   const error = await txRunSteps(
-    ctx,
+    state,
     [
       prepareRepoStep,
       inspectComposeStep,
@@ -62,7 +54,7 @@ export async function addRun(
       claimIngressStep,
     ],
     {
-      signal: params.signal ?? { cancelled: false },
+      signal: ctx.signal ?? { cancelled: false },
       cancelled: () => new CancelledError('add cancelled'),
       warn: (message) => observer.warn?.(message),
     },
@@ -70,21 +62,18 @@ export async function addRun(
   if (error) {
     return error
   }
-  return { finalApp: ctx.finalApp, secretsWritten: ctx.secretsWritten }
+  return { finalApp: state.finalApp, secretsWritten: state.secretsWritten }
 }
 
-const prepareRepoStep: Step<AddRunContext, { repo: string }, JibError> = {
+const prepareRepoStep: Step<AddRunContext, string, JibError> = {
   name: 'repo',
   async up(ctx) {
-    const inspectionCheckout = await ctx.support.cloneForInspection(
-      ctx.params.cfg,
-      ctx.params.appName,
-      {
-        repo: ctx.params.inputs.repo,
-        branch: ctx.params.draftApp.branch,
-        ...(ctx.params.args.source ? { source: ctx.params.args.source } : {}),
-      },
-    )
+    const inspectionCheckout = await sourcesCloneForInspection(ctx.params.cfg, ctx.params.paths, {
+      app: ctx.params.appName,
+      repo: ctx.params.inputs.repo,
+      branch: ctx.params.draftApp.branch,
+      ...(ctx.params.args.source ? { source: ctx.params.args.source } : {}),
+    })
     if (inspectionCheckout instanceof Error) {
       return inspectionCheckout
     }
@@ -99,10 +88,14 @@ const prepareRepoStep: Step<AddRunContext, { repo: string }, JibError> = {
     }
     ctx.workdir = dockerHubWorkdir ?? inspectionCheckout.workdir
     ctx.observer.onStateChange?.('repo_prepared')
-    return { repo: ctx.params.draftApp.image ? 'local' : ctx.params.inputs.repo }
+    return ctx.params.draftApp.image ? 'local' : ctx.params.inputs.repo
   },
-  async down(ctx, state) {
-    return await ctx.support.removeCheckout(ctx.params.appName, state.repo)
+  async down(ctx, repo) {
+    try {
+      return await sourcesRemoveCheckout(ctx.params.paths, ctx.params.appName, repo)
+    } catch (error) {
+      return errorsToJibError(error)
+    }
   },
 }
 
@@ -132,7 +125,7 @@ const collectGuidedInputsStep: Step<AddRunContext, undefined, JibError> = {
   },
 }
 
-const resolveAppStep: Step<AddRunContext, { managedComposeWritten: boolean }, JibError> = {
+const resolveAppStep: Step<AddRunContext, boolean, JibError> = {
   name: 'resolved app',
   async up(ctx) {
     const finalApp = await addBuildResolvedApp(
@@ -151,18 +144,22 @@ const resolveAppStep: Step<AddRunContext, { managedComposeWritten: boolean }, Ji
     }
     ctx.finalApp = finalApp
     ctx.observer.onStateChange?.('app_resolved')
-    return {
-      managedComposeWritten:
-        ctx.finalApp.compose?.includes(
-          pathsManagedComposePath(ctx.params.paths, ctx.params.appName),
-        ) ?? false,
-    }
+    return (
+      ctx.finalApp.compose?.includes(
+        pathsManagedComposePath(ctx.params.paths, ctx.params.appName),
+      ) ?? false
+    )
   },
-  async down(ctx, state) {
-    if (!state.managedComposeWritten) {
+  async down(ctx, managedComposeWritten) {
+    if (!managedComposeWritten) {
       return undefined
     }
-    return await ctx.support.removeManagedCompose(ctx.params.appName)
+    try {
+      await rm(pathsManagedComposePath(ctx.params.paths, ctx.params.appName), { force: true })
+      return undefined
+    } catch (error) {
+      return errorsToJibError(error)
+    }
   },
 }
 
@@ -191,7 +188,7 @@ const writeConfigStep: Step<AddRunContext, undefined, JibError> = {
       ...ctx.params.cfg,
       apps: { ...ctx.params.cfg.apps, [ctx.params.appName]: ctx.finalApp },
     }
-    const error = await ctx.support.writeConfig(ctx.params.configFile, finalCfg)
+    const error = await configWrite(ctx.params.configFile, finalCfg)
     if (error instanceof Error) {
       return error
     }
@@ -199,7 +196,7 @@ const writeConfigStep: Step<AddRunContext, undefined, JibError> = {
     return undefined
   },
   async down(ctx) {
-    const current = await ctx.support.loadConfig(ctx.params.configFile)
+    const current = await configLoad(ctx.params.configFile)
     const loaded = current instanceof Error ? ctx.params.cfg : current
     if (current instanceof Error) {
       ctx.observer.warn?.(
@@ -208,7 +205,7 @@ const writeConfigStep: Step<AddRunContext, undefined, JibError> = {
     }
     const rollbackApps = { ...loaded.apps }
     delete rollbackApps[ctx.params.appName]
-    return await ctx.support.writeConfig(ctx.params.configFile, {
+    return await configWrite(ctx.params.configFile, {
       ...loaded,
       apps: rollbackApps,
     })
@@ -216,16 +213,15 @@ const writeConfigStep: Step<AddRunContext, undefined, JibError> = {
 }
 
 /** Writes add-flow secrets and removes newly written keys when the flow rolls back. */
-const writeSecretsStep: Step<AddRunContext, { keys: string[] }, JibError> = {
+const writeSecretsStep: Step<AddRunContext, string[], JibError> = {
   name: 'secrets',
   async up(ctx) {
     const keys: string[] = []
     for (const { key, value } of ctx.guided.configEntries) {
-      const entry = { key, value }
       try {
-        const error = await ctx.support.upsertSecret(ctx.params.appName, entry)
+        const error = await secretsUpsert(ctx.params.paths, ctx.params.appName, key, value)
         if (!(error instanceof Error)) {
-          keys.push(entry.key)
+          keys.push(key)
           continue
         }
         await cleanupWrittenSecrets(ctx, keys)
@@ -238,10 +234,10 @@ const writeSecretsStep: Step<AddRunContext, { keys: string[] }, JibError> = {
     }
     ctx.secretsWritten = ctx.guided.configEntries.length
     ctx.observer.onStateChange?.('secrets_written')
-    return { keys }
+    return keys
   },
-  async down(ctx, state) {
-    await cleanupWrittenSecrets(ctx, state.keys)
+  async down(ctx, keys) {
+    await cleanupWrittenSecrets(ctx, keys)
     return undefined
   },
 }
@@ -250,9 +246,22 @@ const writeSecretsStep: Step<AddRunContext, { keys: string[] }, JibError> = {
 const claimIngressStep: Step<AddRunContext, undefined, JibError> = {
   name: 'ingress',
   async up(ctx) {
-    const error = await ctx.support.claimIngress(ctx.params.appName, ctx.finalApp)
-    if (error instanceof Error) {
-      return error
+    try {
+      const progress = tuiSpinner()
+      progress.start(`claiming ingress for ${ctx.params.appName}`)
+      const error = await ingressClaim(
+        ingressCreateOperator(ctx.params.paths),
+        ctx.params.appName,
+        ctx.finalApp,
+        (update) => progress.message(update.message),
+      )
+      if (error instanceof Error) {
+        progress.stop('ingress failed')
+        return errorsToJibError(error)
+      }
+      progress.stop('ingress ready')
+    } catch (error) {
+      return errorsToJibError(error)
     }
     ctx.observer.onStateChange?.('routes_claimed')
     return undefined
@@ -263,7 +272,7 @@ const claimIngressStep: Step<AddRunContext, undefined, JibError> = {
 async function cleanupWrittenSecrets(ctx: AddRunContext, keys: readonly string[]): Promise<void> {
   for (const key of keys) {
     try {
-      const error = await ctx.support.removeSecret(ctx.params.appName, key)
+      const error = await secretsRemove(ctx.params.paths, ctx.params.appName, key)
       if (error instanceof Error) {
         ctx.observer.warn?.(`secret cleanup (${key}): ${error.message}`)
       }

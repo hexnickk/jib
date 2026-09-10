@@ -1,12 +1,12 @@
 import { CliError } from '@jib/cli'
 import type { App, Config } from '@jib/config'
 import { configLoad } from '@jib/config'
-import { InternalError, type JibError, NotFoundError } from '@jib/errors'
+import { InternalError, type JibError } from '@jib/errors'
 import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
 import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
 import type { DeployRunResult } from '@/flows/deploy/run.ts'
-import { removeApp, removeCreateSupport } from '@/flows/remove/index.ts'
+import { removeApp } from '@/flows/remove/index.ts'
 import type { AddFlowResult } from './types.ts'
 
 export interface InterruptTrap {
@@ -70,21 +70,13 @@ export async function addRollbackApp(
   }
   const result = await removeApp(
     {
-      support: removeCreateSupport({
-        paths,
-        releaseIngress: (appName) => ingressRelease(ingressCreateOperator(paths), appName),
-      }),
-      observer: { warn: (message) => consola.warn(message) },
+      paths,
+      releaseIngress: (appName) => ingressRelease(ingressCreateOperator(paths), appName),
+      warn: (message) => consola.warn(message),
     },
     { appName: app, cfg, configFile: paths.configFile, quiet: false },
   )
-  if (result instanceof NotFoundError) {
-    return undefined
-  }
-  if (result instanceof InternalError) {
-    return result
-  }
-  return undefined
+  return result instanceof InternalError ? result : undefined
 }
 
 /** Installs SIGINT and SIGTERM handlers that allow the flow to observe cancellation safely. */

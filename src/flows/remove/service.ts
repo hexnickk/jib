@@ -1,62 +1,72 @@
+import { rm } from 'node:fs/promises'
+import { type Config, configWrite } from '@jib/config'
+import { dockerComposeFor, dockerOverridePath } from '@jib/docker'
 import { type JibError, NotFoundError } from '@jib/errors'
-import type { RemoveObserver, RemoveParams, RemoveResult, RemoveSupport } from './types.ts'
+import { type Paths, pathsManagedComposePath } from '@jib/paths'
+import { secretsRemoveApp } from '@jib/secrets'
+import { sourcesRemoveCheckout } from '@jib/sources'
+import { stateCreateStore, stateRemove } from '@jib/state'
 
-export interface RemoveRunContext {
-  support: RemoveSupport
-  observer?: RemoveObserver
+interface RemoveContext {
+  paths: Paths
+  releaseIngress(appName: string): Promise<JibError | undefined>
+  warn?(message: string): void
 }
 
 /** Removes one app and persists the config change before best-effort cleanup. */
 export async function removeApp(
-  ctx: RemoveRunContext,
-  params: RemoveParams,
-): Promise<RemoveResult | NotFoundError | JibError> {
-  const appCfg = params.cfg.apps[params.appName]
+  ctx: RemoveContext,
+  params: { appName: string; cfg: Config; configFile: string; quiet: boolean },
+): Promise<JibError | undefined> {
+  const { paths } = ctx
+  const { appName, cfg, configFile, quiet } = params
+  const store = stateCreateStore(paths.stateDir)
+  const appCfg = cfg.apps[appName]
   if (!appCfg) {
-    return new NotFoundError(`app "${params.appName}" not found in config`)
+    return new NotFoundError(`app "${appName}" not found in config`)
   }
 
   if (appCfg.domains.length > 0) {
-    await runBestEffort(ctx, 'ingress release', () => ctx.support.releaseIngress(params.appName))
+    await runBestEffort(ctx, 'ingress release', () => ctx.releaseIngress(appName))
   }
-  await runBestEffort(ctx, 'compose down', () =>
-    ctx.support.stopApp(params.cfg, params.appName, params.quiet),
-  )
-  const nextApps = { ...params.cfg.apps }
-  delete nextApps[params.appName]
-  const writeResult = await ctx.support.writeConfig(params.configFile, {
-    ...params.cfg,
-    apps: nextApps,
+  await runBestEffort(ctx, 'compose down', async () => {
+    const compose = dockerComposeFor(cfg, paths, appName)
+    if (compose instanceof Error) {
+      return compose
+    }
+    return await compose.down(false, { quiet })
   })
+  const nextApps = { ...cfg.apps }
+  delete nextApps[appName]
+  const writeResult = await configWrite(configFile, { ...cfg, apps: nextApps })
   if (writeResult instanceof Error) {
     return writeResult
   }
 
-  await runBestEffort(ctx, 'repo cleanup', () =>
-    ctx.support.removeCheckout(params.appName, appCfg.repo),
+  await runBestEffort(ctx, 'repo cleanup', () => sourcesRemoveCheckout(paths, appName, appCfg.repo))
+  await runBestEffort(ctx, 'secrets cleanup', () => secretsRemoveApp(paths, appName))
+  await runBestEffort(ctx, 'state cleanup', () => stateRemove(store, appName))
+  await runBestEffort(ctx, 'override cleanup', () =>
+    rm(dockerOverridePath(paths.overridesDir, appName), { force: true }),
   )
-  await runBestEffort(ctx, 'secrets cleanup', () => ctx.support.removeSecrets(params.appName))
-  await runBestEffort(ctx, 'state cleanup', () => ctx.support.removeState(params.appName))
-  await runBestEffort(ctx, 'override cleanup', () => ctx.support.removeOverride(params.appName))
   await runBestEffort(ctx, 'managed compose cleanup', () =>
-    ctx.support.removeManagedCompose(params.appName),
+    rm(pathsManagedComposePath(paths, appName), { force: true }),
   )
-  return { app: params.appName, removed: true }
 }
 
-/** Runs a cleanup step and downgrades failures to observer warnings. */
+/** Runs a cleanup step and downgrades failures to warnings. */
 async function runBestEffort(
-  ctx: RemoveRunContext,
+  ctx: RemoveContext,
   label: string,
-  step: () => Promise<JibError | undefined>,
+  step: () => Promise<JibError | void>,
 ): Promise<void> {
   try {
     const error = await step()
     if (error instanceof Error) {
-      ctx.observer?.warn?.(`${label}: ${error.message}`)
+      ctx.warn?.(`${label}: ${error.message}`)
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    ctx.observer?.warn?.(`${label}: ${message}`)
+    ctx.warn?.(`${label}: ${message}`)
   }
 }

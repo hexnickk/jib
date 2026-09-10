@@ -1,8 +1,6 @@
 import type { App, Config, Domain, HealthCheck, ParsedDomain } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
-import type { JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
-import type { InspectionCheckout } from '@jib/sources'
 
 export type EnvEntry = { key: string; value: string }
 
@@ -50,7 +48,6 @@ export interface AddFlowParams {
 }
 
 export type AddFlowResult = { finalApp: App; secretsWritten: number }
-export type AddFlowOutcome = AddFlowResult | JibError
 
 export interface AddResolveInput {
   appName: string
@@ -64,19 +61,4 @@ export interface AddResolveInput {
 export interface AddFlowObserver {
   onStateChange?(state: AddFlowState): void
   warn?(message: string): void
-}
-
-export interface AddSupport {
-  cloneForInspection(
-    cfg: Config,
-    appName: string,
-    target: { repo: string; branch: string; source?: string },
-  ): Promise<InspectionCheckout | JibError>
-  removeCheckout(appName: string, repo: string): Promise<undefined | JibError>
-  loadConfig(configFile: string): Promise<Config | JibError>
-  writeConfig(configFile: string, cfg: Config): Promise<undefined | JibError>
-  upsertSecret(appName: string, entry: EnvEntry): Promise<undefined | JibError>
-  removeSecret(appName: string, key: string): Promise<undefined | JibError>
-  removeManagedCompose(appName: string): Promise<undefined | JibError>
-  claimIngress(appName: string, finalApp: App): Promise<undefined | JibError>
 }
