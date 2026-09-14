@@ -1,5 +1,6 @@
 import type { Config } from '@jib/config'
-import type { InternalError } from '@jib/errors'
+import { dockerCollectContainerStatus, type DockerContainerStatus } from '@jib/docker'
+import { InternalError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { type SourceStatus, sourcesCollectStatuses } from '@jib/sources'
 import { $ } from '@/libs/shell'
@@ -11,11 +12,7 @@ export interface ServiceStatus {
   status: string
 }
 
-export interface ContainerStatus {
-  service: string
-  state: string
-  status: string
-}
+export type ContainerStatus = DockerContainerStatus
 
 export interface AppStatus {
   name: string
@@ -23,6 +20,7 @@ export interface AppStatus {
   lastDeploy: string
   lastDeployStatus: string
   containers: ContainerStatus[]
+  containerError?: string
   domains: { host: string; port?: number | undefined }[]
 }
 
@@ -76,37 +74,16 @@ export async function stateCollectApps(
     if (state instanceof Error) {
       return state
     }
-    const containers = await collectContainers(name)
+    const containers = await dockerCollectContainerStatus(name)
     results.push({
       name,
       sha: state.deployed_sha,
       lastDeploy: state.last_deploy,
       lastDeployStatus: state.last_deploy_status,
-      containers,
+      containers: containers instanceof Error ? [] : containers,
+      ...(containers instanceof Error ? { containerError: containers.message } : {}),
       domains: app.domains.map((domain) => ({ host: domain.host, port: domain.port })),
     })
   }
   return results
-}
-
-async function collectContainers(app: string): Promise<ContainerStatus[]> {
-  try {
-    const res = await $`docker compose -p jib-${app} ps --format json`
-    if (res.exitCode !== 0) {
-      return []
-    }
-    const stdout = res.stdout.trim()
-    if (!stdout) {
-      return []
-    }
-    return stdout
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => {
-        const obj = JSON.parse(line) as { Service: string; State: string; Status: string }
-        return { service: obj.Service, state: obj.State, status: obj.Status }
-      })
-  } catch {
-    return []
-  }
 }

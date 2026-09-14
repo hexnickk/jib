@@ -1,9 +1,10 @@
 import type { Config } from '@jib/config'
-import { type DeployResult, deployApp, deployCreateDeps } from '@jib/deploy'
-import { InternalError, type JibError } from '@jib/errors'
+import { deployApp, deployCreateDeps } from '@jib/deploy'
+import { type JibError, NotFoundError, errorsToJibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
-import { type PreparedSource, sourcesSync } from '@jib/sources'
+import { sourcesSync } from '@jib/sources'
 import { tuiSpinner } from '@jib/tui'
+import { notificationsNotifyDeployment } from '@/flows/notifications/deliver.ts'
 
 export interface DeployRunResult {
   app: string
@@ -13,59 +14,70 @@ export interface DeployRunResult {
   workdir: string
 }
 
-/** Runs prepare + deploy and returns its result or a shared typed error. */
-export async function runDeploy(
+/** Owns deployment dependencies, preparation, progress, execution, and the final notification. */
+export async function deployRun(
   ctx: { cfg: Config; paths: Paths },
-  app: string,
-  ref?: string,
-): Promise<DeployRunResult | InternalError> {
-  const { cfg, paths } = ctx
-  const prepareSpin = tuiSpinner()
-
-  prepareSpin.start(`[1/2] preparing ${app}`)
-  let ready: PreparedSource | InternalError
+  input: { app: string; trigger: 'manual' | 'auto'; ref?: string },
+): Promise<JibError | DeployRunResult> {
+  const app = ctx.cfg.apps[input.app]
+  if (!app) {
+    return new NotFoundError(`app "${input.app}" not found in config`)
+  }
+  const deps = deployCreateDeps(ctx.cfg, ctx.paths)
+  const spinner = input.trigger === 'manual' ? tuiSpinner() : undefined
+  const start = Date.now()
+  let stage = 'prepare'
+  let revision = app.image ?? ''
+  let result: JibError | DeployRunResult
   try {
-    const result = await sourcesSync(cfg, paths, { app }, ref)
-    ready = result instanceof Error ? new InternalError(result.message, { cause: result }) : result
+    spinner?.start(`preparing ${input.app}`)
+    deps.log.info(`${input.app}: preparing source`)
+    const ready = await sourcesSync(ctx.cfg, ctx.paths, { app: input.app }, input.ref)
+    if (ready instanceof Error) {
+      result = ready
+    } else {
+      revision = ready.sha
+      deps.log.info(`${input.app}: repo ready @ ${ready.sha.slice(0, 8)}`)
+      stage = 'lock'
+      const deployed = await deployApp(
+        deps,
+        { app: input.app, trigger: input.trigger, workdir: ready.workdir, sha: ready.sha },
+        (step, message) => {
+          stage = step
+          deps.log.info(`${input.app}: ${step}: ${message}`)
+          spinner?.message(`${step}: ${message}`)
+        },
+      )
+      result =
+        deployed instanceof Error
+          ? deployed
+          : {
+              app: input.app,
+              durationMs: deployed.durationMs,
+              preparedSha: ready.sha,
+              sha: deployed.deployedSHA,
+              workdir: ready.workdir,
+            }
+    }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    ready = new InternalError(message, { cause: error })
+    result = errorsToJibError(error)
   }
-  if (ready instanceof Error) {
-    prepareSpin.stop(`[1/2] failed to prepare ${app}`)
-    return ready
-  }
-  prepareSpin.stop(`[1/2] repo ready @ ${ready.sha.slice(0, 8)}`)
-
-  const deploySpin = tuiSpinner()
-  deploySpin.start(`[2/2] deploying ${app}`)
-  let deployed: JibError | DeployResult
-  try {
-    deployed = await deployApp(
-      deployCreateDeps(cfg, paths),
-      { app, workdir: ready.workdir, sha: ready.sha, trigger: 'manual' },
-      (step, message) => deploySpin.message(`${step}: ${message}`),
-    )
-  } catch (error) {
-    deploySpin.stop(`[2/2] failed to deploy ${app}`)
-    const message = error instanceof Error ? error.message : String(error)
-    return new InternalError(message, { cause: error })
-  }
-  if (deployed instanceof Error) {
-    deploySpin.stop(`[2/2] failed to deploy ${app}`)
-    return deployed instanceof InternalError
-      ? deployed
-      : new InternalError(deployed.message, { cause: deployed })
-  }
-
-  deploySpin.stop(
-    `[2/2] ${app} deployed @ ${deployed.deployedSHA.slice(0, 8)} (${deployed.durationMs}ms)`,
+  spinner?.stop(
+    result instanceof Error
+      ? `${input.app}: ${stage} failed`
+      : `${input.app} deployed @ ${result.sha.slice(0, 8)} (${result.durationMs}ms)`,
   )
-  return {
-    app,
-    durationMs: deployed.durationMs,
-    preparedSha: ready.sha,
-    sha: deployed.deployedSHA,
-    workdir: ready.workdir,
+  // Lock contention is not a deployment. Preparation failures are actual failed attempts.
+  if (stage !== 'lock') {
+    await notificationsNotifyDeployment(ctx, {
+      app: input.app,
+      revision,
+      ...(app.image ? {} : { ref: input.ref ?? app.branch }),
+      trigger: input.trigger,
+      success: !(result instanceof Error),
+      stage,
+      durationMs: Date.now() - start,
+    })
   }
+  return result
 }

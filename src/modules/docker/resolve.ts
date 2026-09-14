@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import type { App, Domain } from '@jib/config'
 import { ValidationError } from '@jib/errors'
+import { loggingCreateLogger } from '@jib/logging'
 import {
   type ComposeService,
   dockerHasPublishedPorts,
@@ -51,11 +52,7 @@ export function dockerInspectComposeApp(
 }
 
 /** Resolves ingress service bindings and container ports from parsed compose files. */
-export function dockerResolveFromCompose(
-  appCfg: App,
-  workdir: string,
-  warn?: (message: string) => void,
-): App | ValidationError {
+export function dockerResolveFromCompose(appCfg: App, workdir: string): App | ValidationError {
   const inspection = dockerInspectComposeApp(workdir, appCfg.compose)
   if (inspection instanceof Error) {
     return inspection
@@ -85,7 +82,7 @@ export function dockerResolveFromCompose(
     }
     let containerPort = domain.container_port ?? dockerInferContainerPort(service)
     if (containerPort === undefined) {
-      warn?.(
+      loggingCreateLogger('docker').warn(
         `could not infer container port for service "${service.name}"; defaulting to ${FALLBACK_CONTAINER_PORT}`,
       )
       containerPort = FALLBACK_CONTAINER_PORT
@@ -94,7 +91,7 @@ export function dockerResolveFromCompose(
   }
 
   if (publishing.size > 0) {
-    warnPublished(publishing, nextDomains, warn)
+    warnPublished(publishing, nextDomains)
   }
   return { ...appCfg, domains: nextDomains }
 }
@@ -118,23 +115,17 @@ function resolveComposeFiles(workdir: string, composeFiles: string[]): Validatio
 }
 
 /** Explains when jib will replace user-declared `ports:` entries with managed ingress mappings. */
-function warnPublished(
-  publishing: Map<string, ComposeService>,
-  domains: Domain[],
-  warn?: (message: string) => void,
-): void {
-  if (!warn) {
-    return
-  }
+function warnPublished(publishing: Map<string, ComposeService>, domains: Domain[]): void {
+  const log = loggingCreateLogger('docker')
   for (const [name, service] of publishing) {
     const original = service.ports.map((port) => JSON.stringify(port)).join(', ')
     const replacements = domains
       .filter((domain) => domain.service === name)
       .map((domain) => `${domain.port}:${domain.container_port}`)
       .join(', ')
-    warn(
+    log.warn(
       `service "${name}" publishes ports in compose (${original}); jib will replace with [${replacements}] via !override at deploy time.`,
     )
   }
-  warn('consider removing `ports:` from your compose file to avoid confusion.')
+  log.warn('consider removing `ports:` from your compose file to avoid confusion.')
 }

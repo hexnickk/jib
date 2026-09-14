@@ -2,8 +2,7 @@ import { CliError } from '@jib/cli'
 import { configLoad, configLoadContext } from '@jib/config'
 import { CancelledError, RollbackError } from '@jib/errors'
 import { sourcesPreflightSelection } from '@jib/sources'
-import { tuiIsInteractive, tuiPromptConfirmResult, tuiPromptSelectResult } from '@jib/tui'
-import { runDeploy } from '../deploy/run.ts'
+import { deployRun } from '../deploy/run.ts'
 import { addBuildDraftApp } from './app.ts'
 import { addChooseInitialSource, addCreateInspectionObserver } from './command-support.ts'
 import { addNormalizeError } from './errors.ts'
@@ -38,11 +37,6 @@ export async function addRunCommand(args: AddCommandArgs) {
       repo: inputs.repo,
       source: source.value,
       branch: typeof args.branch === 'string' ? args.branch : undefined,
-    },
-    {
-      isInteractive: tuiIsInteractive,
-      promptConfirm: tuiPromptConfirmResult,
-      promptSelect: tuiPromptSelectResult,
     },
   )
   if (preflight instanceof Error) {
@@ -85,12 +79,12 @@ export async function addRunCommand(args: AddCommandArgs) {
         return result
       },
       (result) =>
-        runDeploy(
+        deployRun(
           {
             cfg: { ...preflight.cfg, apps: { ...preflight.cfg.apps, [appName]: result.finalApp } },
             paths,
           },
-          appName,
+          { app: appName, trigger: 'manual' },
         ),
       (result) => addRollbackApp(paths, appName, preflight.cfg, result.finalApp),
       interrupt,

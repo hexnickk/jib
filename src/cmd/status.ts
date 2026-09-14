@@ -1,13 +1,9 @@
-import { configLoadContext } from '@jib/config'
-import {
-  type AppStatus,
-  type ServiceStatus,
-  type SourceStatus,
-  stateCollectApps,
-  stateCollectServices,
-  stateCollectSources,
-} from '@jib/state'
+import { pathsGetPaths } from '@jib/paths'
+import type { AppStatus, ServiceStatus, SourceStatus } from '@jib/state'
 import type { CommandModule } from 'yargs'
+import { statusCollectSnapshot } from '@/flows/status/report.ts'
+import { machineFormatStatus, machineWarnings } from '@/modules/machine/status.ts'
+import { notificationsStatus } from '@/modules/notifications/service.ts'
 import { cmdCreateHandler } from './handler.ts'
 
 /** Renders a human-readable relative time for the status screen. */
@@ -78,6 +74,11 @@ function printApps(apps: AppStatus[]): void {
     const deployInfo = app.lastDeploy ? `${deployState}  ${sha}  ${ago}` : `${deployState}  ${sha}`
     printLine(`  ${app.name}`)
     printLine(`    deploy:   ${deployInfo}`)
+    if (app.containerError) {
+      printLine(`    containers: unknown (${app.containerError})`)
+    } else if (app.containers.length === 0) {
+      printLine('    containers: none')
+    }
     for (const container of app.containers) {
       printLine(
         `    service:  ${container.service.padEnd(16)} ${container.state}  ${container.status}`,
@@ -93,30 +94,37 @@ function printApps(apps: AppStatus[]): void {
 
 const cliStatusCommand = {
   command: 'status',
-  describe: 'Show server status: services, sources, apps',
+  describe: 'Show machine resources, services, sources, apps, and notifications',
   handler: cmdCreateHandler(statusRunCommand),
 } satisfies CommandModule
 
 /** Collects status data and writes the text status view. */
 async function statusRunCommand() {
-  const loaded = await configLoadContext()
-  if (loaded instanceof Error) {
-    return loaded
-  }
-  const { cfg, paths } = loaded
-  const hasCloudflared = cfg.modules?.cloudflared === true
-  const [services, sources, apps] = await Promise.all([
-    stateCollectServices(hasCloudflared),
-    stateCollectSources(cfg, paths),
-    stateCollectApps(cfg, paths),
+  const ctx = { paths: pathsGetPaths() }
+  const [snapshot, notifications] = await Promise.all([
+    statusCollectSnapshot(ctx),
+    notificationsStatus(ctx),
   ])
-  if (apps instanceof Error) {
-    return apps
+  if (snapshot instanceof Error) {
+    return snapshot
   }
-
+  const { machine, services, sources, apps } = snapshot
+  for (const warning of machineWarnings(machine)) {
+    printLine(`⚠ ${warning}`)
+  }
+  printLine(`machine · ${machine.hostname}`)
+  machineFormatStatus(machine).forEach((line) => printLine(`  ${line}`))
+  printLine()
   printServices(services)
   printSources(sources)
-  printApps(apps)
+  if (!(apps instanceof Error)) {
+    printApps(apps)
+  }
+  printLine()
+  if (!(notifications instanceof Error)) {
+    printLine(notifications)
+  }
+  return apps instanceof Error ? apps : notifications instanceof Error ? notifications : undefined
 }
 
 export default cliStatusCommand

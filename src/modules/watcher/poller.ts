@@ -1,9 +1,9 @@
 import { type Config, configParseDuration } from '@jib/config'
-import { deployApp } from '@jib/deploy'
 import { InternalError, type JibError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
-import { sourcesProbe, sourcesSync } from '@jib/sources'
+import { sourcesProbe } from '@jib/sources'
+import { deployRun } from '@/flows/deploy/run.ts'
 /** Parses `poll_interval`, defaulting to 5 minutes only for invalid raw strings. */
 export function watcherParsePollInterval(raw: string): number {
   return configParseDuration(raw) ?? 5 * 60_000
@@ -25,85 +25,25 @@ export async function watcherPollApp(
   if (!app || !app.repo || app.repo === 'local') {
     return
   }
-  const source = await probePollApp(cfg, paths, appName)
-  if (source instanceof Error) {
-    return source
-  }
-  if (!source) {
-    return
-  }
-  const prev = lastSeen.get(appName) ?? ''
-  if (source.sha === prev) {
-    return
-  }
-  const prepared = await syncPollApp(cfg, paths, appName)
-  if (prepared instanceof Error) {
-    return prepared
-  }
-  log.info(`${appName}: new sha ${prepared.sha.slice(0, 7)} (was ${prev.slice(0, 7) || 'none'})`)
   try {
-    const result = await deployPreparedApp(ctx, appName, prepared)
+    const source = await sourcesProbe(cfg, paths, { app: appName })
+    if (source instanceof Error) {
+      return new InternalError(`probe ${appName}: ${source.message}`, { cause: source })
+    }
+    const prev = lastSeen.get(appName) ?? ''
+    if (!source || source.sha === prev) {
+      return
+    }
+    log.info(`${appName}: new sha ${source.sha.slice(0, 7)} (was ${prev.slice(0, 7) || 'none'})`)
+    const result = await deployRun(ctx, { app: appName, trigger: 'auto' })
     if (result instanceof Error) {
       return new InternalError(`deploy ${appName}: ${result.message}`, { cause: result })
     }
+    lastSeen.set(appName, result.preparedSha)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    return new InternalError(`deploy ${appName}: ${message}`, { cause: error })
+    return new InternalError(`poll ${appName}: ${message}`, { cause: error })
   }
-  lastSeen.set(appName, prepared.sha)
-}
-
-async function probePollApp(
-  cfg: Config,
-  paths: Paths,
-  appName: string,
-): Promise<InternalError | { branch: string; workdir: string; sha: string } | null> {
-  try {
-    const result = await sourcesProbe(cfg, paths, { app: appName })
-    return result instanceof Error
-      ? new InternalError(`probe ${appName}: ${result.message}`, { cause: result })
-      : result
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    return new InternalError(`probe ${appName}: ${message}`, { cause: error })
-  }
-}
-
-async function syncPollApp(
-  cfg: Config,
-  paths: Paths,
-  appName: string,
-): Promise<InternalError | { workdir: string; sha: string }> {
-  try {
-    const result = await sourcesSync(cfg, paths, { app: appName })
-    return result instanceof Error
-      ? new InternalError(`sync ${appName}: ${result.message}`, { cause: result })
-      : result
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    return new InternalError(`sync ${appName}: ${message}`, { cause: error })
-  }
-}
-
-async function deployPreparedApp(
-  ctx: PollAppContext,
-  appName: string,
-  prepared: { workdir: string; sha: string },
-): Promise<InternalError | undefined> {
-  const { cfg, paths, log } = ctx
-  const result = await deployApp(
-    {
-      config: cfg,
-      paths,
-      stateDir: paths.stateDir,
-      log,
-    },
-    { app: appName, workdir: prepared.workdir, sha: prepared.sha, trigger: 'auto' },
-    (step, message) => log.info(`${appName}: ${step}: ${message}`),
-  )
-  return result instanceof Error
-    ? new InternalError(`deploy ${appName}: ${result.message}`, { cause: result })
-    : undefined
 }
 
 export interface PollerDeps {

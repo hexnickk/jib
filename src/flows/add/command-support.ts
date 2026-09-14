@@ -4,7 +4,6 @@ import type { JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { sourcesBuildChoices, sourcesRunSetup } from '@jib/sources'
 import { tuiIsInteractive, tuiPromptSelectResult, tuiSpinner } from '@jib/tui'
-import { consola } from 'consola'
 
 /** Chooses the initial source, prompting only when the caller did not provide one. */
 export async function addChooseInitialSource(
@@ -62,7 +61,6 @@ export function addCreateInspectionObserver() {
           progress.stop('compose inspected')
         }
       },
-      warn: (message: string) => consola.warn(message),
     },
     stop: () => {
       if (!active) {

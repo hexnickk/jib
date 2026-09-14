@@ -7,17 +7,18 @@ import {
 } from '@jib/cli'
 import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
-import { tuiIntro, tuiNote, tuiOutro } from '@jib/tui'
+import { tuiIntro, tuiLog, tuiNote, tuiOutro } from '@jib/tui'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
 import { initConfigureOptionalModules } from '@/flows/init/optional.ts'
 import { initReconcileOptionalModules } from '@/flows/init/reconcile.ts'
 import { initUnseenOptionalModules } from '@/flows/init/registry.ts'
+import { notificationsOfferSetup } from '@/modules/notifications/setup.ts'
 import { hasBootstrapState } from '../migrations/service.ts'
 import { cmdCreateHandler } from './handler.ts'
 
 const cliInitCommand = {
   command: 'init',
-  describe: 'Configure optional modules',
+  describe: 'Configure optional modules and notifications',
   builder: {
     check: {
       type: 'boolean',
@@ -52,18 +53,18 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
   if (loaded instanceof Error) {
     return loaded
   }
-  const config = await initReconcileOptionalModules(
-    loaded,
-    paths,
-    args.check ? async () => undefined : undefined,
-  )
+  const config = await initReconcileOptionalModules(loaded, paths, { check: args.check === true })
   if (config instanceof Error) {
     return config
   }
 
   const unseen = initUnseenOptionalModules(config)
-  if (args.check || unseen.length === 0) {
-    const pending = unseen.map((mod) => mod.manifest.name)
+  const notificationsPending = config.notifications === undefined
+  if (args.check || (unseen.length === 0 && !notificationsPending)) {
+    const pending = [
+      ...unseen.map((mod) => mod.manifest.name),
+      ...(notificationsPending ? ['notifications'] : []),
+    ]
     if (pending.length === 0) {
       tuiNote('No optional modules are waiting for setup.', 'Optional modules')
       tuiOutro('nothing to do')
@@ -74,27 +75,45 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
     return
   }
 
-  tuiNote(
-    `Choose which optional pieces you want Jib to manage now.\n${unseen
-      .map((mod) => `${mod.manifest.name}: ${mod.manifest.description ?? mod.manifest.name}`)
-      .join('\n')}`,
-    'Optional modules',
-  )
+  if (unseen.length > 0) {
+    tuiNote(
+      `Choose which optional pieces you want Jib to manage now.\n${unseen
+        .map((mod) => `${mod.manifest.name}: ${mod.manifest.description ?? mod.manifest.name}`)
+        .join('\n')}`,
+      'Optional modules',
+    )
+  }
 
   if (!cliCanPrompt()) {
-    return cliCreateMissingInputError(
-      'missing optional module choices for jib init',
-      unseen.map((mod) => ({
+    return cliCreateMissingInputError('missing optional module choices for jib init', [
+      ...unseen.map((mod) => ({
         field: `modules.${mod.manifest.name}`,
         message:
           'set this module to true or false in config, or rerun with interactive prompts enabled',
       })),
-    )
+      ...(notificationsPending
+        ? [
+            {
+              field: 'notifications',
+              message:
+                'run sudo jib notifications setup, set notifications: false to skip, or rerun interactively',
+            },
+          ]
+        : []),
+    ])
   }
 
   const configureError = await initConfigureOptionalModules(config, paths, unseen)
   if (configureError instanceof Error) {
     return configureError
+  }
+  if (notificationsPending) {
+    const error = await notificationsOfferSetup({ paths })
+    if (error) {
+      // Optional messaging must not undo otherwise successful host setup.
+      tuiLog.warning(`Notification setup not completed: ${error.message}`)
+      tuiNote('Retry later: sudo jib notifications setup', 'Notifications')
+    }
   }
   const finalConfig = await configLoad(paths.configFile)
   if (finalConfig instanceof Error) {

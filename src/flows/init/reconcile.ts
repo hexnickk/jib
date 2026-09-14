@@ -3,11 +3,11 @@ import { type Config, configWrite } from '@jib/config'
 import type { JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 
-/** Persists inferred optional-module flags and returns the updated config or a typed error. */
+/** Reconciles inferred flags; check mode returns the same result without persisting it. */
 export async function initReconcileOptionalModules(
   config: Config,
   paths: Paths,
-  writeConfig: (configFile: string, config: Config) => Promise<JibError | undefined> = configWrite,
+  options: { check?: boolean } = {},
 ): Promise<Config | JibError> {
   if (config.modules.cloudflared !== undefined || !cloudflaredHasTunnelToken(paths)) {
     return config
@@ -20,9 +20,11 @@ export async function initReconcileOptionalModules(
       cloudflared: true,
     },
   }
-  const writeResult = await writeConfig(paths.configFile, next)
-  if (writeResult instanceof Error) {
-    return writeResult
+  if (!options.check) {
+    const writeResult = await configWrite(paths.configFile, next)
+    if (writeResult instanceof Error) {
+      return writeResult
+    }
   }
   return next
 }

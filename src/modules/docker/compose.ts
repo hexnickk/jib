@@ -38,16 +38,17 @@ export interface DockerCompose {
   ps(): Promise<ExecResult | InternalError>
 }
 
+/** Shared project-name mapping for Compose execution and status queries. */
+export function dockerProjectName(app: string): string {
+  return `jib-${app}`
+}
+
 /** Creates a plain docker-compose runner object for one app. */
 export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
   const runner = cfg.exec ?? dockerRealExec
 
-  function projectName(): string {
-    return `jib-${cfg.app}`
-  }
-
   function baseArgs(): string[] {
-    const args = ['compose', '-p', projectName()]
+    const args = ['compose', '-p', dockerProjectName(cfg.app)]
     for (const file of cfg.files) {
       args.push('-f', file)
     }
@@ -63,7 +64,7 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
 
   return {
     cfg,
-    projectName,
+    projectName: () => dockerProjectName(cfg.app),
     baseArgs,
     async build(buildArgs: Record<string, string> = {}, opts: { quiet?: boolean } = {}) {
       const args = ['docker', ...baseArgs(), ...envArgs(), 'build']

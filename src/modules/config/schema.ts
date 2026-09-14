@@ -68,12 +68,42 @@ export const AppSchema = z.object({
   services: z.array(z.string()).optional(),
 })
 
+export const NotificationsSchema = z.object({
+  chatId: z
+    .string()
+    .regex(
+      /^(?:-?[1-9]\d*|@[A-Za-z][A-Za-z0-9_]{4,31})$/,
+      'use a numeric chat ID or @public_channel',
+    ),
+  dailyAt: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, 'use HH:mm (24-hour time)'),
+  timezone: z
+    .string()
+    .refine((value) => {
+      if (!/^[A-Za-z0-9_+/-]+$/.test(value)) {
+        return false
+      }
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: value }).format()
+        return true
+      } catch {
+        return false
+      }
+    }, 'use an IANA timezone, for example Europe/Berlin or UTC')
+    .transform(
+      (value) => new Intl.DateTimeFormat('en', { timeZone: value }).resolvedOptions().timeZone,
+    ),
+})
+
+export type NotificationsConfig = z.infer<typeof NotificationsSchema>
+
 export const ConfigSchema = z.object({
   config_version: z.number().int().positive(),
   poll_interval: z.string().default('5m'),
   modules: z.record(z.string(), z.boolean()).optional().default({}),
   sources: z.record(z.string(), SourceSchema).optional().default({}),
   apps: z.record(z.string(), AppSchema).default({}),
+  // Absent: init has not offered setup. False: explicitly skipped or removed.
+  notifications: z.union([NotificationsSchema, z.literal(false)]).optional(),
   ingress: IngressConfigSchema.optional(),
 })
 

@@ -1,4 +1,5 @@
-import { InternalError, type JibError } from '@jib/errors'
+import type { JibError } from '@jib/errors'
+import { loggingCreateLogger } from '@jib/logging'
 
 /** Cancellation contract checked before and after each transactional step. */
 export interface CancelSignal {
@@ -24,60 +25,49 @@ export async function txRunSteps<
   options: {
     signal: CancelSignal
     cancelled: () => Err
-    warn?: (message: string) => void
   },
 ): Promise<undefined | Err> {
-  const { signal, cancelled, warn } = options
+  const { signal, cancelled } = options
   const done: Array<{ step: Step<Ctx, unknown, Err, RollbackErr>; state: unknown }> = []
 
   for (const step of steps) {
     if (signal.cancelled) {
-      return rollback(ctx, done, cancelled(), warn)
+      return rollback(ctx, done, cancelled())
     }
 
     const state = await step.up(ctx, signal)
     if (state instanceof Error) {
-      return rollback(ctx, done, state as Err, warn)
+      return rollback(ctx, done, state as Err)
     }
 
     done.push({ step, state })
   }
 
-  return signal.cancelled ? rollback(ctx, done, cancelled(), warn) : undefined
+  return signal.cancelled ? rollback(ctx, done, cancelled()) : undefined
 }
 
 async function rollback<Ctx, Err extends JibError, RollbackErr extends JibError = JibError>(
   ctx: Ctx,
   done: ReadonlyArray<{ step: Step<Ctx, unknown, Err, RollbackErr>; state: unknown }>,
   error: Err,
-  warn?: (message: string) => void,
 ): Promise<Err> {
+  const log = loggingCreateLogger('tx')
   for (const { step, state } of [...done].reverse()) {
-    const rollbackError = await runRollbackStep(ctx, step, state)
-    if (rollbackError) {
-      warn?.(rollbackError.message)
+    if (!step.down) {
+      continue
+    }
+    let failure: string | undefined
+    try {
+      const result = await step.down(ctx, state)
+      if (result instanceof Error) {
+        failure = result.message
+      }
+    } catch (cause) {
+      failure = cause instanceof Error ? cause.message : String(cause)
+    }
+    if (failure !== undefined) {
+      log.warn(`${step.name} rollback: ${failure}`)
     }
   }
-
   return error
-}
-
-async function runRollbackStep<Ctx, Err extends JibError, RollbackErr extends JibError>(
-  ctx: Ctx,
-  step: Step<Ctx, unknown, Err, RollbackErr>,
-  state: unknown,
-): Promise<undefined | InternalError> {
-  if (!step.down) {
-    return undefined
-  }
-  try {
-    const result = await step.down(ctx, state)
-    if (!(result instanceof Error)) {
-      return undefined
-    }
-    return new InternalError(`${step.name} rollback: ${result.message}`, { cause: result })
-  } catch (cause) {
-    const message = cause instanceof Error ? cause.message : String(cause)
-    return new InternalError(`${step.name} rollback: ${message}`, { cause })
-  }
 }

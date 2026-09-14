@@ -60,5 +60,4 @@ export interface AddResolveInput {
 
 export interface AddFlowObserver {
   onStateChange?(state: AddFlowState): void
-  warn?(message: string): void
 }

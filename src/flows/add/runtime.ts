@@ -1,8 +1,7 @@
 import { CliError } from '@jib/cli'
 import type { App, Config } from '@jib/config'
 import { configLoad } from '@jib/config'
-import { InternalError, type JibError } from '@jib/errors'
-import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
+import { NotFoundError, type JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { consola } from 'consola'
 import type { DeployRunResult } from '@/flows/deploy/run.ts'
@@ -68,15 +67,8 @@ export async function addRollbackApp(
   if (!cfg.apps[app]) {
     return undefined
   }
-  const result = await removeApp(
-    {
-      paths,
-      releaseIngress: (appName) => ingressRelease(ingressCreateOperator(paths), appName),
-      warn: (message) => consola.warn(message),
-    },
-    { appName: app, cfg, configFile: paths.configFile, quiet: false },
-  )
-  return result instanceof InternalError ? result : undefined
+  const result = await removeApp({ paths, cfg }, app)
+  return result instanceof NotFoundError ? undefined : result
 }
 
 /** Installs SIGINT and SIGTERM handlers that allow the flow to observe cancellation safely. */

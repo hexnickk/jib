@@ -29,16 +29,19 @@ export async function deployRunFlow(
     return new InternalError(`insufficient disk space: ${free} bytes free`)
   }
 
+  emit('state', 'reading deployed state')
   const prevState = await stateLoad(deps.stateDir, cmd.app)
   if (prevState instanceof Error) {
     return prevState
   }
 
+  emit('override', 'preparing compose overrides')
   const overrideError = await deploySyncOverride(deps.paths, cmd.app, appCfg, cmd.workdir)
   if (overrideError) {
     return overrideError
   }
 
+  emit('secrets', 'linking app secrets')
   const secretsError = await deployLinkSecrets(deps.paths, cmd.app, cmd.workdir)
   if (secretsError) {
     return secretsError
@@ -90,6 +93,7 @@ export async function deployRunFlow(
       last_deploy_status: 'success',
       last_deploy_error: '',
     }
+    emit('state', 'recording deployment')
     const saveError = await stateSave(deps.stateDir, cmd.app, next)
     if (saveError) {
       return saveError

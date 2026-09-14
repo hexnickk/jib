@@ -1,7 +1,6 @@
 import { configLoad } from '@jib/config'
 import { pathsGetPaths } from '@jib/paths'
 import { sourcesSetupRef } from '@jib/sources'
-import { tuiPromptSelectResult } from '@jib/tui'
 import type { CommandModule } from 'yargs'
 import { cmdCreateHandler } from './handler.ts'
 
@@ -20,7 +19,7 @@ async function sourcesSetupRunCommand() {
   if (config instanceof Error) {
     return config
   }
-  const source = await sourcesSetupRef(config, paths, { promptSelect: tuiPromptSelectResult })
+  const source = await sourcesSetupRef({ cfg: config, paths })
   if (source instanceof Error) {
     return source
   }

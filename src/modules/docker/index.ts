@@ -27,6 +27,7 @@ export {
 } from './parse.ts'
 export { dockerFindUnsafeBindMounts, type UnsafeBindMount } from './volume-safety.ts'
 export { dockerComposeFor } from './compose-for.ts'
+export { dockerCollectContainerStatus, type DockerContainerStatus } from './status.ts'
 export {
   dockerEnsureInstalledResult,
   dockerRuntimeReady,

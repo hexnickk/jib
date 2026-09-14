@@ -21,6 +21,7 @@ import initCommand from './cmd/init.ts'
 import lifecycleCommands from './cmd/lifecycle.ts'
 import logsCommand from './cmd/logs.ts'
 import migrateCommand from './cmd/migrate.ts'
+import notificationsCommand from './cmd/notifications.ts'
 import removeCommand from './cmd/remove.ts'
 import runCommand from './cmd/run.ts'
 import sourcesCommands from './cmd/sources.ts'
@@ -46,6 +47,7 @@ const cliCommands = [
   ...sourcesCommands,
   ...envCommands,
   ...cloudflaredCommands,
+  notificationsCommand,
 ]
 
 const SHARED_FILE_UMASK = 0o002

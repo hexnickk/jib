@@ -3,6 +3,7 @@ import { type App, configLoad, configWrite } from '@jib/config'
 import type { ComposeInspection } from '@jib/docker'
 import { CancelledError, InternalError, type JibError, errorsToJibError } from '@jib/errors'
 import { ingressClaim, ingressCreateOperator } from '@jib/ingress'
+import { type Logger, loggingCreateLogger } from '@jib/logging'
 import { pathsManagedComposePath } from '@jib/paths'
 import { secretsRemove, secretsUpsert } from '@jib/secrets'
 import { sourcesCloneForInspection, sourcesRemoveCheckout } from '@jib/sources'
@@ -17,6 +18,7 @@ import type { AddFlowObserver, AddFlowParams, AddFlowResult, GuidedInputs } from
 interface AddRunContext {
   readonly params: AddFlowParams
   readonly observer: AddFlowObserver
+  readonly log: Logger
   inspection: ComposeInspection
   workdir: string
   guided: GuidedInputs
@@ -32,6 +34,7 @@ export async function addRun(
   const state: AddRunContext = {
     params: ctx,
     observer,
+    log: loggingCreateLogger('add'),
     inspection: { composeFiles: [], services: [] },
     workdir: '',
     guided: { domains: [], configEntries: [] },
@@ -56,7 +59,6 @@ export async function addRun(
     {
       signal: ctx.signal ?? { cancelled: false },
       cancelled: () => new CancelledError('add cancelled'),
-      warn: (message) => observer.warn?.(message),
     },
   )
   if (error) {
@@ -199,9 +201,7 @@ const writeConfigStep: Step<AddRunContext, undefined, JibError> = {
     const current = await configLoad(ctx.params.configFile)
     const loaded = current instanceof Error ? ctx.params.cfg : current
     if (current instanceof Error) {
-      ctx.observer.warn?.(
-        `config cleanup load: ${current.message}; falling back to original snapshot`,
-      )
+      ctx.log.warn(`config cleanup load: ${current.message}; falling back to original snapshot`)
     }
     const rollbackApps = { ...loaded.apps }
     delete rollbackApps[ctx.params.appName]
@@ -279,10 +279,10 @@ async function cleanupWrittenSecrets(ctx: AddRunContext, keys: readonly string[]
     try {
       const error = await secretsRemove(ctx.params.paths.secretsDir, ctx.params.appName, key)
       if (error instanceof Error) {
-        ctx.observer.warn?.(`secret cleanup (${key}): ${error.message}`)
+        ctx.log.warn(`secret cleanup (${key}): ${error.message}`)
       }
     } catch (error) {
-      ctx.observer.warn?.(
+      ctx.log.warn(
         `secret cleanup (${key}): ${error instanceof Error ? error.message : String(error)}`,
       )
     }

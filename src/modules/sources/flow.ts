@@ -1,6 +1,7 @@
 import { type Config, configLoad } from '@jib/config'
 import { CancelledError, type JibError, ValidationError, errorsToJibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
+import { tuiIsInteractive, tuiPromptConfirmResult, tuiPromptSelectResult } from '@jib/tui'
 import {
   sourcesAvailableSetupOptions,
   sourcesConfiguredOptions,
@@ -9,158 +10,98 @@ import {
   sourcesRunSetup,
 } from './recovery.ts'
 import { sourcesProbe } from './service.ts'
-import type { SourceProbe, SourceTarget } from './types.ts'
-
-type SourceChoice = `existing:${string}` | `setup:${string}`
-
-export interface SourceRecoveryDeps {
-  isInteractive?: () => boolean
-  loadConfig?: (configFile: string) => Promise<Config | JibError>
-  probe?: typeof sourcesProbe
-  promptSelect?: (opts: {
-    message: string
-    options: { value: SourceChoice; label: string; hint?: string }[]
-    initialValue?: SourceChoice
-  }) => Promise<SourceChoice | JibError>
-  promptConfirm?: (opts: { message: string; initialValue?: boolean }) => Promise<boolean | JibError>
-  runSetup?: (cfg: Config, paths: Paths, value: string) => Promise<string | null>
-}
-
-/** Checks whether an error represents an authentication failure for the selected repository. */
-export function sourcesIsAuthFailure(repo: string, error: unknown): boolean {
-  return sourcesRepoHasAuthFailure(repo, error)
-}
+import type { SourceSelectOption, SourceTarget } from './types.ts'
 
 /** Builds choices from configured sources and source drivers that can be set up. */
-export function sourcesBuildChoices(
-  cfg: Config,
-): { value: SourceChoice; label: string; hint?: string }[] {
-  const existing = sourcesConfiguredOptions(cfg) as {
-    value: SourceChoice
-    label: string
-    hint?: string
-  }[]
-  const setup = sourcesAvailableSetupOptions().map((option) => ({
-    value: `setup:${option.value}` as const,
-    label: `Set up new ${option.label}`,
-  }))
-  return [...existing, ...setup]
+export function sourcesBuildChoices(cfg: Config): SourceSelectOption[] {
+  return [
+    ...sourcesConfiguredOptions(cfg),
+    ...sourcesAvailableSetupOptions().map((option) => ({
+      value: `setup:${option.value}`,
+      label: `Set up new ${option.label}`,
+    })),
+  ]
 }
 
-/** Prompts for a source driver setup when more than one setup option exists. */
-export async function sourcesSetupRef(
-  cfg: Config,
-  paths: Paths,
-  deps: Pick<SourceRecoveryDeps, 'promptSelect' | 'runSetup'> = {},
-): Promise<string | JibError | null> {
-  const setupOptions = sourcesAvailableSetupOptions()
-  if (setupOptions.length === 0) {
+/** Owns driver selection and setup prompts; callers only provide application context. */
+export async function sourcesSetupRef(ctx: {
+  cfg: Config
+  paths: Paths
+}): Promise<string | JibError | null> {
+  const options = sourcesAvailableSetupOptions()
+  if (options.length === 0) {
     return null
   }
-  if (setupOptions.length === 1) {
-    const setupOption = setupOptions[0]
-    if (!setupOption) {
-      return null
-    }
-    return await (deps.runSetup ?? sourcesRunSetup)(cfg, paths, setupOption.value)
+  const only = options.length === 1 ? options[0] : undefined
+  if (only) {
+    return sourcesRunSetup(ctx.cfg, ctx.paths, only.value)
   }
-  if (!deps.promptSelect) {
+  if (!tuiIsInteractive()) {
     return new ValidationError(
       'missing source setup selection; rerun with interactive prompts enabled',
     )
   }
-
-  const choice = await deps.promptSelect({
+  const choice = await tuiPromptSelectResult({
     message: 'What kind of source would you like to set up?',
-    options: setupOptions.map((option) => ({
-      value: `setup:${option.value}` as const,
-      label: option.label,
-    })),
+    options,
   })
-  if (choice instanceof Error) {
-    return choice
-  }
-  if (!choice.startsWith('setup:')) {
-    return null
-  }
-  return (deps.runSetup ?? sourcesRunSetup)(cfg, paths, choice.slice('setup:'.length))
+  return choice instanceof Error ? choice : sourcesRunSetup(ctx.cfg, ctx.paths, choice)
 }
 
-/** Probes a chosen source and offers interactive recovery for authentication failures. */
+/** Probes a chosen source and owns interactive recovery for authentication failures. */
 export async function sourcesPreflightSelection(
   ctx: { cfg: Config; paths: Paths },
   selection: SourceTarget & { repo: string },
-  deps: SourceRecoveryDeps = {},
 ): Promise<{ cfg: Config; source?: string; branch: string } | JibError> {
-  const { cfg, paths } = ctx
-  const { app: appName, repo, source: currentSource, branch: currentBranch } = selection
-  let resolvedCfg = cfg
-  let source = currentSource
-  const runProbe = deps.probe ?? sourcesProbe
-
+  const { paths } = ctx
+  let cfg = ctx.cfg
+  let source = selection.source
   for (;;) {
-    const target: SourceTarget = {
-      app: appName,
-      repo,
-      ...(currentBranch ? { branch: currentBranch } : {}),
+    const probe = await sourcesProbe(cfg, paths, {
+      app: selection.app,
+      repo: selection.repo,
+      ...(selection.branch ? { branch: selection.branch } : {}),
       ...(source ? { source } : {}),
+    }).catch(errorsToJibError)
+    if (!(probe instanceof Error)) {
+      const branch = probe?.branch ?? selection.branch ?? 'main'
+      return source ? { cfg, source, branch } : { cfg, branch }
     }
-    let probeResult: SourceProbe | JibError | null
-    try {
-      probeResult = await runProbe(resolvedCfg, paths, target)
-    } catch (error) {
-      probeResult = errorsToJibError(error)
+    const next = await recover({ cfg, paths }, { repo: selection.repo, source }, probe)
+    if (next instanceof Error) {
+      return next
     }
-    if (!(probeResult instanceof Error)) {
-      const branch = probeResult?.branch ?? currentBranch ?? 'main'
-      return source ? { cfg: resolvedCfg, source, branch } : { cfg: resolvedCfg, branch }
+    if (!next) {
+      return probe
     }
-
-    const nextSource = await sourcesMaybeRecover(
-      { cfg: resolvedCfg, paths },
-      { repo, source },
-      probeResult,
-      deps,
-    )
-    if (nextSource instanceof Error) {
-      return nextSource
-    }
-    if (!nextSource) {
-      return probeResult
-    }
-
-    source = nextSource
-    const reloaded = await (deps.loadConfig ?? configLoad)(paths.configFile)
+    source = next
+    const reloaded = await configLoad(paths.configFile)
     if (reloaded instanceof Error) {
       return reloaded
     }
-    resolvedCfg = reloaded
+    cfg = reloaded
   }
 }
 
-/** Attempts interactive source recovery and returns a replacement source or no recovery. */
-export async function sourcesMaybeRecover(
+async function recover(
   ctx: { cfg: Config; paths: Paths },
   selection: Pick<SourceTarget, 'source'> & { repo: string },
-  error: unknown,
-  deps: SourceRecoveryDeps = {},
+  error: JibError,
 ): Promise<string | JibError | null> {
   const { cfg, paths } = ctx
-  const { repo, source: currentSource } = selection
-  const interactive = deps.isInteractive?.() ?? false
-  if (!interactive || !sourcesRepoSupportsRecovery(repo) || !sourcesIsAuthFailure(repo, error)) {
+  const { repo, source } = selection
+  if (
+    !tuiIsInteractive() ||
+    !sourcesRepoSupportsRecovery(repo) ||
+    !sourcesRepoHasAuthFailure(repo, error)
+  ) {
     return null
   }
-  if (!deps.promptSelect) {
-    return null
-  }
-
-  const hasCurrentSource = currentSource ? cfg.sources[currentSource] !== undefined : false
-  const choice = await deps.promptSelect({
+  const choice = await tuiPromptSelectResult({
     message:
       'Repo access failed. Choose an existing source or set up a new one, then retry the clone.',
     options: sourcesBuildChoices(cfg),
-    ...(hasCurrentSource ? { initialValue: `existing:${currentSource}` as SourceChoice } : {}),
+    ...(source && cfg.sources[source] ? { initialValue: `existing:${source}` } : {}),
   })
   if (choice instanceof Error) {
     return choice
@@ -168,20 +109,11 @@ export async function sourcesMaybeRecover(
   if (choice.startsWith('existing:')) {
     return choice.slice('existing:'.length)
   }
-  if (!choice.startsWith('setup:')) {
-    return null
-  }
-
-  const created = await (deps.runSetup ?? sourcesRunSetup)(
-    cfg,
-    paths,
-    choice.slice('setup:'.length),
-  )
+  const created = await sourcesRunSetup(cfg, paths, choice.slice('setup:'.length))
   if (!created) {
     return new CancelledError('source setup did not complete; add cancelled')
   }
-
-  const confirmed = await (deps.promptConfirm ?? (async () => true))({
+  const confirmed = await tuiPromptConfirmResult({
     message: `After finishing setup for "${created}", retry the clone now?`,
     initialValue: true,
   })

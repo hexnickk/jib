@@ -4,7 +4,6 @@ import { type ComposeInspection, dockerResolveFromCompose } from '@jib/docker'
 import { type JibError, ValidationError } from '@jib/errors'
 import { pathsDockerHubImage } from '@jib/paths'
 import type { Paths } from '@jib/paths'
-import { consola } from 'consola'
 import { addParseApp } from './app.ts'
 import { GENERATED_COMPOSE_FILE, addPersistGeneratedCompose } from './compose-scaffold.ts'
 import { addMergeConfigEntries } from './config-entries.ts'
@@ -71,7 +70,7 @@ export async function addBuildResolvedApp(
   if (parsedApp instanceof Error) {
     return parsedApp
   }
-  return dockerResolveFromCompose(parsedApp, workdir, (message) => consola.warn(message))
+  return dockerResolveFromCompose(parsedApp, workdir)
 }
 
 /** Ensures tunnel routes have both desired module enablement and a managed token. */

@@ -1,9 +1,6 @@
 import { cliCanPrompt, cliCreateMissingInputError } from '@jib/cli'
 import { configLoadAppContext } from '@jib/config'
-import type { JibError } from '@jib/errors'
-import { ingressCreateOperator, ingressRelease } from '@jib/ingress'
-import type { Paths } from '@jib/paths'
-import { tuiPromptConfirmResult, tuiSpinner } from '@jib/tui'
+import { tuiPromptConfirmResult } from '@jib/tui'
 import { consola } from 'consola'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
 import { removeApp } from '@/flows/remove/index.ts'
@@ -50,33 +47,11 @@ async function removeRunCommand(args: ArgumentsCamelCase<{ app: string; force?: 
     }
   }
 
-  const result = await removeApp(
-    {
-      paths,
-      releaseIngress: (nextAppName) => removeReleaseIngress(paths, nextAppName),
-      warn: (message) => consola.warn(message),
-    },
-    { appName, cfg, configFile: paths.configFile, quiet: false },
-  )
+  const result = await removeApp({ paths, cfg }, appName)
   if (result instanceof Error) {
     return result
   }
   consola.success(`removed ${appName}`)
-}
-
-/** Releases managed ingress while mirroring progress through the CLI spinner. */
-async function removeReleaseIngress(paths: Paths, app: string): Promise<undefined | JibError> {
-  const progress = tuiSpinner()
-  progress.start(`releasing ingress for ${app}`)
-  const error = await ingressRelease(ingressCreateOperator(paths), app, (update) =>
-    progress.message(update.message),
-  )
-  if (error instanceof Error) {
-    progress.stop('ingress release failed')
-    return error
-  }
-  progress.stop('ingress released')
-  return undefined
 }
 
 export default cliRemoveCommand
