@@ -46,14 +46,6 @@ export function addUnionScopes(left: ConfigScope, right: ConfigScope): ConfigSco
     : 'build'
 }
 
-/** Infers the narrowest scope that covers the observed runtime/build usage. */
-export function addInferScope(runtimeRef: boolean, buildRef: boolean): ConfigScope {
-  if (runtimeRef && buildRef) {
-    return 'both'
-  }
-  return buildRef ? 'build' : 'runtime'
-}
-
 /** Formats a scope label for interactive add-flow prompts. */
 export function addScopeLabel(scope: ConfigScope): string {
   switch (scope) {

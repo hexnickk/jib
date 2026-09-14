@@ -8,8 +8,8 @@ import { consola } from 'consola'
 import { addParseApp } from './app.ts'
 import { GENERATED_COMPOSE_FILE, addPersistGeneratedCompose } from './compose-scaffold.ts'
 import { addMergeConfigEntries } from './config-entries.ts'
+import { addPromptForConfig } from './config-prompts.ts'
 import { addCollectDomains } from './domains.ts'
-import { addMergeGuidedServiceAnswers } from './guided.ts'
 import { addPromptForServices } from './service-prompts.ts'
 import type { AddInputs, AddResolveInput, ConfigEntry } from './types.ts'
 
@@ -23,19 +23,19 @@ export async function addCollectGuidedInputs(
   if (domains instanceof Error) {
     return domains
   }
-  const answers = await addPromptForServices(domains, composeServices)
-  if (answers instanceof Error) {
-    return answers
+  const guidedDomains = await addPromptForServices(domains, composeServices, inputs.ingressDefault)
+  if (guidedDomains instanceof Error) {
+    return guidedDomains
   }
-  const guided = addMergeGuidedServiceAnswers(domains, serviceNames, answers, inputs.ingressDefault)
-  if (guided instanceof Error) {
-    return guided
+  const appEntries = await addPromptForConfig(composeServices, inputs.configEntries)
+  if (appEntries instanceof Error) {
+    return appEntries
   }
-  const configEntries = addMergeConfigEntries([...inputs.configEntries, ...guided.configEntries])
+  const configEntries = addMergeConfigEntries([...inputs.configEntries, ...appEntries])
   if (configEntries instanceof Error) {
     return configEntries
   }
-  return { domains: guided.domains, configEntries }
+  return { domains: guidedDomains, configEntries }
 }
 
 /** Builds the fully resolved app config once compose inspection and prompts are done. */

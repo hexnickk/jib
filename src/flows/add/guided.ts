@@ -2,22 +2,13 @@ import type { CliIssue } from '@jib/cli'
 import type { ParsedDomain } from '@jib/config'
 import { type ComposeService, dockerHasPublishedPorts, dockerInferContainerPort } from '@jib/docker'
 import { ValidationError } from '@jib/errors'
-import { addInferScope, addMergeConfigEntries } from './config-entries.ts'
+import { addUnionScopes } from './config-entries.ts'
 import type { ConfigEntry, ConfigScope, EnvEntry } from './types.ts'
 
 export interface AddServiceSummary {
   name: string
   inferredContainerPort?: number
   publishesPorts: boolean
-  envRefs?: string[]
-  buildArgRefs?: string[]
-}
-
-export interface GuidedServiceAnswer {
-  service: string
-  expose?: boolean
-  domainHosts?: string[]
-  configEntries?: ConfigEntry[]
 }
 
 /** Splits comma-separated user input into trimmed non-empty values. */
@@ -51,8 +42,6 @@ export function addSummarizeComposeServices(services: ComposeService[]): AddServ
       name: service.name,
       ...(inferredContainerPort !== undefined ? { inferredContainerPort } : {}),
       publishesPorts: dockerHasPublishedPorts(service),
-      ...(service.envRefs.length > 0 ? { envRefs: service.envRefs } : {}),
-      ...(service.buildArgRefs.length > 0 ? { buildArgRefs: service.buildArgRefs } : {}),
     }
   })
 }
@@ -89,58 +78,18 @@ export function addAssignCliDomainsToServices(
   return { domains: nextDomains, issues }
 }
 
-/** Infers the config scopes referenced by one summarized compose service. */
-export function addDetectedConfigScopes(service: AddServiceSummary): Map<string, ConfigScope> {
+/** Deduplicates app variables and combines runtime/build usage across all services. */
+export function addDetectedConfigScopes(services: ComposeService[]): Map<string, ConfigScope> {
   const out = new Map<string, ConfigScope>()
-  for (const key of service.envRefs ?? []) {
-    out.set(key, addInferScope(true, out.has(key)))
-  }
-  for (const key of service.buildArgRefs ?? []) {
-    const prior = out.get(key)
-    out.set(key, addInferScope(prior === 'runtime' || prior === 'both', true))
+  for (const service of services) {
+    for (const key of service.envRefs) {
+      out.set(key, addUnionScopes(out.get(key) ?? 'runtime', 'runtime'))
+    }
+    for (const key of service.buildArgRefs) {
+      out.set(key, addUnionScopes(out.get(key) ?? 'build', 'build'))
+    }
   }
   return out
-}
-
-/** Merges guided prompt answers back into final domains and config entries. */
-export function addMergeGuidedServiceAnswers(
-  existingDomains: ParsedDomain[],
-  serviceNames: string[],
-  answers: GuidedServiceAnswer[],
-  ingressDefault: string,
-): { domains: ParsedDomain[]; configEntries: ConfigEntry[] } | ValidationError {
-  const knownServices = new Set(serviceNames)
-  const domains: ParsedDomain[] = [...existingDomains]
-  const configEntries: ConfigEntry[] = []
-  const servicesWithDomains = new Set(
-    existingDomains.flatMap((domain) => (domain.service ? [domain.service] : [])),
-  )
-
-  for (const answer of answers) {
-    if (!knownServices.has(answer.service)) {
-      continue
-    }
-    configEntries.push(...(answer.configEntries ?? []))
-    if (!answer.expose || servicesWithDomains.has(answer.service)) {
-      continue
-    }
-    for (const host of answer.domainHosts ?? []) {
-      domains.push({
-        host,
-        service: answer.service,
-        ...(ingressDefault !== 'direct' ? { ingress: 'cloudflare-tunnel' as const } : {}),
-      })
-    }
-    if ((answer.domainHosts?.length ?? 0) > 0) {
-      servicesWithDomains.add(answer.service)
-    }
-  }
-
-  const merged = addMergeConfigEntries(configEntries)
-  if (merged instanceof Error) {
-    return merged
-  }
-  return { domains, configEntries: merged }
 }
 
 /** Renders the final add plan summary shown before config is written. */
@@ -171,12 +120,4 @@ export function addRenderPlanSummary(input: {
     )
   }
   return lines.join('\n')
-}
-
-/** Chooses the default exposure suggestion for one service in the guided flow. */
-export function addShouldDefaultExposeService(
-  _service: AddServiceSummary,
-  totalServices: number,
-): boolean {
-  return totalServices === 1
 }
