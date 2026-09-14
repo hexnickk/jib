@@ -47,17 +47,6 @@ export function sourcesBuildChoices(
   return [...existing, ...setup]
 }
 
-/** Runs a concrete setup choice like `setup:github` and returns the created source name. */
-async function sourcesCreateSetupRef(
-  choice: Extract<SourceChoice, `setup:${string}`>,
-  cfg: Config,
-  paths: Paths,
-  deps: Pick<SourceRecoveryDeps, 'runSetup'>,
-): Promise<string | null> {
-  const setupValue = choice.slice('setup:'.length)
-  return await (deps.runSetup ?? sourcesRunSetup)(cfg, paths, setupValue)
-}
-
 /** Prompts for a source driver setup when more than one setup option exists. */
 export async function sourcesSetupRef(
   cfg: Config,
@@ -94,12 +83,7 @@ export async function sourcesSetupRef(
   if (!choice.startsWith('setup:')) {
     return null
   }
-  return await sourcesCreateSetupRef(
-    choice as Extract<SourceChoice, `setup:${string}`>,
-    cfg,
-    paths,
-    deps,
-  )
+  return (deps.runSetup ?? sourcesRunSetup)(cfg, paths, choice.slice('setup:'.length))
 }
 
 /** Probes a chosen source and offers interactive recovery for authentication failures. */
@@ -121,7 +105,12 @@ export async function sourcesPreflightSelection(
       ...(currentBranch ? { branch: currentBranch } : {}),
       ...(source ? { source } : {}),
     }
-    const probeResult = await readSourceProbe(runProbe, resolvedCfg, paths, target)
+    let probeResult: SourceProbe | JibError | null
+    try {
+      probeResult = await runProbe(resolvedCfg, paths, target)
+    } catch (error) {
+      probeResult = errorsToJibError(error)
+    }
     if (!(probeResult instanceof Error)) {
       const branch = probeResult?.branch ?? currentBranch ?? 'main'
       return source ? { cfg: resolvedCfg, source, branch } : { cfg: resolvedCfg, branch }
@@ -183,11 +172,10 @@ export async function sourcesMaybeRecover(
     return null
   }
 
-  const created = await sourcesCreateSetupRef(
-    choice as Extract<SourceChoice, `setup:${string}`>,
+  const created = await (deps.runSetup ?? sourcesRunSetup)(
     cfg,
     paths,
-    deps,
+    choice.slice('setup:'.length),
   )
   if (!created) {
     return new CancelledError('source setup did not complete; add cancelled')
@@ -201,18 +189,4 @@ export async function sourcesMaybeRecover(
     return confirmed
   }
   return confirmed ? created : new CancelledError('add cancelled')
-}
-
-/** Converts an unexpected probe throw to a shared result error. */
-async function readSourceProbe(
-  probe: typeof sourcesProbe,
-  cfg: Config,
-  paths: Paths,
-  target: SourceTarget,
-): Promise<SourceProbe | JibError | null> {
-  try {
-    return await probe(cfg, paths, target)
-  } catch (error) {
-    return errorsToJibError(error)
-  }
 }

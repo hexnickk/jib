@@ -1,6 +1,6 @@
-import { type App, configLoadAppContext } from '@jib/config'
+import { configLoadContext } from '@jib/config'
 import { InternalError, type JibError, NotFoundError, ValidationError } from '@jib/errors'
-import { type Paths, pathsRepoPath } from '@jib/paths'
+import { pathsRepoPath } from '@jib/paths'
 import { dockerComposeFor } from './compose-for.ts'
 import { dockerInspectComposeApp } from './resolve.ts'
 
@@ -51,39 +51,37 @@ export function dockerParseRunArgs(raw: string[]): ExecParts | ValidationError {
   return { app: app as string, service: (before[0] ?? '') as string, cmd: after }
 }
 
-/** Chooses the target service when the user omitted it and compose only has one service. */
-function resolveServiceResult(
-  requested: string,
-  appName: string,
-  appCfg: App,
-  paths: Paths,
-): string | ValidationError {
-  if (requested) {
-    return requested
+/** Executes a command in an existing app container. */
+export async function dockerExecApp(parts: ExecParts): Promise<JibError | undefined> {
+  const resolved = await resolveShell(parts)
+  if (resolved instanceof Error) {
+    return resolved
   }
-  const dir = pathsRepoPath(paths, appName, appCfg.repo)
-  const inspection = dockerInspectComposeApp(appCfg, dir)
-  if (inspection instanceof Error) {
-    return inspection
+  const error = await resolved.compose.exec(resolved.service, parts.cmd)
+  if (error) {
+    return new InternalError(`exec failed for app "${parts.app}": ${error.message}`, {
+      cause: error,
+    })
   }
-  const services = inspection.services
-  if (services.length === 1) {
-    return services[0]?.name ?? ''
-  }
-  if (services.length === 0) {
-    return new ValidationError(`app "${appName}" has no services in its compose file`)
-  }
-  return new ValidationError(
-    `app "${appName}" has multiple services (${services.map((service) => service.name).join(', ')}); specify one explicitly`,
-  )
 }
 
-/** Resolves app + service selection for `jib exec` / `jib run` and performs the compose action. */
-export async function dockerHandleShell(
-  parts: ExecParts,
-  mode: 'exec' | 'run',
-): Promise<JibError | undefined> {
-  const loaded = await configLoadAppContext(parts.app)
+/** Runs a one-off app container, using its default command when none is supplied. */
+export async function dockerRunApp(parts: ExecParts): Promise<JibError | undefined> {
+  const resolved = await resolveShell(parts)
+  if (resolved instanceof Error) {
+    return resolved
+  }
+  const error = await resolved.compose.run(resolved.service, parts.cmd)
+  if (error) {
+    return new InternalError(`run failed for app "${parts.app}": ${error.message}`, {
+      cause: error,
+    })
+  }
+}
+
+/** Loads the app's Compose runner and resolves an omitted service without starting containers. */
+async function resolveShell(parts: ExecParts) {
+  const loaded = await configLoadContext()
   if (loaded instanceof Error) {
     return loaded
   }
@@ -92,19 +90,24 @@ export async function dockerHandleShell(
   if (!appCfg) {
     return new NotFoundError(`app "${parts.app}" not found in config`)
   }
-  const service = resolveServiceResult(parts.service, parts.app, appCfg, paths)
-  if (service instanceof Error) {
-    return service
+  let service = parts.service
+  if (!service) {
+    const dir = pathsRepoPath(paths, parts.app, appCfg.repo)
+    const inspection = dockerInspectComposeApp(dir, appCfg.compose)
+    if (inspection instanceof Error) {
+      return inspection
+    }
+    const services = inspection.services
+    if (services.length > 1) {
+      return new ValidationError(
+        `app "${parts.app}" has multiple services (${services.map((entry) => entry.name).join(', ')}); specify one explicitly`,
+      )
+    }
+    service = services[0]?.name ?? ''
   }
   const compose = dockerComposeFor(cfg, paths, parts.app)
   if (compose instanceof Error) {
     return compose
   }
-  const commandError =
-    mode === 'exec' ? await compose.exec(service, parts.cmd) : await compose.run(service, parts.cmd)
-  if (commandError) {
-    return new InternalError(`${mode} failed for app "${parts.app}": ${commandError.message}`, {
-      cause: commandError,
-    })
-  }
+  return { compose, service }
 }

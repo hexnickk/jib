@@ -55,7 +55,7 @@ async function initRunCommand(args: ArgumentsCamelCase<{ check?: boolean }>) {
   const config = await initReconcileOptionalModules(
     loaded,
     paths,
-    args.check ? { writeConfig: async () => undefined } : {},
+    args.check ? async () => undefined : undefined,
   )
   if (config instanceof Error) {
     return config

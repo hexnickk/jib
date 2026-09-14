@@ -4,7 +4,6 @@ import { InternalError, type JibError } from '@jib/errors'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
 import { sourcesProbe, sourcesSync } from '@jib/sources'
-import { stateCreateStore } from '@jib/state'
 /** Parses `poll_interval`, defaulting to 5 minutes only for invalid raw strings. */
 export function watcherParsePollInterval(raw: string): number {
   return configParseDuration(raw) ?? 5 * 60_000
@@ -96,11 +95,11 @@ async function deployPreparedApp(
     {
       config: cfg,
       paths,
-      store: stateCreateStore(paths.stateDir),
+      stateDir: paths.stateDir,
       log,
     },
     { app: appName, workdir: prepared.workdir, sha: prepared.sha, trigger: 'auto' },
-    { emit: (step, message) => log.info(`${appName}: ${step}: ${message}`) },
+    (step, message) => log.info(`${appName}: ${step}: ${message}`),
   )
   return result instanceof Error
     ? new InternalError(`deploy ${appName}: ${result.message}`, { cause: result })

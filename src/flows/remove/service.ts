@@ -5,7 +5,7 @@ import { type JibError, NotFoundError } from '@jib/errors'
 import { type Paths, pathsManagedComposePath } from '@jib/paths'
 import { secretsRemoveApp } from '@jib/secrets'
 import { sourcesRemoveCheckout } from '@jib/sources'
-import { stateCreateStore, stateRemove } from '@jib/state'
+import { stateRemove } from '@jib/state'
 
 interface RemoveContext {
   paths: Paths
@@ -20,7 +20,6 @@ export async function removeApp(
 ): Promise<JibError | undefined> {
   const { paths } = ctx
   const { appName, cfg, configFile, quiet } = params
-  const store = stateCreateStore(paths.stateDir)
   const appCfg = cfg.apps[appName]
   if (!appCfg) {
     return new NotFoundError(`app "${appName}" not found in config`)
@@ -44,8 +43,8 @@ export async function removeApp(
   }
 
   await runBestEffort(ctx, 'repo cleanup', () => sourcesRemoveCheckout(paths, appName, appCfg.repo))
-  await runBestEffort(ctx, 'secrets cleanup', () => secretsRemoveApp(paths, appName))
-  await runBestEffort(ctx, 'state cleanup', () => stateRemove(store, appName))
+  await runBestEffort(ctx, 'secrets cleanup', () => secretsRemoveApp(paths.secretsDir, appName))
+  await runBestEffort(ctx, 'state cleanup', () => stateRemove(paths.stateDir, appName))
   await runBestEffort(ctx, 'override cleanup', () =>
     rm(dockerOverridePath(paths.overridesDir, appName), { force: true }),
   )

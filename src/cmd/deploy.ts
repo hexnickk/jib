@@ -6,7 +6,7 @@ import { cmdCreateHandler } from './handler.ts'
 
 const cliDeployCommand = {
   command: 'deploy <app>',
-  describe: 'Build and deploy an app',
+  describe: 'Sync source, build and deploy an app',
   builder: {
     ref: { type: 'string', description: 'Git ref (SHA, branch, tag)' },
   },

@@ -13,20 +13,18 @@ import pkg from '../package.json' with { type: 'json' }
 import addCommand from './cmd/add.ts'
 import cloudflaredCommands from './cmd/cloudflared.ts'
 import deployCommand from './cmd/deploy.ts'
-import downCommand from './cmd/down.ts'
 import envCommands from './cmd/env.ts'
 import execCommand from './cmd/exec.ts'
 import { cmdExitError } from './cmd/handler.ts'
 import ingressCommands from './cmd/ingress.ts'
 import initCommand from './cmd/init.ts'
+import lifecycleCommands from './cmd/lifecycle.ts'
 import logsCommand from './cmd/logs.ts'
 import migrateCommand from './cmd/migrate.ts'
 import removeCommand from './cmd/remove.ts'
-import restartCommand from './cmd/restart.ts'
 import runCommand from './cmd/run.ts'
 import sourcesCommands from './cmd/sources.ts'
 import statusCommand from './cmd/status.ts'
-import upCommand from './cmd/up.ts'
 import updateCommand from './cmd/update.ts'
 import watchCommand from './cmd/watch.ts'
 
@@ -38,9 +36,7 @@ const cliCommands = [
   addCommand,
   removeCommand,
   deployCommand,
-  upCommand,
-  downCommand,
-  restartCommand,
+  ...lifecycleCommands,
   execCommand,
   runCommand,
   logsCommand,

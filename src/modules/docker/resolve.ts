@@ -29,10 +29,10 @@ export function dockerDiscoverComposeFiles(workdir: string): string[] {
 
 /** Resolves the compose files for one app and parses their merged service list. */
 export function dockerInspectComposeApp(
-  appCfg: Pick<App, 'compose'>,
   workdir: string,
+  declaredFiles: string[] = [],
 ): ComposeInspection | ValidationError {
-  const composeFiles = resolveComposeFiles(workdir, appCfg.compose ?? [])
+  const composeFiles = resolveComposeFiles(workdir, declaredFiles)
   if (composeFiles instanceof Error) {
     return composeFiles
   }
@@ -54,9 +54,9 @@ export function dockerInspectComposeApp(
 export function dockerResolveFromCompose(
   appCfg: App,
   workdir: string,
-  opts: { warn?: (message: string) => void } = {},
+  warn?: (message: string) => void,
 ): App | ValidationError {
-  const inspection = dockerInspectComposeApp(appCfg, workdir)
+  const inspection = dockerInspectComposeApp(workdir, appCfg.compose)
   if (inspection instanceof Error) {
     return inspection
   }
@@ -83,12 +83,18 @@ export function dockerResolveFromCompose(
     if (dockerHasPublishedPorts(service)) {
       publishing.set(service.name, service)
     }
-    const containerPort = domain.container_port ?? resolvePort(service, opts.warn)
+    let containerPort = domain.container_port ?? dockerInferContainerPort(service)
+    if (containerPort === undefined) {
+      warn?.(
+        `could not infer container port for service "${service.name}"; defaulting to ${FALLBACK_CONTAINER_PORT}`,
+      )
+      containerPort = FALLBACK_CONTAINER_PORT
+    }
     nextDomains.push({ ...domain, service: service.name, container_port: containerPort })
   }
 
   if (publishing.size > 0) {
-    warnPublished(publishing, nextDomains, opts.warn)
+    warnPublished(publishing, nextDomains, warn)
   }
   return { ...appCfg, domains: nextDomains }
 }
@@ -109,18 +115,6 @@ function resolveComposeFiles(workdir: string, composeFiles: string[]): Validatio
     return [discovered[0] as string]
   }
   return new ValidationError('no compose file found in the repo root')
-}
-
-/** Picks the inferred container port for one service, defaulting to `80` when compose is silent. */
-function resolvePort(service: ComposeService, warn?: (message: string) => void): number {
-  const inferred = dockerInferContainerPort(service)
-  if (inferred !== undefined) {
-    return inferred
-  }
-  warn?.(
-    `could not infer container port for service "${service.name}"; defaulting to ${FALLBACK_CONTAINER_PORT}`,
-  )
-  return FALLBACK_CONTAINER_PORT
 }
 
 /** Explains when jib will replace user-declared `ports:` entries with managed ingress mappings. */

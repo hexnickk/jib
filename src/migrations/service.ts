@@ -11,9 +11,7 @@ import { migrations, runJibMigrationsResult } from './index.ts'
 
 const SESSION_RELOAD_GROUPS = [GROUP, DOCKER_GROUP]
 
-interface GroupCheckDeps {
-  run?: (args: string[]) => { exitCode: number; stdout: { toString(): string } }
-}
+type GroupCheck = (args: string[]) => { exitCode: number; stdout: { toString(): string } }
 
 export interface MigrationRunResult {
   appliedMigrations: string[]
@@ -27,14 +25,11 @@ export function hasBootstrapState(paths: Paths): boolean {
 export function userInGroup(
   user: string,
   group: string = GROUP,
-  deps: GroupCheckDeps = {},
+  run: GroupCheck = (args) => {
+    const result = $.sync`${args}`
+    return { exitCode: result.exitCode ?? 0, stdout: result.stdout }
+  },
 ): boolean {
-  const run =
-    deps.run ??
-    ((args) => {
-      const result = $.sync`${args}`
-      return { exitCode: result.exitCode ?? 0, stdout: result.stdout }
-    })
   try {
     const result = run(['id', '-nG', user])
     if (result.exitCode !== 0) {
@@ -50,12 +45,12 @@ export function userInGroup(
 export function migrationMissingUserGroups(
   user: string | undefined,
   groups: string[] = SESSION_RELOAD_GROUPS,
-  deps: GroupCheckDeps = {},
+  run?: GroupCheck,
 ): string[] {
   if (!user || user === 'root') {
     return []
   }
-  return groups.filter((group) => !userInGroup(user, group, deps))
+  return groups.filter((group) => !userInGroup(user, group, run))
 }
 
 /** Runs all pending migrations and returns their summary or a shared internal error. */

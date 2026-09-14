@@ -8,13 +8,9 @@ import { CLOUDFLARED_SERVICE_NAME } from './templates.ts'
 import { cloudflaredExtractTunnelToken } from './token.ts'
 
 interface ShellCommandResultLike {
-  exitCode: number
+  exitCode: number | null
   stderr: { toString(): string }
   stdout: { toString(): string }
-}
-
-interface CloudflaredEnableServiceDeps {
-  run?: () => Promise<ShellCommandResultLike>
 }
 
 export interface CloudflaredEnableServiceResult {
@@ -74,10 +70,10 @@ export async function cloudflaredEnableConfig(paths: Paths): Promise<undefined |
 
 /** Enables and starts the systemd unit without surfacing runner exceptions. */
 export async function cloudflaredEnableService(
-  deps: CloudflaredEnableServiceDeps = {},
+  run: () => Promise<ShellCommandResultLike> = () =>
+    $`sudo systemctl enable --now ${CLOUDFLARED_SERVICE_NAME}`,
 ): Promise<CloudflaredEnableServiceResult> {
   try {
-    const run = deps.run ?? (() => $`sudo systemctl enable --now ${CLOUDFLARED_SERVICE_NAME}`)
     const result = await run()
     return {
       ok: result.exitCode === 0,

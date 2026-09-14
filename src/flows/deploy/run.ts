@@ -44,7 +44,7 @@ export async function runDeploy(
     deployed = await deployApp(
       deployCreateDeps(cfg, paths),
       { app, workdir: ready.workdir, sha: ready.sha, trigger: 'manual' },
-      { emit: (step, message) => deploySpin.message(`${step}: ${message}`) },
+      (step, message) => deploySpin.message(`${step}: ${message}`),
     )
   } catch (error) {
     deploySpin.stop(`[2/2] failed to deploy ${app}`)

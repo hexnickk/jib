@@ -31,9 +31,9 @@ interface MigrationCommandResult {
   stderr: { toString(): string }
 }
 
-interface UserGroupDeps {
-  run?: (args: readonly string[]) => Promise<MigrationCommandResult> | MigrationCommandResult
-}
+type UserGroupRunner = (
+  args: readonly string[],
+) => Promise<MigrationCommandResult> | MigrationCommandResult
 
 export function buildSudoersContent(): string {
   return `# jib: allow jib group to manage jib-owned services without password
@@ -121,9 +121,8 @@ export async function writeValidatedSudoers(
  */
 export async function migrationEnsureGroupResult(
   group: string,
-  deps: UserGroupDeps = {},
+  run: UserGroupRunner = migrationRunCommand,
 ): Promise<InternalError | undefined> {
-  const run = deps.run ?? migrationRunCommand
   try {
     const groupResult = await run(['getent', 'group', group])
     if (groupResult.exitCode === 0) {
@@ -151,10 +150,9 @@ export async function migrationEnsureGroupResult(
 export async function migrationEnsureUserInGroupResult(
   user: string,
   group: string,
-  deps: UserGroupDeps = {},
+  run: UserGroupRunner = migrationRunCommand,
 ): Promise<InternalError | undefined> {
-  const run = deps.run ?? migrationRunCommand
-  const groupError = await migrationEnsureGroupResult(group, deps)
+  const groupError = await migrationEnsureGroupResult(group, run)
   if (groupError) {
     return groupError
   }

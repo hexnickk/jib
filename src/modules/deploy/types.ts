@@ -1,20 +1,18 @@
 import type { Config } from '@jib/config'
 import type { Logger } from '@jib/logging'
 import type { Paths } from '@jib/paths'
-import type { StateStore } from '@jib/state'
 
 export const MIN_DISK_BYTES = 2 * 1024 * 1024 * 1024
 
 export interface DeployDeps {
   config: Config
   paths: Paths
-  store: StateStore
+  stateDir: string
   log: Logger
 }
 
-export interface ProgressCtx {
-  emit: (step: string, message: string) => void
-}
+// Approved exception to the ctx convention: pass a single progress callback directly.
+export type DeployProgress = (step: string, message: string) => void
 
 export interface DeployCmd {
   app: string

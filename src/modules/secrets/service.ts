@@ -2,9 +2,7 @@ import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { InternalError, NotFoundError } from '@jib/errors'
 
-export interface SecretsContext {
-  secretsDir: string
-}
+// Approved exception to the ctx convention: pass the secrets directory directly.
 
 export interface AppSecretStatus {
   app: string
@@ -54,17 +52,6 @@ async function readEnvIfPresent(path: string): Promise<string | InternalError | 
   }
 }
 
-/** Ensures the per-app secrets directory exists with the managed permissions. */
-async function ensureAppDir(path: string): Promise<undefined | InternalError> {
-  try {
-    await mkdir(path, { recursive: true, mode: DIR_MODE })
-    await chmod(path, DIR_MODE)
-    return
-  } catch (error) {
-    return new InternalError(`writing secrets ${path}`, { cause: error })
-  }
-}
-
 /** Writes one managed secrets file and reapplies the expected mode. */
 async function writeSecure(path: string, content: string): Promise<undefined | InternalError> {
   try {
@@ -78,10 +65,10 @@ async function writeSecure(path: string, content: string): Promise<undefined | I
 
 /** Checks whether an app secrets file exists without treating absence as failure. */
 export async function secretsCheckApp(
-  ctx: SecretsContext,
+  secretsDir: string,
   app: string,
 ): Promise<AppSecretStatus | InternalError> {
-  const path = join(ctx.secretsDir, app, '.env')
+  const path = join(secretsDir, app, '.env')
   try {
     await stat(path)
     return { app, exists: true, path }
@@ -95,10 +82,10 @@ export async function secretsCheckApp(
 
 /** Reads one app secrets file and returns masked key previews for display. */
 export async function secretsReadMasked(
-  ctx: SecretsContext,
+  secretsDir: string,
   app: string,
 ): Promise<MaskedSecretEntry[] | InternalError | NotFoundError> {
-  const path = join(ctx.secretsDir, app, '.env')
+  const path = join(secretsDir, app, '.env')
   const content = await readEnvIfPresent(path)
   if (content instanceof Error) {
     return content
@@ -118,17 +105,19 @@ export async function secretsReadMasked(
 
 /** Inserts or updates one secret key in an app env file. */
 export async function secretsUpsert(
-  ctx: SecretsContext,
+  secretsDir: string,
   app: string,
   key: string,
   value: string,
 ): Promise<undefined | InternalError> {
-  const appDir = join(ctx.secretsDir, app)
-  const ensured = await ensureAppDir(appDir)
-  if (ensured instanceof Error) {
-    return ensured
+  const appDir = join(secretsDir, app)
+  try {
+    await mkdir(appDir, { recursive: true, mode: DIR_MODE })
+    await chmod(appDir, DIR_MODE)
+  } catch (error) {
+    return new InternalError(`writing secrets ${appDir}`, { cause: error })
   }
-  const path = join(ctx.secretsDir, app, '.env')
+  const path = join(appDir, '.env')
   const existing = await readEnvIfPresent(path)
   if (existing instanceof Error) {
     return existing
@@ -149,11 +138,11 @@ export async function secretsUpsert(
 
 /** Removes one secret key from an app env file, returning false when absent. */
 export async function secretsRemove(
-  ctx: SecretsContext,
+  secretsDir: string,
   app: string,
   key: string,
 ): Promise<boolean | InternalError> {
-  const path = join(ctx.secretsDir, app, '.env')
+  const path = join(secretsDir, app, '.env')
   const content = await readEnvIfPresent(path)
   if (content instanceof Error) {
     return content
@@ -176,10 +165,10 @@ export async function secretsRemove(
 
 /** Removes the entire managed secrets directory for one app. */
 export async function secretsRemoveApp(
-  ctx: SecretsContext,
+  secretsDir: string,
   app: string,
 ): Promise<undefined | InternalError> {
-  const path = join(ctx.secretsDir, app)
+  const path = join(secretsDir, app)
   try {
     await rm(path, { recursive: true, force: true })
     return

@@ -41,7 +41,8 @@ export {
 } from './resolve.ts'
 export {
   type ExecParts,
-  dockerHandleShell,
+  dockerExecApp,
+  dockerRunApp,
   dockerParseExecArgs,
   dockerParseRunArgs,
 } from './shell.ts'

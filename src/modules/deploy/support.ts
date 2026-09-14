@@ -3,13 +3,14 @@ import { join } from 'node:path'
 import type { App } from '@jib/config'
 import { dockerParseComposeServices, dockerWriteOverride } from '@jib/docker'
 import { InternalError, type JibError, errorsToJibError } from '@jib/errors'
+import type { Paths } from '@jib/paths'
 import { $ } from '@/libs/shell'
 import { deployBuildOverrideServices } from './override.ts'
-import type { DeployDeps } from './types.ts'
 
+// Approved exception to the ctx convention: pass a lone dependency directly.
 /** Regenerates the jib-managed compose override file for one app. */
 export async function deploySyncOverride(
-  deps: DeployDeps,
+  paths: Paths,
   app: string,
   appCfg: App,
   workdir: string,
@@ -17,7 +18,7 @@ export async function deploySyncOverride(
   try {
     const parsed = dockerParseComposeServices(workdir, appCfg.compose ?? [])
     const services = deployBuildOverrideServices(parsed, appCfg.domains)
-    await dockerWriteOverride(deps.paths.overridesDir, app, services)
+    await dockerWriteOverride(paths.overridesDir, app, services)
   } catch (error) {
     return errorsToJibError(error)
   }
@@ -25,11 +26,11 @@ export async function deploySyncOverride(
 
 /** Symlinks the managed env file into the prepared workdir when one exists. */
 export async function deployLinkSecrets(
-  deps: DeployDeps,
+  paths: Paths,
   app: string,
   workdir: string,
 ): Promise<JibError | undefined> {
-  const src = join(deps.paths.secretsDir, app, '.env')
+  const src = join(paths.secretsDir, app, '.env')
   try {
     await stat(src)
   } catch (error) {

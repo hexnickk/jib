@@ -71,7 +71,7 @@ export async function addBuildResolvedApp(
   if (parsedApp instanceof Error) {
     return parsedApp
   }
-  return dockerResolveFromCompose(parsedApp, workdir, { warn: (message) => consola.warn(message) })
+  return dockerResolveFromCompose(parsedApp, workdir, (message) => consola.warn(message))
 }
 
 /** Ensures tunnel routes have both desired module enablement and a managed token. */

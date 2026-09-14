@@ -117,7 +117,7 @@ function inspectComposeOnce(
   workdir: string,
   compose: string[] | undefined,
 ): ComposeInspection | CliError | ValidationError {
-  const inspection = dockerInspectComposeApp({ compose }, workdir)
+  const inspection = dockerInspectComposeApp(workdir, compose)
   if (inspection instanceof Error) {
     return inspection
   }

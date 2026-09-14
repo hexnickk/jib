@@ -219,7 +219,12 @@ const writeSecretsStep: Step<AddRunContext, string[], JibError> = {
     const keys: string[] = []
     for (const { key, value } of ctx.guided.configEntries) {
       try {
-        const error = await secretsUpsert(ctx.params.paths, ctx.params.appName, key, value)
+        const error = await secretsUpsert(
+          ctx.params.paths.secretsDir,
+          ctx.params.appName,
+          key,
+          value,
+        )
         if (!(error instanceof Error)) {
           keys.push(key)
           continue
@@ -272,7 +277,7 @@ const claimIngressStep: Step<AddRunContext, undefined, JibError> = {
 async function cleanupWrittenSecrets(ctx: AddRunContext, keys: readonly string[]): Promise<void> {
   for (const key of keys) {
     try {
-      const error = await secretsRemove(ctx.params.paths, ctx.params.appName, key)
+      const error = await secretsRemove(ctx.params.paths.secretsDir, ctx.params.appName, key)
       if (error instanceof Error) {
         ctx.observer.warn?.(`secret cleanup (${key}): ${error.message}`)
       }

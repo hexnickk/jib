@@ -14,6 +14,7 @@ export interface ComposeConfig {
 
 export interface UpOptions {
   services?: string[]
+  noBuild?: boolean
   buildArgs?: Record<string, string>
   quiet?: boolean
 }
@@ -28,7 +29,6 @@ export interface DockerCompose {
   ): Promise<InternalError | undefined>
   up(opts?: UpOptions): Promise<InternalError | undefined>
   down(removeVolumes?: boolean, opts?: { quiet?: boolean }): Promise<InternalError | undefined>
-  restart(services?: string[], opts?: { quiet?: boolean }): Promise<InternalError | undefined>
   exec(service: string, cmd: string[]): Promise<InternalError | undefined>
   run(service: string, cmd: string[]): Promise<InternalError | undefined>
   logs(
@@ -81,6 +81,7 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
         '-d',
         '--force-recreate',
         '--remove-orphans',
+        ...(opts.noBuild ? ['--no-build'] : []),
         ...(opts.services ?? []),
       ]
       return runResult(cfg, runner, args, {
@@ -96,14 +97,6 @@ export function dockerCreateCompose(cfg: ComposeConfig): DockerCompose {
         args.push('-v')
       }
       return runResult(cfg, runner, args, opts.quiet ? { capture: true } : {})
-    },
-    async restart(services: string[] = [], opts: { quiet?: boolean } = {}) {
-      return runResult(
-        cfg,
-        runner,
-        ['docker', ...baseArgs(), 'restart', ...services],
-        opts.quiet ? { capture: true } : {},
-      )
     },
     async exec(service: string, cmd: string[]) {
       return runResult(cfg, runner, ['docker', ...baseArgs(), 'exec', service, ...cmd], {

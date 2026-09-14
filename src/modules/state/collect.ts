@@ -3,7 +3,7 @@ import type { InternalError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 import { type SourceStatus, sourcesCollectStatuses } from '@jib/sources'
 import { $ } from '@/libs/shell'
-import { stateCreateStore, stateLoad } from './store.ts'
+import { stateLoad } from './store.ts'
 
 export interface ServiceStatus {
   name: string
@@ -70,10 +70,9 @@ export async function stateCollectApps(
   cfg: Config,
   paths: Paths,
 ): Promise<AppStatus[] | InternalError> {
-  const store = stateCreateStore(paths.stateDir)
   const results: AppStatus[] = []
   for (const [name, app] of Object.entries(cfg.apps)) {
-    const state = await stateLoad(store, name)
+    const state = await stateLoad(paths.stateDir, name)
     if (state instanceof Error) {
       return state
     }

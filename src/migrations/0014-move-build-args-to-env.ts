@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { configLoad, configWrite } from '@jib/config'
 import { InternalError, type JibError } from '@jib/errors'
-import { type SecretsContext, secretsUpsert } from '@jib/secrets'
+import { secretsUpsert } from '@jib/secrets'
 import { parse } from 'yaml'
 import type { JibMigration, MigrationContext } from './types.ts'
 
@@ -34,20 +34,20 @@ export async function moveBuildArgsToEnv(ctx: MigrationContext): Promise<JibErro
     return cfg
   }
 
-  const secrets: SecretsContext = { secretsDir: ctx.paths.secretsDir }
+  const { secretsDir } = ctx.paths
   for (const [appName, legacy] of legacyApps) {
     if (!cfg.apps[appName]) {
       continue
     }
     for (const [key, value] of Object.entries(legacy.buildArgs)) {
-      const hasKey = await envFileHasKey(secrets, appName, key)
+      const hasKey = await envFileHasKey(secretsDir, appName, key)
       if (hasKey instanceof Error) {
         return hasKey
       }
       if (hasKey) {
         continue
       }
-      const upsertError = await secretsUpsert(secrets, appName, key, value)
+      const upsertError = await secretsUpsert(secretsDir, appName, key, value)
       if (upsertError instanceof Error) {
         return upsertError
       }
@@ -104,12 +104,12 @@ function stringRecord(value: unknown): Record<string, string> | undefined {
 
 /** Returns whether an env file defines a key; a missing env file is treated as empty. */
 async function envFileHasKey(
-  secrets: SecretsContext,
+  secretsDir: string,
   appName: string,
   key: string,
 ): Promise<boolean | InternalError> {
   try {
-    const raw = await readFile(join(secrets.secretsDir, appName, '.env'), 'utf8')
+    const raw = await readFile(join(secretsDir, appName, '.env'), 'utf8')
     return raw
       .split('\n')
       .some((line) => line.trimStart().startsWith(`${key}=`) && !line.trimStart().startsWith('#'))

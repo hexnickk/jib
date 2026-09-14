@@ -3,29 +3,13 @@ import { type Config, configWrite } from '@jib/config'
 import type { JibError } from '@jib/errors'
 import type { Paths } from '@jib/paths'
 
-interface ReconcileDeps {
-  writeConfig?: (configFile: string, config: Config) => Promise<JibError | undefined>
-}
-
-/** Infers enabled optional modules from durable resources created by older installs. */
-export function initInferredOptionalModules(config: Config, paths: Paths): Record<string, true> {
-  const inferred: Record<string, true> = {}
-
-  if (config.modules.cloudflared === undefined && cloudflaredHasTunnelToken(paths)) {
-    inferred.cloudflared = true
-  }
-
-  return inferred
-}
-
 /** Persists inferred optional-module flags and returns the updated config or a typed error. */
 export async function initReconcileOptionalModules(
   config: Config,
   paths: Paths,
-  deps: ReconcileDeps = {},
+  writeConfig: (configFile: string, config: Config) => Promise<JibError | undefined> = configWrite,
 ): Promise<Config | JibError> {
-  const inferred = initInferredOptionalModules(config, paths)
-  if (Object.keys(inferred).length === 0) {
+  if (config.modules.cloudflared !== undefined || !cloudflaredHasTunnelToken(paths)) {
     return config
   }
 
@@ -33,10 +17,10 @@ export async function initReconcileOptionalModules(
     ...config,
     modules: {
       ...config.modules,
-      ...inferred,
+      cloudflared: true,
     },
   }
-  const writeResult = await (deps.writeConfig ?? configWrite)(paths.configFile, next)
+  const writeResult = await writeConfig(paths.configFile, next)
   if (writeResult instanceof Error) {
     return writeResult
   }

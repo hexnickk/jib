@@ -1,26 +1,9 @@
 import { CliError } from '@jib/cli'
 import { configLoadContext } from '@jib/config'
-import {
-  type SecretsContext,
-  secretsCheckApp,
-  secretsReadMasked,
-  secretsRemove,
-  secretsUpsert,
-} from '@jib/secrets'
+import { secretsCheckApp, secretsReadMasked, secretsRemove, secretsUpsert } from '@jib/secrets'
 import { consola } from 'consola'
 import type { ArgumentsCamelCase, CommandModule } from 'yargs'
 import { cmdCreateHandler } from './handler.ts'
-
-/** Loads the shared env command context from the managed config. */
-async function loadEnvContext() {
-  const loaded = await configLoadContext()
-  if (loaded instanceof Error) {
-    return loaded
-  }
-  const { cfg, paths } = loaded
-  const secrets: SecretsContext = { secretsDir: paths.secretsDir }
-  return { cfg, paths, secrets }
-}
 
 const cliEnvCommands = [
   {
@@ -52,11 +35,11 @@ const cliEnvCommands = [
 async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: string }>) {
   const appName = String(args.app)
   const pair = String(args.pair)
-  const loaded = await loadEnvContext()
+  const loaded = await configLoadContext()
   if (loaded instanceof Error) {
     return loaded
   }
-  const { cfg, secrets } = loaded
+  const { cfg, paths } = loaded
   const appCfg = cfg.apps[appName]
   if (!appCfg) {
     return new CliError('missing_app', `app "${appName}" not found in config`)
@@ -67,7 +50,7 @@ async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: st
   }
   const key = pair.slice(0, separator)
   const value = pair.slice(separator + 1)
-  const upsertError = await secretsUpsert(secrets, appName, key, value)
+  const upsertError = await secretsUpsert(paths.secretsDir, appName, key, value)
   if (upsertError instanceof Error) {
     return upsertError
   }
@@ -77,11 +60,11 @@ async function envSetRunCommand(args: ArgumentsCamelCase<{ app: string; pair: st
 /** Prints masked env variables for one app or all apps. */
 async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
   const requestedApp = typeof args.app === 'string' ? args.app : undefined
-  const loaded = await loadEnvContext()
+  const loaded = await configLoadContext()
   if (loaded instanceof Error) {
     return loaded
   }
-  const { cfg, secrets } = loaded
+  const { cfg, paths } = loaded
   const apps = requestedApp ? [requestedApp] : Object.keys(cfg.apps).sort()
   if (apps.length === 0) {
     consola.log('no apps configured')
@@ -99,7 +82,7 @@ async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
     if (!appCfg) {
       return new CliError('missing_app', `app "${appName}" not found in config`)
     }
-    const status = await secretsCheckApp(secrets, appName)
+    const status = await secretsCheckApp(paths.secretsDir, appName)
     if (status instanceof Error) {
       return status
     }
@@ -108,7 +91,7 @@ async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
       missingApp = true
       continue
     }
-    const entries = await secretsReadMasked(secrets, appName)
+    const entries = await secretsReadMasked(paths.secretsDir, appName)
     if (entries instanceof Error) {
       return entries
     }
@@ -135,16 +118,16 @@ async function envListRunCommand(args: ArgumentsCamelCase<{ app?: string }>) {
 async function envDeleteRunCommand(args: ArgumentsCamelCase<{ app: string; key: string }>) {
   const appName = String(args.app)
   const key = String(args.key)
-  const loaded = await loadEnvContext()
+  const loaded = await configLoadContext()
   if (loaded instanceof Error) {
     return loaded
   }
-  const { cfg, secrets } = loaded
+  const { cfg, paths } = loaded
   const appCfg = cfg.apps[appName]
   if (!appCfg) {
     return new CliError('missing_app', `app "${appName}" not found in config`)
   }
-  const removed = await secretsRemove(secrets, appName, key)
+  const removed = await secretsRemove(paths.secretsDir, appName, key)
   if (removed instanceof Error) {
     return removed
   }
